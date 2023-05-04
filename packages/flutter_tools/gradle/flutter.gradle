@@ -26,6 +26,7 @@ import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.util.VersionNumber
+import org.yaml.snakeyaml.Yaml
 
 /** For apps only. Provides the flutter extension used in app/build.gradle. */
 class FlutterExtension {
@@ -63,6 +64,7 @@ buildscript {
     dependencies {
         /* When bumping, also update ndkVersion above. */
         classpath 'com.android.tools.build:gradle:7.3.0'
+        classpath group: 'org.yaml', name: 'snakeyaml', version: '2.0'
     }
 }
 
