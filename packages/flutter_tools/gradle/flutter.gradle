@@ -969,6 +969,24 @@ class FlutterPlugin implements Plugin<Project> {
                   return
                 }
                 Task copyFlutterAssetsTask = addFlutterDeps(variant)
+                copyFlutterAssetsTask.doLast {  
+                  if (variant.flavorName != null && !variant.flavorName.isEmpty()) {
+                    def outputDir = copyFlutterAssetsTask.destinationDir
+                    def shorebirdYamlFile = new File("${outputDir}/flutter_assets/shorebird.yaml")
+                    def flavor = variant.flavorName                        
+                    def shorebirdYaml = new Yaml().load(shorebirdYamlFile.text)
+                    def flavorAppId = shorebirdYaml['app_id'][flavor]
+                    if (flavorAppId == null) {
+                        throw new GradleException("Cannot find app_id for ${flavor} in shorebird.yaml")
+                    }
+                    def content = 'app_id: ' + flavorAppId + '\n';
+                    if (shorebirdYaml.containsKey('base_url')) {
+                        content += 'base_url: ' + shorebirdYaml['base_url'] + '\n';
+                    }
+
+                    shorebirdYamlFile.write(content)
+                  }                    
+                }
                 def variantOutput = variant.outputs.first()
                 def processResources = variantOutput.hasProperty("processResourcesProvider") ?
                     variantOutput.processResourcesProvider.get() : variantOutput.processResources
