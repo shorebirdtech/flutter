@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:meta/meta.dart';
 import 'package:process/process.dart';
+import 'package:yaml/yaml.dart';
 
 import '../artifacts.dart';
 import '../base/file_system.dart';
@@ -497,6 +498,14 @@ Future<XcodeBuildResult> buildXcodeProject({
         globals.printError('Archive succeeded but the expected xcarchive at $outputDir not found');
       }
     }
+    
+    try {
+      updateShorebirdYaml(buildInfo, app.archiveBundleOutputPath);
+    } on Exception catch (error) {
+      globals.printError('[shorebird] failed to generate shorebird configuration.\n$error');
+      return XcodeBuildResult(success: false);
+    }
+
     return XcodeBuildResult(
         success: true,
         output: outputDir,
@@ -509,6 +518,52 @@ Future<XcodeBuildResult> buildXcodeProject({
       xcResult: xcResult,
     );
   }
+}
+
+void updateShorebirdYaml(BuildInfo buildInfo, String xcarchivePath) {
+  final File shorebirdYaml = globals.fs.file(
+    globals.fs.path.join(
+      xcarchivePath,
+      'Products',
+      'Applications',
+      'Runner.app',
+      'Frameworks',
+      'App.framework',
+      'flutter_assets',
+      'shorebird.yaml',
+    ),
+  );
+  if (!shorebirdYaml.existsSync()) {
+    throw Exception('shorebird.yaml not found.');
+  }
+  final YamlDocument yaml = loadYamlDocument(shorebirdYaml.readAsStringSync());
+  final YamlMap yamlMap = yaml.contents as YamlMap;
+  final String? flavor = buildInfo.flavor;
+  String appId = '';
+  if (flavor == null) {
+    final String? defaultAppId = yamlMap['app_id'] as String?;
+    if (defaultAppId == null || defaultAppId.isEmpty) {
+      throw Exception('Cannot find "app_id" in shorebird.yaml');
+    }
+    appId = defaultAppId;
+  } else {
+    final YamlMap? yamlFlavors = yamlMap['flavors'] as YamlMap?;
+    if (yamlFlavors == null) {
+      throw Exception('Cannot find "flavors" in shorebird.yaml.');
+    }
+    final String? flavorAppId = yamlFlavors[flavor] as String?;
+    if (flavorAppId == null || flavorAppId.isEmpty) {
+      throw Exception('Cannot find "app_id" for $flavor in shorebird.yaml');
+    }
+    appId = flavorAppId;
+  }
+  final StringBuffer yamlContent = StringBuffer();
+  final String? baseUrl = yamlMap['base_url'] as String?;
+  yamlContent.writeln('app_id: $appId');
+  if (baseUrl != null) {
+    yamlContent.writeln('base_url: $baseUrl');
+  }
+  shorebirdYaml.writeAsStringSync(yamlContent.toString(), flush: true);
 }
 
 /// Extended attributes applied by Finder can cause code signing errors. Remove them.
