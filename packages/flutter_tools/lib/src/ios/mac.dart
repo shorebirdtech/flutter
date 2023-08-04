@@ -500,7 +500,7 @@ Future<XcodeBuildResult> buildXcodeProject({
     }
     
     try {
-      updateShorebirdYaml(buildInfo, app.archiveBundleOutputPath);
+      updateShorebirdYaml(buildInfo, app);
     } on Exception catch (error) {
       globals.printError('[shorebird] failed to generate shorebird configuration.\n$error');
       return XcodeBuildResult(success: false);
@@ -520,13 +520,13 @@ Future<XcodeBuildResult> buildXcodeProject({
   }
 }
 
-void updateShorebirdYaml(BuildInfo buildInfo, String xcarchivePath) {
+void updateShorebirdYaml(BuildInfo buildInfo, BuildableIOSApp app) {
   final File shorebirdYaml = globals.fs.file(
     globals.fs.path.join(
-      xcarchivePath,
+      app.archiveBundleOutputPath,
       'Products',
       'Applications',
-      'Runner.app',
+      app.name ?? 'Runner.app',
       'Frameworks',
       'App.framework',
       'flutter_assets',
@@ -534,7 +534,10 @@ void updateShorebirdYaml(BuildInfo buildInfo, String xcarchivePath) {
     ),
   );
   if (!shorebirdYaml.existsSync()) {
-    throw Exception('shorebird.yaml not found.');
+    throw Exception('''
+Cannot find shorebird.yaml in ${shorebirdYaml.absolute.path}.
+Please file an issue at: https://github.com/shorebirdtech/shorebird/issues/new
+''');
   }
   final YamlDocument yaml = loadYamlDocument(shorebirdYaml.readAsStringSync());
   final YamlMap yamlMap = yaml.contents as YamlMap;
