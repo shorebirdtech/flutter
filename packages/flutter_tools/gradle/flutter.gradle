@@ -1035,6 +1035,9 @@ class FlutterPlugin implements Plugin<Project> {
                     if (shorebirdYaml.containsKey('base_url')) {
                         content += 'base_url: ' + shorebirdYaml['base_url'] + '\n';
                     }
+                    if (shorebirdYaml.containsKey('auto_update')) {
+                        content += 'auto_update: ' + shorebirdYaml['auto_update'] + '\n';
+                    }
                     shorebirdYamlFile.write(content)
                   }                    
                 }
