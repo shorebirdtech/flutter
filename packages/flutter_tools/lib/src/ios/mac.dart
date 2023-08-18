@@ -542,9 +542,13 @@ Please file an issue at: https://github.com/shorebirdtech/shorebird/issues/new
   }
   final StringBuffer yamlContent = StringBuffer();
   final String? baseUrl = yamlMap['base_url'] as String?;
+  final bool? autoUpdate = yamlMap['auto_update'] as bool?;
   yamlContent.writeln('app_id: $appId');
   if (baseUrl != null) {
     yamlContent.writeln('base_url: $baseUrl');
+  }
+  if (autoUpdate != null) {
+    yamlContent.writeln('auto_update: $autoUpdate');
   }
   shorebirdYaml.writeAsStringSync(yamlContent.toString(), flush: true);
 }
