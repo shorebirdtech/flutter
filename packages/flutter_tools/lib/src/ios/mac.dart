@@ -567,7 +567,7 @@ Please file an issue at: https://github.com/shorebirdtech/shorebird/issues/new
   if (baseUrl != null) {
     yamlContent.writeln('base_url: $baseUrl');
   }
-  final String? autoUpdate = yamlMap['auto_update'] as String?;
+  final bool? autoUpdate = yamlMap['auto_update'] as bool?;
   if (autoUpdate != null) {
     yamlContent.writeln('auto_update: $autoUpdate');
   }
