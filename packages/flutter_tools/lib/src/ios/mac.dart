@@ -569,7 +569,7 @@ Please file an issue at: https://github.com/shorebirdtech/shorebird/issues/new
   }
   final String? autoUpdate = yamlMap['auto_update'] as String?;
   if (autoUpdate != null) {
-    yamlContent.writeln('auto_update: $auto_update');
+    yamlContent.writeln('auto_update: $autoUpdate');
   }
   shorebirdYaml.writeAsStringSync(yamlContent.toString(), flush: true);
 }
