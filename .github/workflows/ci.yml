@@ -12,6 +12,9 @@ jobs:
 
     name: 🧪 Test
 
+    env:
+      FLUTTER_STORAGE_BASE_URL: https://download.shorebird.dev
+
     steps:
       - name: 📚 Git Checkout
         uses: actions/checkout@v3
@@ -22,7 +25,6 @@ jobs:
       - name: Install Dependencies
         run: dart pub get
         working-directory: ./dev/bots
-
 
       - name: 🧪 Run Tests
         run: |
