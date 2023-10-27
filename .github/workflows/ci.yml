@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    name: 🧪 Test
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@v3
+
+      - name: 🎯 Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: Install Dependencies
+        run: dart pub get
+        working-directory: ./dev/bots
+
+      - name: 🧪 Run Tests
+        run: dart ./dev/bots/test.dart
