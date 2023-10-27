@@ -23,5 +23,8 @@ jobs:
         run: dart pub get
         working-directory: ./dev/bots
 
+
       - name: 🧪 Run Tests
-        run: dart ./dev/bots/test.dart
+        run: |
+          export PATH="$PATH":"$HOME/bin"
+          dart ./dev/bots/test.dart
