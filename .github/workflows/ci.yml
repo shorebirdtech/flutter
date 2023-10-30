@@ -28,12 +28,9 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          export PATH="$PATH":"$HOME/bin"
-          flutter pub global activate very_good_cli
+          dart pub global activate very_good_cli
           very_good packages get --recursive
         working-directory: ./dev
 
       - name: 🧪 Run Tests
-        run: |
-          export PATH="$PATH":"$HOME/bin"
-          dart ./dev/bots/test.dart
+        run: dart ./dev/bots/test.dart
