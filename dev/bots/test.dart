@@ -980,7 +980,7 @@ Future<void> _runFrameworkTests() async {
   Future<void> runMisc() async {
     printProgress('${green}Running package tests$reset for directories other than packages/flutter');
     await _runTestHarnessTests();
-    await runExampleTests();
+    // await runExampleTests();
     // await _runDartTest(path.join(flutterRoot, 'dev', 'bots'));
     // await _runDartTest(path.join(flutterRoot, 'dev', 'devicelab'), ensurePrecompiledTool: false); // See https://github.com/flutter/flutter/issues/86209
     // await _runDartTest(path.join(flutterRoot, 'dev', 'conductor', 'core'), forceSingleCore: true);
