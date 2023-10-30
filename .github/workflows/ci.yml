@@ -29,8 +29,7 @@ jobs:
       - name: Install Dependencies
         run: |
           ./bin/flutter pub global activate very_good_cli
-          very_good --analytics false
-          very_good packages get --recursive
+          very_good packages get --recursive ./dev
 
       - name: 🧪 Run Tests
         run: |
