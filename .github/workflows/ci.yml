@@ -26,7 +26,10 @@ jobs:
       - name: 🎯 Setup Dart
         uses: dart-lang/setup-dart@v1
 
-      - name: Install Dependencies
+      - name: 🦄 Install Very Good CLI
+        run: dart pub global activate very_good_cli
+
+      - name: 📦 Install Dependencies
         run: dart pub global run very_good_cli:very_good packages get -r
 
       - name: 🧪 Run Tests
