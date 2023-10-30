@@ -8,7 +8,11 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
 
     name: 🧪 Test
 
@@ -17,14 +21,16 @@ jobs:
 
     steps:
       - name: 📚 Git Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: 🎯 Setup Dart
         uses: dart-lang/setup-dart@v1
 
       - name: Install Dependencies
-        run: dart pub get
-        working-directory: ./dev/bots
+        run: |
+          ./bin/flutter pub global activate very_good_cli
+          very_good --analytics false
+          very_good packages get --recursive
 
       - name: 🧪 Run Tests
         run: |
