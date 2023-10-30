@@ -27,9 +27,7 @@ jobs:
         uses: dart-lang/setup-dart@v1
 
       - name: Install Dependencies
-        run: |
-          dart pub global activate very_good_cli
-          very_good packages get --recursive
+        run: dart pub global activate very_good_cli && very_good packages get --recursive
         working-directory: ./dev
 
       - name: 🧪 Run Tests
