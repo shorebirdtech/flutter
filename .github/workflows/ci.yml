@@ -30,5 +30,9 @@ jobs:
         run: dart pub get
         working-directory: ./dev/bots
 
+      - name: 📦 Install Dependencies
+        run: dart pub get
+        working-directory: ./dev/tools
+
       - name: 🧪 Run Tests
         run: dart ./dev/bots/test.dart
