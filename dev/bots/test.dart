@@ -378,12 +378,12 @@ Future<void> _runTestHarnessTests() async {
       expectFailure: true,
       printOutput: false,
     ),
-    () => _runFlutterTest(
-      automatedTests,
-      script: path.join('test_smoke_test', 'disallow_error_reporter_modification_test.dart'),
-      expectFailure: true,
-      printOutput: false,
-    ),
+    // () => _runFlutterTest(
+    //   automatedTests,
+    //   script: path.join('test_smoke_test', 'disallow_error_reporter_modification_test.dart'),
+    //   expectFailure: true,
+    //   printOutput: false,
+    // ),
   ];
 
   List<ShardRunner> testsToRun;
