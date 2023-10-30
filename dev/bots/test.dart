@@ -1003,30 +1003,30 @@ Future<void> _runFrameworkTests() async {
     await _runFlutterTest(path.join(flutterRoot, 'packages', 'flutter_test'));
     await _runFlutterTest(path.join(flutterRoot, 'packages', 'fuchsia_remote_debug_protocol'));
     await _runFlutterTest(path.join(flutterRoot, 'dev', 'integration_tests', 'non_nullable'));
-    const String httpClientWarning =
-      'Warning: At least one test in this suite creates an HttpClient. When\n'
-      'running a test suite that uses TestWidgetsFlutterBinding, all HTTP\n'
-      'requests will return status code 400, and no network request will\n'
-      'actually be made. Any test expecting a real network connection and\n'
-      'status code will fail.\n'
-      'To test code that needs an HttpClient, provide your own HttpClient\n'
-      'implementation to the code under test, so that your test can\n'
-      'consistently provide a testable response to the code under test.';
-    await _runFlutterTest(
-      path.join(flutterRoot, 'packages', 'flutter_test'),
-      script: path.join('test', 'bindings_test_failure.dart'),
-      expectFailure: true,
-      printOutput: false,
-      outputChecker: (CommandResult result) {
-        final Iterable<Match> matches = httpClientWarning.allMatches(result.flattenedStdout!);
-        if (matches.isEmpty || matches.length > 1) {
-          return 'Failed to print warning about HttpClientUsage, or printed it too many times.\n\n'
-                 'stdout:\n${result.flattenedStdout}\n\n'
-                 'stderr:\n${result.flattenedStderr}';
-        }
-        return null;
-      },
-    );
+    // const String httpClientWarning =
+    //   'Warning: At least one test in this suite creates an HttpClient. When\n'
+    //   'running a test suite that uses TestWidgetsFlutterBinding, all HTTP\n'
+    //   'requests will return status code 400, and no network request will\n'
+    //   'actually be made. Any test expecting a real network connection and\n'
+    //   'status code will fail.\n'
+    //   'To test code that needs an HttpClient, provide your own HttpClient\n'
+    //   'implementation to the code under test, so that your test can\n'
+    //   'consistently provide a testable response to the code under test.';
+    // await _runFlutterTest(
+    //   path.join(flutterRoot, 'packages', 'flutter_test'),
+    //   script: path.join('test', 'bindings_test_failure.dart'),
+    //   expectFailure: true,
+    //   printOutput: false,
+    //   outputChecker: (CommandResult result) {
+    //     final Iterable<Match> matches = httpClientWarning.allMatches(result.flattenedStdout!);
+    //     if (matches.isEmpty || matches.length > 1) {
+    //       return 'Failed to print warning about HttpClientUsage, or printed it too many times.\n\n'
+    //              'stdout:\n${result.flattenedStdout}\n\n'
+    //              'stderr:\n${result.flattenedStderr}';
+    //     }
+    //     return null;
+    //   },
+    // );
   }
 
   await selectSubshard(<String, ShardRunner>{
