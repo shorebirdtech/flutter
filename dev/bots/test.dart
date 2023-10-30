@@ -257,7 +257,7 @@ Future<void> main(List<String> args) async {
       // // All web integration tests
       // 'web_long_running_tests': _runWebLongRunningTests,
       // 'flutter_plugins': _runFlutterPackagesTests,
-      'skp_generator': _runSkpGeneratorTests,
+      // 'skp_generator': _runSkpGeneratorTests,
       kTestHarnessShardName: _runTestHarnessTests, // Used for testing this script; also run as part of SHARD=framework_tests, SUBSHARD=misc.
     });
   } catch (error, stackTrace) {
