@@ -1,5 +1,9 @@
 name: ci
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   pull_request:
   push:
@@ -28,12 +32,9 @@ jobs:
         uses: dart-lang/setup-dart@v1
 
       - name: 📦 Install Dependencies
-        run: dart pub get
-        working-directory: ./dev/bots
-
-      - name: 📦 Install Dependencies
-        run: dart pub get
-        working-directory: ./dev/tools
+        run: |
+          dart pub get -C ./dev/bots
+          dart pub get -C ./dev/tools
 
       - name: 🧪 Run Tests
         run: dart ./dev/bots/test.dart
