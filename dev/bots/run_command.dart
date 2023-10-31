@@ -190,9 +190,9 @@ Future<CommandResult> runCommand(String executable, List<String> arguments, {
     String allOutput;
     if (failureMessage == null) {
       allOutput = '${result.flattenedStdout}\n${result.flattenedStderr}';
-      if (allOutput.split('\n').length > 10) {
-        allOutput = '(stdout/stderr output was more than 10 lines)';
-      }
+      // if (allOutput.split('\n').length > 10) {
+      //   allOutput = '(stdout/stderr output was more than 10 lines)';
+      // }
     } else {
       allOutput = '';
     }
