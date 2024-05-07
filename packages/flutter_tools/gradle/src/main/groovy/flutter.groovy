@@ -1327,7 +1327,6 @@ class FlutterPlugin implements Plugin<Project> {
         } // end def addFlutterDeps
 
         if (isFlutterAppProject()) {
-
             project.android.applicationVariants.all { variant ->
                 Task assembleTask = getAssembleTask(variant)
                 if (!shouldConfigureFlutterTask(assembleTask)) {
