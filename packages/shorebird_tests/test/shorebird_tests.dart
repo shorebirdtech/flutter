@@ -62,14 +62,14 @@ Future<void> testWithShorebirdProject(String name,
           projectDirectory.path,
           'shorebird.yaml',
         ),
-      ).writeAsString('''
+      ).writeAsStringSync('''
 app_id: 123
 ''');
 
       try {
         await _createFlutterProject(projectDirectory);
 
-        projectDirectory.pubspecFile.writeAsString('''
+        projectDirectory.pubspecFile.writeAsStringSync('''
 ${projectDirectory.pubspecFile.readAsStringSync()}
 
   assets:
@@ -123,7 +123,7 @@ extension ShorebirdProjectDirectoryOnDirectory on Directory {
 ''';
 
     final currentGradleContent = appGradleFile.readAsStringSync();
-    appGradleFile.writeAsString(
+    appGradleFile.writeAsStringSync(
       '''
 ${currentGradleContent.replaceFirst(
         '    buildTypes {',
@@ -142,7 +142,7 @@ flavors:
 ''';
 
     final currentShorebirdContent = shorebirdFile.readAsStringSync();
-    shorebirdFile.writeAsString(
+    shorebirdFile.writeAsStringSync(
       '''
 $currentShorebirdContent
 $flavors
