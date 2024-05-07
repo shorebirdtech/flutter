@@ -1334,15 +1334,13 @@ class FlutterPlugin implements Plugin<Project> {
                 }
                 Task copyFlutterAssetsTask = addFlutterDeps(variant)
                 copyFlutterAssetsTask.doLast {
-
                   def content = "";
                   def outputDir = copyFlutterAssetsTask.destinationDir
-                  def publicKeyFile = new File("${project.rootDir.absolutePath}/../public.pem");
-
                   def shorebirdYamlFile = new File("${outputDir}/flutter_assets/shorebird.yaml")
-                  if (publicKeyFile.exists()) {
-                    def base64EncodedKey = Base64.getEncoder().encode(publicKeyFile.readBytes());
-                    content += 'patch_public_key: ' + new String(base64EncodedKey) + '\n';
+
+                  def shorebirdPublicKeyEnvVar = System.getenv('SHOREBIRD_PUBLIC_KEY')
+                  if (shorebirdPublicKeyEnvVar != null && !shorebirdPublicKeyEnvVar.isEmpty()) {
+                    content += 'patch_public_key: ' + shorebirdPublicKeyEnvVar + '\n';
                   }
 
                   if (variant.flavorName != null && !variant.flavorName.isEmpty()) {
