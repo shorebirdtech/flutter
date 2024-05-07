@@ -6,8 +6,8 @@ import com.android.build.OutputFile
 import groovy.json.JsonSlurper
 import groovy.json.JsonGenerator
 import groovy.xml.QName
+
 import java.nio.file.Paths
-import java.util.Set
 import org.apache.tools.ant.taskdefs.condition.Os
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
@@ -28,7 +28,6 @@ import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.internal.os.OperatingSystem
-import org.gradle.util.VersionNumber
 import org.yaml.snakeyaml.Yaml
 
 /**
@@ -1185,22 +1184,31 @@ class FlutterPlugin implements Plugin<Project> {
                 }
                 Task copyFlutterAssetsTask = addFlutterDeps(variant)
                 copyFlutterAssetsTask.doLast {
+                  def content = "";
+                  def outputDir = copyFlutterAssetsTask.destinationDir
+                  def shorebirdYamlFile = new File("${outputDir}/flutter_assets/shorebird.yaml")
+
+                  def shorebirdPublicKeyEnvVar = System.getenv('SHOREBIRD_PUBLIC_KEY')
+                  if (shorebirdPublicKeyEnvVar != null && !shorebirdPublicKeyEnvVar.isEmpty()) {
+                    content += 'patch_public_key: ' + shorebirdPublicKeyEnvVar + '\n';
+                  }
+
                   if (variant.flavorName != null && !variant.flavorName.isEmpty()) {
-                    def outputDir = copyFlutterAssetsTask.destinationDir
-                    def shorebirdYamlFile = new File("${outputDir}/flutter_assets/shorebird.yaml")
                     def flavor = variant.flavorName
                     def shorebirdYaml = new Yaml().load(shorebirdYamlFile.text)
                     def flavorAppId = shorebirdYaml['flavors'][flavor]
                     if (flavorAppId == null) {
                         throw new GradleException("Cannot find app_id for ${flavor} in shorebird.yaml")
                     }
-                    def content = 'app_id: ' + flavorAppId + '\n';
+                    content += 'app_id: ' + flavorAppId + '\n';
                     if (shorebirdYaml.containsKey('base_url')) {
                         content += 'base_url: ' + shorebirdYaml['base_url'] + '\n';
                     }
                     if (shorebirdYaml.containsKey('auto_update')) {
                         content += 'auto_update: ' + shorebirdYaml['auto_update'] + '\n';
                     }
+                  }
+                  if (!content.isEmpty()) {
                     shorebirdYamlFile.write(content)
                   }
                 }
