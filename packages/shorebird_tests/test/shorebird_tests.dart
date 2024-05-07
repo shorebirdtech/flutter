@@ -46,38 +46,46 @@ Future<void> _createFlutterProject(Directory projectDirectory) async {
 @isTest
 Future<void> testWithShorebirdProject(String name,
     FutureOr<void> Function(Directory projectDirectory) testFn) async {
-  test(name, () async {
-    final parentDirectory = Directory.systemTemp.createTempSync();
-    final projectDirectory = Directory(
-      path.join(
-        parentDirectory.path,
-        'shorebird_test',
-      ),
-    )..createSync();
+  test(
+    name,
+    () async {
+      final parentDirectory = Directory.systemTemp.createTempSync();
+      final projectDirectory = Directory(
+        path.join(
+          parentDirectory.path,
+          'shorebird_test',
+        ),
+      )..createSync();
 
-    File(
-      path.join(
-        projectDirectory.path,
-        'shorebird.yaml',
-      ),
-    ).writeAsString('''
+      File(
+        path.join(
+          projectDirectory.path,
+          'shorebird.yaml',
+        ),
+      ).writeAsString('''
 app_id: 123
 ''');
 
-    try {
-      await _createFlutterProject(projectDirectory);
+      try {
+        await _createFlutterProject(projectDirectory);
 
-      projectDirectory.pubspecFile.writeAsString('''
+        projectDirectory.pubspecFile.writeAsString('''
 ${projectDirectory.pubspecFile.readAsStringSync()}
 
   assets:
     - shorebird.yaml
 ''');
-      await testFn(projectDirectory);
-    } finally {
-      projectDirectory.deleteSync(recursive: true);
-    }
-  });
+        await testFn(projectDirectory);
+      } finally {
+        projectDirectory.deleteSync(recursive: true);
+      }
+    },
+    timeout: Timeout(
+      // These tests usually run flutter creat, flutter build, etc, which can take a while,
+      // specially in CI, so setting from the default of 30 seconds to 2 minutes.
+      Duration(minutes: 2),
+    ),
+  );
 }
 
 extension ShorebirdProjectDirectoryOnDirectory on Directory {
