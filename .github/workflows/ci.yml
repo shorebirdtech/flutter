@@ -38,7 +38,7 @@ jobs:
 
       - name: 🐦 Run Shorebird Tests
         run: dart test
-        working-directory: ./packages/shorebird_test
+        working-directory: packages/shorebird_test
 
       - name: 🧪 Run Tests
         run: dart ./dev/bots/test.dart
