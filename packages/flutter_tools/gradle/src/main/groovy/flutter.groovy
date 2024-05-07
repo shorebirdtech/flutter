@@ -6,10 +6,8 @@ import com.android.build.OutputFile
 import groovy.json.JsonSlurper
 import groovy.json.JsonGenerator
 import groovy.xml.QName
-import org.gradle.api.file.Directory
 
 import java.nio.file.Paths
-import java.util.Set
 import org.apache.tools.ant.taskdefs.condition.Os
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
@@ -30,7 +28,6 @@ import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.internal.os.OperatingSystem
-import org.gradle.util.VersionNumber
 import org.yaml.snakeyaml.Yaml
 
 /**
