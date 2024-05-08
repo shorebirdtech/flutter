@@ -82,8 +82,8 @@ ${projectDirectory.pubspecFile.readAsStringSync()}
     },
     timeout: Timeout(
       // These tests usually run flutter creat, flutter build, etc, which can take a while,
-      // specially in CI, so setting from the default of 30 seconds to 4 minutes.
-      Duration(minutes: 4),
+      // specially in CI, so setting from the default of 30 seconds to 6 minutes.
+      Duration(minutes: 6),
     ),
   );
 }
