@@ -13,7 +13,7 @@ File get _flutterBinaryFile => File(
         '..',
         '..',
         'bin',
-        'flutter',
+        'flutter${Platform.isWindows ? '.bat' : ''}',
       ),
     );
 
