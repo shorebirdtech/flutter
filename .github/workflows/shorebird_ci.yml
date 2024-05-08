@@ -34,7 +34,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '21'
+          java-version: '11'
 
       - name: 🐦 Run Shorebird Tests
         run: dart test
