@@ -28,6 +28,9 @@ jobs:
       - name: 📚 Git Checkout
         uses: actions/checkout@v4
 
+      - name: 🎯 Setup Dart
+        uses: dart-lang/setup-dart@v1
+
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
