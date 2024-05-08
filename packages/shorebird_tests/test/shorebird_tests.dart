@@ -40,7 +40,7 @@ Future<ProcessResult> _runFlutterCommand(
 
 Future<void> _createFlutterProject(Directory projectDirectory) async {
   final result = await _runFlutterCommand(
-    ['create', '.'],
+    ['create', '--empty', '.'],
     workingDirectory: projectDirectory,
   );
   if (result.exitCode != 0) {
