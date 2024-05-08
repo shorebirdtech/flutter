@@ -7,6 +7,10 @@ import 'package:path/path.dart' as path;
 import 'package:meta/meta.dart';
 import 'package:test/test.dart';
 
+/// This will be the path to the flutter binary housed in this flutter repository.
+///
+/// Which since we are running the tests from this inner package , we need to go up two directories
+/// in order to find the flutter binary in the bin folder.
 File get _flutterBinaryFile => File(
       path.join(
         Directory.current.path,
@@ -17,6 +21,7 @@ File get _flutterBinaryFile => File(
       ),
     );
 
+/// Runs a flutter command using the correct binary ([_flutterBinaryFile]) with the given arguments.
 Future<ProcessResult> _runFlutterCommand(
   List<String> arguments, {
   required Directory workingDirectory,
@@ -81,7 +86,7 @@ ${projectDirectory.pubspecFile.readAsStringSync()}
       }
     },
     timeout: Timeout(
-      // These tests usually run flutter creat, flutter build, etc, which can take a while,
+      // These tests usually run flutter create, flutter build, etc, which can take a while,
       // specially in CI, so setting from the default of 30 seconds to 6 minutes.
       Duration(minutes: 6),
     ),
