@@ -1,4 +1,4 @@
-name: ci
+name: shorebird_ci
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,7 +19,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
-    name: 🧪 Test
+    name: 🐦 Test
 
     env:
       FLUTTER_STORAGE_BASE_URL: https://download.shorebird.dev
@@ -28,13 +28,9 @@ jobs:
       - name: 📚 Git Checkout
         uses: actions/checkout@v4
 
-      - name: 🎯 Setup Dart
-        uses: dart-lang/setup-dart@v1
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
 
-      - name: 📦 Install Dependencies
-        run: |
-          dart pub get -C ./dev/bots
-          dart pub get -C ./dev/tools
-
-      - name: 🧪 Run Tests
-        run: dart ./dev/bots/test.dart
+      - name: 🐦 Run Shorebird Tests
+        run: dart test
+        working-directory: packages/shorebird_tests
