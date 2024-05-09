@@ -89,8 +89,8 @@ void main() {
           () => logger.info('''
 Usage: shorebird_tools package [arguments]
 -h, --help                  Print this usage information.
--p, --patch (mandatory)     The patch path to package
--o, --output (mandatory)    The path to the output archive
+-p, --patch (mandatory)     The path to the patch artifact which will be packaged
+-o, --output (mandatory)    Where to write the packaged patch archive
 
 Run "shorebird_tools help" to see global options.'''),
         ).called(1);
@@ -115,8 +115,8 @@ Run "shorebird_tools help" to see global options.'''),
           () => logger.info('''
 Usage: shorebird_tools package [arguments]
 -h, --help                  Print this usage information.
--p, --patch (mandatory)     The patch path to package
--o, --output (mandatory)    The path to the output archive
+-p, --patch (mandatory)     The path to the patch artifact which will be packaged
+-o, --output (mandatory)    Where to write the packaged patch archive
 
 Run "shorebird_tools help" to see global options.'''),
         ).called(1);
