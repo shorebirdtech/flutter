@@ -36,6 +36,7 @@ class ShorebirdToolsCommandRunner extends CommandRunner<int> {
 
     // Add sub commands
     addCommand(SampleCommand(logger: _logger));
+    addCommand(PackageCommand(logger: _logger));
   }
 
   @override
