@@ -28,23 +28,3 @@ jobs:
     uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/dart_package.yml@v1
     with:
       working_directory: packages/shorebird_tools
-
-  verify-version:
-    runs-on: ubuntu-latest
-    steps:
-      - name: 📚 Git Checkout
-        uses: actions/checkout@v2
-
-      - name: 🎯 Setup Dart
-        uses: dart-lang/setup-dart@v1
-        with:
-          sdk: "stable"
-
-      - name: 📦 Install Dependencies
-        run: |
-          dart pub get
-        working-directory: packages/shorebird_tools
-
-      - name: 🔎 Verify version
-        run: dart run test --run-skipped -t version-verify
-        working-directory: packages/shorebird_tools
