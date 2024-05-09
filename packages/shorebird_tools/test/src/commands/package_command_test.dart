@@ -56,8 +56,30 @@ void main() {
       expect(extractedFile.readAsStringSync(), 'banana');
     });
 
-    group('wrong usage', () {
-      test('when missing option for -p', () async {
+    group('when the patch file does not exists', () {
+      test('error and logs', () async {
+        final exitCode = await commandRunner.run(
+          [
+            'package',
+            '-p',
+            p.join(testDir.path, 'patch.txt'),
+            '-o',
+            p.join(testDir.path, 'patch.zip'),
+          ],
+        );
+
+        expect(exitCode, ExitCode.software.code);
+
+        verify(
+          () => logger.err(
+            'Patch file not found at ${p.join(testDir.path, 'patch.txt')}',
+          ),
+        ).called(1);
+      });
+    });
+
+    group('when missing option for -p', () {
+      test('shows errors and print the correct usage', () async {
         final exitCode = await commandRunner.run(['package', '-p']);
 
         expect(exitCode, ExitCode.usage.code);
@@ -73,8 +95,10 @@ Usage: shorebird_tools package [arguments]
 Run "shorebird_tools help" to see global options.'''),
         ).called(1);
       });
+    });
 
-      test('when missing option for -o', () async {
+    group('when missing option for -o', () {
+      test('shows errors and print the correct usage', () async {
         final exitCode = await commandRunner.run(
           [
             'package',
