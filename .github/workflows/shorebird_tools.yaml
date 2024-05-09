@@ -50,6 +50,8 @@ jobs:
       - name: 📦 Install Dependencies
         run: |
           dart pub get
+        working-directory: packages/shorebird_tools
 
       - name: 🔎 Verify version
         run: dart run test --run-skipped -t version-verify
+        working-directory: packages/shorebird_tools
