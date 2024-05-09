@@ -11,9 +11,7 @@ class _MockLogger extends Mock implements Logger {}
 
 class _MockProgress extends Mock implements Progress {}
 
-
 const latestVersion = '0.0.0';
-
 
 void main() {
   group('ShorebirdToolsCommandRunner', () {
