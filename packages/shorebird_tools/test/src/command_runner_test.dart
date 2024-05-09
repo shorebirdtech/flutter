@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:args/command_runner.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:mocktail/mocktail.dart';
@@ -9,11 +7,7 @@ import 'package:test/test.dart';
 
 class _MockLogger extends Mock implements Logger {}
 
-class _MockProgress extends Mock implements Progress {}
-
-
 const latestVersion = '0.0.0';
-
 
 void main() {
   group('ShorebirdToolsCommandRunner', () {
