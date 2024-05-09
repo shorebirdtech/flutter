@@ -27,7 +27,7 @@ jobs:
   build:
     uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/dart_package.yml@v1
     with:
-      working-directory: packages/shorebird_tools
+      working_directory: packages/shorebird_tools
 
   verify-version:
     runs-on: ubuntu-latest
