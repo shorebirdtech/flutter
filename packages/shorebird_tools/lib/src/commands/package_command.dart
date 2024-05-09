@@ -20,18 +20,18 @@ class PackageCommand extends Command<int> {
         'patch',
         abbr: 'p',
         mandatory: true,
-        help: 'The patch path to package',
+        help: 'The path to the patch artifact which will be packaged',
       )
       ..addOption(
         'output',
         abbr: 'o',
         mandatory: true,
-        help: 'The path to the output archive',
+        help: 'Where to write the packaged patch archive',
       );
   }
 
   @override
-  String get description => 'Packages a generated patch into an archive';
+  String get description => 'Packages a patch artifact into an archive';
 
   @override
   String get name => 'package';
