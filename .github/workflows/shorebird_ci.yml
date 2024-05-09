@@ -1,4 +1,4 @@
-name: shorebird_ci
+name: shorebird_tests
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -6,9 +6,25 @@ concurrency:
 
 on:
   pull_request:
+    paths:
+      - ".github/workflows/shorebird_tests.yaml"
+      - "packages/shorebird_tests/lib/**"
+      - "packages/shorebird_tests/test/**"
+      - "packages/shorebird_tests/pubspec.yaml"
+      - "packages/flutter_tools/lib/**"
+      - "packages/flutter_tools/test/**"
+      - "packages/flutter_tools/pubspec.yaml"
   push:
     branches:
       - main
+    paths:
+      - ".github/workflows/shorebird_tests.yaml"
+      - "packages/shorebird_tests/lib/**"
+      - "packages/shorebird_tests/test/**"
+      - "packages/shorebird_tests/pubspec.yaml"
+      - "packages/flutter_tools/lib/**"
+      - "packages/flutter_tools/test/**"
+      - "packages/flutter_tools/pubspec.yaml"
 
 jobs:
   test:
