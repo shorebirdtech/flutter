@@ -26,6 +26,7 @@ open source.
 * [Flutter documentation](https://docs.flutter.dev/)
 * [Development wiki](https://github.com/flutter/flutter/wiki)
 * [Contributing to Flutter](https://github.com/flutter/flutter/blob/master/CONTRIBUTING.md)
+* [Shorebird's customizations](./shorebird.md)
 
 For announcements about new releases, follow the
 [flutter-announce@googlegroups.com](https://groups.google.com/forum/#!forum/flutter-announce)
