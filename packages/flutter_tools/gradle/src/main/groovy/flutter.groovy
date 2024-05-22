@@ -1336,12 +1336,8 @@ class FlutterPlugin implements Plugin<Project> {
                   def outputDir = copyFlutterAssetsTask.destinationDir
                   def shorebirdYamlFile = new File("${outputDir}/flutter_assets/shorebird.yaml")
 
-                  def shorebirdPublicKeyEnvVar = System.getenv('SHOREBIRD_PUBLIC_KEY')
-                  if (shorebirdPublicKeyEnvVar != null && !shorebirdPublicKeyEnvVar.isEmpty()) {
-                    content += 'patch_public_key: ' + shorebirdPublicKeyEnvVar + '\n';
-                  }
-
-                  if (variant.flavorName != null && !variant.flavorName.isEmpty()) {
+                  def usedFlavors = variant.flavorName != null && !variant.flavorName.isEmpty();
+                  if (usedFlavors) {
                     def flavor = variant.flavorName
                     def shorebirdYaml = new Yaml().load(shorebirdYamlFile.text)
                     def flavorAppId = shorebirdYaml['flavors'][flavor]
@@ -1355,6 +1351,19 @@ class FlutterPlugin implements Plugin<Project> {
                     if (shorebirdYaml.containsKey('auto_update')) {
                         content += 'auto_update: ' + shorebirdYaml['auto_update'] + '\n';
                     }
+                  }
+
+                  def shorebirdPublicKeyEnvVar = System.getenv('SHOREBIRD_PUBLIC_KEY')
+                  if (shorebirdPublicKeyEnvVar != null && !shorebirdPublicKeyEnvVar.isEmpty()) {
+                      // When a flavor were used, the content variable will already include
+                      // the app_id and other attributes, since the code above makes sure of that
+                      //
+                      // But when no flavor was used, it will be empty, so we make sure that include
+                      // the original file in the beginning
+                      if (!usedFlavors) {
+                          content += shorebirdYamlFile.text;
+                      }
+                      content += 'patch_public_key: ' + shorebirdPublicKeyEnvVar + '\n';
                   }
                   if (!content.isEmpty()) {
                     shorebirdYamlFile.write(content)
