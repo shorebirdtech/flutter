@@ -39,13 +39,6 @@ Future<ProcessResult> _runFlutterCommand(
   );
 }
 
-Future<void> _flutterUpgrade() async {
-  await _runFlutterCommand(
-    ['upgrade'],
-    workingDirectory: Directory.current,
-  );
-}
-
 Future<void> _createFlutterProject(Directory projectDirectory) async {
   final result = await _runFlutterCommand(
     ['create', '--empty', '.'],
@@ -62,7 +55,6 @@ Future<void> testWithShorebirdProject(String name,
   test(
     name,
     () async {
-      await _flutterUpgrade();
       final parentDirectory = Directory.systemTemp.createTempSync();
       final projectDirectory = Directory(
         path.join(
