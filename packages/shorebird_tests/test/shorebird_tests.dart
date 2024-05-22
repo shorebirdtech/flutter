@@ -195,7 +195,7 @@ $flavors
     await extractArchiveToDisk(
         decodedBytes, path.join(this.path, 'apk-extracted'));
 
-    final raw = File(
+    final yamlString = File(
       path.join(
         this.path,
         'apk-extracted',
@@ -204,6 +204,6 @@ $flavors
         'shorebird.yaml',
       ),
     ).readAsStringSync();
-    return loadYaml(raw) as YamlMap;
+    return loadYaml(yamlString) as YamlMap;
   }
 }
