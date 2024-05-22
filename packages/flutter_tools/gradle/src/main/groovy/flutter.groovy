@@ -1332,42 +1332,32 @@ class FlutterPlugin implements Plugin<Project> {
                 }
                 Task copyFlutterAssetsTask = addFlutterDeps(variant)
                 copyFlutterAssetsTask.doLast {
-                  def content = "";
+                  def yaml = new Yaml()
                   def outputDir = copyFlutterAssetsTask.destinationDir
-                  def shorebirdYamlFile = new File("${outputDir}/flutter_assets/shorebird.yaml")
 
-                  def usedFlavors = variant.flavorName != null && !variant.flavorName.isEmpty();
-                  if (usedFlavors) {
-                    def flavor = variant.flavorName
-                    def shorebirdYaml = new Yaml().load(shorebirdYamlFile.text)
-                    def flavorAppId = shorebirdYaml['flavors'][flavor]
-                    if (flavorAppId == null) {
-                        throw new GradleException("Cannot find app_id for ${flavor} in shorebird.yaml")
-                    }
-                    content += 'app_id: ' + flavorAppId + '\n';
-                    if (shorebirdYaml.containsKey('base_url')) {
-                        content += 'base_url: ' + shorebirdYaml['base_url'] + '\n';
-                    }
-                    if (shorebirdYaml.containsKey('auto_update')) {
-                        content += 'auto_update: ' + shorebirdYaml['auto_update'] + '\n';
-                    }
+                  // Read the shorebird.yaml file into a map.
+                  def shorebirdYamlFile = new File("${outputDir}/flutter_assets/shorebird.yaml")
+                  def shorebirdYamlData = yaml.load(shorebirdYamlFile.text)
+
+                  // Update the app_id to the correct flavor if one was provided.
+                  if (variant.flavorName != null && !variant.flavorName.isEmpty()) {
+                    shorebirdYamlData['app_id'] = shorebirdYamlData.flavors[variant.flavorName]
                   }
 
+                  // Remove any flavors. This is a no-op if the flavors key doesn't exist.
+                  shorebirdYamlData.remove('flavors')
+
+                  // Add a public key if one was provided via an env var.
+                  // Ideally we'd have a way to pass the key as a parameter, but
+                  // an env var was the easiest way to get this working.
                   def shorebirdPublicKeyEnvVar = System.getenv('SHOREBIRD_PUBLIC_KEY')
                   if (shorebirdPublicKeyEnvVar != null && !shorebirdPublicKeyEnvVar.isEmpty()) {
-                      // When a flavor were used, the content variable will already include
-                      // the app_id and other attributes, since the code above makes sure of that
-                      //
-                      // But when no flavor was used, it will be empty, so we make sure that include
-                      // the original file in the beginning
-                      if (!usedFlavors) {
-                          content += shorebirdYamlFile.text;
-                      }
-                      content += 'patch_public_key: ' + shorebirdPublicKeyEnvVar + '\n';
+                    shorebirdYamlData['patch_public_key'] = shorebirdPublicKeyEnvVar
                   }
-                  if (!content.isEmpty()) {
-                    shorebirdYamlFile.write(content)
-                  }
+
+                  // Write the updated map back to the shorebird.yaml file.
+                  def updatedYamlString = yaml.dumpAsMap(shorebirdYamlData)
+                  shorebirdYamlFile.write(updatedYamlString)
                 }
                 def variantOutput = variant.outputs.first()
                 def processResources = variantOutput.hasProperty(propProcessResourcesProvider) ?
