@@ -25,6 +25,7 @@ on:
       - "packages/flutter_tools/lib/**"
       - "packages/flutter_tools/test/**"
       - "packages/flutter_tools/pubspec.yaml"
+  workflow_dispatch:
 
 jobs:
   test:
@@ -49,8 +50,8 @@ jobs:
 
       - uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '11'
+          distribution: "zulu"
+          java-version: "11"
 
       - name: 🐦 Run Shorebird Tests
         run: dart test
