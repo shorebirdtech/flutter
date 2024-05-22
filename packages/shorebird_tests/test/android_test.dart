@@ -15,8 +15,7 @@ void main() {
       testWithShorebirdProject(
         'adds the public key on top of the original file',
         (projectDirectory) async {
-          final originalContent =
-              await projectDirectory.shorebirdFile.readAsString();
+          final originalYaml = projectDirectory.shorebirdYaml;
 
           const base64PublicKey = 'public_123';
           await projectDirectory.runFlutterBuildApk(
@@ -29,10 +28,13 @@ void main() {
               await projectDirectory.getGeneratedShorebirdYaml();
 
           expect(
-            generatedYaml,
-            equals(
-              '${originalContent}patch_public_key: $base64PublicKey\n',
-            ),
+            generatedYaml.keys,
+            containsAll(originalYaml.keys),
+          );
+
+          expect(
+            generatedYaml['patch_public_key'],
+            equals(base64PublicKey),
           );
         },
       );
@@ -52,7 +54,7 @@ void main() {
             flavor: 'internal',
           );
 
-          expect(generatedYaml, contains('app_id: internal_123'));
+          expect(generatedYaml['app_id'], equals('internal_123'));
         },
       );
 
@@ -76,10 +78,10 @@ void main() {
               flavor: 'internal',
             );
 
-            expect(generatedYaml, contains('app_id: internal_123'));
+            expect(generatedYaml['app_id'], equals('internal_123'));
             expect(
-              generatedYaml,
-              contains('patch_public_key: $base64PublicKey'),
+              generatedYaml['patch_public_key'],
+              equals(base64PublicKey),
             );
           },
         );

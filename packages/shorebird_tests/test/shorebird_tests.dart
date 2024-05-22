@@ -6,6 +6,7 @@ import 'package:path/path.dart' as path;
 
 import 'package:meta/meta.dart';
 import 'package:test/test.dart';
+import 'package:yaml/yaml.dart';
 
 /// This will be the path to the flutter binary housed in this flutter repository.
 ///
@@ -102,6 +103,9 @@ extension ShorebirdProjectDirectoryOnDirectory on Directory {
         path.join(this.path, 'shorebird.yaml'),
       );
 
+  YamlMap get shorebirdYaml =>
+      loadYaml(shorebirdFile.readAsStringSync()) as YamlMap;
+
   File get appGradleFile => File(
         path.join(this.path, 'android', 'app', 'build.gradle'),
       );
@@ -184,14 +188,14 @@ $flavors
         ),
       );
 
-  Future<String> getGeneratedShorebirdYaml({String? flavor}) async {
+  Future<YamlMap> getGeneratedShorebirdYaml({String? flavor}) async {
     final decodedBytes =
         ZipDecoder().decodeBytes(apkFile(flavor: flavor).readAsBytesSync());
 
     await extractArchiveToDisk(
         decodedBytes, path.join(this.path, 'apk-extracted'));
 
-    return File(
+    final raw = File(
       path.join(
         this.path,
         'apk-extracted',
@@ -200,5 +204,6 @@ $flavors
         'shorebird.yaml',
       ),
     ).readAsStringSync();
+    return loadYaml(raw) as YamlMap;
   }
 }
