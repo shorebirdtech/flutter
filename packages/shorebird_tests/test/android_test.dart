@@ -58,7 +58,7 @@ void main() {
         },
       );
 
-      group('when passed through the environment variable', () {
+      group('when public key passed through environment variable', () {
         testWithShorebirdProject(
           'correctly changes the app id and adds the public key',
           (projectDirectory) async {
