@@ -83,7 +83,7 @@ app_id: "123"
 
         await testFn(projectDirectory);
       } finally {
-        //projectDirectory.deleteSync(recursive: true);
+        projectDirectory.deleteSync(recursive: true);
       }
     },
     timeout: Timeout(
