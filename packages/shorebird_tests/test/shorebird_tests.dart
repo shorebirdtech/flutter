@@ -63,24 +63,24 @@ Future<void> testWithShorebirdProject(String name,
         ),
       )..createSync();
 
-      File(
-        path.join(
-          projectDirectory.path,
-          'shorebird.yaml',
-        ),
-      ).writeAsStringSync('''
-app_id: 123
-''');
-
       try {
         await _createFlutterProject(projectDirectory);
 
         projectDirectory.pubspecFile.writeAsStringSync('''
 ${projectDirectory.pubspecFile.readAsStringSync()}
-
   assets:
     - shorebird.yaml
 ''');
+
+        File(
+          path.join(
+            projectDirectory.path,
+            'shorebird.yaml',
+          ),
+        ).writeAsStringSync('''
+app_id: "123"
+''');
+
         await testFn(projectDirectory);
       } finally {
         projectDirectory.deleteSync(recursive: true);
@@ -177,6 +177,22 @@ $flavors
     }
   }
 
+  Future<void> runFlutterBuildIos({
+    Map<String, String>? environment,
+  }) async {
+    final result = await _runFlutterCommand(
+      // The projects used to test are generated on spot, to make it simpler we don't
+      // configure any apple accounts on it, so we skip code signing here.
+      ['build', 'ipa', '--no-codesign'],
+      workingDirectory: this,
+      environment: environment,
+    );
+
+    if (result.exitCode != 0) {
+      throw Exception('Failed to run `flutter build ios`: ${result.stderr}');
+    }
+  }
+
   File apkFile({String? flavor}) => File(
         path.join(
           this.path,
@@ -188,7 +204,17 @@ $flavors
         ),
       );
 
-  Future<YamlMap> getGeneratedShorebirdYaml({String? flavor}) async {
+  Directory iosArchiveFile() => Directory(
+        path.join(
+          this.path,
+          'build',
+          'ios',
+          'archive',
+          'Runner.xcarchive',
+        ),
+      );
+
+  Future<YamlMap> getGeneratedAndroidShorebirdYaml({String? flavor}) async {
     final decodedBytes =
         ZipDecoder().decodeBytes(apkFile(flavor: flavor).readAsBytesSync());
 
@@ -200,6 +226,22 @@ $flavors
         this.path,
         'apk-extracted',
         'assets',
+        'flutter_assets',
+        'shorebird.yaml',
+      ),
+    ).readAsStringSync();
+    return loadYaml(yamlString) as YamlMap;
+  }
+
+  Future<YamlMap> getGeneratedIoShorebirdYaml() async {
+    final yamlString = File(
+      path.join(
+        iosArchiveFile().path,
+        'Products',
+        'Applications',
+        'Runner.app',
+        'Frameworks',
+        'App.framework',
         'flutter_assets',
         'shorebird.yaml',
       ),
