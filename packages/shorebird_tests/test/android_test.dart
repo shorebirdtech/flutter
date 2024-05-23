@@ -9,6 +9,7 @@ void main() {
 
       expect(projectDirectory.apkFile().existsSync(), isTrue);
       expect(projectDirectory.shorebirdFile.existsSync(), isTrue);
+      expect(projectDirectory.getGeneratedAndroidShorebirdYaml(), completes);
     });
 
     group('when passing the public key through the environment variable', () {
@@ -25,7 +26,7 @@ void main() {
           );
 
           final generatedYaml =
-              await projectDirectory.getGeneratedShorebirdYaml();
+              await projectDirectory.getGeneratedAndroidShorebirdYaml();
 
           expect(
             generatedYaml.keys,
@@ -50,7 +51,7 @@ void main() {
           await projectDirectory.runFlutterBuildApk(flavor: 'internal');
 
           final generatedYaml =
-              await projectDirectory.getGeneratedShorebirdYaml(
+              await projectDirectory.getGeneratedAndroidShorebirdYaml(
             flavor: 'internal',
           );
 
@@ -74,7 +75,7 @@ void main() {
             );
 
             final generatedYaml =
-                await projectDirectory.getGeneratedShorebirdYaml(
+                await projectDirectory.getGeneratedAndroidShorebirdYaml(
               flavor: 'internal',
             );
 
