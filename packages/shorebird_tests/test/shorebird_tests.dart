@@ -181,7 +181,8 @@ $flavors
     Map<String, String>? environment,
   }) async {
     final result = await _runFlutterCommand(
-      // We are using `--no-codesign` because we are not signing the app
+      // The projects used to test are generated on spot, to make it simpler we don't
+      // configure any apple accounts on it, so  we skip code signing here.
       ['build', 'ipa', '--no-codesign'],
       workingDirectory: this,
       environment: environment,
