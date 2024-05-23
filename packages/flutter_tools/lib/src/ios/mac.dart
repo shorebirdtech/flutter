@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:meta/meta.dart';
 import 'package:process/process.dart';
@@ -588,6 +589,11 @@ Please file an issue at: https://github.com/shorebirdtech/shorebird/issues/new
   final bool? autoUpdate = yamlMap['auto_update'] as bool?;
   if (autoUpdate != null) {
     yamlContent.writeln('auto_update: $autoUpdate');
+  }
+
+  final String? shorebirdPublicKeyEnvVar = Platform.environment['SHOREBIRD_PUBLIC_KEY'];
+  if (shorebirdPublicKeyEnvVar != null) {
+    yamlContent.writeln('patch_public_key: $shorebirdPublicKeyEnvVar');
   }
   shorebirdYaml.writeAsStringSync(yamlContent.toString(), flush: true);
 }
