@@ -45,7 +45,7 @@ void main() {
       testWithShorebirdProject(
         'correctly changes the app id',
         (projectDirectory) async {
-          projectDirectory.addAndroidFlavors();
+          await projectDirectory.addProjectFlavors();
           projectDirectory.addShorebirdFlavors();
 
           await projectDirectory.runFlutterBuildApk(flavor: 'internal');
@@ -64,7 +64,7 @@ void main() {
           'correctly changes the app id and adds the public key',
           (projectDirectory) async {
             const base64PublicKey = 'public_123';
-            projectDirectory.addAndroidFlavors();
+            await projectDirectory.addProjectFlavors();
             projectDirectory.addShorebirdFlavors();
 
             await projectDirectory.runFlutterBuildApk(
