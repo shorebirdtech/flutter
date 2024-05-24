@@ -10,7 +10,7 @@ void main() {
         await projectDirectory.runFlutterBuildIos();
 
         expect(projectDirectory.iosArchiveFile().existsSync(), isTrue);
-        expect(projectDirectory.getGeneratedIoShorebirdYaml(), completes);
+        expect(projectDirectory.getGeneratedIosShorebirdYaml(), completes);
       });
 
       group('when passing the public key through the environment variable', () {
@@ -27,7 +27,7 @@ void main() {
             );
 
             final generatedYaml =
-                await projectDirectory.getGeneratedIoShorebirdYaml();
+                await projectDirectory.getGeneratedIosShorebirdYaml();
 
             expect(
               generatedYaml.keys,
@@ -43,7 +43,53 @@ void main() {
         );
       });
 
-      // TODO(erickzanardo): Add tests for flavors.
+      group('when building with a flavor', () {
+        testWithShorebirdProject(
+          'correctly changes the app id',
+          (projectDirectory) async {
+            await projectDirectory.addProjectFlavors();
+            projectDirectory.addShorebirdFlavors();
+
+            await projectDirectory.runFlutterBuildIos(flavor: 'internal');
+
+            final generatedYaml =
+                await projectDirectory.getGeneratedIosShorebirdYaml(
+                    //flavor: 'internal',
+                    );
+
+            expect(generatedYaml['app_id'], equals('internal_123'));
+          },
+        );
+
+        group('when public key passed through environment variable', () {
+          testWithShorebirdProject(
+            'correctly changes the app id and adds the public key',
+            (projectDirectory) async {
+              const base64PublicKey = 'public_123';
+              await projectDirectory.addProjectFlavors();
+              projectDirectory.addShorebirdFlavors();
+
+              await projectDirectory.runFlutterBuildIos(
+                flavor: 'internal',
+                environment: {
+                  'SHOREBIRD_PUBLIC_KEY': base64PublicKey,
+                },
+              );
+
+              final generatedYaml =
+                  await projectDirectory.getGeneratedIosShorebirdYaml(
+                      //flavor: 'internal',
+                      );
+
+              expect(generatedYaml['app_id'], equals('internal_123'));
+              expect(
+                generatedYaml['patch_public_key'],
+                equals(base64PublicKey),
+              );
+            },
+          );
+        });
+      });
     },
     testOn: 'mac-os',
   );

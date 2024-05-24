@@ -27,7 +27,7 @@ Future<ProcessResult> _runFlutterCommand(
   List<String> arguments, {
   required Directory workingDirectory,
   Map<String, String>? environment,
-}) async {
+}) {
   return Process.run(
     _flutterBinaryFile.absolute.path,
     arguments,
@@ -110,42 +110,59 @@ extension ShorebirdProjectDirectoryOnDirectory on Directory {
         path.join(this.path, 'android', 'app', 'build.gradle'),
       );
 
-  void addAndroidFlavors() {
-    // TODO(erickzanardo): Maybe in the future make this more dynamic
-    // and allow the user to pass the flavors, but it is good for now.
-    const flavors = '''
-    flavorDimensions "track"
-    productFlavors {
-      playStore {
-        dimension "track"
-        applicationIdSuffix ".ps"
-      }
-      internal {
-        dimension "track"
-        applicationIdSuffix ".internal"
-      }
-      global {
-        dimension "track"
-        applicationIdSuffix ".global"
-      }
-    }
-''';
+  Future<void> addPubDependency(String name, {bool dev = false}) {
+    return _runFlutterCommand(
+      ['pub', 'add', if (dev) '--dev', name],
+      workingDirectory: this,
+    );
+  }
 
-    final currentGradleContent = appGradleFile.readAsStringSync();
-    appGradleFile.writeAsStringSync(
-      '''
-${currentGradleContent.replaceFirst(
-        '    buildTypes {',
-        '    $flavors\n    buildTypes {',
-      )}
-''',
+  Future<void> addProjectFlavors() async {
+    await addPubDependency('flutter_flavorizr', dev: true);
+
+    await File(
+      path.join(
+        this.path,
+        'flavorizr.yaml',
+      ),
+    ).writeAsString('''
+flavors:
+  playStore:
+    app:
+      name: "App"
+
+    android:
+      applicationId: "com.example.shorebird_test"
+    ios:
+      bundleId: "com.example.shorebird_test"
+  internal:
+    app:
+      name: "App (Internal)"
+
+    android:
+      applicationId: "com.example.shorebird_test.internal"
+    ios:
+      bundleId: "com.example.shorebird_test.internal"
+  global:
+    app:
+      name: "App (Global)"
+
+    android:
+      applicationId: "com.example.shorebird_test.global"
+    ios:
+      bundleId: "com.example.shorebird_test.global"
+''');
+
+    await _runFlutterCommand(
+      ['pub', 'run', 'flutter_flavorizr'],
+      workingDirectory: this,
     );
   }
 
   void addShorebirdFlavors() {
     const flavors = '''
 flavors:
-  global: global_123 
+  global: global_123
   internal: internal_123
   playStore: playStore_123
 ''';
@@ -179,11 +196,12 @@ $flavors
 
   Future<void> runFlutterBuildIos({
     Map<String, String>? environment,
+    String? flavor,
   }) async {
     final result = await _runFlutterCommand(
       // The projects used to test are generated on spot, to make it simpler we don't
       // configure any apple accounts on it, so we skip code signing here.
-      ['build', 'ipa', '--no-codesign'],
+      ['build', 'ipa', '--no-codesign', if (flavor != null) '--flavor=$flavor'],
       workingDirectory: this,
       environment: environment,
     );
@@ -233,7 +251,7 @@ $flavors
     return loadYaml(yamlString) as YamlMap;
   }
 
-  Future<YamlMap> getGeneratedIoShorebirdYaml() async {
+  Future<YamlMap> getGeneratedIosShorebirdYaml() async {
     final yamlString = File(
       path.join(
         iosArchiveFile().path,
