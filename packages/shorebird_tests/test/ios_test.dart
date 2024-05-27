@@ -53,9 +53,7 @@ void main() {
             await projectDirectory.runFlutterBuildIos(flavor: 'internal');
 
             final generatedYaml =
-                await projectDirectory.getGeneratedIosShorebirdYaml(
-                    //flavor: 'internal',
-                    );
+                await projectDirectory.getGeneratedIosShorebirdYaml();
 
             expect(generatedYaml['app_id'], equals('internal_123'));
           },
@@ -77,9 +75,7 @@ void main() {
               );
 
               final generatedYaml =
-                  await projectDirectory.getGeneratedIosShorebirdYaml(
-                      //flavor: 'internal',
-                      );
+                  await projectDirectory.getGeneratedIosShorebirdYaml();
 
               expect(generatedYaml['app_id'], equals('internal_123'));
               expect(
