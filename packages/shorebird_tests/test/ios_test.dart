@@ -34,7 +34,6 @@ void main() {
               containsAll(originalYaml.keys),
             );
 
-            print(generatedYaml);
             expect(
               generatedYaml['patch_public_key'],
               equals(base64PublicKey),
