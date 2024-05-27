@@ -57,5 +57,5 @@ jobs:
           java-version: "11"
 
       - name: 🐦 Run Shorebird Tests
-        run: dart test --concurrency=1
+        run: dart test
         working-directory: packages/shorebird_tests
