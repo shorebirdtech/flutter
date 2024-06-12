@@ -541,12 +541,13 @@ Future<XcodeBuildResult> buildXcodeProject({
 }
 
 void updateShorebirdYaml(BuildInfo buildInfo, BuildableIOSApp app) {
+  final String resolvedAppName = app.name ?? 'Runner.app';
   final File shorebirdYaml = globals.fs.file(
     globals.fs.path.join(
       app.archiveBundleOutputPath,
       'Products',
       'Applications',
-      app.name ?? 'Runner.app',
+      resolvedAppName,
       'Frameworks',
       'App.framework',
       'flutter_assets',
@@ -554,8 +555,36 @@ void updateShorebirdYaml(BuildInfo buildInfo, BuildableIOSApp app) {
     ),
   );
   if (!shorebirdYaml.existsSync()) {
+    // Find the closest existing parent of the file.
+    Directory parent = shorebirdYaml.parent;
+
+    int i = 0;
+    // The max depth is just a hard limit to prevent the cli from going too far back in the
+    // folder tree and unintentionally "invading" a user folder that isn't the project. 
+    //
+    // This limit should never be reached though, since at least the `Applications` or
+    // `Products` folder should exist, no matter what changed in the app.
+    // This is really just an overcautious from our side to make sure we never
+    // access files that we don't need.
+    const int maxDepth = 7;
+    while (!parent.existsSync() && i < maxDepth) {
+      parent = parent.parent;
+      i++;
+    }
+
+    String parentChildren = '';
+    if (parent.existsSync()) {
+      parentChildren = parent.listSync().map((FileSystemEntity entity) => entity.basename).join(', ');
+    }
+
     throw Exception('''
 Cannot find shorebird.yaml in ${shorebirdYaml.absolute.path}.
+Resolved app name: $resolvedAppName
+
+Closest existing parent:
+  PATH: ${parent.absolute.path}
+  CHILDREN: $parentChildren
+
 Please file an issue at: https://github.com/shorebirdtech/shorebird/issues/new
 ''');
   }
