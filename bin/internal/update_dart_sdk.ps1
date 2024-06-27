@@ -64,6 +64,7 @@ if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") {
     }
 }
 $dartSdkUrl = "$dartSdkBaseUrl/flutter_infra_release/flutter/$engineVersion/$dartZipName"
+Write-Host "Downloading Dart SDK from $dartSdkUrl..."
 
 if ((Test-Path $dartSdkPath) -or (Test-Path $dartSdkLicense)) {
     # Move old SDK to a new location instead of deleting it in case it is still in use (e.g. by IntelliJ).
@@ -102,21 +103,24 @@ If (Get-Command 7z -errorAction SilentlyContinue) {
     Write-Host "Expanding downloaded archive with 7z..."
     # The built-in unzippers are painfully slow. Use 7-Zip, if available.
     & 7z x $dartSdkZip "-o$cachePath" -bd | Out-Null
-} ElseIf (Get-Command 7za -errorAction SilentlyContinue) {
+}
+ElseIf (Get-Command 7za -errorAction SilentlyContinue) {
     Write-Host "Expanding downloaded archive with 7za..."
     # Use 7-Zip's standalone version 7za.exe, if available.
     & 7za x $dartSdkZip "-o$cachePath" -bd | Out-Null
-} ElseIf (Get-Command Microsoft.PowerShell.Archive\Expand-Archive -errorAction SilentlyContinue) {
+}
+ElseIf (Get-Command Microsoft.PowerShell.Archive\Expand-Archive -errorAction SilentlyContinue) {
     Write-Host "Expanding downloaded archive with PowerShell..."
     # Use PowerShell's built-in unzipper, if available (requires PowerShell 5+).
-    $global:ProgressPreference='SilentlyContinue'
+    $global:ProgressPreference = 'SilentlyContinue'
     Microsoft.PowerShell.Archive\Expand-Archive $dartSdkZip -DestinationPath $cachePath
-} Else {
+}
+Else {
     Write-Host "Expanding downloaded archive with Windows..."
     # As last resort: fall back to the Windows GUI.
     $shell = New-Object -com shell.application
     $zip = $shell.NameSpace($dartSdkZip)
-    foreach($item in $zip.items()) {
+    foreach ($item in $zip.items()) {
         $shell.Namespace($cachePath).copyhere($item)
     }
 }
@@ -125,4 +129,4 @@ Remove-Item $dartSdkZip
 $engineVersion | Out-File $engineStamp -Encoding ASCII
 
 # Try to delete all old SDKs and license files.
-Get-ChildItem -Path $cachePath | Where {$_.BaseName.StartsWith($oldDartSdkPrefix)} | Remove-Item -Recurse -ErrorAction SilentlyContinue
+Get-ChildItem -Path $cachePath | Where { $_.BaseName.StartsWith($oldDartSdkPrefix) } | Remove-Item -Recurse -ErrorAction SilentlyContinue
