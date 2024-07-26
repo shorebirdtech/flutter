@@ -8,23 +8,16 @@ on:
   pull_request:
     paths:
       - ".github/workflows/shorebird_tests.yaml"
-      - "packages/shorebird_tests/lib/**"
-      - "packages/shorebird_tests/test/**"
-      - "packages/shorebird_tests/pubspec.yaml"
-      - "packages/flutter_tools/lib/**"
-      - "packages/flutter_tools/test/**"
-      - "packages/flutter_tools/pubspec.yaml"
+      # /** is short and simple, rather than precise (lib/, test/ pubspec.yaml):
+      - "packages/shorebird_tests/**"
+      - "packages/flutter_tools/**"
   push:
     branches:
-      - main
+      - shorebird/dev
     paths:
       - ".github/workflows/shorebird_tests.yaml"
-      - "packages/shorebird_tests/lib/**"
-      - "packages/shorebird_tests/test/**"
-      - "packages/shorebird_tests/pubspec.yaml"
-      - "packages/flutter_tools/lib/**"
-      - "packages/flutter_tools/test/**"
-      - "packages/flutter_tools/pubspec.yaml"
+      - "packages/shorebird_tests/**"
+      - "packages/flutter_tools/**"
   workflow_dispatch:
 
 jobs:
@@ -38,6 +31,8 @@ jobs:
 
     name: 🐦 Shorebird Test
 
+    # TODO(eseidel): This is also set inside shorebird_tests, unclear if
+    # if it's needed here as well.
     env:
       FLUTTER_STORAGE_BASE_URL: https://download.shorebird.dev
 
@@ -48,6 +43,8 @@ jobs:
           # Fetch all branches and tags to ensure that Flutter can determine its version
           fetch-depth: 0
 
+      # TODO(eseidel): shorebird_tests seems to assume flutter is available
+      # yet it doesn't seem to set it up here?
       - name: 🎯 Setup Dart
         uses: dart-lang/setup-dart@v1
 

@@ -18,7 +18,8 @@ void updateShorebirdYaml(BuildInfo buildInfo, String shorebirdYamlPath) {
   final YamlMap yamlMap = input.contents as YamlMap;
   final Map<String, dynamic> compiled = compileShorebirdYaml(yamlMap, flavor: buildInfo.flavor, environment: globals.platform.environment);
   // Currently we write out over the same yaml file, we should fix this to
-  // write to a new .json file instead and avoid naming confusion.
+  // write to a new .json file instead and avoid naming confusion between the
+  // input and compiled files.
   final YamlEditor yamlEditor = YamlEditor('');
   yamlEditor.update(<Object?>[], compiled);
   shorebirdYaml.writeAsStringSync(yamlEditor.toString(), flush: true);
