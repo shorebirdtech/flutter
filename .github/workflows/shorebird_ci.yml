@@ -1,4 +1,4 @@
-name: shorebird_tests
+name: shorebird_ci
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
