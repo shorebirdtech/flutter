@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:io';
-
 import 'package:yaml/yaml.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 
@@ -18,7 +16,7 @@ void updateShorebirdYaml(BuildInfo buildInfo, String shorebirdYamlPath) {
   }
   final YamlDocument input = loadYamlDocument(shorebirdYaml.readAsStringSync());
   final YamlMap yamlMap = input.contents as YamlMap;
-  final Map<String, dynamic> compiled = compileShorebirdYaml(yamlMap, flavor: buildInfo.flavor);
+  final Map<String, dynamic> compiled = compileShorebirdYaml(yamlMap, flavor: buildInfo.flavor, environment: globals.platform.environment);
   // Currently we write out over the same yaml file, we should fix this to
   // write to a new .json file instead and avoid naming confusion.
   final YamlEditor yamlEditor = YamlEditor('');
@@ -26,7 +24,7 @@ void updateShorebirdYaml(BuildInfo buildInfo, String shorebirdYamlPath) {
   shorebirdYaml.writeAsStringSync(yamlEditor.toString(), flush: true);
 }
 
-String determineAppId(YamlMap yamlMap, {required String? flavor}) {
+String appIdForFlavor(YamlMap yamlMap, {required String? flavor}) {
   if (flavor == null) {
     final String? defaultAppId = yamlMap['app_id'] as String?;
     if (defaultAppId == null || defaultAppId.isEmpty) {
@@ -46,8 +44,8 @@ String determineAppId(YamlMap yamlMap, {required String? flavor}) {
   return flavorAppId;
 }
 
-Map<String, dynamic> compileShorebirdYaml(YamlMap yamlMap, {required String? flavor}) {
-  final String appId = determineAppId(yamlMap, flavor: flavor);
+Map<String, dynamic> compileShorebirdYaml(YamlMap yamlMap, {required String? flavor, required Map<String, String> environment}) {
+  final String appId = appIdForFlavor(yamlMap, flavor: flavor);
   final Map<String, dynamic> compiled = <String, dynamic>{
     'app_id': appId,
   };
@@ -58,7 +56,7 @@ Map<String, dynamic> compileShorebirdYaml(YamlMap yamlMap, {required String? fla
   }
   copyIfSet('base_url');
   copyIfSet('auto_update');
-  final String? shorebirdPublicKeyEnvVar = Platform.environment['SHOREBIRD_PUBLIC_KEY'];
+  final String? shorebirdPublicKeyEnvVar = environment['SHOREBIRD_PUBLIC_KEY'];
   if (shorebirdPublicKeyEnvVar != null) {
     compiled['patch_public_key'] = shorebirdPublicKeyEnvVar;
   }
