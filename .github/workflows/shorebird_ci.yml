@@ -6,19 +6,9 @@ concurrency:
 
 on:
   pull_request:
-    paths:
-      - ".github/workflows/shorebird_tests.yaml"
-      # /** is short and simple, rather than precise (lib/, test/ pubspec.yaml):
-      - "packages/shorebird_tests/**"
-      - "packages/flutter_tools/**"
   push:
     branches:
       - shorebird/dev
-    paths:
-      - ".github/workflows/shorebird_tests.yaml"
-      - "packages/shorebird_tests/**"
-      - "packages/flutter_tools/**"
-  workflow_dispatch:
 
 jobs:
   test:
