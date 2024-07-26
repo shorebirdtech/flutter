@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:io';
+
+import 'package:flutter_tools/src/build_info.dart';
 import 'package:flutter_tools/src/shorebird/shorebird_yaml.dart';
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
@@ -68,6 +71,28 @@ base_url: https://example.com
         'base_url': 'https://example.com',
         'patch_public_key': '4-a',
       });
+    });
+    test('edit in place', () {
+      const String yamlContents = '''
+app_id: 1-a
+auto_update: false
+flavors:
+  foo: 2-a
+  bar: 3-a
+base_url: https://example.com
+''';
+    // Make a temporary file to test editing in place.
+      final Directory tempDir = Directory.systemTemp.createTempSync('shorebird_yaml_test.');
+      final File tempFile = File('${tempDir.path}/shorebird.yaml');
+      tempFile.writeAsStringSync(yamlContents);
+      updateShorebirdYaml(const BuildInfo(BuildMode.release, 'foo', treeShakeIcons: false), tempFile.path, environment: <String, String>{'SHOREBIRD_PUBLIC_KEY': '4-a'});
+      final String updatedContents = tempFile.readAsStringSync();
+      // Order is not guaranteed, so parse as YAML to compare.
+      final YamlDocument updated = loadYamlDocument(updatedContents);
+      final YamlMap yamlMap = updated.contents as YamlMap;
+      expect(yamlMap['app_id'], '2-a');
+      expect(yamlMap['auto_update'], false);
+      expect(yamlMap['base_url'], 'https://example.com');
     });
   });
 }

@@ -9,14 +9,14 @@ import '../base/file_system.dart';
 import '../build_info.dart';
 import '../globals.dart' as globals;
 
-void updateShorebirdYaml(BuildInfo buildInfo, String shorebirdYamlPath) {
+void updateShorebirdYaml(BuildInfo buildInfo, String shorebirdYamlPath, {required Map<String, String> environment}) {
   final File shorebirdYaml = globals.fs.file(shorebirdYamlPath);
   if (!shorebirdYaml.existsSync()) {
     throw Exception('shorebird.yaml not found at $shorebirdYamlPath');
   }
   final YamlDocument input = loadYamlDocument(shorebirdYaml.readAsStringSync());
   final YamlMap yamlMap = input.contents as YamlMap;
-  final Map<String, dynamic> compiled = compileShorebirdYaml(yamlMap, flavor: buildInfo.flavor, environment: globals.platform.environment);
+  final Map<String, dynamic> compiled = compileShorebirdYaml(yamlMap, flavor: buildInfo.flavor, environment: environment);
   // Currently we write out over the same yaml file, we should fix this to
   // write to a new .json file instead and avoid naming confusion between the
   // input and compiled files.
