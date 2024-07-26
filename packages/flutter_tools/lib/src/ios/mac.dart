@@ -519,7 +519,7 @@ Future<XcodeBuildResult> buildXcodeProject({
     }
 
     try {
-      updateShorebirdYaml(buildInfo, app.shorebirdYamlPath);
+      updateShorebirdYaml(buildInfo, app.shorebirdYamlPath, environment: globals.platform.environment);
     } on Exception catch (error) {
       globals.printError('[shorebird] failed to generate shorebird configuration.\n$error');
       return XcodeBuildResult(success: false);

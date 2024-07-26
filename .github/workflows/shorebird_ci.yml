@@ -48,6 +48,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
         # TODO(eseidel): We can't run all flutter_tools tests until we make
         # our changes not throw exceptions on missing shorebird.yaml.
+        # https://github.com/shorebirdtech/shorebird/issues/2392
         run: ../../bin/flutter test test/general.shard/shorebird
         working-directory: packages/flutter_tools
 
