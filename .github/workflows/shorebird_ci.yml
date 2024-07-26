@@ -1,4 +1,4 @@
-name: shorebird_tests
+name: shorebird_ci
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -6,26 +6,9 @@ concurrency:
 
 on:
   pull_request:
-    paths:
-      - ".github/workflows/shorebird_tests.yaml"
-      - "packages/shorebird_tests/lib/**"
-      - "packages/shorebird_tests/test/**"
-      - "packages/shorebird_tests/pubspec.yaml"
-      - "packages/flutter_tools/lib/**"
-      - "packages/flutter_tools/test/**"
-      - "packages/flutter_tools/pubspec.yaml"
   push:
     branches:
-      - main
-    paths:
-      - ".github/workflows/shorebird_tests.yaml"
-      - "packages/shorebird_tests/lib/**"
-      - "packages/shorebird_tests/test/**"
-      - "packages/shorebird_tests/pubspec.yaml"
-      - "packages/flutter_tools/lib/**"
-      - "packages/flutter_tools/test/**"
-      - "packages/flutter_tools/pubspec.yaml"
-  workflow_dispatch:
+      - shorebird/dev
 
 jobs:
   test:
@@ -38,6 +21,8 @@ jobs:
 
     name: 🐦 Shorebird Test
 
+    # TODO(eseidel): This is also set inside shorebird_tests, unclear if
+    # if it's needed here as well.
     env:
       FLUTTER_STORAGE_BASE_URL: https://download.shorebird.dev
 
@@ -48,6 +33,8 @@ jobs:
           # Fetch all branches and tags to ensure that Flutter can determine its version
           fetch-depth: 0
 
+      # TODO(eseidel): shorebird_tests seems to assume flutter is available
+      # yet it doesn't seem to set it up here?
       - name: 🎯 Setup Dart
         uses: dart-lang/setup-dart@v1
 
@@ -55,6 +42,14 @@ jobs:
         with:
           distribution: "zulu"
           java-version: "11"
+
+      - name: 🐦 Run Flutter Tools Tests
+        # TODO(eseidel): Find a nice way to run this on windows.
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
+        # TODO(eseidel): We can't run all flutter_tools tests until we make
+        # our changes not throw exceptions on missing shorebird.yaml.
+        run: ../../bin/flutter test test/general.shard/shorebird
+        working-directory: packages/flutter_tools
 
       - name: 🐦 Run Shorebird Tests
         run: dart test

@@ -1332,6 +1332,11 @@ class FlutterPlugin implements Plugin<Project> {
                 }
                 Task copyFlutterAssetsTask = addFlutterDeps(variant)
                 copyFlutterAssetsTask.doLast {
+                  // TODO(eseidel): This is currently duplicating logic
+                  // inside shorebird_yaml.dart in the flutter tool.  We should
+                  // just call `flutter build shorebird-yaml` or something
+                  // instead, but I don't know how to call `flutter build`
+                  // from here yet.
                   def yaml = new Yaml()
                   def outputDir = copyFlutterAssetsTask.destinationDir
 

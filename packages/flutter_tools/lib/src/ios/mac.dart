@@ -8,11 +8,9 @@ import 'dart:io';
 import 'package:meta/meta.dart';
 import 'package:process/process.dart';
 import 'package:unified_analytics/unified_analytics.dart';
-import 'package:yaml/yaml.dart';
 
 import '../artifacts.dart';
 import '../base/file_system.dart';
-import '../base/io.dart';
 import '../base/logger.dart';
 import '../base/process.dart';
 import '../base/project_migrator.dart';
@@ -29,6 +27,7 @@ import '../migrations/xcode_script_build_phase_migration.dart';
 import '../migrations/xcode_thin_binary_build_phase_input_paths_migration.dart';
 import '../project.dart';
 import '../reporting/reporting.dart';
+import '../shorebird/shorebird_yaml.dart';
 import 'application_package.dart';
 import 'code_signing.dart';
 import 'migrations/host_app_info_plist_migration.dart';
@@ -520,7 +519,7 @@ Future<XcodeBuildResult> buildXcodeProject({
     }
 
     try {
-      updateShorebirdYaml(buildInfo, app);
+      updateShorebirdYaml(buildInfo, app.shorebirdYamlPath);
     } on Exception catch (error) {
       globals.printError('[shorebird] failed to generate shorebird configuration.\n$error');
       return XcodeBuildResult(success: false);
@@ -538,93 +537,6 @@ Future<XcodeBuildResult> buildXcodeProject({
       xcResult: xcResult,
     );
   }
-}
-
-void updateShorebirdYaml(BuildInfo buildInfo, BuildableIOSApp app) {
-  final String resolvedAppName = app.name ?? 'Runner.app';
-  final File shorebirdYaml = globals.fs.file(
-    globals.fs.path.join(
-      app.archiveBundleOutputPath,
-      'Products',
-      'Applications',
-      resolvedAppName,
-      'Frameworks',
-      'App.framework',
-      'flutter_assets',
-      'shorebird.yaml',
-    ),
-  );
-  if (!shorebirdYaml.existsSync()) {
-    // Find the closest existing parent of the file.
-    Directory parent = shorebirdYaml.parent;
-
-    int i = 0;
-    // The max depth is just a hard limit to prevent the cli from going too far back in the
-    // folder tree and unintentionally "invading" a user folder that isn't the project. 
-    //
-    // This limit should never be reached though, since at least the `Applications` or
-    // `Products` folder should exist, no matter what changed in the app.
-    // This is really just an overcautious from our side to make sure we never
-    // access files that we don't need.
-    const int maxDepth = 7;
-    while (!parent.existsSync() && i < maxDepth) {
-      parent = parent.parent;
-      i++;
-    }
-
-    String parentChildren = '';
-    if (parent.existsSync()) {
-      parentChildren = parent.listSync().map((FileSystemEntity entity) => entity.basename).join(', ');
-    }
-
-    throw Exception('''
-Cannot find shorebird.yaml in ${shorebirdYaml.absolute.path}.
-Resolved app name: $resolvedAppName
-
-Closest existing parent:
-  PATH: ${parent.absolute.path}
-  CHILDREN: $parentChildren
-
-Please file an issue at: https://github.com/shorebirdtech/shorebird/issues/new
-''');
-  }
-  final YamlDocument yaml = loadYamlDocument(shorebirdYaml.readAsStringSync());
-  final YamlMap yamlMap = yaml.contents as YamlMap;
-  final String? flavor = buildInfo.flavor;
-  String appId = '';
-  if (flavor == null) {
-    final String? defaultAppId = yamlMap['app_id'] as String?;
-    if (defaultAppId == null || defaultAppId.isEmpty) {
-      throw Exception('Cannot find "app_id" in shorebird.yaml');
-    }
-    appId = defaultAppId;
-  } else {
-    final YamlMap? yamlFlavors = yamlMap['flavors'] as YamlMap?;
-    if (yamlFlavors == null) {
-      throw Exception('Cannot find "flavors" in shorebird.yaml.');
-    }
-    final String? flavorAppId = yamlFlavors[flavor] as String?;
-    if (flavorAppId == null || flavorAppId.isEmpty) {
-      throw Exception('Cannot find "app_id" for $flavor in shorebird.yaml');
-    }
-    appId = flavorAppId;
-  }
-  final StringBuffer yamlContent = StringBuffer();
-  final String? baseUrl = yamlMap['base_url'] as String?;
-  yamlContent.writeln('app_id: $appId');
-  if (baseUrl != null) {
-    yamlContent.writeln('base_url: $baseUrl');
-  }
-  final bool? autoUpdate = yamlMap['auto_update'] as bool?;
-  if (autoUpdate != null) {
-    yamlContent.writeln('auto_update: $autoUpdate');
-  }
-
-  final String? shorebirdPublicKeyEnvVar = Platform.environment['SHOREBIRD_PUBLIC_KEY'];
-  if (shorebirdPublicKeyEnvVar != null) {
-    yamlContent.writeln('patch_public_key: $shorebirdPublicKeyEnvVar');
-  }
-  shorebirdYaml.writeAsStringSync(yamlContent.toString(), flush: true);
 }
 
 /// Extended attributes applied by Finder can cause code signing errors. Remove them.
