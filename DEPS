@@ -15,6 +15,10 @@ vars = {
   'skia_git': 'https://skia.googlesource.com',
   'llvm_git': 'https://llvm.googlesource.com',
   'skia_revision': 'e7b8d078851fd505475fe74359e31a421e6968ea',
+  "dart_sdk_revision": "ddb0f3b6c38b1774a3413c2c159b124be6bd1df7",
+  "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
+  "updater_git": "https://github.com/shorebirdtech/updater.git",
+  "updater_rev": "78c84e5bf72266da07df536e98d431782cb39a6d",
 
   # WARNING: DO NOT EDIT canvaskit_cipd_instance MANUALLY
   # See `lib/web_ui/README.md` for how to roll CanvasKit to a new version.
@@ -225,14 +229,14 @@ gclient_gn_args = [
 # Only these hosts are allowed for dependencies in this DEPS file.
 # If you need to add a new host, contact chrome infrastructure team.
 allowed_hosts = [
-  'boringssl.googlesource.com',
-  'chrome-infra-packages.appspot.com',
-  'chromium.googlesource.com',
-  'dart.googlesource.com',
-  'flutter.googlesource.com',
-  'llvm.googlesource.com',
-  'skia.googlesource.com',
-  'swiftshader.googlesource.com',
+    "boringssl.googlesource.com",
+    "chrome-infra-packages.appspot.com",
+    "chromium.googlesource.com",
+    "dart.googlesource.com",
+    "flutter.googlesource.com",
+    "llvm.googlesource.com",
+    "skia.googlesource.com",
+    "swiftshader.googlesource.com",
 ]
 
 deps = {
@@ -296,7 +300,7 @@ deps = {
   #  Var('flutter_git') + '/third_party/protobuf-gn' + '@' + Var('dart_protobuf_gn_rev'),
 
   'engine/src/flutter/third_party/dart':
-   Var('dart_git') + '/sdk.git' + '@' + Var('dart_revision'),
+   Var('dart_sdk_git') + '@' + Var('dart_sdk_revision'),
 
   # WARNING: Unused Dart dependencies in the list below till "WARNING:" marker are removed automatically - see create_updated_flutter_deps.py.
 
@@ -483,6 +487,9 @@ deps = {
 
   'engine/src/flutter/third_party/ocmock':
    Var('flutter_git') + '/third_party/ocmock' + '@' +  Var('ocmock_rev'),
+
+  'engine/src/flutter/third_party/updater':
+   Var('updater_git') + '@' + Var('updater_rev'),
 
   'engine/src/flutter/third_party/libjpeg-turbo/src':
    Var('flutter_git') + '/third_party/libjpeg-turbo' + '@' + '0fb821f3b2e570b2783a94ccd9a2fb1f4916ae9f',
