@@ -129,8 +129,17 @@ class AOTSnapshotter {
     final Directory outputDir = _fileSystem.directory(outputPath);
     outputDir.createSync(recursive: true);
 
+    final List<String> dumpClassTableLinkInfoArgs = <String>[
+      // Shorebird dumps the class table information during snapshot compilation which is later used during linking.
+      '--print_class_table_link_debug_info_to=${_fileSystem.path.join(outputDir.parent.path, 'App.class_table.json')}',
+      '--print_class_table_link_info_to=${_fileSystem.path.join(outputDir.parent.path, 'App.ct.link')}',
+    ];
+
     final List<String> genSnapshotArgs = <String>[
+      // Shorebird uses --deterministic to improve snapshot stability and increase linking.
       '--deterministic',
+      // Only use the default Shorebird gen_snapshot args on iOS.
+      if (platform == TargetPlatform.ios || platform == TargetPlatform.darwin) ...dumpClassTableLinkInfoArgs,
     ];
 
     final bool targetingApplePlatform =
