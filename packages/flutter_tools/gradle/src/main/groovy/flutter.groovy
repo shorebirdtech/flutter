@@ -6,6 +6,7 @@
 import com.android.build.OutputFile
 import groovy.json.JsonGenerator
 import groovy.xml.QName
+
 import java.nio.file.Paths
 import org.apache.tools.ant.taskdefs.condition.Os
 import org.gradle.api.DefaultTask
@@ -27,6 +28,7 @@ import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.internal.os.OperatingSystem
+import org.yaml.snakeyaml.Yaml
 
 /**
  * For apps only. Provides the flutter extension used in the app-level Gradle
@@ -116,6 +118,7 @@ buildscript {
         //  * AGP version constants in packages/flutter_tools/lib/src/android/gradle_utils.dart
         //  * AGP version in dependencies block in packages/flutter_tools/gradle/build.gradle.kts
         classpath("com.android.tools.build:gradle:7.3.0")
+        classpath(group: 'org.yaml', name: 'snakeyaml', version: '2.0')
     }
 }
 
@@ -1384,6 +1387,43 @@ class FlutterPlugin implements Plugin<Project> {
                     return
                 }
                 Task copyFlutterAssetsTask = addFlutterDeps(variant)
+                copyFlutterAssetsTask.doLast {
+                  // TODO(eseidel): This is currently duplicating logic
+                  // inside shorebird_yaml.dart in the flutter tool.  We should
+                  // just call `flutter build shorebird-yaml` or something
+                  // instead, but I don't know how to call `flutter build`
+                  // from here yet.
+                  def yaml = new Yaml()
+                  def outputDir = copyFlutterAssetsTask.destinationDir
+
+                  // Read the shorebird.yaml file into a map.
+                  def shorebirdYamlFile = new File("${outputDir}/flutter_assets/shorebird.yaml")
+                  def shorebirdYamlData = yaml.load(shorebirdYamlFile.text)
+
+                  // Update the app_id to the correct flavor if one was provided.
+                  if (variant.flavorName != null && !variant.flavorName.isEmpty()) {
+                    def shorebirdFlavor = shorebirdYamlData.flavors[variant.flavorName]
+                    if (shorebirdFlavor == null) {
+                      throw new GradleException("Flavor '${variant.flavorName}' not found in shorebird.yaml")
+                    }
+                    shorebirdYamlData['app_id'] = shorebirdFlavor
+                  }
+
+                  // Remove any flavors. This is a no-op if the flavors key doesn't exist.
+                  shorebirdYamlData.remove('flavors')
+
+                  // Add a public key if one was provided via an env var.
+                  // Ideally we'd have a way to pass the key as a parameter, but
+                  // an env var was the easiest way to get this working.
+                  def shorebirdPublicKeyEnvVar = System.getenv('SHOREBIRD_PUBLIC_KEY')
+                  if (shorebirdPublicKeyEnvVar != null && !shorebirdPublicKeyEnvVar.isEmpty()) {
+                    shorebirdYamlData['patch_public_key'] = shorebirdPublicKeyEnvVar
+                  }
+
+                  // Write the updated map back to the shorebird.yaml file.
+                  def updatedYamlString = yaml.dumpAsMap(shorebirdYamlData)
+                  shorebirdYamlFile.write(updatedYamlString)
+                }
                 def variantOutput = variant.outputs.first()
                 def processResources = variantOutput.hasProperty(propProcessResourcesProvider) ?
                     variantOutput.processResourcesProvider.get() : variantOutput.processResources
