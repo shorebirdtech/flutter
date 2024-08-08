@@ -172,11 +172,13 @@ source_set("flutter_linux_sources") {
 
   deps = [
     "//flutter/fml",
+    "//flutter/shell/common/shorebird",
     "//flutter/shell/platform/common:common_cpp_enums",
     "//flutter/shell/platform/common:common_cpp_input",
     "//flutter/shell/platform/common:common_cpp_switches",
     "//flutter/shell/platform/embedder:embedder_headers",
     "//flutter/third_party/rapidjson",
+    "//flutter/third_party/tonic",
   ]
 }
 
