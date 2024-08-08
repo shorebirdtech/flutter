@@ -5,15 +5,20 @@
 #include "flutter/shell/platform/windows/flutter_windows_engine.h"
 
 #include <dwmapi.h>
+#include <shlobj.h>
+#include <windows.h>
+#include <winerror.h>
 
 #include <filesystem>
 #include <shared_mutex>
 #include <sstream>
+#include <string>
 
 #include "flutter/fml/logging.h"
 #include "flutter/fml/paths.h"
 #include "flutter/fml/platform/win/wstring_conversion.h"
 #include "flutter/fml/synchronization/waitable_event.h"
+#include "flutter/shell/common/shorebird/shorebird.h"
 #include "flutter/shell/platform/common/client_wrapper/binary_messenger_impl.h"
 #include "flutter/shell/platform/common/client_wrapper/include/flutter/standard_message_codec.h"
 #include "flutter/shell/platform/common/path_utils.h"
@@ -27,6 +32,7 @@
 #include "flutter/shell/platform/windows/task_runner.h"
 #include "flutter/third_party/accessibility/ax/ax_node.h"
 #include "shell/platform/windows/flutter_project_bundle.h"
+#include "third_party/tonic/filesystem/filesystem/file.h"
 
 // winbase.h defines GetCurrentTime as a macro.
 #undef GetCurrentTime
@@ -246,13 +252,125 @@ bool FlutterWindowsEngine::Run() {
   return Run("");
 }
 
+int GetReleaseVersionAndBuildNumber(ReleaseVersion* release_version) {
+  char module_path[MAX_PATH];
+  // Get the full path of the currently running executable. The return value is
+  // the size of the string that was copied to the buffer, with -1 indicating
+  // failure.
+  if (GetModuleFileNameA(NULL, module_path, MAX_PATH) == -1) {
+    return -1;
+  }
+
+  // Get the size of the version information
+  DWORD handle = -1;
+  DWORD version_info_size = GetFileVersionInfoSizeA(module_path, &handle);
+  if (version_info_size == -1) {
+    return -1;
+  }
+
+  // Allocate memory for version info
+  // std::vector<char> version_data(version_info_size);
+  std::unique_ptr<char[]> version_data(new char[version_info_size]);
+  if (!GetFileVersionInfoA(module_path, handle, version_info_size,
+                           version_data.get())) {
+    return -1;
+  }
+
+  // Get the version info structure
+  VS_FIXEDFILEINFO* file_info = nullptr;
+  UINT file_info_size = -1;
+  if (!VerQueryValueA(version_data.get(), "\\",
+                      reinterpret_cast<LPVOID*>(&file_info), &file_info_size)) {
+    return -1;
+  }
+
+  if (file_info) {
+    // Extract version numbers
+    DWORD major = HIWORD(file_info->dwFileVersionMS);
+    DWORD minor = LOWORD(file_info->dwFileVersionMS);
+    DWORD build = HIWORD(file_info->dwFileVersionLS);
+
+    char version[49];
+    snprintf(version, sizeof(version), "%lu.%lu.%lu", major, minor, build);
+    release_version->version = std::string(version);
+    release_version->build_number =
+        std::to_string(LOWORD(file_info->dwFileVersionLS));
+    return kSuccess;
+  }
+
+  return -1;
+}
+
+bool GetLocalAppDataPath(std::string& outPath) {
+  PWSTR path = nullptr;
+  HRESULT result = SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, NULL, &path);
+  if (!SUCCEEDED(result)) {
+    return false;
+  }
+
+  std::wstring widePath(path);
+  std::string localAppDataPath(widePath.begin(), widePath.end());
+  // The calling process is responsible for freeing this resource
+  // https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shgetknownfolderpath
+  CoTaskMemFree(path);
+  outPath = localAppDataPath;
+  return true;
+}
+
+bool SetUpShorebird(std::string assets_path_string, std::string& patch_path) {
+  auto shorebird_yaml_path =
+      fml::paths::JoinPaths({assets_path_string, "shorebird.yaml"});
+  std::string shorebird_yaml_contents("");
+  if (!filesystem::ReadFileToString(shorebird_yaml_path,
+                                    &shorebird_yaml_contents)) {
+    FML_LOG(ERROR) << "Failed to read shorebird.yaml.";
+    return false;
+  }
+
+  std::string code_cache_path;
+  if (!GetLocalAppDataPath(code_cache_path)) {
+    FML_LOG(ERROR) << "Failed to retrieve the local AppData directory.";
+    return false;
+  }
+
+  auto executable_location = fml::paths::GetExecutableDirectoryPath().second;
+  auto app_path =
+      fml::paths::JoinPaths({executable_location, "data", "app.so"});
+  ReleaseVersion release_version;
+  auto release_version_result =
+      GetReleaseVersionAndBuildNumber(&release_version);
+  if (release_version_result != kSuccess) {
+    FML_LOG(ERROR)
+        << "Failed to retrieve the release version and build number.";
+    return false;
+  }
+
+  ShorebirdConfigArgs shorebird_args(code_cache_path, code_cache_path, app_path,
+                                     shorebird_yaml_contents, release_version);
+  return ConfigureShorebird(shorebird_args, patch_path);
+}
+
 bool FlutterWindowsEngine::Run(std::string_view entrypoint) {
+  std::string assets_path_string = project_->assets_path().u8string();
+  std::string icu_path_string = project_->icu_path().u8string();
+
   if (!project_->HasValidPaths()) {
     FML_LOG(ERROR) << "Missing or unresolvable paths to assets.";
     return false;
   }
-  std::string assets_path_string = project_->assets_path().u8string();
-  std::string icu_path_string = project_->icu_path().u8string();
+
+  std::string patch_path;
+  auto setup_shorebird_result = SetUpShorebird(assets_path_string, patch_path);
+  if (setup_shorebird_result) {
+    // If we have a patch installed, we replace the default AOT library path
+    // with the patch path here.
+    FML_LOG(INFO) << "Setting project patch path: " << patch_path;
+    project_->SetAotLibraryPath(patch_path);
+  } else {
+    FML_LOG(ERROR) << "Failed to configure Shorebird.";
+  }
+
+  // This loads AOT data from the project_'s aot_library_path_.
   if (embedder_api_.RunsAOTCompiledDartCode()) {
     aot_data_ = project_->LoadAotData(embedder_api_);
     if (!aot_data_) {
@@ -381,6 +499,15 @@ bool FlutterWindowsEngine::Run(std::string_view entrypoint) {
     if (host->root_isolate_create_callback_) {
       host->root_isolate_create_callback_();
     }
+  };
+  // Copied from shell\platform\darwin\macos\framework\Source\FlutterEngine.mm
+  // Writes log messages to stdout.
+  args.log_message_callback = [](const char* tag, const char* message,
+                                 void* user_data) {
+    if (tag && tag[0]) {
+      std::cout << tag << ": ";
+    }
+    std::cout << message << std::endl;
   };
   args.channel_update_callback = [](const FlutterChannelUpdate* update,
                                     void* user_data) {
