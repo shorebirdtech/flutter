@@ -7,6 +7,7 @@ import com.android.build.OutputFile
 import com.flutter.gradle.BaseApplicationNameHandler
 import groovy.json.JsonGenerator
 import groovy.xml.QName
+
 import java.nio.file.Paths
 import org.apache.tools.ant.taskdefs.condition.Os
 import org.gradle.api.DefaultTask
@@ -30,6 +31,7 @@ import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.internal.os.OperatingSystem
+import org.yaml.snakeyaml.Yaml
 
 /**
  * For apps only. Provides the flutter extension used in the app-level Gradle
@@ -102,6 +104,41 @@ class FlutterExtension {
         return flutterVersionName
     }
 }
+
+// This buildscript block supplies dependencies for this file's own import
+// declarations above. It exists solely for compatibility with projects that
+// have not migrated to declaratively apply the Flutter Gradle Plugin;
+// for those that have, FGP's `build.gradle.kts`  takes care of this.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // When bumping, also update:
+        //  * ndkVersion in FlutterExtension in packages/flutter_tools/gradle/src/main/groovy/flutter.groovy
+        //  * AGP version in the buildscript block in packages/flutter_tools/gradle/src/main/kotlin/dependency_version_checker.gradle.kts
+        //  * AGP version constants in packages/flutter_tools/lib/src/android/gradle_utils.dart
+        //  * AGP version in dependencies block in packages/flutter_tools/gradle/build.gradle.kts
+        classpath("com.android.tools.build:gradle:7.3.0")
+        classpath(group: 'org.yaml', name: 'snakeyaml', version: '2.0')
+    }
+}
+
+/**
+ * Some apps don't set default compile options.
+ * Apps can change these values in the app-level Gradle build file
+ * (android/app/build.gradle or android/app/build.gradle.kts).
+ * This just ensures that default values are set.
+ */
+android {
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+apply plugin: FlutterPlugin
 
 class FlutterPlugin implements Plugin<Project> {
 
