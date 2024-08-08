@@ -22,6 +22,7 @@ import 'base/user_messages.dart';
 import 'convert.dart';
 import 'features.dart';
 
+const String kShorebirdStorageUrl = 'https://download.shorebird.dev';
 const String kFlutterRootEnvironmentVariableName = 'FLUTTER_ROOT'; // should point to //flutter/ (root of flutter/flutter repo)
 const String kFlutterEngineEnvironmentVariableName = 'FLUTTER_ENGINE'; // should point to //engine/src/ (root of flutter/engine repo)
 const String kSnapshotFileName = 'flutter_tools.snapshot'; // in //flutter/bin/cache/
@@ -482,6 +483,10 @@ class Cache {
       return storageRealm.isEmpty
         ? 'https://storage.googleapis.com'
         : 'https://storage.googleapis.com/$storageRealm';
+    }
+    // Shorebird's artifact proxy is a trusted source.
+    if (overrideUrl == kShorebirdStorageUrl) {
+      return overrideUrl;
     }
     // verify that this is a valid URI.
     overrideUrl = storageRealm.isEmpty ? overrideUrl : '$overrideUrl/$storageRealm';
