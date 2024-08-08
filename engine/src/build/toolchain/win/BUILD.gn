@@ -201,8 +201,11 @@ template("msvc_toolchain") {
       expname = "${dllname}.exp"
       pdbname = "${dllname}.pdb"
       rspfile = "${dllname}.rsp"
+      # .def files are used to export symbols from the DLL. This arg will be
+      # removed by the python tool wrapper if the .def file doesn't exist.
+      deffile = "${dllname}.def"
 
-      link_command = "\"$python_path\" $tool_wrapper_path link-wrapper $env False link.exe /nologo /IMPLIB:$libname /DLL /OUT:$dllname /PDB:${dllname}.pdb @$rspfile"
+      link_command = "\"$python_path\" $tool_wrapper_path link-wrapper $env False link.exe /nologo /IMPLIB:$libname /DLL /OUT:$dllname /PDB:${dllname}.pdb /DEF:$deffile @$rspfile"
 
       # TODO(brettw) support manifests
       #manifest_command = "\"$python_path\" $tool_wrapper_path manifest-wrapper $env mt.exe -nologo -manifest $manifests -out:${dllname}.manifest"

@@ -34,6 +34,7 @@
 #import "flutter/third_party/spring_animation/spring_animation.h"
 
 FLUTTER_ASSERT_ARC
+#import <third_party/dart/runtime/vm/cpu.h>
 
 static constexpr int kMicrosecondsPerSecond = 1000 * 1000;
 static constexpr CGFloat kScrollViewContentSize = 2.0;
@@ -256,6 +257,8 @@ typedef struct MouseState {
   if (!project) {
     project = [[FlutterDartProject alloc] init];
   }
+  FML_LOG(INFO) << "CPU::Id(): " << dart::CPU::Id();
+
   FlutterView.forceSoftwareRendering = project.settings.enable_software_rendering;
   FlutterEngine* engine = [[FlutterEngine alloc] initWithName:@"io.flutter"
                                                       project:project
