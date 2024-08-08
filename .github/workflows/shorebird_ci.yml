@@ -1,0 +1,57 @@
+name: shorebird_ci
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+  push:
+    branches:
+      - shorebird/dev
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    name: 🐦 Shorebird Test
+
+    # TODO(eseidel): This is also set inside shorebird_tests, unclear if
+    # if it's needed here as well.
+    env:
+      FLUTTER_STORAGE_BASE_URL: https://download.shorebird.dev
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@v4
+        with:
+          # Fetch all branches and tags to ensure that Flutter can determine its version
+          fetch-depth: 0
+
+      # TODO(eseidel): shorebird_tests seems to assume flutter is available
+      # yet it doesn't seem to set it up here?
+      - name: 🎯 Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
+      - name: 🐦 Run Flutter Tools Tests
+        # TODO(eseidel): Find a nice way to run this on windows.
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
+        # TODO(eseidel): We can't run all flutter_tools tests until we make
+        # our changes not throw exceptions on missing shorebird.yaml.
+        # https://github.com/shorebirdtech/shorebird/issues/2392
+        run: ../../bin/flutter test test/general.shard/shorebird
+        working-directory: packages/flutter_tools
+
+      - name: 🐦 Run Shorebird Tests
+        run: dart test
+        working-directory: packages/shorebird_tests
