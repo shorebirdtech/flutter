@@ -85,7 +85,16 @@ base_url: https://example.com
       final Directory tempDir = Directory.systemTemp.createTempSync('shorebird_yaml_test.');
       final File tempFile = File('${tempDir.path}/shorebird.yaml');
       tempFile.writeAsStringSync(yamlContents);
-      updateShorebirdYaml(const BuildInfo(BuildMode.release, 'foo', treeShakeIcons: false), tempFile.path, environment: <String, String>{'SHOREBIRD_PUBLIC_KEY': '4-a'});
+      updateShorebirdYaml(
+        const BuildInfo(
+          BuildMode.release,
+          'foo',
+          treeShakeIcons: false,
+          packageConfigPath: '',
+        ),
+        tempFile.path,
+        environment: <String, String>{'SHOREBIRD_PUBLIC_KEY': '4-a'},
+      );
       final String updatedContents = tempFile.readAsStringSync();
       // Order is not guaranteed, so parse as YAML to compare.
       final YamlDocument updated = loadYamlDocument(updatedContents);
