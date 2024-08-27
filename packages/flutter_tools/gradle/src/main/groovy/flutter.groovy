@@ -1404,7 +1404,11 @@ class FlutterPlugin implements Plugin<Project> {
 
                   // Update the app_id to the correct flavor if one was provided.
                   if (variant.flavorName != null && !variant.flavorName.isEmpty()) {
-                    shorebirdYamlData['app_id'] = shorebirdYamlData.flavors[variant.flavorName]
+                    def shorebirdFlavor = shorebirdYamlData.flavors[variant.flavorName]
+                    if (shorebirdFlavor == null) {
+                      throw new GradleException("Flavor '${variant.flavorName}' not found in shorebird.yaml")
+                    }
+                    shorebirdYamlData['app_id'] = shorebirdFlavor
                   }
 
                   // Remove any flavors. This is a no-op if the flavors key doesn't exist.
