@@ -849,6 +849,24 @@ void main() {
     expect(webCacheDirectory.childFile('bar'), isNot(exists));
   });
 
+  testWithoutContext('No warning is logged when FLUTTER_STORAGE_BASE_URL points to $kShorebirdStorageUrl', () async {
+    final MemoryFileSystem fileSystem = MemoryFileSystem.test();
+    final BufferLogger logger = BufferLogger.test();
+    final Cache cache = Cache.test(
+      logger: logger,
+      processManager: FakeProcessManager.any(),
+      fileSystem: fileSystem,
+      platform: FakePlatform(
+        environment: <String, String>{
+          'FLUTTER_STORAGE_BASE_URL': kShorebirdStorageUrl,
+        },
+      ),
+    );
+
+    expect(cache.storageBaseUrl, kShorebirdStorageUrl);
+    expect(logger.warningText, isEmpty);
+  });
+
   testWithoutContext('FlutterWebSdk CanvasKit URL can be overridden via FLUTTER_STORAGE_BASE_URL', () async {
     final MemoryFileSystem fileSystem = MemoryFileSystem.test();
     final Directory internalDir = fileSystem.currentDirectory
