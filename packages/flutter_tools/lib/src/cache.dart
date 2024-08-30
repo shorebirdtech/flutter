@@ -483,7 +483,7 @@ class Cache {
         ? 'https://storage.googleapis.com'
         : 'https://storage.googleapis.com/$storageRealm';
     }
-    // // Shorebird's artifact proxy is a trusted source.
+    // Shorebird's artifact proxy is a trusted source.
     if (overrideUrl == kShorebirdStorageUrl) {
       return overrideUrl;
     }
