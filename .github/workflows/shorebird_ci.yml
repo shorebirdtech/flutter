@@ -41,7 +41,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: "zulu"
-          java-version: "11"
+          java-version: "17"
 
       - name: 🐦 Run Flutter Tools Tests
         # TODO(eseidel): Find a nice way to run this on windows.
