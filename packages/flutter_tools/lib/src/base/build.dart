@@ -133,8 +133,8 @@ class AOTSnapshotter {
       // Shorebird uses --deterministic to improve snapshot stability and increase linking.
       '--deterministic',
       // Shorebird dumps the class table information during snapshot compilation.
-      '--print_class_table_link_debug_info_to=${_fileSystem.path.join(outputDir.path, 'class_table.json')}',
-      '--print_class_table_link_info_to=${_fileSystem.path.join(outputDir.path, 'ct.link')}',
+      '--print_class_table_link_debug_info_to=${_fileSystem.path.join(outputDir.path, 'App.class_table.json')}',
+      '--print_class_table_link_info_to=${_fileSystem.path.join(outputDir.path, 'App.ct.link')}',
     ];
 
     final bool targetingApplePlatform =
