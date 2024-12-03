@@ -159,6 +159,7 @@ class AotAssemblyRelease extends AotAssemblyBase {
   @override
   List<Source> get outputs => const <Source>[
     Source.pattern('{OUTPUT_DIR}/App.framework/App'),
+    Source.pattern('{OUTPUT_DIR}/App.ct.link') // Shorebird class table link information.
   ];
 
   @override
