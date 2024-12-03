@@ -129,7 +129,7 @@ class AOTSnapshotter {
     final Directory outputDir = _fileSystem.directory(outputPath);
     outputDir.createSync(recursive: true);
 
-    final Directory shorebirdOutputDir = _fileSystem.directory(_fileSystem.path.join(outputDir.parent.path, 'shorebird'));
+    final Directory shorebirdOutputDir = _fileSystem.directory(_fileSystem.path.join(outputDir.parent.parent.path, 'shorebird'));
     shorebirdOutputDir.createSync(recursive: true);
 
     final List<String> shorebirdDefaultGenSnapshotArgs = <String>[
