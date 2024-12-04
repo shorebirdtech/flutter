@@ -629,6 +629,18 @@ class ReleaseIosApplicationBundle extends _IosAssetBundleWithDSYM {
   ];
 
   @override
+  List<Source> get inputs => <Source>[
+    ...super.inputs,
+    const Source.pattern('{BUILD_DIR}/App.ct.link'),
+  ];
+
+  @override
+  List<Source> get outputs => <Source>[
+    ...super.outputs,
+    const Source.pattern('{OUTPUT_DIR}/App.ct.link'),
+  ];
+
+  @override
   Future<void> build(Environment environment) async {
     bool buildSuccess = true;
     try {
