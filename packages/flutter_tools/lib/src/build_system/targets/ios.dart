@@ -132,12 +132,11 @@ abstract class AotAssemblyBase extends Target {
       skipMissingInputs: true,
     );
 
-    // Copy the class table link information to the output directory.
-    globals.fs.directory(buildOutputPath).childFile('App.ct.link').copySync(
-        globals.fs
-            .directory(environment.outputDir.path)
-            .childFile('App.ct.link')
-            .path);
+    // Copy the class table link information from the buildOutputPath to the iOS build directory.
+    final File classTableLink = environment.fileSystem.file(environment.fileSystem.path.join(buildOutputPath, 'App.ct.link'));
+    if (classTableLink.existsSync()) {
+      classTableLink.copySync(environment.fileSystem.path.join(getIosBuildDirectory(), 'App.ct.link'));
+    }
   }
 }
 
