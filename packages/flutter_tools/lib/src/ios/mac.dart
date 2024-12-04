@@ -545,13 +545,14 @@ Future<XcodeBuildResult> buildXcodeProject({
       }
     }
 
+    // Copy shorebird class table link information into the generated xcarchive.
     final File classTableLinkInfo = globals.fs.file(globals.fs.path.join(getIosBuildDirectory(), 'shorebird', 'App.ct.link'));
     if (classTableLinkInfo.existsSync()) {
       final Directory outputShorebirdDirectory = globals.fs.directory(globals.fs.path.join(outputDir!, 'shorebird'));
       if (outputShorebirdDirectory.existsSync()) {
         outputShorebirdDirectory.deleteSync(recursive: true);
       }
-      classTableLinkInfo.copySync(outputShorebirdDirectory.path);
+      classTableLinkInfo.copySync(globals.fs.path.join(outputShorebirdDirectory.path, 'App.ct.link'));
     }
 
     try {
