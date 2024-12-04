@@ -545,7 +545,6 @@ Future<XcodeBuildResult> buildXcodeProject({
       }
     }
 
-
     try {
       updateShorebirdYaml(buildInfo, app.shorebirdYamlPath, environment: globals.platform.environment);
     } on Exception catch (error) {
