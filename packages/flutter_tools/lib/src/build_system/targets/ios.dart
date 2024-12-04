@@ -132,12 +132,12 @@ abstract class AotAssemblyBase extends Target {
       skipMissingInputs: true,
     );
 
-    // // Copy the class table link information to the output directory.
-    // globals.fs.directory(buildOutputPath).childFile('App.ct.link').copySync(
-    //     globals.fs
-    //         .directory(environment.outputDir.path)
-    //         .childFile('App.ct.link')
-    //         .path);
+    // Copy the class table link information to the output directory.
+    globals.fs.directory(buildOutputPath).childFile('App.ct.link').copySync(
+        globals.fs
+            .directory(environment.outputDir.path)
+            .childFile('App.ct.link')
+            .path);
   }
 }
 
@@ -152,7 +152,6 @@ class AotAssemblyRelease extends AotAssemblyBase {
   List<Source> get inputs => const <Source>[
     Source.pattern('{FLUTTER_ROOT}/packages/flutter_tools/lib/src/build_system/targets/ios.dart'),
     Source.pattern('{BUILD_DIR}/app.dill'),
-    Source.pattern('{BUILD_DIR}/App.ct.link'),
     Source.artifact(Artifact.engineDartBinary),
     Source.artifact(Artifact.skyEnginePath),
     // TODO(zanderso): cannot reference gen_snapshot with artifacts since
@@ -167,7 +166,6 @@ class AotAssemblyRelease extends AotAssemblyBase {
   @override
   List<Source> get outputs => const <Source>[
     Source.pattern('{OUTPUT_DIR}/App.framework/App'),
-    Source.pattern('{OUTPUT_DIR}/App.ct.link') // Shorebird class table link information.
   ];
 
   @override
