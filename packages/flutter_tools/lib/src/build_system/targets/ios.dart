@@ -131,6 +131,13 @@ abstract class AotAssemblyBase extends Target {
       // Don't fail if the dSYM wasn't created (i.e. during a debug build).
       skipMissingInputs: true,
     );
+
+    // // Copy the class table link information to the output directory.
+    // globals.fs.directory(buildOutputPath).childFile('App.ct.link').copySync(
+    //     globals.fs
+    //         .directory(environment.outputDir.path)
+    //         .childFile('App.ct.link')
+    //         .path);
   }
 }
 
@@ -145,6 +152,7 @@ class AotAssemblyRelease extends AotAssemblyBase {
   List<Source> get inputs => const <Source>[
     Source.pattern('{FLUTTER_ROOT}/packages/flutter_tools/lib/src/build_system/targets/ios.dart'),
     Source.pattern('{BUILD_DIR}/app.dill'),
+    Source.pattern('{BUILD_DIR}/App.ct.link'),
     Source.artifact(Artifact.engineDartBinary),
     Source.artifact(Artifact.skyEnginePath),
     // TODO(zanderso): cannot reference gen_snapshot with artifacts since
@@ -626,18 +634,6 @@ class ReleaseIosApplicationBundle extends _IosAssetBundleWithDSYM {
   @override
   List<Target> get dependencies => const <Target>[
     AotAssemblyRelease(),
-  ];
-
-  @override
-  List<Source> get inputs => <Source>[
-    ...super.inputs,
-    const Source.pattern('{BUILD_DIR}/App.ct.link'),
-  ];
-
-  @override
-  List<Source> get outputs => <Source>[
-    ...super.outputs,
-    const Source.pattern('{OUTPUT_DIR}/App.ct.link'),
   ];
 
   @override
