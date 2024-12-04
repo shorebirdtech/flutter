@@ -545,6 +545,15 @@ Future<XcodeBuildResult> buildXcodeProject({
       }
     }
 
+    final File classTableLinkInfo = globals.fs.file(globals.fs.path.join(getIosBuildDirectory(), 'shorebird', 'App.ct.link'));
+    if (classTableLinkInfo.existsSync()) {
+      final Directory outputShorebirdDirectory = globals.fs.directory(globals.fs.path.join(outputDir!, 'shorebird'));
+      if (outputShorebirdDirectory.existsSync()) {
+        outputShorebirdDirectory.deleteSync(recursive: true);
+      }
+      classTableLinkInfo.copySync(outputShorebirdDirectory.path);
+    }
+
     try {
       updateShorebirdYaml(buildInfo, app.shorebirdYamlPath, environment: globals.platform.environment);
     } on Exception catch (error) {
