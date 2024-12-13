@@ -133,7 +133,7 @@ class BuildableIOSApp extends IOSApp {
       archiveBundleOutputPath,
       'Products',
       'Applications',
-      _hostAppBundleName ?? 'Runner.app',
+      _appProductName != null ? '$_appProductName.app' : 'Runner.app',
       'Frameworks',
       'App.framework',
       'flutter_assets',
