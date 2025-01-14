@@ -21,6 +21,7 @@ import '../flutter_plugins.dart';
 import '../globals.dart' as globals;
 import '../migrations/cmake_custom_command_migration.dart';
 import '../migrations/cmake_native_assets_migration.dart';
+import '../shorebird/shorebird_yaml.dart';
 import 'migrations/build_architecture_migration.dart';
 import 'migrations/show_window_migration.dart';
 import 'migrations/version_migration.dart';
@@ -127,6 +128,19 @@ Future<void> buildWindows(
     'Built ${globals.fs.path.relative(buildOutput.path)}',
     color: TerminalColor.green,
   );
+  final File shorebirdYamlFile = buildDirectory
+    .childDirectory('runner')
+    .childDirectory(sentenceCase(buildModeName))
+    .childDirectory('data')
+    .childDirectory('flutter_assets')
+    .childFile('shorebird.yaml');
+
+  try {
+    updateShorebirdYaml(buildInfo, shorebirdYamlFile.path, environment: globals.platform.environment);
+  } on Exception catch (error) {
+    globals.printError('[shorebird] failed to generate shorebird configuration.\n$error');
+    throw Exception('Failed to generate shorebird configuration');
+  }
 
   if (buildInfo.codeSizeDirectory != null && sizeAnalyzer != null) {
     final String arch = getNameForTargetPlatform(targetPlatform);
