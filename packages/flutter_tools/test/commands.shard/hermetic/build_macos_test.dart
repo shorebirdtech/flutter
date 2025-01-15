@@ -57,6 +57,15 @@ final FakePlatform macosPlatformCustomEnv = FakePlatform(
     }
 );
 
+final Platform macosPlatformWithShorebirdPublicKey = FakePlatform(
+    operatingSystem: 'macos',
+    environment: <String, String>{
+      'FLUTTER_ROOT': '/',
+      'HOME': '/',
+      'SHOREBIRD_PUBLIC_KEY': 'my_public_key',
+    }
+);
+
 final Platform notMacosPlatform = FakePlatform(
   environment: <String, String>{
     'FLUTTER_ROOT': '/',
@@ -836,6 +845,39 @@ STDERR STUFF
         'LUCI_CI': 'True'
       }
     ),
+    FeatureFlags: () => TestFeatureFlags(isMacOSEnabled: true),
+  });
+
+  testUsingContext('macOS build outputs path and size when successful',
+      () async {
+    final BuildCommand command = BuildCommand(
+      artifacts: artifacts,
+      androidSdk: FakeAndroidSdk(),
+      buildSystem: TestBuildSystem.all(BuildResult(success: true)),
+      fileSystem: MemoryFileSystem.test(),
+      processUtils: processUtils,
+      logger: BufferLogger.test(),
+      osUtils: FakeOperatingSystemUtils(),
+    );
+    createMinimalMockProjectFiles();
+    final File shorebirdYamlFile = fileSystem.file(
+      'build/macos/Build/Products/Release/example.app/Contents/Frameworks/App.framework/Resources/flutter_assets/shorebird.yaml',
+    )
+      ..createSync(recursive: true)
+      ..writeAsStringSync('app_id: my-app-id');
+
+    await createTestCommandRunner(command)
+        .run(const <String>['build', 'macos', '--no-pub']);
+
+    final String updatedYaml = shorebirdYamlFile.readAsStringSync();
+    expect(updatedYaml, contains('app_id: my-app-id'));
+    expect(updatedYaml, contains('patch_public_key: my_public_key'));
+  }, overrides: <Type, Generator>{
+    FileSystem: () => fileSystem,
+    ProcessManager: () => FakeProcessManager.list(<FakeCommand>[
+          setUpFakeXcodeBuildHandler('Release'),
+        ]),
+    Platform: () => macosPlatformWithShorebirdPublicKey,
     FeatureFlags: () => TestFeatureFlags(isMacOSEnabled: true),
   });
 }
