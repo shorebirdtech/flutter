@@ -22,6 +22,7 @@ import '../migrations/xcode_project_object_version_migration.dart';
 import '../migrations/xcode_script_build_phase_migration.dart';
 import '../migrations/xcode_thin_binary_build_phase_input_paths_migration.dart';
 import '../project.dart';
+import '../shorebird/shorebird_yaml.dart';
 import 'application_package.dart';
 import 'cocoapod_utils.dart';
 import 'migrations/flutter_application_migration.dart';
@@ -221,6 +222,32 @@ Future<void> buildMacOS({
   }
   final String? applicationBundle = MacOSApp.fromMacOSProject(flutterProject.macos).applicationBundle(buildInfo);
   if (applicationBundle != null) {
+    final String shorebirdYamlPath = globals.fs.path.join(
+      applicationBundle,
+      'Contents',
+      'Frameworks',
+      'App.framework',
+      'Resources',
+      'flutter_assets',
+      'shorebird.yaml',
+    );
+    if (globals.fs.isFileSync(shorebirdYamlPath)) {
+      try {
+        updateShorebirdYaml(
+          buildInfo,
+          shorebirdYamlPath,
+          environment: globals.platform.environment,
+        );
+      } on Exception catch (error) {
+        globals.printError(
+          '[shorebird] failed to generate shorebird configuration.\n$error',
+        );
+        throw Exception(
+          'Failed to generate shorebird configuration. Error: $error',
+        );
+      }
+    }
+
     final Directory outputDirectory = globals.fs.directory(applicationBundle);
     // This output directory is the .app folder itself.
     final int? directorySize = globals.os.getDirectorySize(outputDirectory);
