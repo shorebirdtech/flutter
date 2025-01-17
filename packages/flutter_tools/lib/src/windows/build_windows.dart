@@ -137,7 +137,7 @@ Future<void> buildWindows(
 
   if (shorebirdYamlFile.existsSync()) {
     try {
-      updateShorebirdYaml(buildInfo, shorebirdYamlFile.path, environment: globals.platform.environment);
+      updateShorebirdYaml(buildInfo.flavor, shorebirdYamlFile.path, environment: globals.platform.environment);
     } on Exception catch (error) {
       globals.printError('[shorebird] failed to generate shorebird configuration.\n$error');
       throw Exception('Failed to generate shorebird configuration');

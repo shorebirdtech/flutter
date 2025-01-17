@@ -10,8 +10,9 @@ import '../../base/file_system.dart';
 import '../../base/io.dart';
 import '../../base/process.dart';
 import '../../build_info.dart';
-import '../../globals.dart' as globals show xcode;
+import '../../globals.dart' as globals show platform, xcode;
 import '../../reporting/reporting.dart';
+import '../../shorebird/shorebird_yaml.dart';
 import '../build_system.dart';
 import '../depfile.dart';
 import '../exceptions.dart';
@@ -683,6 +684,22 @@ class ReleaseMacOSBundleFlutterAssets extends MacOSBundleFlutterAssets {
     bool buildSuccess = true;
     try {
       await super.build(environment);
+      final ResolvedFiles resolvedOutputs = resolveOutputs(environment);
+      for (final File outputSource in resolvedOutputs.sources) {
+         if (outputSource.basename == 'shorebird.yaml') {
+          try {
+            updateShorebirdYaml(
+              environment.defines[kFlavor],
+              outputSource.path,
+              environment: globals.platform.environment,
+            );
+          } on Exception catch (error) {
+            throw Exception(
+              'Failed to generate shorebird configuration. Error: $error',
+            );
+          }
+        }
+      }
     } catch (_) {  // ignore: avoid_catches_without_on_clauses
       buildSuccess = false;
       rethrow;
