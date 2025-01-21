@@ -564,6 +564,43 @@ void main() {
     ProcessManager: () => processManager,
   });
 
+  testUsingContext('ReleaseMacOSBundleFlutterAssets updates shorebird.yaml if present', () async {
+    environment.defines[kBuildMode] = 'release';
+    environment.defines[kXcodeAction] = 'install';
+    environment.defines[kFlavor] = 'internal';
+
+    fileSystem.file('bin/cache/artifacts/engine/darwin-x64/vm_isolate_snapshot.bin')
+        .createSync(recursive: true);
+    fileSystem.file('bin/cache/artifacts/engine/darwin-x64/isolate_snapshot.bin')
+        .createSync(recursive: true);
+    fileSystem.file(fileSystem.path.join(environment.buildDir.path, 'App.framework', 'App'))
+        .createSync(recursive: true);
+    final String shorebirdYamlPath = fileSystem.path.join(
+      environment.buildDir.path,
+      'App.framework','Versions',
+      'A',
+      'Resources',
+      'flutter_assets',
+      'shorebird.yaml',
+    );
+    fileSystem.file(fileSystem.path.join(environment.buildDir.path, 'App.framework', 'App'))
+        ..createSync(recursive: true)
+        ..writeAsStringSync('''
+# Some other text that should be removed
+app_id: base-app-id
+flavors:
+  internal: internal-app-id
+  stable: stable-app-id
+''');
+
+    await const ReleaseMacOSBundleFlutterAssets().build(environment);
+
+    expect(fileSystem.file(shorebirdYamlPath).readAsStringSync(), 'app_id: internal-app-id');
+  }, overrides: <Type, Generator>{
+    FileSystem: () => fileSystem,
+    ProcessManager: () => processManager,
+  });
+
   testUsingContext('DebugMacOSFramework creates expected binary with arm64 only arch', () async {
     environment.defines[kDarwinArchs] = 'arm64';
     processManager.addCommand(
