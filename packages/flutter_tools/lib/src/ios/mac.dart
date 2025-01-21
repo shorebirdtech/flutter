@@ -32,7 +32,6 @@ import '../migrations/xcode_thin_binary_build_phase_input_paths_migration.dart';
 import '../plugins.dart';
 import '../project.dart';
 import '../reporting/reporting.dart';
-import '../shorebird/shorebird_yaml.dart';
 import 'application_package.dart';
 import 'code_signing.dart';
 import 'migrations/host_app_info_plist_migration.dart';
@@ -547,13 +546,6 @@ Future<XcodeBuildResult> buildXcodeProject({
       if (!globals.fs.isDirectorySync(outputDir)) {
         globals.printError('Archive succeeded but the expected xcarchive at $outputDir not found');
       }
-    }
-
-    try {
-      updateShorebirdYaml(buildInfo, app.shorebirdYamlPath, environment: globals.platform.environment);
-    } on Exception catch (error) {
-      globals.printError('[shorebird] failed to generate shorebird configuration.\n$error');
-      return XcodeBuildResult(success: false);
     }
 
     return XcodeBuildResult(
