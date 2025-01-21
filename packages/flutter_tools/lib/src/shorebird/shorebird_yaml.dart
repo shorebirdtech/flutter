@@ -25,7 +25,7 @@ void updateShorebirdYaml(String? flavor, String shorebirdYamlPath, {required Map
 }
 
 String appIdForFlavor(YamlMap yamlMap, {required String? flavor}) {
-  if (flavor == null) {
+  if (flavor == null || flavor.isEmpty) {
     final String? defaultAppId = yamlMap['app_id'] as String?;
     if (defaultAppId == null || defaultAppId.isEmpty) {
       throw Exception('Cannot find "app_id" in shorebird.yaml');
