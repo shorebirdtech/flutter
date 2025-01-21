@@ -4,7 +4,6 @@
 
 import 'dart:io';
 
-import 'package:flutter_tools/src/build_info.dart';
 import 'package:flutter_tools/src/shorebird/shorebird_yaml.dart';
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
@@ -86,12 +85,7 @@ base_url: https://example.com
       final File tempFile = File('${tempDir.path}/shorebird.yaml');
       tempFile.writeAsStringSync(yamlContents);
       updateShorebirdYaml(
-        const BuildInfo(
-          BuildMode.release,
-          'foo',
-          treeShakeIcons: false,
-          packageConfigPath: '',
-        ),
+        'foo',
         tempFile.path,
         environment: <String, String>{'SHOREBIRD_PUBLIC_KEY': '4-a'},
       );
