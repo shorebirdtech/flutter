@@ -128,12 +128,6 @@ Future<void> buildWindows(
     'Built ${globals.fs.path.relative(buildOutput.path)}',
     color: TerminalColor.green,
   );
-  final File shorebirdYamlFile = buildDirectory
-    .childDirectory('runner')
-    .childDirectory(sentenceCase(buildModeName))
-    .childDirectory('data')
-    .childDirectory('flutter_assets')
-    .childFile('shorebird.yaml');
 
   if (buildInfo.codeSizeDirectory != null && sizeAnalyzer != null) {
     final String arch = getNameForTargetPlatform(targetPlatform);
