@@ -135,14 +135,14 @@ Future<void> buildWindows(
     .childDirectory('flutter_assets')
     .childFile('shorebird.yaml');
 
-  if (shorebirdYamlFile.existsSync()) {
-    try {
-      updateShorebirdYaml(buildInfo.flavor, shorebirdYamlFile.path, environment: globals.platform.environment);
-    } on Exception catch (error) {
-      globals.printError('[shorebird] failed to generate shorebird configuration.\n$error');
-      throw Exception('Failed to generate shorebird configuration');
-    }
-  }
+  // if (shorebirdYamlFile.existsSync()) {
+  //   try {
+  //     updateShorebirdYaml(buildInfo.flavor, shorebirdYamlFile.path, environment: globals.platform.environment);
+  //   } on Exception catch (error) {
+  //     globals.printError('[shorebird] failed to generate shorebird configuration.\n$error');
+  //     throw Exception('Failed to generate shorebird configuration');
+  //   }
+  // }
 
   if (buildInfo.codeSizeDirectory != null && sizeAnalyzer != null) {
     final String arch = getNameForTargetPlatform(targetPlatform);
