@@ -128,21 +128,6 @@ Future<void> buildWindows(
     'Built ${globals.fs.path.relative(buildOutput.path)}',
     color: TerminalColor.green,
   );
-  final File shorebirdYamlFile = buildDirectory
-    .childDirectory('runner')
-    .childDirectory(sentenceCase(buildModeName))
-    .childDirectory('data')
-    .childDirectory('flutter_assets')
-    .childFile('shorebird.yaml');
-
-  if (shorebirdYamlFile.existsSync()) {
-    try {
-      updateShorebirdYaml(buildInfo.flavor, shorebirdYamlFile.path, environment: globals.platform.environment);
-    } on Exception catch (error) {
-      globals.printError('[shorebird] failed to generate shorebird configuration.\n$error');
-      throw Exception('Failed to generate shorebird configuration');
-    }
-  }
 
   if (buildInfo.codeSizeDirectory != null && sizeAnalyzer != null) {
     final String arch = getNameForTargetPlatform(targetPlatform);
