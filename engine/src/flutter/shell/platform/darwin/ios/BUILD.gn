@@ -52,15 +52,14 @@ source_set("flutter_framework_source") {
     ":ios_gpu_configuration_config",
     "//flutter:config",
   ]
-  allow_circular_includes_from = [ ":flutter_framework_source" ]
-  deps = [
-    ":flutter_framework_source",
-    "//flutter/fml",
-    "//flutter/shell/common/shorebird",
-    "//flutter/shell/platform/common:common_cpp_input",
-    "//flutter/shell/platform/darwin/common:framework_common",
-    "//flutter/third_party/icu",
-  ]
+
+  if (target_cpu == "arm64") {
+    libs = [ "//flutter/third_party/updater/target/aarch64-apple-ios/release/libupdater.a" ]
+  } else if (target_cpu == "x64") {
+    libs = [ "//flutter/third_party/updater/target/x86_64-apple-ios/release/libupdater.a" ]
+  } else {
+    assert(false, "Unsupported target_cpu")
+  }
 
   sources = [
     "framework/Source/FlutterAppDelegate.mm",
@@ -168,37 +167,6 @@ source_set("flutter_framework_source") {
   ]
   sources += _flutter_framework_headers
 
-  defines = [ "FLUTTER_FRAMEWORK=1" ]
-  if (darwin_extension_safe) {
-    defines += [ "APPLICATION_EXTENSION_API_ONLY=1" ]
-  }
-
-  deps += [
-    "$dart_src/runtime/bin:elf_loader",
-    "//flutter/fml",
-    "//flutter/runtime",
-    "//flutter/shell/common",
-    "//flutter/shell/common/shorebird",
-    "//flutter/shell/platform/darwin/common",
-    "//flutter/shell/platform/darwin/common:framework_common",
-    "//flutter/shell/platform/embedder:embedder_as_internal_library",
-    "//flutter/shell/profiling:profiling",
-    "//flutter/third_party/spring_animation",
-  ]
-
-  public_configs = [
-    ":ios_gpu_configuration_config",
-    "//flutter:config",
-  ]
-
-  if (target_cpu == "arm64") {
-    libs = [ "//flutter/third_party/updater/target/aarch64-apple-ios/release/libupdater.a" ]
-  } else if (target_cpu == "x64") {
-    libs = [ "//flutter/third_party/updater/target/x86_64-apple-ios/release/libupdater.a" ]
-  } else {
-    assert(false, "Unsupported target_cpu")
-  }
-
   frameworks = [
     "AudioToolbox.framework",
     "CoreMedia.framework",
@@ -215,6 +183,7 @@ source_set("flutter_framework_source") {
   }
 
   deps = [
+    "$dart_src/runtime/bin:elf_loader",
     ":ios_gpu_configuration",
     "//flutter/common:common",
     "//flutter/common/graphics",
@@ -222,6 +191,7 @@ source_set("flutter_framework_source") {
     "//flutter/lib/ui",
     "//flutter/runtime",
     "//flutter/shell/common",
+    "//flutter/shell/common/shorebird",
     "//flutter/shell/platform/common:common_cpp_input",
     "//flutter/shell/platform/darwin/common",
     "//flutter/shell/platform/darwin/common:framework_common",
