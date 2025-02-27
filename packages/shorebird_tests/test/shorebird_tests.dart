@@ -110,15 +110,23 @@ extension ShorebirdProjectDirectoryOnDirectory on Directory {
         path.join(this.path, 'android', 'app', 'build.gradle'),
       );
 
-  Future<void> addPubDependency(String name, {bool dev = false}) {
-    return _runFlutterCommand(
+  Future<void> addPubDependency(String name, {bool dev = false}) async {
+    final result = await _runFlutterCommand(
       ['pub', 'add', if (dev) '--dev', name],
       workingDirectory: this,
     );
+    if (result.exitCode != 0) {
+      throw Exception(
+          'Failed to run `flutter pub add $name`: ${result.stderr}');
+    }
   }
 
   Future<void> addProjectFlavors() async {
-    await addPubDependency('flutter_flavorizr', dev: true);
+    await addPubDependency(
+      // TODO(felangel): revert to using published version once 3.29.0 support is released.
+      // https://github.com/AngeloAvv/flutter_flavorizr/pull/291
+      'dev:flutter_flavorizr:{"git":{"url":"https://github.com/wjlee611/flutter_flavorizr.git","ref":"chore/temp-migrate-3-29","path":"."}}',
+    );
 
     await File(
       path.join(
@@ -153,10 +161,14 @@ flavors:
       bundleId: "com.example.shorebird_test.global"
 ''');
 
-    await _runFlutterCommand(
+    final result = await _runFlutterCommand(
       ['pub', 'run', 'flutter_flavorizr'],
       workingDirectory: this,
     );
+    if (result.exitCode != 0) {
+      throw Exception(
+          'Failed to run `flutter pub run flutter_flavorizr`: ${result.stderr}');
+    }
   }
 
   void addShorebirdFlavors() {
