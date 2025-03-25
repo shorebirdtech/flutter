@@ -405,8 +405,8 @@ class CompileMacOSFramework extends Target {
 
     await LinkSupplement.create(
       environment,
-      inputBuildDir: getMacOSBuildDirectory(),
-      outputBuildDir: buildOutputPath,
+      inputBuildDir: buildOutputPath,
+      outputBuildDir: getMacOSBuildDirectory(),
     );
   }
 
