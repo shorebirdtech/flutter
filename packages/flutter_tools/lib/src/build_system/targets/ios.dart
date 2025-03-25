@@ -142,8 +142,8 @@ abstract class AotAssemblyBase extends Target {
 
     await LinkSupplement.create(
       environment,
-      inputBuildDir: getIosBuildDirectory(),
-      outputBuildDir: buildOutputPath,
+      inputBuildDir: buildOutputPath,
+      outputBuildDir: getIosBuildDirectory(),
     );
   }
 }
