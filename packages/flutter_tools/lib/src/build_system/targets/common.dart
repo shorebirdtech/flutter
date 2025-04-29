@@ -486,6 +486,8 @@ abstract final class LinkSupplement {
     // into the shorebird directory.
     maybeCopy('App.ct.link');
     maybeCopy('App.class_table.json');
+    maybeCopy('App.dt.link');
+    maybeCopy('App.dispatch_table.json');
     maybeCopy('App.ft.link');
     maybeCopy('App.field_table.json');
   }
