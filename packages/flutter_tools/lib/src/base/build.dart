@@ -129,20 +129,27 @@ class AOTSnapshotter {
     final Directory outputDir = _fileSystem.directory(outputPath);
     outputDir.createSync(recursive: true);
 
-    final List<String> dumpClassTableLinkInfoArgs = <String>[
+    // Currently we only use the linker on iOS, but we will eventually split out
+    // the concept of "optimizes patch snapshot" from "uses linker" and probably
+    // only uses the linker on iOS, but optimize patch snapshots everywhere.
+    // TODO(eseidel): TargetPlatform.darwin doesn't use the linker.
+    bool usesLinker = (platform == TargetPlatform.ios || platform == TargetPlatform.darwin);
+    final List<String> dumpLinkInfoArgs = <String>[
       // Shorebird dumps the class table information during snapshot compilation which is later used during linking.
       '--print_class_table_link_debug_info_to=${_fileSystem.path.join(outputDir.parent.path, 'App.class_table.json')}',
       '--print_class_table_link_info_to=${_fileSystem.path.join(outputDir.parent.path, 'App.ct.link')}',
       '--print_field_table_link_debug_info_to=${_fileSystem.path.join(outputDir.parent.path, 'App.field_table.json')}',
       '--print_field_table_link_info_to=${_fileSystem.path.join(outputDir.parent.path, 'App.ft.link')}',
+      '--print_dispatch_table_link_debug_info_to=${_fileSystem.path.join(outputDir.parent.path, 'App.dispatch_table.json')}',
+      '--print_dispatch_table_link_info_to=${_fileSystem.path.join(outputDir.parent.path, 'App.dt.link')}',
     ];
 
     final List<String> genSnapshotArgs = <String>[
       // Shorebird uses --deterministic to improve snapshot stability and increase linking.
       '--deterministic',
-      // Only use the default Shorebird gen_snapshot args on iOS.
-      if (platform == TargetPlatform.ios || platform == TargetPlatform.darwin)
-        ...dumpClassTableLinkInfoArgs,
+      // Only save LinkInfo if we're using the linker.
+      if (usesLinker)
+        ...dumpLinkInfoArgs,
     ];
 
     final bool targetingApplePlatform =
