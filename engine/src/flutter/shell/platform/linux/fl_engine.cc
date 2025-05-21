@@ -5,19 +5,12 @@
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_engine.h"
 
 #include <epoxy/egl.h>
-#include <glib.h>
 #include <gmodule.h>
 
 #include <cstring>
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <vector>
 
 #include "flutter/common/constants.h"
 #include "flutter/fml/logging.h"
-#include "flutter/fml/paths.h"
-#include "flutter/shell/common/shorebird/shorebird.h"
 #include "flutter/shell/platform/common/engine_switches.h"
 #include "flutter/shell/platform/embedder/embedder.h"
 #include "flutter/shell/platform/linux/fl_binary_messenger_private.h"
@@ -31,12 +24,11 @@
 #include "flutter/shell/platform/linux/fl_platform_handler.h"
 #include "flutter/shell/platform/linux/fl_plugin_registrar_private.h"
 #include "flutter/shell/platform/linux/fl_settings_handler.h"
+#include "flutter/shell/platform/linux/fl_shorebird.h"
 #include "flutter/shell/platform/linux/fl_texture_gl_private.h"
 #include "flutter/shell/platform/linux/fl_texture_registrar_private.h"
 #include "flutter/shell/platform/linux/fl_windowing_handler.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_plugin_registry.h"
-#include "rapidjson/document.h"
-#include "third_party/tonic/filesystem/filesystem/file.h"
 
 // Unique number associated with platform tasks.
 static constexpr size_t kPlatformTaskRunnerIdentifier = 1;
@@ -620,59 +612,6 @@ FlDisplayMonitor* fl_engine_get_display_monitor(FlEngine* self) {
   return self->display_monitor;
 }
 
-gboolean fl_set_up_shorebird(const char* assets_path, std::string& patch_path) {
-  auto shorebird_yaml_path =
-      fml::paths::JoinPaths({assets_path, "shorebird.yaml"});
-  std::string shorebird_yaml_contents("");
-  if (!filesystem::ReadFileToString(shorebird_yaml_path,
-                                    &shorebird_yaml_contents)) {
-    FML_LOG(ERROR) << "Failed to read shorebird.yaml.";
-    return false;
-  }
-
-  // Read appid from shorebird.yaml
-  std::string appid = "";
-  std::stringstream ss(shorebird_yaml_contents);
-  std::string line;
-  std::string appid_prefix = "appid:";
-  while (std::getline(ss, line, '\n')) {
-    if (line.find(appid_prefix) != std::string::npos) {
-      appid = line.substr(line.find(appid_prefix) + appid_prefix.size());
-      break;
-    }
-  }
-
-  std::string code_cache_path =
-      fml::paths::JoinPaths({g_get_home_dir(), ".shorebird_cache", appid});
-  auto executable_location = fml::paths::GetExecutableDirectoryPath().second;
-  auto app_path =
-      fml::paths::JoinPaths({executable_location, "lib", "libapp.so"});
-  auto version_json_path = fml::paths::JoinPaths({assets_path, "version.json"});
-  std::ifstream input(version_json_path);
-  if (!input) {
-    return false;
-  }
-  std::string json_contents{std::istreambuf_iterator<char>(input),
-                            std::istreambuf_iterator<char>()};
-
-  rapidjson::Document json_doc;
-  json_doc.Parse(json_contents.c_str());
-  if (json_doc.HasParseError()) {
-    // Could not parse version file, aborting.
-    return false;
-  }
-
-  const auto version_map = json_doc.GetObject();
-  flutter::ReleaseVersion release_version{
-      version_map["version"].GetString(),
-      version_map["build_number"].GetString()};
-
-  flutter::ShorebirdConfigArgs shorebird_args(code_cache_path, code_cache_path,
-                                              app_path, shorebird_yaml_contents,
-                                              release_version);
-  return ConfigureShorebird(shorebird_args, patch_path);
-}
-
 gboolean fl_engine_start(FlEngine* self, GError** error) {
   g_return_val_if_fail(FL_IS_ENGINE(self), FALSE);
 
@@ -748,7 +687,7 @@ gboolean fl_engine_start(FlEngine* self, GError** error) {
     source.type = kFlutterEngineAOTDataSourceTypeElfPath;
     std::string patch_path;
     auto setup_shorebird_result =
-        fl_set_up_shorebird(args.assets_path, patch_path);
+        flutter::SetUpShorebird(args.assets_path, patch_path);
     if (setup_shorebird_result) {
       // If we have a patch installed, we replace the default AOT library path
       // with the patch path here.
