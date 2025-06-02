@@ -15,7 +15,7 @@ vars = {
   'skia_git': 'https://skia.googlesource.com',
   'llvm_git': 'https://llvm.googlesource.com',
   'skia_revision': '1f39b47bf067193e98f92a75f7ae824129c18d03',
-  "dart_sdk_revision": "db98bc55fda4532256cee84033ef5940efe796a8",
+  "dart_sdk_revision": "1621ed696f271b7d1907f6cfed9d2b39b61a0831",
   "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
   "updater_git": "https://github.com/shorebirdtech/updater.git",
   "updater_rev": "ab23721e35d2e740026def44e1469e17e3440c83",
