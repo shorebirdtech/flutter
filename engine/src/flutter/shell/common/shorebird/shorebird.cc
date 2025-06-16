@@ -80,6 +80,31 @@ FileCallbacks ShorebirdFileCallbacks() {
   };
 }
 
+// Given the contents of a yaml file, return the given value if it exists,
+// otherwise return an empty string.
+// Does not support nested keys.
+std::string get_value_from_yaml(const std::string& yaml,
+                                const std::string& key) {
+  std::stringstream ss(yaml);
+  std::string line;
+  std::string prefix = key + ":";
+  while (std::getline(ss, line, '\n')) {
+    if (line.find(prefix) != std::string::npos) {
+      auto ret = line.substr(line.find(prefix) + prefix.size());
+
+      // Remove leading and trailing spaces
+      while (!ret.empty() && std::isspace(ret.front())) {
+        ret.erase(0, 1);
+      }
+      while (!ret.empty() && std::isspace(ret.back())) {
+        ret.pop_back();
+      }
+      return ret;
+    }
+  }
+  return "";
+}
+
 // FIXME: consolidate this with the other ConfigureShorebird
 bool ConfigureShorebird(const ShorebirdConfigArgs& args,
                         std::string& patch_path) {
@@ -87,23 +112,10 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   auto shorebird_updater_dir_name = "shorebird_updater";
 
   // Parse app id from shorebird.yaml
-  std::string app_id = "";
-  std::stringstream ss(args.shorebird_yaml);
-  std::string line;
-  std::string appid_prefix = "appid:";
-  while (std::getline(ss, line, '\n')) {
-    if (line.find(appid_prefix) != std::string::npos) {
-      app_id = line.substr(line.find(appid_prefix) + appid_prefix.size());
-
-      // Remove leading and trailing spaces
-      while (!app_id.empty() && std::isspace(app_id.front())) {
-        app_id.erase(0, 1);
-      }
-      while (!app_id.empty() && std::isspace(app_id.back())) {
-        app_id.pop_back();
-      }
-      break;
-    }
+  std::string app_id = get_value_from_yaml(args.shorebird_yaml, "appid");
+  if (app_id.empty()) {
+    FML_LOG(ERROR) << "Shorebird updater: appid not found in shorebird.yaml";
+    return false;
   }
 
   auto code_cache_dir = fml::paths::JoinPaths(

@@ -41,7 +41,10 @@ if (enable_unittests) {
   executable("shorebird_unittests") {
     testonly = true
 
-    sources = [ "snapshots_data_handle_unittests.cc" ]
+    sources = [
+      "snapshots_data_handle_unittests.cc",
+      "shorebird_unittests.cc",
+    ]
 
     # This only includes snapshots_data_handle and not shorebird because
     # shorebird fails to link due to a missing updater lib.
