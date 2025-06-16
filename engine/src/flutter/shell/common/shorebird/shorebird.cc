@@ -83,8 +83,7 @@ FileCallbacks ShorebirdFileCallbacks() {
 // Given the contents of a yaml file, return the given value if it exists,
 // otherwise return an empty string.
 // Does not support nested keys.
-std::string get_value_from_yaml(const std::string& yaml,
-                                const std::string& key) {
+std::string GetValueFromYaml(const std::string& yaml, const std::string& key) {
   std::stringstream ss(yaml);
   std::string line;
   std::string prefix = key + ":";
@@ -112,7 +111,7 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   auto shorebird_updater_dir_name = "shorebird_updater";
 
   // Parse app id from shorebird.yaml
-  std::string app_id = get_value_from_yaml(args.shorebird_yaml, "appid");
+  std::string app_id = GetValueFromYaml(args.shorebird_yaml, "appid");
   if (app_id.empty()) {
     FML_LOG(ERROR) << "Shorebird updater: appid not found in shorebird.yaml";
     return false;
