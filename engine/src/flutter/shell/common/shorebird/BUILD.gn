@@ -49,6 +49,7 @@ if (enable_unittests) {
     # This only includes snapshots_data_handle and not shorebird because
     # shorebird fails to link due to a missing updater lib.
     deps = [
+      ":shorebird",
       ":shorebird_fixtures",
       ":snapshots_data_handle",
       "//flutter/runtime",
