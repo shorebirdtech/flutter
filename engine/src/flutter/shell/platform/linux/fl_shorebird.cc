@@ -24,20 +24,8 @@ gboolean SetUpShorebird(const char* assets_path, std::string& patch_path) {
     return false;
   }
 
-  // Read appid from shorebird.yaml
-  std::string appid = "";
-  std::stringstream ss(shorebird_yaml_contents);
-  std::string line;
-  std::string appid_prefix = "appid:";
-  while (std::getline(ss, line, '\n')) {
-    if (line.find(appid_prefix) != std::string::npos) {
-      appid = line.substr(line.find(appid_prefix) + appid_prefix.size());
-      break;
-    }
-  }
-
   std::string code_cache_path =
-      fml::paths::JoinPaths({g_get_home_dir(), ".shorebird_cache", appid});
+      fml::paths::JoinPaths({g_get_home_dir(), ".shorebird_cache"});
   auto executable_location = fml::paths::GetExecutableDirectoryPath().second;
   auto app_path =
       fml::paths::JoinPaths({executable_location, "lib", "libapp.so"});

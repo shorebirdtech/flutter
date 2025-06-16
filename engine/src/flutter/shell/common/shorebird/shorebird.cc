@@ -86,10 +86,30 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   patch_path = args.release_app_library_path;
   auto shorebird_updater_dir_name = "shorebird_updater";
 
+  // Parse app id from shorebird.yaml
+  std::string app_id = "";
+  std::stringstream ss(args.shorebird_yaml);
+  std::string line;
+  std::string appid_prefix = "appid:";
+  while (std::getline(ss, line, '\n')) {
+    if (line.find(appid_prefix) != std::string::npos) {
+      app_id = line.substr(line.find(appid_prefix) + appid_prefix.size());
+
+      // Remove leading and trailing spaces
+      while (!app_id.empty() && std::isspace(app_id.front())) {
+        app_id.erase(0, 1);
+      }
+      while (!app_id.empty() && std::isspace(app_id.back())) {
+        app_id.pop_back();
+      }
+      break;
+    }
+  }
+
   auto code_cache_dir = fml::paths::JoinPaths(
-      {std::move(args.code_cache_path), shorebird_updater_dir_name});
+      {std::move(args.code_cache_path), shorebird_updater_dir_name, app_id});
   auto app_storage_dir = fml::paths::JoinPaths(
-      {std::move(args.app_storage_path), shorebird_updater_dir_name});
+      {std::move(args.app_storage_path), shorebird_updater_dir_name, app_id});
 
   fml::CreateDirectory(fml::paths::GetCachesDirectory(),
                        {shorebird_updater_dir_name},
