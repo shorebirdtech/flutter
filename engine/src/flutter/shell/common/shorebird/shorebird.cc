@@ -80,16 +80,47 @@ FileCallbacks ShorebirdFileCallbacks() {
   };
 }
 
+// Given the contents of a yaml file, return the given value if it exists,
+// otherwise return an empty string.
+// Does not support nested keys.
+std::string GetValueFromYaml(const std::string& yaml, const std::string& key) {
+  std::stringstream ss(yaml);
+  std::string line;
+  std::string prefix = key + ":";
+  while (std::getline(ss, line, '\n')) {
+    if (line.find(prefix) != std::string::npos) {
+      auto ret = line.substr(line.find(prefix) + prefix.size());
+
+      // Remove leading and trailing spaces
+      while (!ret.empty() && std::isspace(ret.front())) {
+        ret.erase(0, 1);
+      }
+      while (!ret.empty() && std::isspace(ret.back())) {
+        ret.pop_back();
+      }
+      return ret;
+    }
+  }
+  return "";
+}
+
 // FIXME: consolidate this with the other ConfigureShorebird
 bool ConfigureShorebird(const ShorebirdConfigArgs& args,
                         std::string& patch_path) {
   patch_path = args.release_app_library_path;
   auto shorebird_updater_dir_name = "shorebird_updater";
 
+  // Parse app id from shorebird.yaml
+  std::string app_id = GetValueFromYaml(args.shorebird_yaml, "appid");
+  if (app_id.empty()) {
+    FML_LOG(ERROR) << "Shorebird updater: appid not found in shorebird.yaml";
+    return false;
+  }
+
   auto code_cache_dir = fml::paths::JoinPaths(
-      {std::move(args.code_cache_path), shorebird_updater_dir_name});
+      {std::move(args.code_cache_path), shorebird_updater_dir_name, app_id});
   auto app_storage_dir = fml::paths::JoinPaths(
-      {std::move(args.app_storage_path), shorebird_updater_dir_name});
+      {std::move(args.app_storage_path), shorebird_updater_dir_name, app_id});
 
   fml::CreateDirectory(fml::paths::GetCachesDirectory(),
                        {shorebird_updater_dir_name},
