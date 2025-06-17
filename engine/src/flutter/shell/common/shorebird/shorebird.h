@@ -40,6 +40,8 @@ void ConfigureShorebird(std::string code_cache_path,
                         const std::string& version,
                         const std::string& version_code);
 
+std::string GetValueFromYaml(const std::string& yaml, const std::string& key);
+
 }  // namespace flutter
 
 #endif  // FLUTTER_SHELL_COMMON_SHOREBIRD_SHOREBIRD_H_
