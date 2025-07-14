@@ -286,15 +286,15 @@ int GetReleaseVersionAndBuildNumber(ReleaseVersion* release_version) {
 
   if (file_info) {
     // Extract version numbers
-    DWORD major = HIWORD(file_info->dwFileVersionMS);
-    DWORD minor = LOWORD(file_info->dwFileVersionMS);
-    DWORD build = HIWORD(file_info->dwFileVersionLS);
+    DWORD major = HIWORD(file_info->dwProductVersionMS);
+    DWORD minor = LOWORD(file_info->dwProductVersionMS);
+    DWORD build = HIWORD(file_info->dwProductVersionLS);
 
     char version[49];
     snprintf(version, sizeof(version), "%lu.%lu.%lu", major, minor, build);
     release_version->version = std::string(version);
     release_version->build_number =
-        std::to_string(LOWORD(file_info->dwFileVersionLS));
+        std::to_string(LOWORD(file_info->dwProductVersionLS));
     return kSuccess;
   }
 
