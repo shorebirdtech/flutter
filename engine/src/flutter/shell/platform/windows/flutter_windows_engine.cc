@@ -269,36 +269,51 @@ int GetReleaseVersionAndBuildNumber(ReleaseVersion* release_version) {
   }
 
   // Allocate memory for version info
-  // std::vector<char> version_data(version_info_size);
   std::unique_ptr<char[]> version_data(new char[version_info_size]);
   if (!GetFileVersionInfoA(module_path, handle, version_info_size,
                            version_data.get())) {
     return -1;
   }
 
-  // Get the version info structure
-  VS_FIXEDFILEINFO* file_info = nullptr;
-  UINT file_info_size = -1;
-  if (!VerQueryValueA(version_data.get(), "\\",
-                      reinterpret_cast<LPVOID*>(&file_info), &file_info_size)) {
+  // Adopted from
+  // https://learn.microsoft.com/en-us/windows/win32/api/winver/nf-winver-verqueryvaluea
+  // Get the translation table
+  struct LANGANDCODEPAGE {
+    WORD wLanguage;
+    WORD wCodePage;
+  }* lpTranslate;
+
+  UINT cbTranslate = 0;
+  if (!VerQueryValueA(version_data.get(), "\\VarFileInfo\\Translation",
+                      (LPVOID*)&lpTranslate, &cbTranslate)) {
+    FML_LOG(ERROR) << "Error: Unable to get translation info.";
     return -1;
   }
 
-  if (file_info) {
-    // Extract version numbers
-    DWORD major = HIWORD(file_info->dwProductVersionMS);
-    DWORD minor = LOWORD(file_info->dwProductVersionMS);
-    DWORD build = HIWORD(file_info->dwProductVersionLS);
+  // Construct the query string using the first translation found
+  char subBlock[64];
+  sprintf_s(subBlock, "\\StringFileInfo\\%04x%04x\\ProductVersion",
+            lpTranslate[0].wLanguage, lpTranslate[0].wCodePage);
 
-    char version[49];
-    snprintf(version, sizeof(version), "%lu.%lu.%lu", major, minor, build);
-    release_version->version = std::string(version);
-    release_version->build_number =
-        std::to_string(LOWORD(file_info->dwProductVersionLS));
-    return kSuccess;
+  LPSTR versionString = nullptr;
+  UINT size = 0;
+  if (!VerQueryValueA(version_data.get(), subBlock, (LPVOID*)&versionString,
+                      &size)) {
+    return -1;
   }
 
-  return -1;
+  if (!versionString) {
+    return -1;
+  }
+
+  // The version string is in the format of "1.0.0+1".
+  auto version = std::string(versionString);
+  auto pos = version.find("+");
+  auto semVer = version.substr(0, pos);
+  auto patch = version.substr(pos + 1, version.length());
+  release_version->version = semVer;
+  release_version->build_number = patch;
+  return kSuccess;
 }
 
 bool GetLocalAppDataPath(std::string& outPath) {
