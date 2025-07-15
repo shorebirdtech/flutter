@@ -306,13 +306,19 @@ int GetReleaseVersionAndBuildNumber(ReleaseVersion* release_version) {
     return -1;
   }
 
-  // The version string is in the format of "1.0.0+1".
+  // The version string is in the format of "1.0.0+1", with the label ("+1")
+  // being optional.
   auto version = std::string(versionString);
-  auto pos = version.find("+");
-  auto semVer = version.substr(0, pos);
-  auto patch = version.substr(pos + 1, version.length());
-  release_version->version = semVer;
-  release_version->build_number = patch;
+  auto plusPos = version.find("+");
+  if (plusPos != std::string::npos) {
+    auto semVer = version.substr(0, plusPos);
+    auto patch = version.substr(plusPos + 1, version.length());
+    release_version->version = semVer;
+    release_version->build_number = patch;
+  } else {
+    release_version->version = version;
+  }
+
   return kSuccess;
 }
 
