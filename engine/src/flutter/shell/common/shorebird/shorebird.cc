@@ -132,8 +132,11 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
     AppParameters app_parameters;
     // Combine version and version_code into a single string.
     // We could also pass these separately through to the updater if needed.
-    auto release_version =
-        args.release_version.version + "+" + args.release_version.build_number;
+    auto release_version = args.release_version.version;
+    if (!args.release_version.build_number.empty()) {
+      release_version += "+" + args.release_version.build_number;
+    }
+
     app_parameters.release_version = release_version.c_str();
     app_parameters.code_cache_dir = code_cache_dir.c_str();
     app_parameters.app_storage_dir = app_storage_dir.c_str();
