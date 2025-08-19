@@ -365,13 +365,17 @@ Future<void> testMain() async {
       final ui.PlatformMessageCallback? savedCallback = dispatcher.onPlatformMessage;
 
       bool markTextEventHandled = false;
-      dispatcher.onPlatformMessage =
-          (String channel, ByteData? data, ui.PlatformMessageResponseCallback? callback) {
-            final ByteData response = const JSONMessageCodec().encodeMessage(<String, dynamic>{
+      dispatcher.onPlatformMessage = (
+        String channel,
+        ByteData? data,
+        ui.PlatformMessageResponseCallback? callback,
+      ) {
+        final ByteData response =
+            const JSONMessageCodec().encodeMessage(<String, dynamic>{
               'handled': markTextEventHandled,
             })!;
-            callback!(response);
-          };
+        callback!(response);
+      };
       RawKeyboard.initialize();
 
       final InputConfiguration config = InputConfiguration(viewId: kImplicitViewId);
@@ -678,9 +682,10 @@ Future<void> testMain() async {
 
         expect(domDocument.activeElement, textEditing.strategy.domElement);
 
-        final flutterView = EnginePlatformDispatcher.instance.viewManager.findViewForElement(
-          textEditing.strategy.domElement,
-        )!;
+        final flutterView =
+            EnginePlatformDispatcher.instance.viewManager.findViewForElement(
+              textEditing.strategy.domElement,
+            )!;
 
         flutterView.dom.rootElement.focusWithoutScroll();
         expect(spy.messages, isEmpty);
@@ -3038,11 +3043,12 @@ Future<void> testMain() async {
         <String>['username', 'password', 'newPassword'],
         <String>['field1', 'field2', 'field3'],
       );
-      final EngineAutofillForm autofillForm = EngineAutofillForm.fromFrameworkMessage(
-        kImplicitViewId,
-        createAutofillInfo('username', 'field1'),
-        fields,
-      )!;
+      final EngineAutofillForm autofillForm =
+          EngineAutofillForm.fromFrameworkMessage(
+            kImplicitViewId,
+            createAutofillInfo('username', 'field1'),
+            fields,
+          )!;
 
       // Number of elements if number of fields sent to the constructor minus
       // one (for the focused text element).
@@ -3095,11 +3101,12 @@ Future<void> testMain() async {
         <String>['username', 'password', 'newPassword'],
         <String>['zzyyxx', 'aabbcc', 'jjkkll'],
       );
-      final EngineAutofillForm autofillForm = EngineAutofillForm.fromFrameworkMessage(
-        kImplicitViewId,
-        createAutofillInfo('username', 'field1'),
-        fields,
-      )!;
+      final EngineAutofillForm autofillForm =
+          EngineAutofillForm.fromFrameworkMessage(
+            kImplicitViewId,
+            createAutofillInfo('username', 'field1'),
+            fields,
+          )!;
 
       expect(autofillForm.formIdentifier, 'aabbcc*jjkkll*zzyyxx');
     });
@@ -3111,11 +3118,12 @@ Future<void> testMain() async {
         <String>['username', 'password', 'newPassword'],
         <String>['field1', 'fields2', 'field3'],
       );
-      final EngineAutofillForm autofillForm = EngineAutofillForm.fromFrameworkMessage(
-        kImplicitViewId,
-        createAutofillInfo('username', 'field1'),
-        fields,
-      )!;
+      final EngineAutofillForm autofillForm =
+          EngineAutofillForm.fromFrameworkMessage(
+            kImplicitViewId,
+            createAutofillInfo('username', 'field1'),
+            fields,
+          )!;
 
       final DomHTMLInputElement testInputElement = createDomHTMLInputElement();
       autofillForm.placeForm(testInputElement);
@@ -3137,11 +3145,12 @@ Future<void> testMain() async {
 
     test('Validate single element form', () {
       final List<dynamic> fields = createFieldValues(<String>['username'], <String>['field1']);
-      final EngineAutofillForm autofillForm = EngineAutofillForm.fromFrameworkMessage(
-        kImplicitViewId,
-        createAutofillInfo('username', 'field1'),
-        fields,
-      )!;
+      final EngineAutofillForm autofillForm =
+          EngineAutofillForm.fromFrameworkMessage(
+            kImplicitViewId,
+            createAutofillInfo('username', 'field1'),
+            fields,
+          )!;
 
       // The focused element is the only field. Form should be empty after
       // the initialization (focus element is appended later).
@@ -3176,11 +3185,12 @@ Future<void> testMain() async {
         <String>['email', 'username', 'password'],
         <String>['field1', 'field2', 'field3'],
       );
-      final EngineAutofillForm autofillForm = EngineAutofillForm.fromFrameworkMessage(
-        kImplicitViewId,
-        createAutofillInfo('email', 'field1'),
-        fields,
-      )!;
+      final EngineAutofillForm autofillForm =
+          EngineAutofillForm.fromFrameworkMessage(
+            kImplicitViewId,
+            createAutofillInfo('email', 'field1'),
+            fields,
+          )!;
 
       expect(autofillForm.elements, hasLength(2));
 
@@ -3215,11 +3225,12 @@ Future<void> testMain() async {
           <String>['email', 'username', 'password'],
           <String>['field1', 'field2', 'field3'],
         );
-        final EngineAutofillForm autofillForm = EngineAutofillForm.fromFrameworkMessage(
-          kImplicitViewId,
-          createAutofillInfo('email', 'field1'),
-          fields,
-        )!;
+        final EngineAutofillForm autofillForm =
+            EngineAutofillForm.fromFrameworkMessage(
+              kImplicitViewId,
+              createAutofillInfo('email', 'field1'),
+              fields,
+            )!;
         final List<DomHTMLInputElement> formChildNodes =
             autofillForm.formElement.childNodes.toList() as List<DomHTMLInputElement>;
         final DomHTMLInputElement username = formChildNodes[0];
@@ -3243,11 +3254,12 @@ Future<void> testMain() async {
         <String>['email', 'username', 'password'],
         <String>['field1', 'field2', 'field3'],
       );
-      final EngineAutofillForm autofillForm = EngineAutofillForm.fromFrameworkMessage(
-        kImplicitViewId,
-        createAutofillInfo('email', 'field1'),
-        fields,
-      )!;
+      final EngineAutofillForm autofillForm =
+          EngineAutofillForm.fromFrameworkMessage(
+            kImplicitViewId,
+            createAutofillInfo('email', 'field1'),
+            fields,
+          )!;
       final List<DomHTMLInputElement> formChildNodes =
           autofillForm.formElement.childNodes.toList() as List<DomHTMLInputElement>;
       final DomHTMLInputElement username = formChildNodes[0];
@@ -3270,11 +3282,12 @@ Future<void> testMain() async {
           <String>['email', 'username', 'password'],
           <String>['field1', 'field2', 'field3'],
         );
-        final EngineAutofillForm autofillForm = EngineAutofillForm.fromFrameworkMessage(
-          kImplicitViewId,
-          createAutofillInfo('email', 'field1'),
-          fields,
-        )!;
+        final EngineAutofillForm autofillForm =
+            EngineAutofillForm.fromFrameworkMessage(
+              kImplicitViewId,
+              createAutofillInfo('email', 'field1'),
+              fields,
+            )!;
 
         final DomHTMLInputElement testInputElement = createDomHTMLInputElement();
         testInputElement.name = 'email';
