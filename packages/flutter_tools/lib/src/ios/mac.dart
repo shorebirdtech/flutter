@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:meta/meta.dart';
 import 'package:process/process.dart';
@@ -11,6 +10,7 @@ import 'package:unified_analytics/unified_analytics.dart';
 
 import '../artifacts.dart';
 import '../base/file_system.dart';
+import '../base/io.dart';
 import '../base/logger.dart';
 import '../base/process.dart';
 import '../base/project_migrator.dart';
@@ -33,7 +33,6 @@ import '../migrations/xcode_script_build_phase_migration.dart';
 import '../migrations/xcode_thin_binary_build_phase_input_paths_migration.dart';
 import '../plugins.dart';
 import '../project.dart';
-import '../reporting/reporting.dart';
 import 'application_package.dart';
 import 'code_signing.dart';
 import 'migrations/host_app_info_plist_migration.dart';
@@ -607,7 +606,6 @@ Future<XcodeBuildResult> buildXcodeProject({
         globals.printError('Archive succeeded but the expected xcarchive at $outputDir not found');
       }
     }
-
     return XcodeBuildResult(
       success: true,
       output: outputDir,
