@@ -167,12 +167,8 @@ class PointerBinding {
 typedef QueuedEvent = ({DomEvent event, Duration timeStamp, List<ui.PointerData> data});
 
 @visibleForTesting
-typedef DebounceState = ({
-  bool started,
-  DomEventTarget target,
-  Timer timer,
-  List<QueuedEvent> queue,
-});
+typedef DebounceState =
+    ({bool started, DomEventTarget target, Timer timer, List<QueuedEvent> queue});
 
 /// Disambiguates taps and clicks that are produced both by the framework from
 /// `pointerdown`/`pointerup` events and those detected as DOM "click" events by
