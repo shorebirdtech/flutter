@@ -22,6 +22,7 @@
     shorebird_update_with_result;
     shorebird_next_boot_patch_number;
     shorebird_current_boot_patch_number;
+    shorebird_validate_next_boot_patch;
   local:
     *;
 };

@@ -161,6 +161,7 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   // https://github.com/shorebirdtech/shorebird/issues/950
 
   FML_LOG(INFO) << "Checking for active patch";
+  shorebird_validate_next_boot_patch();
   char* c_active_path = shorebird_next_boot_patch_path();
   if (c_active_path != NULL) {
     patch_path = c_active_path;
@@ -261,6 +262,7 @@ void ConfigureShorebird(std::string code_cache_path,
   SetBaseSnapshot(settings);
 #endif
 
+  shorebird_validate_next_boot_patch();
   char* c_active_path = shorebird_next_boot_patch_path();
   if (c_active_path != NULL) {
     std::string active_path = c_active_path;
