@@ -16,6 +16,10 @@ vars = {
   'skia_git': 'https://skia.googlesource.com',
   'llvm_git': 'https://llvm.googlesource.com',
   'skia_revision': 'e9ed4fc9f1544c58d8a9347c1fc9471d8dd7c465',
+  "dart_sdk_revision": "b65ce89c8057d6880e00693a7b0ecd7b9e5f61ca",
+  "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
+  "updater_git": "https://github.com/shorebirdtech/updater.git",
+  "updater_rev": "76f005940db57c38b479cee858abc0cfbd12ac28",
 
   # WARNING: DO NOT EDIT canvaskit_cipd_instance MANUALLY
   # See `lib/web_ui/README.md` for how to roll CanvasKit to a new version.
@@ -284,7 +288,7 @@ deps = {
   'https://boringssl.googlesource.com/boringssl.git' + '@' + Var('dart_boringssl_rev'),
 
   'engine/src/flutter/third_party/dart':
-   Var('dart_git') + '/sdk.git' + '@' + Var('dart_revision'),
+   Var('dart_sdk_git') + '@' + Var('dart_sdk_revision'),
 
   # WARNING: Unused Dart dependencies in the list below till "WARNING:" marker are removed automatically - see create_updated_flutter_deps.py.
 
@@ -480,6 +484,9 @@ deps = {
 
   'engine/src/flutter/third_party/ocmock':
    Var('flutter_git') + '/third_party/ocmock' + '@' +  Var('ocmock_rev'),
+
+  'engine/src/flutter/third_party/updater':
+   Var('updater_git') + '@' + Var('updater_rev'),
 
   'engine/src/flutter/third_party/libjpeg-turbo/src':
    Var('flutter_git') + '/third_party/libjpeg-turbo' + '@' + '0fb821f3b2e570b2783a94ccd9a2fb1f4916ae9f',
