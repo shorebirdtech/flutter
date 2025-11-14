@@ -8,6 +8,8 @@ import static io.flutter.Build.API_LEVELS;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
@@ -42,6 +44,10 @@ import io.flutter.util.Preconditions;
 import io.flutter.view.AccessibilityBridge;
 import io.flutter.view.FlutterCallbackInformation;
 import io.flutter.view.TextureRegistry;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -178,6 +184,9 @@ public class FlutterJNI {
       @Nullable String bundlePath,
       @NonNull String appStoragePath,
       @NonNull String engineCachesPath,
+      @Nullable String shorebirdYaml,
+      @Nullable String version,
+      @Nullable String versionCode,
       long initTimeMillis,
       int apiLevel);
 
@@ -206,8 +215,47 @@ public class FlutterJNI {
       Log.w(TAG, "FlutterJNI.init called more than once");
     }
 
+    String version = null;
+    String versionCode = null;
+    try {
+      PackageInfo packageInfo =
+          context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+      version = packageInfo.versionName;
+      if (Build.VERSION.SDK_INT >= API_LEVELS.API_28) {
+        versionCode = String.valueOf(packageInfo.getLongVersionCode());
+      } else {
+        versionCode = String.valueOf(packageInfo.versionCode);
+      }
+    } catch (PackageManager.NameNotFoundException e) {
+      Log.e(TAG, "Failed to read app version.  Shorebird updater can't run.", e);
+    }
+
+    String shorebirdYaml = null;
+    try {
+      InputStream yaml = context.getAssets().open("flutter_assets/shorebird.yaml");
+      BufferedReader r = new BufferedReader(new InputStreamReader(yaml));
+      StringBuilder total = new StringBuilder();
+      for (String line; (line = r.readLine()) != null; ) {
+        total.append(line).append('\n');
+      }
+      shorebirdYaml = total.toString();
+      Log.d(TAG, "shorebird.yaml: " + shorebirdYaml);
+    } catch (IOException e) {
+      Log.e(TAG, "Failed to load shorebird.yaml", e);
+      Log.e(TAG, "Did you remember to include shorebird.yaml in your pubspec.yaml's assets?");
+    }
+
     FlutterJNI.nativeInit(
-        context, args, bundlePath, appStoragePath, engineCachesPath, initTimeMillis, apiLevel);
+        context,
+        args,
+        bundlePath,
+        appStoragePath,
+        engineCachesPath,
+        shorebirdYaml,
+        version,
+        versionCode,
+        initTimeMillis,
+        apiLevel);
     FlutterJNI.initCalled = true;
   }
 
