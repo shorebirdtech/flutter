@@ -14,6 +14,7 @@ import '../../devfs.dart';
 import '../../flutter_manifest.dart';
 import '../../isolated/native_assets/dart_hook_result.dart';
 import '../../project.dart';
+import '../../shorebird/shorebird_yaml.dart';
 import '../build_system.dart';
 import '../depfile.dart';
 import '../exceptions.dart';
@@ -190,6 +191,19 @@ Future<Depfile> copyAssets(
           }
           if (doCopy) {
             await (content.file as File).copy(file.path);
+            if (file.basename == 'shorebird.yaml') {
+              try {
+                updateShorebirdYaml(
+                  environment.defines[kFlavor],
+                  file.path,
+                  environment: globals.platform.environment,
+                );
+              } on Exception catch (error) {
+                throw Exception(
+                  'Failed to generate shorebird configuration. Error: $error',
+                );
+              }
+            }
           }
         } else {
           await file.writeAsBytes(await entry.value.content.contentsAsBytes());
