@@ -45,6 +45,7 @@ generated_file("artifacts_entitlement_config") {
 if (build_engine_artifacts) {
   zip_bundle("artifacts") {
     deps = [
+      "$dart_src/runtime/bin:analyze_snapshot",
       "$dart_src/runtime/bin:gen_snapshot",
       "//flutter/flutter_frontend_server:frontend_server",
       "//flutter/impeller/compiler:impellerc",
@@ -142,6 +143,10 @@ if (build_engine_artifacts) {
     if (host_os == "mac") {
       deps += [ ":artifacts_entitlement_config" ]
       files += [
+        {
+          source = "$root_out_dir/analyze_snapshot$exe"
+          destination = "analyze_snapshot$exe"
+        },
         {
           source = "$target_gen_dir/entitlements.txt"
           destination = "entitlements.txt"
@@ -320,13 +325,24 @@ if (is_mac) {
 }
 
 if (host_os == "win") {
+  # This rule archives both gen_snapshot *and* analyze_snapshot. The name is
+  # misleading. We (shorebird) have updated this rule to include
+  # analyze_snapshot but did not update the name because it is referenced
+  # elsewhere in the tooling.
   zip_bundle("archive_win_gen_snapshot") {
-    deps = [ "//flutter:gen_snapshot" ]
+    deps = [
+      "//flutter:analyze_snapshot",
+      "//flutter:gen_snapshot",
+    ]
     output = "$full_target_platform_name-$flutter_runtime_mode/windows-x64.zip"
     files = [
       {
         source = "$root_out_dir/gen_snapshot/gen_snapshot.exe"
         destination = "gen_snapshot.exe"
+      },
+      {
+        source = "$root_out_dir/analyze_snapshot/analyze_snapshot.exe"
+        destination = "analyze_snapshot.exe"
       },
     ]
   }
