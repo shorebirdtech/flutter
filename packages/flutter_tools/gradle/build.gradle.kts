@@ -64,6 +64,7 @@ dependencies {
     //  * ndkVersion in FlutterExtension in packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt
     compileOnly("com.android.tools.build:gradle:8.11.1")
 
+    implementation("org.yaml:snakeyaml:2.0")
     testImplementation(kotlin("test"))
     testImplementation("com.android.tools.build:gradle:8.11.1")
     testImplementation("org.mockito:mockito-core:5.8.0")
