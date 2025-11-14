@@ -171,6 +171,7 @@ source_set("flutter_shell_native_src") {
     "//flutter/runtime",
     "//flutter/runtime:libdart",
     "//flutter/shell/common",
+    "//flutter/shell/common/shorebird",
     "//flutter/shell/platform/android/context",
     "//flutter/shell/platform/android/external_view_embedder",
     "//flutter/shell/platform/android/jni",
@@ -184,6 +185,8 @@ source_set("flutter_shell_native_src") {
 
   public_configs = [ "//flutter:config" ]
 
+  include_dirs = [ "//flutter/updater" ]
+
   defines = []
 
   libs = [
@@ -191,6 +194,17 @@ source_set("flutter_shell_native_src") {
     "EGL",
     "GLESv2",
   ]
+  if (target_cpu == "arm") {
+    libs += [ "//flutter/third_party/updater/target/armv7-linux-androideabi/release/libupdater.a" ]
+  } else if (target_cpu == "arm64") {
+    libs += [ "//flutter/third_party/updater/target/aarch64-linux-android/release/libupdater.a" ]
+  } else if (target_cpu == "x64") {
+    libs += [ "//flutter/third_party/updater/target/x86_64-linux-android/release/libupdater.a" ]
+  } else if (target_cpu == "x86") {
+    libs += [ "//flutter/third_party/updater/target/i686-linux-android/release/libupdater.a" ]
+  } else {
+    assert(false, "Unsupported target_cpu")
+  }
 }
 
 action("gen_android_build_config_java") {
@@ -797,8 +811,10 @@ if (target_cpu != "x86") {
   }
 }
 
-if (host_os == "linux" &&
-    (target_cpu == "x64" || target_cpu == "arm64" || target_cpu == "riscv64")) {
+# Build analyze_snapshot for 64-bit target CPUs on linux.
+# Or always targeting arm64 for Shorebird builds.
+if ((host_os == "linux" && (target_cpu == "x64" || target_cpu == "riscv64")) ||
+    target_cpu == "arm64") {
   zip_bundle("analyze_snapshot") {
     deps = [ "$dart_src/runtime/bin:analyze_snapshot($host_toolchain)" ]
 

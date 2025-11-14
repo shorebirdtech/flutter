@@ -346,6 +346,12 @@ class CompileMacOSFramework extends Target {
       // Don't fail if the dSYM wasn't created (i.e. during a debug build).
       skipMissingInputs: true,
     );
+
+    await LinkSupplement.create(
+      environment,
+      inputBuildDir: buildOutputPath,
+      outputBuildDir: getMacOSBuildDirectory(),
+    );
   }
 
   @override

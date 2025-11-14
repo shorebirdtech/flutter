@@ -1049,6 +1049,19 @@ class GitTagVersion {
       }
     }
 
+    // Check if running on a Shorebird release branch.
+    final String shorebirdFlutterReleases = _runGit(
+      'git for-each-ref --contains $gitRef --format %(refname:short) refs/remotes/origin/flutter_release/*',
+      processUtils,
+      workingDirectory,
+    ).trim();
+    final String? shorebirdFlutterVersion = LineSplitter.split(
+      shorebirdFlutterReleases,
+    ).map((e) => e.replaceFirst('origin/flutter_release/', '')).toList().firstOrNull;
+    if (shorebirdFlutterVersion != null) {
+      return parse(shorebirdFlutterVersion);
+    }
+
     // If we don't exist in a tag, use git to find the latest tag.
     return _useNewestTagAndCommitsPastFallback(
       git: git,
