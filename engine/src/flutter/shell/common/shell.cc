@@ -46,6 +46,8 @@
 #include "third_party/skia/include/core/SkGraphics.h"
 #include "third_party/tonic/common/log.h"
 
+#include "third_party/updater/library/include/updater.h"
+
 namespace flutter {
 
 constexpr char kSkiaChannel[] = "flutter/skia";
@@ -521,6 +523,14 @@ Shell::Shell(DartVMRef vm,
       is_gpu_disabled_sync_switch_(new fml::SyncSwitch(is_gpu_disabled)),
       weak_factory_gpu_(nullptr),
       weak_factory_(this) {
+  // FIXME: This is probably the wrong place to hook into.
+#if SHOREBIRD_PLATFORM_SUPPORTED
+  if (!vm_) {
+    shorebird_report_launch_failure();
+  } else {
+    shorebird_report_launch_success();
+  }
+#endif
   FML_CHECK(!settings.enable_software_rendering || !settings.enable_impeller)
       << "Software rendering is incompatible with Impeller.";
   if (!settings.enable_impeller && settings.warn_on_impeller_opt_out) {
