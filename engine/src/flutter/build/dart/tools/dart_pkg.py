@@ -163,7 +163,10 @@ def main():
   for source in args.package_sources:
     relative_source = os.path.relpath(source, common_source_prefix)
     target = os.path.join(target_dir, relative_source)
-    copy(source, target)
+    try:
+      copy(source, target)
+    except shutil.SameFileError:
+      pass
 
   # Copy sdk-ext sources into pkg directory
   sdk_ext_dir = os.path.join(target_dir, 'sdk_ext')
@@ -179,7 +182,10 @@ def main():
   for source in args.sdk_ext_files:
     relative_source = os.path.relpath(source, common_source_prefix)
     target = os.path.join(sdk_ext_dir, relative_source)
-    copy(source, target)
+    try:
+      copy(source, target)
+    except shutil.SameFileError:
+      pass
 
   # Write stamp file.
   with open(args.stamp_file, 'w'):

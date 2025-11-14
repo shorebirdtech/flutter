@@ -130,6 +130,18 @@ class BuildableIOSApp extends IOSApp {
   @override
   String? get name => _appProductName;
 
+  String get shorebirdYamlPath =>
+    globals.fs.path.join(
+      archiveBundleOutputPath,
+      'Products',
+      'Applications',
+      _appProductName != null ? '$_appProductName.app' : 'Runner.app',
+      'Frameworks',
+      'App.framework',
+      'flutter_assets',
+      'shorebird.yaml',
+    );
+
   @override
   String get simulatorBundlePath => _buildAppPath(XcodeSdk.IPhoneSimulator.platformName);
 
