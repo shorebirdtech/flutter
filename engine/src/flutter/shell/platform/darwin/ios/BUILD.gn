@@ -88,6 +88,14 @@ source_set("flutter_framework_source") {
     "//build/config/ios:ios_application_extension",
   ]
 
+  if (target_cpu == "arm64") {
+    libs = [ "//flutter/third_party/updater/target/aarch64-apple-ios/release/libupdater.a" ]
+  } else if (target_cpu == "x64") {
+    libs = [ "//flutter/third_party/updater/target/x86_64-apple-ios/release/libupdater.a" ]
+  } else {
+    assert(false, "Unsupported target_cpu")
+  }
+
   sources = [
     "framework/Source/FlutterAppDelegate.mm",
     "framework/Source/FlutterAppDelegate_Internal.h",
@@ -208,12 +216,14 @@ source_set("flutter_framework_source") {
 
   deps = [
     ":ios_gpu_configuration",
+    "$dart_src/runtime/bin:elf_loader",
     "//flutter/common",
     "//flutter/common/graphics",
     "//flutter/fml",
     "//flutter/lib/ui",
     "//flutter/runtime",
     "//flutter/shell/common",
+    "//flutter/shell/common/shorebird",
     "//flutter/shell/platform/common:common_cpp_input",
     "//flutter/shell/platform/darwin/common",
     "//flutter/shell/platform/darwin/common:framework_common",
