@@ -153,6 +153,8 @@ source_set("common") {
     "//flutter/skia",
   ]
 
+  include_dirs = [ "//flutter/updater" ]
+
   if (impeller_supports_rendering) {
     sources += [
       "snapshot_controller_impeller.cc",
@@ -160,6 +162,31 @@ source_set("common") {
     ]
 
     deps += [ "//flutter/impeller" ]
+  }
+
+  # Needed to compile flutter_tester for macOS.
+  if (host_os == "mac" && target_os == "mac") {
+    if (target_cpu == "arm64") {
+      libs = [ "//flutter/third_party/updater/target/aarch64-apple-darwin/release/libupdater.a" ]
+    } else if (target_cpu == "x64") {
+      libs = [ "//flutter/third_party/updater/target/x86_64-apple-darwin/release/libupdater.a" ]
+    }
+  }
+
+  # Needed to compile flutter_tester for Windows.
+  if (host_os == "win" && target_os == "win") {
+    if (target_cpu == "x64") {
+      libs = [
+        "userenv.lib",
+        "//flutter/third_party/updater/target/x86_64-pc-windows-msvc/release/updater.lib",
+      ]
+    }
+  }
+
+  if (host_os == "linux" && target_os == "linux") {
+    if (target_cpu == "x64") {
+      libs = [ "//flutter/third_party/updater/target/x86_64-unknown-linux-gnu/release/libupdater.a" ]
+    }
   }
 }
 
