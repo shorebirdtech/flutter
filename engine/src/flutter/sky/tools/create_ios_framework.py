@@ -19,7 +19,8 @@ def main():
   parser = argparse.ArgumentParser(
       description=(
           'Creates Flutter.framework, Flutter.xcframework and '
-          'copies architecture-dependent gen_snapshot binaries to output dir'
+          'copies architecture-dependent analyze_snapshot and gen_snapshot '
+          'binaries to output dir'
       )
   )
 
@@ -89,13 +90,17 @@ def main():
         '%s_extension_safe' % simulator_x64_out_dir, '%s_extension_safe' % simulator_arm64_out_dir
     )
 
-  # Copy gen_snapshot binary to destination directory.
+  # Copy analyze_snapshot and gen_snapshot binaries to destination directory.
   if arm64_out_dir:
     gen_snapshot = os.path.join(arm64_out_dir, 'universal', 'gen_snapshot_arm64')
+    analyze_snapshot = os.path.join(arm64_out_dir, 'analyze_snapshot_arm64')
     sky_utils.copy_binary(gen_snapshot, os.path.join(dst, 'gen_snapshot_arm64'))
+    sky_utils.copy_binary(analyze_snapshot, os.path.join(dst, 'analyze_snapshot_arm64'))
   if x64_out_dir:
     gen_snapshot = os.path.join(x64_out_dir, 'universal', 'gen_snapshot_x64')
+    analyze_snapshot = os.path.join(x64_out_dir, 'analyze_snapshot_x64')
     sky_utils.copy_binary(gen_snapshot, os.path.join(dst, 'gen_snapshot_x64'))
+    sky_utils.copy_binary(analyze_snapshot, os.path.join(dst, 'analyze_snapshot_x64'))
 
   zip_archive(dst, args)
   return 0
@@ -177,7 +182,7 @@ def zip_archive(dst, args):
   # See: https://github.com/flutter/flutter/blob/62382c7b83a16b3f48dc06c19a47f6b8667005a5/dev/bots/suite_runners/run_verify_binaries_codesigned_tests.dart#L82-L130
 
   # Binaries that must be codesigned and require entitlements for particular APIs.
-  with_entitlements = ['gen_snapshot_arm64']
+  with_entitlements = ['analyze_snapshot_arm64', 'gen_snapshot_arm64']
   with_entitlements_file = os.path.join(dst, 'entitlements.txt')
   sky_utils.write_codesign_config(with_entitlements_file, with_entitlements)
 
@@ -211,6 +216,7 @@ def zip_archive(dst, args):
   # pylint: enable=line-too-long
 
   zip_contents = [
+      'analyze_snapshot_arm64',
       'gen_snapshot_arm64',
       'Flutter.xcframework',
       'entitlements.txt',
