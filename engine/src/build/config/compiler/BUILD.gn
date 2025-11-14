@@ -443,7 +443,10 @@ config("compiler") {
     # Example PR: https://github.com/dart-lang/native/pull/1615
     ldflags += [
       "-Wl,--no-undefined",
-      "-Wl,--exclude-libs,ALL",
+
+      # TODO: Terrible hack, but otherwise libupdater.a symbols can't
+      # be exported from libflutter.so, even when added to android_exports.lst.
+      # "-Wl,--exclude-libs,ALL",
 
       # Enable identical code folding to reduce size.
       "-Wl,--icf=all",
@@ -646,6 +649,8 @@ config("runtime_library") {
     ldflags += [ "-Wl,--warn-shared-textrel" ]
 
     libs += [
+      # Rust requires libunwind.
+      "unwind",
       "c",
       "dl",
       "m",
@@ -660,6 +665,9 @@ config("runtime_library") {
     } else if (current_cpu == "x86") {
       current_android_cpu = "i686"
     }
+    # libunwind.a is located in the respective android cpu subdirectories.
+    # The clang version needs to match the version in the lib_dirs line above.
+    lib_dirs += [ "${android_toolchain_root}/lib/clang/18/lib/linux/${current_android_cpu}/" ]
     libs += [ "clang_rt.builtins-${current_android_cpu}-android" ]
   }
 

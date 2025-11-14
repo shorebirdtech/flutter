@@ -10,6 +10,7 @@
 #include <cstring>
 
 #include "flutter/common/constants.h"
+#include "flutter/fml/logging.h"
 #include "flutter/shell/platform/common/engine_switches.h"
 #include "flutter/shell/platform/embedder/embedder.h"
 #include "flutter/shell/platform/linux/fl_accessibility_handler.h"
@@ -24,6 +25,7 @@
 #include "flutter/shell/platform/linux/fl_platform_handler.h"
 #include "flutter/shell/platform/linux/fl_plugin_registrar_private.h"
 #include "flutter/shell/platform/linux/fl_settings_handler.h"
+#include "flutter/shell/platform/linux/fl_shorebird.h"
 #include "flutter/shell/platform/linux/fl_texture_gl_private.h"
 #include "flutter/shell/platform/linux/fl_texture_registrar_private.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_plugin_registry.h"
@@ -781,6 +783,9 @@ gboolean fl_engine_start(FlEngine* self, GError** error) {
 
   g_autoptr(GPtrArray) command_line_args =
       g_ptr_array_new_with_free_func(g_free);
+  // FlutterProjectArgs expects a full argv, so when processing it for flags
+  // the first item is treated as the executable and ignored. Add a dummy
+  // value so that all switches are used.
   g_ptr_array_insert(command_line_args, 0, g_strdup("flutter"));
   for (const auto& env_switch : flutter::GetSwitchesFromEnvironment()) {
     g_ptr_array_add(command_line_args, g_strdup(env_switch.c_str()));
@@ -818,9 +823,22 @@ gboolean fl_engine_start(FlEngine* self, GError** error) {
   args.compositor = &compositor;
 
   if (self->embedder_api.RunsAOTCompiledDartCode()) {
+    // This struct contains raw C strings and needs to have its lifetime scoped
+    // to this block.
     FlutterEngineAOTDataSource source = {};
     source.type = kFlutterEngineAOTDataSourceTypeElfPath;
-    source.elf_path = fl_dart_project_get_aot_library_path(self->project);
+    std::string patch_path;
+    auto setup_shorebird_result =
+        flutter::SetUpShorebird(args.assets_path, patch_path);
+    if (setup_shorebird_result) {
+      // If we have a patch installed, we replace the default AOT library path
+      // with the patch path here.
+      source.elf_path = patch_path.c_str();
+    } else {
+      FML_LOG(ERROR) << "Failed to configure Shorebird.";
+      source.elf_path = fl_dart_project_get_aot_library_path(self->project);
+    }
+
     if (self->embedder_api.CreateAOTData(&source, &self->aot_data) !=
         kSuccess) {
       g_set_error(error, fl_engine_error_quark(), FL_ENGINE_ERROR_FAILED,
