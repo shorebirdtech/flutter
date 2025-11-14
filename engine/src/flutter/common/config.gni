@@ -67,6 +67,14 @@ if (slimpeller) {
   feature_defines_list += [ "SLIMPELLER=1" ]
 }
 
+if (is_android || is_ios || is_linux || is_mac || is_win) {
+  feature_defines_list += [ "SHOREBIRD_PLATFORM_SUPPORTED=1" ]
+}
+
+if (is_ios) {
+  feature_defines_list += [ "SHOREBIRD_USE_INTERPRETER=1" ]
+}
+
 if (is_ios || is_mac) {
   flutter_cflags_objc = [
     "-Werror=overriding-method-mismatch",

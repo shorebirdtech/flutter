@@ -485,6 +485,7 @@ def run_cc_tests(
         make_test('platform_view_android_delegate_unittests'),
         # https://github.com/flutter/flutter/issues/36295
         make_test('shell_unittests'),
+        make_test('shorebird_unittests'),
     ]
 
   if is_windows():
