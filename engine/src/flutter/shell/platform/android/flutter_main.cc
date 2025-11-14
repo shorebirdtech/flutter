@@ -20,6 +20,7 @@
 #include "flutter/fml/platform/android/paths_android.h"
 #include "flutter/lib/ui/plugins/callback_cache.h"
 #include "flutter/runtime/dart_vm.h"
+#include "flutter/shell/common/shorebird/shorebird.h"
 #include "flutter/shell/common/switches.h"
 #include "flutter/shell/platform/android/android_context_vk_impeller.h"
 #include "flutter/shell/platform/android/android_rendering_selector.h"
@@ -28,6 +29,8 @@
 #include "impeller/base/validation.h"
 #include "impeller/toolkit/android/proc_table.h"
 #include "txt/platform.h"
+
+#include "third_party/updater/library/include/updater.h"
 
 namespace flutter {
 
@@ -93,6 +96,9 @@ void FlutterMain::Init(JNIEnv* env,
                        jstring kernelPath,
                        jstring appStoragePath,
                        jstring engineCachesPath,
+                       jstring shorebirdYaml,
+                       jstring version,
+                       jstring versionCode,
                        jlong initTimeMillis,
                        jint api_level) {
   std::vector<std::string> args;
@@ -151,8 +157,18 @@ void FlutterMain::Init(JNIEnv* env,
   flutter::DartCallbackCache::SetCachePath(
       fml::jni::JavaStringToString(env, appStoragePath));
 
-  fml::paths::InitializeAndroidCachesPath(
-      fml::jni::JavaStringToString(env, engineCachesPath));
+  auto code_cache_path = fml::jni::JavaStringToString(env, engineCachesPath);
+  auto app_storage_path = fml::jni::JavaStringToString(env, appStoragePath);
+  fml::paths::InitializeAndroidCachesPath(code_cache_path);
+
+#if FLUTTER_RELEASE
+  std::string shorebird_yaml = fml::jni::JavaStringToString(env, shorebirdYaml);
+  std::string version_string = fml::jni::JavaStringToString(env, version);
+  std::string version_code_string =
+      fml::jni::JavaStringToString(env, versionCode);
+  ConfigureShorebird(code_cache_path, app_storage_path, settings,
+                     shorebird_yaml, version_string, version_code_string);
+#endif
 
   flutter::DartCallbackCache::LoadCacheFromDisk();
 
@@ -245,6 +261,7 @@ bool FlutterMain::Register(JNIEnv* env) {
       {
           .name = "nativeInit",
           .signature = "(Landroid/content/Context;[Ljava/lang/String;Ljava/"
+                       "lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/"
                        "lang/String;Ljava/lang/String;Ljava/lang/String;JI)V",
           .fnPtr = reinterpret_cast<void*>(&Init),
       },
