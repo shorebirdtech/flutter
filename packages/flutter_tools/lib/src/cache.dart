@@ -40,6 +40,7 @@ import 'base/utils.dart' show getElapsedAsSeconds, getSizeAsPlatformMB;
 import 'convert.dart';
 import 'features.dart';
 
+const kShorebirdStorageUrl = 'https://download.shorebird.dev';
 const kFlutterRootEnvironmentVariableName =
     'FLUTTER_ROOT'; // should point to //flutter/ (root of flutter/flutter repo)
 const kFlutterEngineEnvironmentVariableName =
@@ -545,6 +546,10 @@ class Cache {
       return storageRealm.isEmpty
           ? 'https://storage.googleapis.com'
           : 'https://storage.googleapis.com/$storageRealm';
+    }
+    // Shorebird's artifact proxy is a trusted source.
+    if (overrideUrl == kShorebirdStorageUrl) {
+      return overrideUrl;
     }
     // verify that this is a valid URI.
     overrideUrl = storageRealm.isEmpty ? overrideUrl : '$overrideUrl/$storageRealm';

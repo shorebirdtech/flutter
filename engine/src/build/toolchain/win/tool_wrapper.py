@@ -121,6 +121,17 @@ class WinTool(object):
       self._UseSeparateMspdbsrv(env, args)
     if sys.platform == 'win32':
       args = list(args)  # *args is a tuple by default, which is read-only.
+
+      # Remove the /DEF arg if not provided. We would ideally be able to do this
+      # in build\toolchain\win\BUILD.gn, but there doesn't seem to be a way to
+      # conditionally add args to the command line based on whether a file exists
+      # or not, so we do it here instead.
+      def_arg_prefix = "/DEF:"
+      for arg in args:
+        if arg.startswith(def_arg_prefix):
+          def_file = arg[len(def_arg_prefix):]
+          if not os.path.exists(def_file):
+            args.remove(arg)
       args[0] = args[0].replace('/', '\\')
     # https://docs.python.org/2/library/subprocess.html:
     # "On Unix with shell=True [...] if args is a sequence, the first item

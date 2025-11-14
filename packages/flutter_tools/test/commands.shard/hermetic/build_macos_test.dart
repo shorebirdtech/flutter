@@ -98,6 +98,14 @@ final macosPlatformCustomEnv = FakePlatform(
   environment: <String, String>{'FLUTTER_ROOT': '/', 'HOME': '/'},
 );
 
+final Platform macosPlatformWithShorebirdPublicKey = FakePlatform(
+    operatingSystem: 'macos',
+    environment: <String, String>{
+      'FLUTTER_ROOT': '/',
+      'HOME': '/',
+      'SHOREBIRD_PUBLIC_KEY': 'my_public_key',
+    }
+);
 final Platform notMacosPlatform = FakePlatform(environment: <String, String>{'FLUTTER_ROOT': '/'});
 
 void main() {
