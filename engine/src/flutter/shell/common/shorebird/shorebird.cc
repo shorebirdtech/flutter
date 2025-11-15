@@ -144,7 +144,7 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
     // https://stackoverflow.com/questions/26032039/convert-vectorstring-into-char-c
     std::vector<const char*> c_paths{};
     c_paths.push_back(args.release_app_library_path.c_str());
-    // Do not modify application_library_path or c_strings will invalidate.
+    // Do not modify application_library_paths or c_strings will invalidate.
 
     app_parameters.original_libapp_paths = c_paths.data();
     app_parameters.original_libapp_paths_size = c_paths.size();
@@ -238,10 +238,10 @@ void ConfigureShorebird(std::string code_cache_path,
 
     // https://stackoverflow.com/questions/26032039/convert-vectorstring-into-char-c
     std::vector<const char*> c_paths{};
-    for (const auto& string : settings.application_library_path) {
+    for (const auto& string : settings.application_library_paths) {
       c_paths.push_back(string.c_str());
     }
-    // Do not modify application_library_path or c_strings will invalidate.
+    // Do not modify application_library_paths or c_strings will invalidate.
 
     app_parameters.original_libapp_paths = c_paths.data();
     app_parameters.original_libapp_paths_size = c_paths.size();
@@ -273,11 +273,11 @@ void ConfigureShorebird(std::string code_cache_path,
     // On iOS we add the patch to the front of the list instead of clearing
     // the list, to allow dart_snapshot.cc to still find the base snapshot
     // for the vm isolate.
-    settings.application_library_path.insert(
-        settings.application_library_path.begin(), active_path);
+    settings.application_library_paths.insert(
+        settings.application_library_paths.begin(), active_path);
 #else
-    settings.application_library_path.clear();
-    settings.application_library_path.emplace_back(active_path);
+    settings.application_library_paths.clear();
+    settings.application_library_paths.emplace_back(active_path);
 #endif
   } else {
     FML_LOG(INFO) << "Shorebird updater: no active patch.";
