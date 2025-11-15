@@ -58,7 +58,7 @@ static std::shared_ptr<const fml::Mapping> SearchMapping(
     bool is_executable) {
 #if SHOREBIRD_USE_INTERPRETER
   // Detect when we're trying to load a Shorebird patch.
-  auto patch_path = native_library_path.front();
+  auto patch_path = native_library_paths.front();
   bool is_patch = patch_path.find(".vmcode") != std::string::npos;
   if (is_patch) {
     // We use this terrible hack to load in the patch and then extract the
