@@ -395,9 +395,6 @@ bool SetUpShorebird(std::string assets_path_string, std::string& patch_path) {
 }
 
 bool FlutterWindowsEngine::Run(std::string_view entrypoint) {
-  std::string assets_path_string = project_->assets_path().u8string();
-  std::string icu_path_string = project_->icu_path().u8string();
-
   if (!project_->HasValidPaths()) {
     FML_LOG(ERROR) << "Missing or unresolvable paths to assets.";
     return false;
