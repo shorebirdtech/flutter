@@ -6,6 +6,7 @@
 
 #include <sstream>
 
+#include <third_party/dart/runtime/bin/elf_loader.h>
 #include "flutter/fml/native_library.h"
 #include "flutter/fml/paths.h"
 #include "flutter/fml/trace_event.h"
