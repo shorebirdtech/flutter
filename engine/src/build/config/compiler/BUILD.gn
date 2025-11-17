@@ -667,7 +667,7 @@ config("runtime_library") {
     }
     # libunwind.a is located in the respective android cpu subdirectories.
     # The clang version needs to match the version in the lib_dirs line above.
-    lib_dirs += [ "${android_toolchain_root}/lib/clang/18/lib/linux/${current_android_cpu}/" ]
+    lib_dirs += [ "${android_toolchain_root}/lib/clang/19/lib/linux/${current_android_cpu}/" ]
     libs += [ "clang_rt.builtins-${current_android_cpu}-android" ]
   }
 
