@@ -192,12 +192,10 @@ Future<Depfile> copyAssets(
                 updateShorebirdYaml(
                   environment.defines[kFlavor],
                   file.path,
-                  environment: globals.platform.environment,
+                  environment: environment.platform.environment,
                 );
               } on Exception catch (error) {
-                throw Exception(
-                  'Failed to generate shorebird configuration. Error: $error',
-                );
+                throw Exception('Failed to generate shorebird configuration. Error: $error');
               }
             }
           }
