@@ -18,12 +18,12 @@
 
 namespace flutter {
 
-/// A cache entry that holds a loaded ELF file and its extracted snapshot
-/// pointers. The ELF is automatically unloaded when the last reference to
+/// A cache entry that holds a loaded patch file and its extracted snapshot
+/// pointers. The patch is automatically unloaded when the last reference to
 /// this entry is released.
 class PatchCacheEntry {
  public:
-  /// Creates a new cache entry by loading the ELF file at the given path.
+  /// Creates a new cache entry by loading the patch file at the given path.
   /// Returns nullptr if loading fails.
   static std::shared_ptr<PatchCacheEntry> Create(const std::string& path);
 
@@ -52,14 +52,14 @@ class PatchCacheEntry {
   FML_DISALLOW_COPY_AND_ASSIGN(PatchCacheEntry);
 };
 
-/// A thread-safe cache for loaded ELF files. Cache entries are automatically
+/// A thread-safe cache for loaded patch files. Cache entries are automatically
 /// removed when all references to them are released.
 class PatchCache {
  public:
   /// Returns the singleton instance of the cache.
   static PatchCache& Instance();
 
-  /// Gets or loads an ELF file at the given path. If the file is already
+  /// Gets or loads a patch file at the given path. If the file is already
   /// cached and the entry is still alive, returns the existing entry.
   /// Otherwise, loads the file and creates a new cache entry.
   /// Returns nullptr if loading fails.
@@ -83,7 +83,7 @@ class PatchCache {
 
 /// Checks if the first path in native_library_paths is a Shorebird patch
 /// (.vmcode file) and if so, attempts to load the requested symbol from
-/// the patch ELF.
+/// the patch.
 ///
 /// @param native_library_paths The list of library paths to check. The first
 ///        path is checked for the .vmcode extension.
