@@ -527,7 +527,7 @@ class Cache {
   /// The base for URLs that store Flutter engine artifacts that are fetched
   /// during the installation of the Flutter SDK.
   ///
-  /// By default the base URL is https://storage.googleapis.com. However, if
+  /// By default the base URL is https://download.shorebird.dev. However, if
   /// `FLUTTER_STORAGE_BASE_URL` environment variable ([kFlutterStorageBaseUrl])
   /// is provided, the environment variable value is returned instead.
   ///
@@ -539,7 +539,7 @@ class Cache {
     String? overrideUrl = _platform.environment[kFlutterStorageBaseUrl];
     if (overrideUrl == null) {
       return storageRealm.isEmpty
-          ? 'https://storage.googleapis.com'
+          ? 'https://download.shorebird.dev'
           : 'https://storage.googleapis.com/$storageRealm';
     }
     // Shorebird's artifact proxy is a trusted source.

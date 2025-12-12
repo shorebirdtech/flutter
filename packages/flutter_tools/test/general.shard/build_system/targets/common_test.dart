@@ -26,6 +26,17 @@ const kBoundaryKey = '4d2d9609-c662-4571-afde-31410f96caa6';
 const kElfAot = '--snapshot_kind=app-aot-elf';
 const kMachoDylibAot = '--snapshot_kind=app-aot-macho-dylib';
 
+/// Generate Shorebird link info arguments for iOS/macOS AOT builds.
+/// The [buildPath] should be the build directory path (outputDir.parent.path).
+List<String> linkInfoArgsFor(String buildPath) => <String>[
+  '--print_class_table_link_debug_info_to=$buildPath/App.class_table.json',
+  '--print_class_table_link_info_to=$buildPath/App.ct.link',
+  '--print_field_table_link_debug_info_to=$buildPath/App.field_table.json',
+  '--print_field_table_link_info_to=$buildPath/App.ft.link',
+  '--print_dispatch_table_link_debug_info_to=$buildPath/App.dispatch_table.json',
+  '--print_dispatch_table_link_info_to=$buildPath/App.dt.link',
+];
+
 final Platform macPlatform = FakePlatform(
   operatingSystem: 'macos',
   environment: <String, String>{},
@@ -802,6 +813,7 @@ void main() {
             // This path is not known by the cache due to the iOS gen_snapshot split.
             'Artifact.genSnapshotArm64.TargetPlatform.ios.profile',
             '--deterministic',
+            ...linkInfoArgsFor(build),
             '--write-v8-snapshot-profile-to=code_size_1/snapshot.arm64.json',
             '--trace-precompiler-to=code_size_1/trace.arm64.json',
             kMachoDylibAot,
