@@ -7,11 +7,9 @@ import 'package:file_testing/file_testing.dart';
 import 'package:flutter_tools/src/artifacts.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
 import 'package:flutter_tools/src/base/logger.dart';
-import 'package:flutter_tools/src/base/version.dart';
 import 'package:flutter_tools/src/build_info.dart';
 import 'package:flutter_tools/src/build_system/build_system.dart';
 import 'package:flutter_tools/src/build_system/targets/macos.dart';
-import 'package:flutter_tools/src/features.dart';
 import 'package:flutter_tools/src/ios/xcodeproj.dart';
 import 'package:flutter_tools/src/project.dart';
 import 'package:test/fake.dart';
@@ -22,6 +20,17 @@ import '../../../src/context.dart';
 import '../../../src/fake_process_manager.dart';
 import '../../../src/fakes.dart';
 import '../../../src/package_config.dart';
+
+/// Generate Shorebird link info arguments for iOS/macOS AOT builds.
+/// The [buildPath] should be the build directory path (outputDir.parent.path).
+List<String> linkInfoArgsFor(String buildPath) => <String>[
+  '--print_class_table_link_debug_info_to=$buildPath/App.class_table.json',
+  '--print_class_table_link_info_to=$buildPath/App.ct.link',
+  '--print_field_table_link_debug_info_to=$buildPath/App.field_table.json',
+  '--print_field_table_link_info_to=$buildPath/App.ft.link',
+  '--print_dispatch_table_link_debug_info_to=$buildPath/App.dispatch_table.json',
+  '--print_dispatch_table_link_info_to=$buildPath/App.dt.link',
+];
 
 void main() {
   late Environment environment;
@@ -805,28 +814,36 @@ void main() {
       environment.defines[kXcodeAction] = 'install';
       environment.defines[kFlavor] = 'internal';
 
+      // Set up engine artifacts
       fileSystem
           .file('bin/cache/artifacts/engine/darwin-x64/vm_isolate_snapshot.bin')
           .createSync(recursive: true);
       fileSystem
           .file('bin/cache/artifacts/engine/darwin-x64/isolate_snapshot.bin')
           .createSync(recursive: true);
+
+      // Set up App.framework binary
       fileSystem
           .file(fileSystem.path
               .join(environment.buildDir.path, 'App.framework', 'App'))
           .createSync(recursive: true);
-      final String shorebirdYamlPath = fileSystem.path.join(
-        environment.buildDir.path,
-        'App.framework',
-        'Versions',
-        'A',
-        'Resources',
-        'flutter_assets',
-        'shorebird.yaml',
-      );
-      fileSystem.file(fileSystem.path
-          .join(environment.buildDir.path, 'App.framework', 'App'))
-        ..createSync(recursive: true)
+
+      // Set up native_assets.json (required by MacOSBundleFlutterAssets)
+      environment.buildDir.childFile('native_assets.json').createSync();
+
+      // Set up pubspec.yaml with shorebird.yaml as an asset
+      fileSystem.file('pubspec.yaml')
+        ..createSync()
+        ..writeAsStringSync('''
+name: example
+flutter:
+  assets:
+    - shorebird.yaml
+''');
+
+      // Create the shorebird.yaml asset file
+      fileSystem.file('shorebird.yaml')
+        ..createSync()
         ..writeAsStringSync('''
 # Some other text that should be removed
 app_id: base-app-id
@@ -835,8 +852,21 @@ flavors:
   stable: stable-app-id
 ''');
 
+      // Set up package config
+      writePackageConfigFiles(directory: fileSystem.currentDirectory, mainLibName: 'example');
+
       await const ReleaseMacOSBundleFlutterAssets().build(environment);
 
+      // The output is in environment.outputDir, not buildDir
+      final String shorebirdYamlPath = fileSystem.path.join(
+        environment.outputDir.path,
+        'App.framework',
+        'Versions',
+        'A',
+        'Resources',
+        'flutter_assets',
+        'shorebird.yaml',
+      );
       expect(fileSystem.file(shorebirdYamlPath).readAsStringSync(),
           'app_id: internal-app-id');
     },
@@ -906,17 +936,15 @@ flavors:
           .childFile('x86_64/App.framework.dSYM/Contents/Resources/DWARF/App')
           .createSync(recursive: true);
 
+      final build = environment.buildDir.path;
       processManager.addCommands(<FakeCommand>[
         FakeCommand(
           command: <String>[
             'Artifact.genSnapshotArm64.TargetPlatform.darwin.release',
             '--deterministic',
-            '--snapshot_kind=app-aot-macho-dylib',
-            '--macho=${environment.buildDir.childFile('arm64/App.framework/App').path}',
-            '--macho-object=${environment.buildDir.childFile('arm64/app.o').path}',
-            '--macho-min-os-version=12.0',
-            '--macho-rpath=@executable_path/Frameworks,@loader_path/Frameworks',
-            '--macho-install-name=@rpath/App.framework/App',
+            ...linkInfoArgsFor(build),
+            '--snapshot_kind=app-aot-assembly',
+            '--assembly=${environment.buildDir.childFile('arm64/snapshot_assembly.S').path}',
             environment.buildDir.childFile('app.dill').path,
           ],
         ),
@@ -924,13 +952,80 @@ flavors:
           command: <String>[
             'Artifact.genSnapshotX64.TargetPlatform.darwin.release',
             '--deterministic',
-            '--snapshot_kind=app-aot-macho-dylib',
-            '--macho=${environment.buildDir.childFile('x86_64/App.framework/App').path}',
-            '--macho-object=${environment.buildDir.childFile('x86_64/app.o').path}',
-            '--macho-min-os-version=12.0',
-            '--macho-rpath=@executable_path/Frameworks,@loader_path/Frameworks',
-            '--macho-install-name=@rpath/App.framework/App',
+            ...linkInfoArgsFor(build),
+            '--snapshot_kind=app-aot-assembly',
+            '--assembly=${environment.buildDir.childFile('x86_64/snapshot_assembly.S').path}',
             environment.buildDir.childFile('app.dill').path,
+          ],
+        ),
+        FakeCommand(
+          command: <String>[
+            'xcrun',
+            'cc',
+            '-arch',
+            'arm64',
+            '-c',
+            environment.buildDir.childFile('arm64/snapshot_assembly.S').path,
+            '-o',
+            environment.buildDir.childFile('arm64/snapshot_assembly.o').path,
+          ],
+        ),
+        FakeCommand(
+          command: <String>[
+            'xcrun',
+            'cc',
+            '-arch',
+            'x86_64',
+            '-c',
+            environment.buildDir.childFile('x86_64/snapshot_assembly.S').path,
+            '-o',
+            environment.buildDir.childFile('x86_64/snapshot_assembly.o').path,
+          ],
+        ),
+        FakeCommand(
+          command: <String>[
+            'xcrun',
+            'clang',
+            '-arch',
+            'arm64',
+            '-dynamiclib',
+            '-Xlinker',
+            '-rpath',
+            '-Xlinker',
+            '@executable_path/Frameworks',
+            '-Xlinker',
+            '-rpath',
+            '-Xlinker',
+            '@loader_path/Frameworks',
+            '-fapplication-extension',
+            '-install_name',
+            '@rpath/App.framework/App',
+            '-o',
+            environment.buildDir.childFile('arm64/App.framework/App').path,
+            environment.buildDir.childFile('arm64/snapshot_assembly.o').path,
+          ],
+        ),
+        FakeCommand(
+          command: <String>[
+            'xcrun',
+            'clang',
+            '-arch',
+            'x86_64',
+            '-dynamiclib',
+            '-Xlinker',
+            '-rpath',
+            '-Xlinker',
+            '@executable_path/Frameworks',
+            '-Xlinker',
+            '-rpath',
+            '-Xlinker',
+            '@loader_path/Frameworks',
+            '-fapplication-extension',
+            '-install_name',
+            '@rpath/App.framework/App',
+            '-o',
+            environment.buildDir.childFile('x86_64/App.framework/App').path,
+            environment.buildDir.childFile('x86_64/snapshot_assembly.o').path,
           ],
         ),
         FakeCommand(
@@ -1009,44 +1104,13 @@ flavors:
       ProcessManager: () => processManager,
     },
   );
-
-  group('FlutterMacOS output', () {
-    late MemoryFileSystem testFileSystem;
-
-    setUp(() {
-      testFileSystem = MemoryFileSystem.test();
-      testFileSystem.file('pubspec.yaml').createSync(recursive: true);
-      testFileSystem.directory('macos').createSync(recursive: true);
-      testFileSystem
-          .directory('macos/Flutter/ephemeral/Packages/.packages/FlutterFramework')
-          .createSync(recursive: true);
-    });
-    testUsingContext(
-      'included when not using SwiftPM',
-      () async {
-        const Target target = ReleaseUnpackMacOS();
-        expect(target.outputs.contains(kFlutterMacOSFrameworkBinarySource), isTrue);
-      },
-      overrides: <Type, Generator>{
-        FeatureFlags: () => TestFeatureFlags(),
-        XcodeProjectInterpreter: () => FakeXcodeProjectInterpreter(version: Version(15, 0, 0)),
-      },
-    );
-  });
 }
 
 class FakeXcodeProjectInterpreter extends Fake implements XcodeProjectInterpreter {
-  FakeXcodeProjectInterpreter({
-    this.isInstalled = true,
-    this.version,
-    this.schemes = const <String>['Runner'],
-  });
+  FakeXcodeProjectInterpreter({this.isInstalled = true, this.schemes = const <String>['Runner']});
 
   @override
   final bool isInstalled;
-
-  @override
-  final Version? version;
 
   List<String> schemes;
 

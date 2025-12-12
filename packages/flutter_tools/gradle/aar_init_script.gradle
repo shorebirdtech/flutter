@@ -42,7 +42,7 @@ void configureProject(Project project, String outputDir) {
         return
     }
 
-    String storageUrl = System.getenv('FLUTTER_STORAGE_BASE_URL') ?: "https://storage.googleapis.com"
+    String storageUrl = System.getenv('FLUTTER_STORAGE_BASE_URL') ?: "https://download.shorebird.dev"
 
     String engineRealm = Paths.get(getFlutterRoot(project), "bin", "cache", "engine.realm")
         .toFile().text.trim()

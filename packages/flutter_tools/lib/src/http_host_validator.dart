@@ -11,7 +11,7 @@ import 'doctor_validator.dart';
 import 'features.dart';
 
 /// Common Flutter HTTP hosts.
-const kCloudHost = 'https://storage.googleapis.com/';
+const kCloudHost = 'https://download.shorebird.dev/';
 const kCocoaPods = 'https://cocoapods.org/';
 const kGitHub = 'https://github.com/';
 const kMaven = 'https://maven.google.com/';

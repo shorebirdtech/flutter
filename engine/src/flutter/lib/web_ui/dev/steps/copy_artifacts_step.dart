@@ -55,8 +55,8 @@ class CopyArtifactsStep implements PipelineStep {
         'Could not generate artifact bucket url for unknown realm.',
       ),
     };
-    final url = Uri.https(
-      'storage.googleapis.com',
+    final Uri url = Uri.https(
+      'download.shorebird.dev',
       '${realmComponent}flutter_infra_release/flutter/${realm == LuciRealm.Try ? gitRevision : contentHash}/flutter-web-sdk.zip',
     );
     final http.Response response = await http.Client().get(url);
