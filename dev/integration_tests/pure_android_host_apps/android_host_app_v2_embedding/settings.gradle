@@ -7,7 +7,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        def flutterStorageUrl = System.getenv("FLUTTER_STORAGE_BASE_URL") ?: "https://storage.googleapis.com"
+        def flutterStorageUrl = System.getenv("FLUTTER_STORAGE_BASE_URL") ?: "https://download.shorebird.dev"
         maven {
             url = uri("$flutterStorageUrl/download.flutter.io")
         }

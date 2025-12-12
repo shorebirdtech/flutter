@@ -26,7 +26,7 @@ import 'prepare_package/transactional_update.dart';
 const String gsBase = 'gs://flutter_infra_release';
 const String releaseFolder = '/releases';
 const String gsReleaseFolder = '$gsBase$releaseFolder';
-const String baseUrl = 'https://storage.googleapis.com/flutter_infra_release';
+const String baseUrl = 'https://download.shorebird.dev/flutter_infra_release';
 
 /// Exception class for when a process fails to run, so we can catch
 /// it and provide something more readable than a stack trace.
