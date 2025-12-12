@@ -1,6 +1,20 @@
 import("//flutter/common/config.gni")
 import("//flutter/testing/testing.gni")
 
+source_set("elf_cache") {
+  sources = [
+    "elf_cache.cc",
+    "elf_cache.h",
+    "elf_mapping.cc",
+    "elf_mapping.h",
+  ]
+
+  deps = [
+    "//flutter/fml",
+    "//flutter/runtime:libdart",
+  ]
+}
+
 source_set("snapshots_data_handle") {
   sources = [
     "snapshots_data_handle.cc",

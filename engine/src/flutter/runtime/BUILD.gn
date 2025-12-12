@@ -118,6 +118,10 @@ source_set("runtime") {
     "//flutter/third_party/tonic",
     "//flutter/txt",
   ]
+
+  if (is_ios) {
+    deps += [ "//flutter/shell/common/shorebird:elf_cache" ]
+  }
 }
 
 if (enable_unittests) {
