@@ -40,7 +40,8 @@ TEST(TryLoadFromPatch, ReturnsNullptrForVmSymbol) {
   EXPECT_EQ(result_vm_data, nullptr);
 
   // VM instructions symbol should return nullptr
-  auto result_vm_instrs = TryLoadFromPatch(paths, "kDartVmSnapshotInstructions");
+  auto result_vm_instrs =
+      TryLoadFromPatch(paths, "kDartVmSnapshotInstructions");
   EXPECT_EQ(result_vm_instrs, nullptr);
 }
 
@@ -60,7 +61,8 @@ TEST(TryLoadFromPatch, ChecksOnlyFirstPath) {
 }
 
 TEST(ElfCache, GetOrLoadReturnsNullptrForNonexistentFile) {
-  auto result = ElfCache::Instance().GetOrLoad("/nonexistent/path/to/file.vmcode");
+  auto result =
+      ElfCache::Instance().GetOrLoad("/nonexistent/path/to/file.vmcode");
   EXPECT_EQ(result, nullptr);
 }
 
