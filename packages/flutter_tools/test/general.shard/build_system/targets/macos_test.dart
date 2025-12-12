@@ -20,6 +20,17 @@ import '../../../src/fake_process_manager.dart';
 import '../../../src/fakes.dart';
 import '../../../src/package_config.dart';
 
+/// Generate Shorebird link info arguments for iOS/macOS AOT builds.
+/// The [buildPath] should be the build directory path (outputDir.parent.path).
+List<String> linkInfoArgsFor(String buildPath) => <String>[
+  '--print_class_table_link_debug_info_to=$buildPath/App.class_table.json',
+  '--print_class_table_link_info_to=$buildPath/App.ct.link',
+  '--print_field_table_link_debug_info_to=$buildPath/App.field_table.json',
+  '--print_field_table_link_info_to=$buildPath/App.ft.link',
+  '--print_dispatch_table_link_debug_info_to=$buildPath/App.dispatch_table.json',
+  '--print_dispatch_table_link_info_to=$buildPath/App.dt.link',
+];
+
 void main() {
   late Environment environment;
   late MemoryFileSystem fileSystem;
@@ -811,28 +822,36 @@ void main() {
       environment.defines[kXcodeAction] = 'install';
       environment.defines[kFlavor] = 'internal';
 
+      // Set up engine artifacts
       fileSystem
           .file('bin/cache/artifacts/engine/darwin-x64/vm_isolate_snapshot.bin')
           .createSync(recursive: true);
       fileSystem
           .file('bin/cache/artifacts/engine/darwin-x64/isolate_snapshot.bin')
           .createSync(recursive: true);
+
+      // Set up App.framework binary
       fileSystem
           .file(fileSystem.path
               .join(environment.buildDir.path, 'App.framework', 'App'))
           .createSync(recursive: true);
-      final String shorebirdYamlPath = fileSystem.path.join(
-        environment.buildDir.path,
-        'App.framework',
-        'Versions',
-        'A',
-        'Resources',
-        'flutter_assets',
-        'shorebird.yaml',
-      );
-      fileSystem.file(fileSystem.path
-          .join(environment.buildDir.path, 'App.framework', 'App'))
-        ..createSync(recursive: true)
+
+      // Set up native_assets.json (required by MacOSBundleFlutterAssets)
+      environment.buildDir.childFile('native_assets.json').createSync();
+
+      // Set up pubspec.yaml with shorebird.yaml as an asset
+      fileSystem.file('pubspec.yaml')
+        ..createSync()
+        ..writeAsStringSync('''
+name: example
+flutter:
+  assets:
+    - shorebird.yaml
+''');
+
+      // Create the shorebird.yaml asset file
+      fileSystem.file('shorebird.yaml')
+        ..createSync()
         ..writeAsStringSync('''
 # Some other text that should be removed
 app_id: base-app-id
@@ -841,8 +860,21 @@ flavors:
   stable: stable-app-id
 ''');
 
+      // Set up package config
+      writePackageConfigFiles(directory: fileSystem.currentDirectory, mainLibName: 'example');
+
       await const ReleaseMacOSBundleFlutterAssets().build(environment);
 
+      // The output is in environment.outputDir, not buildDir
+      final String shorebirdYamlPath = fileSystem.path.join(
+        environment.outputDir.path,
+        'App.framework',
+        'Versions',
+        'A',
+        'Resources',
+        'flutter_assets',
+        'shorebird.yaml',
+      );
       expect(fileSystem.file(shorebirdYamlPath).readAsStringSync(),
           'app_id: internal-app-id');
     },
@@ -912,11 +944,13 @@ flavors:
           .childFile('x86_64/App.framework.dSYM/Contents/Resources/DWARF/App')
           .createSync(recursive: true);
 
+      final build = environment.buildDir.path;
       processManager.addCommands(<FakeCommand>[
         FakeCommand(
           command: <String>[
             'Artifact.genSnapshotArm64.TargetPlatform.darwin.release',
             '--deterministic',
+            ...linkInfoArgsFor(build),
             '--snapshot_kind=app-aot-assembly',
             '--assembly=${environment.buildDir.childFile('arm64/snapshot_assembly.S').path}',
             environment.buildDir.childFile('app.dill').path,
@@ -926,6 +960,7 @@ flavors:
           command: <String>[
             'Artifact.genSnapshotX64.TargetPlatform.darwin.release',
             '--deterministic',
+            ...linkInfoArgsFor(build),
             '--snapshot_kind=app-aot-assembly',
             '--assembly=${environment.buildDir.childFile('x86_64/snapshot_assembly.S').path}',
             environment.buildDir.childFile('app.dill').path,

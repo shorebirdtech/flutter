@@ -942,7 +942,7 @@ void main() {
       expect(messages, <String>['Downloading Web SDK...']);
 
       expect(downloads, <String>[
-        'https://storage.googleapis.com/flutter_infra_release/flutter/hijklmnop/flutter-web-sdk.zip',
+        'https://download.shorebird.dev/flutter_infra_release/flutter/hijklmnop/flutter-web-sdk.zip',
       ]);
 
       expect(locations, <String>['/bin/cache/flutter_web_sdk']);
@@ -1067,7 +1067,7 @@ void main() {
     expect(messages, <String>['Downloading engine information...']);
 
     expect(downloads, <String>[
-      'https://storage.googleapis.com/flutter_infra_release/flutter/hijklmnop/engine_stamp.json',
+      'https://download.shorebird.dev/flutter_infra_release/flutter/hijklmnop/engine_stamp.json',
     ]);
     expect(locations, <String>['/bin/cache']);
     // file copy is done by the real uploader; not the fake.
