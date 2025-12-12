@@ -25,7 +25,8 @@ constexpr const char* kIsolateInstructionsSymbol =
 
 std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
     const std::string& path) {
-  // vmcode files are ELF files prefixed with a shorebird linker header.
+  // vmcode files currently use ELF internally after a prefix of a Shorebird
+  // linker header.
   auto elf_mapping = fml::FileMapping::CreateReadOnly(path);
   if (!elf_mapping) {
     FML_LOG(ERROR) << "Failed to map file: " << path;
@@ -50,11 +51,11 @@ std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
                    /* load as read-only, not rx */ false);
 
   if (elf == nullptr) {
-    FML_LOG(ERROR) << "Failed to load ELF at " << path << " error: " << error;
+    FML_LOG(ERROR) << "Failed to load patch at " << path << " error: " << error;
     return nullptr;
   }
 
-  FML_LOG(INFO) << "Loaded ELF from " << path;
+  FML_LOG(INFO) << "Loaded patch from " << path;
 
   // Use a custom shared_ptr since constructor is private
   return std::shared_ptr<PatchCacheEntry>(
@@ -72,7 +73,7 @@ PatchCacheEntry::PatchCacheEntry(const std::string& path,
 
 PatchCacheEntry::~PatchCacheEntry() {
   if (elf_ != nullptr) {
-    FML_LOG(INFO) << "Unloading ELF from " << path_;
+    FML_LOG(INFO) << "Unloading patch from " << path_;
     Dart_UnloadELF(elf_);
     elf_ = nullptr;
   }
@@ -85,7 +86,8 @@ PatchCache& PatchCache::Instance() {
   return instance;
 }
 
-std::shared_ptr<PatchCacheEntry> PatchCache::GetOrLoad(const std::string& path) {
+std::shared_ptr<PatchCacheEntry> PatchCache::GetOrLoad(
+    const std::string& path) {
   std::lock_guard<std::mutex> lock(mutex_);
 
   // Check if we have a cached entry that's still alive
@@ -144,11 +146,11 @@ std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
   // Load the patch ELF using the cache.
   auto cache_entry = PatchCache::Instance().GetOrLoad(patch_path);
   if (!cache_entry) {
-    FML_LOG(FATAL) << "Failed to load ELF at " << patch_path;
+    FML_LOG(FATAL) << "Failed to load symbol from patch at " << patch_path;
     return nullptr;
   }
 
-  FML_LOG(INFO) << "Loading symbol from patch ELF: " << symbol_name;
+  FML_LOG(INFO) << "Loading symbol from patch: " << symbol_name;
 
   if (symbol == kIsolateDataSymbol) {
     return PatchMapping::CreateIsolateData(cache_entry);
