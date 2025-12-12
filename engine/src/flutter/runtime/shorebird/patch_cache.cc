@@ -57,7 +57,6 @@ std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
 
   FML_LOG(INFO) << "Loaded patch from " << path;
 
-  // Use a custom shared_ptr since constructor is private
   return std::shared_ptr<PatchCacheEntry>(
       new PatchCacheEntry(path, elf, isolate_data, isolate_instrs));
 }
@@ -78,8 +77,6 @@ PatchCacheEntry::~PatchCacheEntry() {
     elf_ = nullptr;
   }
 }
-
-// PatchCache implementation
 
 PatchCache& PatchCache::Instance() {
   static PatchCache instance;
@@ -155,6 +152,7 @@ std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
   if (symbol == kIsolateDataSymbol) {
     return PatchMapping::CreateIsolateData(cache_entry);
   } else {
+    FML_CHECK(symbol == kIsolateInstructionsSymbol);
     return PatchMapping::CreateIsolateInstructions(cache_entry);
   }
 }
