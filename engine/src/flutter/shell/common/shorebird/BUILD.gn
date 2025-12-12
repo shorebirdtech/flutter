@@ -56,6 +56,7 @@ if (enable_unittests) {
     testonly = true
 
     sources = [
+      "elf_cache_unittests.cc",
       "shorebird_unittests.cc",
       "snapshots_data_handle_unittests.cc",
     ]
@@ -63,6 +64,7 @@ if (enable_unittests) {
     # This only includes snapshots_data_handle and not shorebird because
     # shorebird fails to link due to a missing updater lib.
     deps = [
+      ":elf_cache",
       ":shorebird",
       ":shorebird_fixtures",
       ":snapshots_data_handle",

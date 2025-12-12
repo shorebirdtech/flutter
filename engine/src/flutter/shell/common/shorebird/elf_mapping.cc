@@ -10,7 +10,7 @@ namespace flutter {
 
 std::shared_ptr<ElfMapping> ElfMapping::CreateIsolateData(
     std::shared_ptr<ElfCacheEntry> entry) {
-  if (!entry || !entry->IsValid()) {
+  if (!entry) {
     return nullptr;
   }
   const uint8_t* data = entry->isolate_data();
@@ -20,7 +20,7 @@ std::shared_ptr<ElfMapping> ElfMapping::CreateIsolateData(
 
 std::shared_ptr<ElfMapping> ElfMapping::CreateIsolateInstructions(
     std::shared_ptr<ElfCacheEntry> entry) {
-  if (!entry || !entry->IsValid()) {
+  if (!entry) {
     return nullptr;
   }
   const uint8_t* data = entry->isolate_instructions();
