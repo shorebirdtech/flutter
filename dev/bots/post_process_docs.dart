@@ -38,7 +38,7 @@ Future<void> postProcess() async {
   await runProcessWithValidations(<String>[
     'curl',
     '-L',
-    'https://storage.googleapis.com/flutter_infra_release/flutter/$revision/api_docs.zip',
+    'https://download.shorebird.dev/flutter_infra_release/flutter/$revision/api_docs.zip',
     '--output',
     zipDestination,
     '--fail',
