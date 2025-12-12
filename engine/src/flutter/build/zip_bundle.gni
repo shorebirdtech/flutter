@@ -55,7 +55,7 @@ template("zip_bundle") {
     license_path =
         rebase_path("//flutter/sky/packages/sky_engine/LICENSE", "//flutter")
     git_url = "https://github.com/flutter/engine/tree/$engine_version"
-    sky_engine_url = "https://storage.googleapis.com/flutter_infra_release/flutter/$engine_version/sky_engine.zip"
+    sky_engine_url = "https://download.shorebird.dev/flutter_infra_release/flutter/$engine_version/sky_engine.zip"
     outputs = [ license_readme ]
     contents = [
       "# $target_name",
