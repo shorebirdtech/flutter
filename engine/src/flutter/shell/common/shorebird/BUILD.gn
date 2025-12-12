@@ -42,6 +42,7 @@ if (enable_unittests) {
     testonly = true
 
     sources = [
+      "patch_cache_unittests.cc",
       "shorebird_unittests.cc",
       "snapshots_data_handle_unittests.cc",
     ]
@@ -53,6 +54,7 @@ if (enable_unittests) {
       ":shorebird_fixtures",
       ":snapshots_data_handle",
       "//flutter/runtime",
+      "//flutter/runtime/shorebird:patch_cache",
       "//flutter/testing",
       "//flutter/testing:fixture_test",
     ]
