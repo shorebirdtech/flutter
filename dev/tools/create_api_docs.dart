@@ -923,8 +923,8 @@ class PlatformDocGenerator {
 
     for (final String platform in kPlatformDocs.keys) {
       final String zipFile = kPlatformDocs[platform]!.zipName;
-      final url =
-          'https://storage.googleapis.com/${realm}flutter_infra_release/flutter/$engineRevision/$zipFile';
+      final String url =
+          'https://download.shorebird.dev/${realm}flutter_infra_release/flutter/$engineRevision/$zipFile';
       await _extractDocs(url, platform, kPlatformDocs[platform]!, outputDir);
     }
   }
