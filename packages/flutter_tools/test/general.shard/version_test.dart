@@ -67,6 +67,20 @@ void main() {
     required int commitsBetweenRefs,
   }) {
     return [
+      // Shorebird release branch check (returns empty to fall through to
+      // regular version lookup).
+      FakeCommand(
+        command: [
+          'git',
+          'for-each-ref',
+          '--contains',
+          headRef,
+          '--format',
+          '%(refname:short)',
+          'refs/remotes/origin/flutter_release/*',
+        ],
+        stdout: '',
+      ),
       FakeCommand(
         command: const [
           'git',
