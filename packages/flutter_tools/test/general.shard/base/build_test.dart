@@ -37,6 +37,17 @@ const kDefaultClang = <String>[
   'build/foo/snapshot_assembly.o',
 ];
 
+// Shorebird link info arguments added for iOS/macOS builds.
+// These correspond to the dumpLinkInfoArgs in AOTSnapshotter.build().
+const kLinkInfoArgs = <String>[
+  '--print_class_table_link_debug_info_to=build/App.class_table.json',
+  '--print_class_table_link_info_to=build/App.ct.link',
+  '--print_field_table_link_debug_info_to=build/App.field_table.json',
+  '--print_field_table_link_info_to=build/App.ft.link',
+  '--print_dispatch_table_link_debug_info_to=build/App.dispatch_table.json',
+  '--print_dispatch_table_link_info_to=build/App.dt.link',
+];
+
 void main() {
   group('GenSnapshot', () {
     late GenSnapshot genSnapshot;
@@ -203,6 +214,7 @@ void main() {
           command: <String>[
             genSnapshotPath,
             '--deterministic',
+            ...kLinkInfoArgs,
             '--snapshot_kind=app-aot-assembly',
             '--assembly=$assembly',
             '--dwarf-stack-traces',
@@ -278,6 +290,7 @@ void main() {
           command: <String>[
             genSnapshotPath,
             '--deterministic',
+            ...kLinkInfoArgs,
             '--snapshot_kind=app-aot-assembly',
             '--assembly=$assembly',
             '--obfuscate',
@@ -349,6 +362,7 @@ void main() {
           command: <String>[
             genSnapshotPath,
             '--deterministic',
+            ...kLinkInfoArgs,
             '--snapshot_kind=app-aot-assembly',
             '--assembly=${fileSystem.path.join(outputPath, 'snapshot_assembly.S')}',
             'main.dill',
