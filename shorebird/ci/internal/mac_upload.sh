@@ -17,13 +17,15 @@ SHOREBIRD_ROOT=gs://$STORAGE_BUCKET/shorebird/$ENGINE_HASH
 ENGINE_SRC=$ENGINE_ROOT/src
 ENGINE_OUT=$ENGINE_SRC/out
 ENGINE_FLUTTER=$ENGINE_SRC/flutter
+# FLUTTER_ROOT is the Flutter monorepo root (parent of engine/)
+FLUTTER_ROOT=$(dirname $ENGINE_ROOT)
 
-cd $ENGINE_FLUTTER
+cd $FLUTTER_ROOT
 
 # Compute the content-aware hash for the Dart SDK.
 # This allows Flutter checkouts that haven't changed engine content to share
 # the same pre-built Dart SDK, even if they have different git commit SHAs.
-CONTENT_HASH=$($ENGINE_FLUTTER/bin/internal/content_aware_hash.sh)
+CONTENT_HASH=$($FLUTTER_ROOT/bin/internal/content_aware_hash.sh)
 # Can't just `git merge-base` because the engine branches for each
 # major version (e.g. 3.7, 3.8) (e.g. upstream/flutter-3.7-candidate.1)
 # but it's not clear which branch we're forked from, only that we took
