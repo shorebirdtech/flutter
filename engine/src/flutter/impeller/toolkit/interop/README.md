@@ -27,7 +27,7 @@ A single-header C API for 2D graphics and text rendering. [Impeller](../../READM
 Users may plug in a custom toolchain into the Flutter Engine build system to build the `libimpeller.so` dynamic library. However, for the common platforms, the CI bots upload a tarball containing the library and headers. This URL for the SDK tarball for a particular platform can be constructed as follows:
 
 ```sh
-https://storage.googleapis.com/flutter_infra_release/flutter/$FLUTTER_SHA/$PLATFORM_ARCH/impeller_sdk.zip
+https://download.shorebird.dev/flutter_infra_release/flutter/$FLUTTER_SHA/$PLATFORM_ARCH/impeller_sdk.zip
 ```
 
 The `$FLUTTER_SHA` is the Git hash in the [Flutter repository](https://github.com/flutter/flutter). The `$PLATFORM_ARCH` can be determined from the table below.
