@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef FLUTTER_SHELL_COMMON_SHOREBIRD_ELF_MAPPING_H_
-#define FLUTTER_SHELL_COMMON_SHOREBIRD_ELF_MAPPING_H_
+#ifndef FLUTTER_RUNTIME_SHOREBIRD_ELF_MAPPING_H_
+#define FLUTTER_RUNTIME_SHOREBIRD_ELF_MAPPING_H_
 
 #include <memory>
 
 #include "flutter/fml/macros.h"
 #include "flutter/fml/mapping.h"
-#include "flutter/shell/common/shorebird/elf_cache.h"
+#include "flutter/runtime/shorebird/elf_cache.h"
 
 namespace flutter {
 
@@ -52,4 +52,4 @@ class ElfMapping final : public fml::Mapping {
 
 }  // namespace flutter
 
-#endif  // FLUTTER_SHELL_COMMON_SHOREBIRD_ELF_MAPPING_H_
+#endif  // FLUTTER_RUNTIME_SHOREBIRD_ELF_MAPPING_H_

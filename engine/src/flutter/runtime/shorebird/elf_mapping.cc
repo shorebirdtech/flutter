@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "flutter/shell/common/shorebird/elf_mapping.h"
+#include "flutter/runtime/shorebird/elf_mapping.h"
 
 #include "third_party/dart/runtime/include/dart_native_api.h"
 

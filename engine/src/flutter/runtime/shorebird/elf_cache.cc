@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "flutter/shell/common/shorebird/elf_cache.h"
+#include "flutter/runtime/shorebird/elf_cache.h"
 
 #include "flutter/fml/logging.h"
 #include "flutter/fml/mapping.h"
-#include "flutter/shell/common/shorebird/elf_mapping.h"
+#include "flutter/runtime/shorebird/elf_mapping.h"
 
 namespace flutter {
 
@@ -19,17 +19,13 @@ constexpr const char* kIsolateDataSymbol = "kDartIsolateSnapshotData";
 constexpr const char* kIsolateInstructionsSymbol =
     "kDartIsolateSnapshotInstructions";
 
-std::unique_ptr<const fml::Mapping> GetFileMapping(const std::string& path) {
-  return fml::FileMapping::CreateReadOnly(path);
-}
-
 }  // namespace
 
 // ElfCacheEntry implementation
 
 std::shared_ptr<ElfCacheEntry> ElfCacheEntry::Create(const std::string& path) {
   // vmcode files are ELF files prefixed with a shorebird linker header.
-  auto elf_mapping = GetFileMapping(path);
+  auto elf_mapping = fml::FileMapping::CreateReadOnly(path);
   if (!elf_mapping) {
     FML_LOG(ERROR) << "Failed to map file: " << path;
     return nullptr;

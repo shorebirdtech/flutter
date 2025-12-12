@@ -15,7 +15,7 @@
 #include "third_party/dart/runtime/include/dart_api.h"
 
 #if SHOREBIRD_USE_INTERPRETER
-#include "flutter/shell/common/shorebird/elf_cache.h"  // nogncheck
+#include "flutter/runtime/shorebird/elf_cache.h"
 #endif
 
 namespace flutter {

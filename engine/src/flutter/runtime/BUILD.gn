@@ -120,7 +120,7 @@ source_set("runtime") {
   ]
 
   if (is_ios) {
-    deps += [ "//flutter/shell/common/shorebird:elf_cache" ]
+    deps += [ "//flutter/runtime/shorebird:elf_cache" ]
   }
 }
 

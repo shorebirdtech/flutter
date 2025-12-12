@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef FLUTTER_SHELL_COMMON_SHOREBIRD_ELF_CACHE_H_
-#define FLUTTER_SHELL_COMMON_SHOREBIRD_ELF_CACHE_H_
+#ifndef FLUTTER_RUNTIME_SHOREBIRD_ELF_CACHE_H_
+#define FLUTTER_RUNTIME_SHOREBIRD_ELF_CACHE_H_
 
 #include <map>
 #include <memory>
@@ -101,4 +101,4 @@ std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
 
 }  // namespace flutter
 
-#endif  // FLUTTER_SHELL_COMMON_SHOREBIRD_ELF_CACHE_H_
+#endif  // FLUTTER_RUNTIME_SHOREBIRD_ELF_CACHE_H_

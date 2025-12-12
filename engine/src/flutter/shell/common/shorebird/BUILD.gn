@@ -1,20 +1,6 @@
 import("//flutter/common/config.gni")
 import("//flutter/testing/testing.gni")
 
-source_set("elf_cache") {
-  sources = [
-    "elf_cache.cc",
-    "elf_cache.h",
-    "elf_mapping.cc",
-    "elf_mapping.h",
-  ]
-
-  deps = [
-    "//flutter/fml",
-    "//flutter/runtime:libdart",
-  ]
-}
-
 source_set("snapshots_data_handle") {
   sources = [
     "snapshots_data_handle.cc",
@@ -64,11 +50,11 @@ if (enable_unittests) {
     # This only includes snapshots_data_handle and not shorebird because
     # shorebird fails to link due to a missing updater lib.
     deps = [
-      ":elf_cache",
       ":shorebird",
       ":shorebird_fixtures",
       ":snapshots_data_handle",
       "//flutter/runtime",
+      "//flutter/runtime/shorebird:elf_cache",
       "//flutter/testing",
       "//flutter/testing:fixture_test",
     ]
