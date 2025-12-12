@@ -118,6 +118,10 @@ source_set("runtime") {
     "//flutter/third_party/tonic",
     "//flutter/txt",
   ]
+
+  if (is_ios) {
+    deps += [ "//flutter/runtime/shorebird:patch_cache" ]
+  }
 }
 
 if (enable_unittests) {
