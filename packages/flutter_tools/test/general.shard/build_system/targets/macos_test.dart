@@ -822,28 +822,36 @@ void main() {
       environment.defines[kXcodeAction] = 'install';
       environment.defines[kFlavor] = 'internal';
 
+      // Set up engine artifacts
       fileSystem
           .file('bin/cache/artifacts/engine/darwin-x64/vm_isolate_snapshot.bin')
           .createSync(recursive: true);
       fileSystem
           .file('bin/cache/artifacts/engine/darwin-x64/isolate_snapshot.bin')
           .createSync(recursive: true);
+
+      // Set up App.framework binary
       fileSystem
           .file(fileSystem.path
               .join(environment.buildDir.path, 'App.framework', 'App'))
           .createSync(recursive: true);
-      final String shorebirdYamlPath = fileSystem.path.join(
-        environment.buildDir.path,
-        'App.framework',
-        'Versions',
-        'A',
-        'Resources',
-        'flutter_assets',
-        'shorebird.yaml',
-      );
-      fileSystem.file(fileSystem.path
-          .join(environment.buildDir.path, 'App.framework', 'App'))
-        ..createSync(recursive: true)
+
+      // Set up native_assets.json (required by MacOSBundleFlutterAssets)
+      environment.buildDir.childFile('native_assets.json').createSync();
+
+      // Set up pubspec.yaml with shorebird.yaml as an asset
+      fileSystem.file('pubspec.yaml')
+        ..createSync()
+        ..writeAsStringSync('''
+name: example
+flutter:
+  assets:
+    - shorebird.yaml
+''');
+
+      // Create the shorebird.yaml asset file
+      fileSystem.file('shorebird.yaml')
+        ..createSync()
         ..writeAsStringSync('''
 # Some other text that should be removed
 app_id: base-app-id
@@ -852,8 +860,21 @@ flavors:
   stable: stable-app-id
 ''');
 
+      // Set up package config
+      writePackageConfigFiles(directory: fileSystem.currentDirectory, mainLibName: 'example');
+
       await const ReleaseMacOSBundleFlutterAssets().build(environment);
 
+      // The output is in environment.outputDir, not buildDir
+      final String shorebirdYamlPath = fileSystem.path.join(
+        environment.outputDir.path,
+        'App.framework',
+        'Versions',
+        'A',
+        'Resources',
+        'flutter_assets',
+        'shorebird.yaml',
+      );
       expect(fileSystem.file(shorebirdYamlPath).readAsStringSync(),
           'app_id: internal-app-id');
     },
