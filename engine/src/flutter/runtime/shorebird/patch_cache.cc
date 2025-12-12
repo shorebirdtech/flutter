@@ -2,28 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "flutter/runtime/shorebird/elf_cache.h"
+#include "flutter/runtime/shorebird/patch_cache.h"
 
 #include "flutter/fml/logging.h"
 #include "flutter/fml/mapping.h"
-#include "flutter/runtime/shorebird/elf_mapping.h"
+#include "flutter/runtime/shorebird/patch_mapping.h"
 
 namespace flutter {
 
 namespace {
 
-// These symbol names match the constants in dart_snapshot.h.
-// We duplicate them here to avoid a circular dependency since runtime depends
-// on elf_cache.
+// These symbol names match the constants in dart_snapshot.cc.
+// We duplicate them here rather than extracting them into a header.
+// They are actually defined down in Dart and will never change.
 constexpr const char* kIsolateDataSymbol = "kDartIsolateSnapshotData";
 constexpr const char* kIsolateInstructionsSymbol =
     "kDartIsolateSnapshotInstructions";
 
 }  // namespace
 
-// ElfCacheEntry implementation
+// PatchCacheEntry implementation
 
-std::shared_ptr<ElfCacheEntry> ElfCacheEntry::Create(const std::string& path) {
+std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
+    const std::string& path) {
   // vmcode files are ELF files prefixed with a shorebird linker header.
   auto elf_mapping = fml::FileMapping::CreateReadOnly(path);
   if (!elf_mapping) {
@@ -56,20 +57,20 @@ std::shared_ptr<ElfCacheEntry> ElfCacheEntry::Create(const std::string& path) {
   FML_LOG(INFO) << "Loaded ELF from " << path;
 
   // Use a custom shared_ptr since constructor is private
-  return std::shared_ptr<ElfCacheEntry>(
-      new ElfCacheEntry(path, elf, isolate_data, isolate_instrs));
+  return std::shared_ptr<PatchCacheEntry>(
+      new PatchCacheEntry(path, elf, isolate_data, isolate_instrs));
 }
 
-ElfCacheEntry::ElfCacheEntry(const std::string& path,
-                             Dart_LoadedElf* elf,
-                             const uint8_t* isolate_data,
-                             const uint8_t* isolate_instrs)
+PatchCacheEntry::PatchCacheEntry(const std::string& path,
+                                 Dart_LoadedElf* elf,
+                                 const uint8_t* isolate_data,
+                                 const uint8_t* isolate_instrs)
     : path_(path),
       elf_(elf),
       isolate_data_(isolate_data),
       isolate_instrs_(isolate_instrs) {}
 
-ElfCacheEntry::~ElfCacheEntry() {
+PatchCacheEntry::~PatchCacheEntry() {
   if (elf_ != nullptr) {
     FML_LOG(INFO) << "Unloading ELF from " << path_;
     Dart_UnloadELF(elf_);
@@ -77,21 +78,21 @@ ElfCacheEntry::~ElfCacheEntry() {
   }
 }
 
-// ElfCache implementation
+// PatchCache implementation
 
-ElfCache& ElfCache::Instance() {
-  static ElfCache instance;
+PatchCache& PatchCache::Instance() {
+  static PatchCache instance;
   return instance;
 }
 
-std::shared_ptr<ElfCacheEntry> ElfCache::GetOrLoad(const std::string& path) {
+std::shared_ptr<PatchCacheEntry> PatchCache::GetOrLoad(const std::string& path) {
   std::lock_guard<std::mutex> lock(mutex_);
 
   // Check if we have a cached entry that's still alive
   auto it = cache_.find(path);
   if (it != cache_.end()) {
     if (auto entry = it->second.lock()) {
-      FML_LOG(INFO) << "ElfCache hit for " << path;
+      FML_LOG(INFO) << "PatchCache hit for " << path;
       return entry;
     }
     // Entry expired, remove it
@@ -99,7 +100,7 @@ std::shared_ptr<ElfCacheEntry> ElfCache::GetOrLoad(const std::string& path) {
   }
 
   // Load a new entry
-  auto entry = ElfCacheEntry::Create(path);
+  auto entry = PatchCacheEntry::Create(path);
   if (entry) {
     cache_[path] = entry;  // Store weak_ptr
   }
@@ -107,7 +108,7 @@ std::shared_ptr<ElfCacheEntry> ElfCache::GetOrLoad(const std::string& path) {
   return entry;
 }
 
-void ElfCache::PruneExpired() {
+void PatchCache::PruneExpired() {
   std::lock_guard<std::mutex> lock(mutex_);
 
   for (auto it = cache_.begin(); it != cache_.end();) {
@@ -141,7 +142,7 @@ std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
   }
 
   // Load the patch ELF using the cache.
-  auto cache_entry = ElfCache::Instance().GetOrLoad(patch_path);
+  auto cache_entry = PatchCache::Instance().GetOrLoad(patch_path);
   if (!cache_entry) {
     FML_LOG(FATAL) << "Failed to load ELF at " << patch_path;
     return nullptr;
@@ -150,9 +151,9 @@ std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
   FML_LOG(INFO) << "Loading symbol from patch ELF: " << symbol_name;
 
   if (symbol == kIsolateDataSymbol) {
-    return ElfMapping::CreateIsolateData(cache_entry);
+    return PatchMapping::CreateIsolateData(cache_entry);
   } else {
-    return ElfMapping::CreateIsolateInstructions(cache_entry);
+    return PatchMapping::CreateIsolateInstructions(cache_entry);
   }
 }
 

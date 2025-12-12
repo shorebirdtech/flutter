@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef FLUTTER_RUNTIME_SHOREBIRD_ELF_CACHE_H_
-#define FLUTTER_RUNTIME_SHOREBIRD_ELF_CACHE_H_
+#ifndef FLUTTER_RUNTIME_SHOREBIRD_PATCH_CACHE_H_
+#define FLUTTER_RUNTIME_SHOREBIRD_PATCH_CACHE_H_
 
 #include <map>
 #include <memory>
@@ -21,13 +21,13 @@ namespace flutter {
 /// A cache entry that holds a loaded ELF file and its extracted snapshot
 /// pointers. The ELF is automatically unloaded when the last reference to
 /// this entry is released.
-class ElfCacheEntry {
+class PatchCacheEntry {
  public:
   /// Creates a new cache entry by loading the ELF file at the given path.
   /// Returns nullptr if loading fails.
-  static std::shared_ptr<ElfCacheEntry> Create(const std::string& path);
+  static std::shared_ptr<PatchCacheEntry> Create(const std::string& path);
 
-  ~ElfCacheEntry();
+  ~PatchCacheEntry();
 
   /// Returns the isolate snapshot data pointer.
   const uint8_t* isolate_data() const { return isolate_data_; }
@@ -39,46 +39,46 @@ class ElfCacheEntry {
   const std::string& path() const { return path_; }
 
  private:
-  ElfCacheEntry(const std::string& path,
-                Dart_LoadedElf* elf,
-                const uint8_t* isolate_data,
-                const uint8_t* isolate_instrs);
+  PatchCacheEntry(const std::string& path,
+                  Dart_LoadedElf* elf,
+                  const uint8_t* isolate_data,
+                  const uint8_t* isolate_instrs);
 
   std::string path_;
   Dart_LoadedElf* elf_;
   const uint8_t* isolate_data_;
   const uint8_t* isolate_instrs_;
 
-  FML_DISALLOW_COPY_AND_ASSIGN(ElfCacheEntry);
+  FML_DISALLOW_COPY_AND_ASSIGN(PatchCacheEntry);
 };
 
 /// A thread-safe cache for loaded ELF files. Cache entries are automatically
 /// removed when all references to them are released.
-class ElfCache {
+class PatchCache {
  public:
   /// Returns the singleton instance of the cache.
-  static ElfCache& Instance();
+  static PatchCache& Instance();
 
   /// Gets or loads an ELF file at the given path. If the file is already
   /// cached and the entry is still alive, returns the existing entry.
   /// Otherwise, loads the file and creates a new cache entry.
   /// Returns nullptr if loading fails.
-  std::shared_ptr<ElfCacheEntry> GetOrLoad(const std::string& path);
+  std::shared_ptr<PatchCacheEntry> GetOrLoad(const std::string& path);
 
   /// Removes expired entries from the cache. This is called automatically
   /// by GetOrLoad, but can also be called explicitly.
   void PruneExpired();
 
  private:
-  ElfCache() = default;
-  ~ElfCache() = default;
+  PatchCache() = default;
+  ~PatchCache() = default;
 
   std::mutex mutex_;
   // We store weak references so entries are automatically cleaned up when
   // all ElfMapping instances release their references.
-  std::map<std::string, std::weak_ptr<ElfCacheEntry>> cache_;
+  std::map<std::string, std::weak_ptr<PatchCacheEntry>> cache_;
 
-  FML_DISALLOW_COPY_AND_ASSIGN(ElfCache);
+  FML_DISALLOW_COPY_AND_ASSIGN(PatchCache);
 };
 
 /// Checks if the first path in native_library_paths is a Shorebird patch
@@ -101,4 +101,4 @@ std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
 
 }  // namespace flutter
 
-#endif  // FLUTTER_RUNTIME_SHOREBIRD_ELF_CACHE_H_
+#endif  // FLUTTER_RUNTIME_SHOREBIRD_PATCH_CACHE_H_

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "flutter/runtime/shorebird/elf_cache.h"
+#include "flutter/runtime/shorebird/patch_cache.h"
 
 #include <string>
 #include <vector>
@@ -12,9 +12,9 @@
 namespace flutter {
 namespace testing {
 
-TEST(ElfCache, InstanceReturnsSameInstance) {
-  ElfCache& instance1 = ElfCache::Instance();
-  ElfCache& instance2 = ElfCache::Instance();
+TEST(PatchCache, InstanceReturnsSameInstance) {
+  PatchCache& instance1 = PatchCache::Instance();
+  PatchCache& instance2 = PatchCache::Instance();
   EXPECT_EQ(&instance1, &instance2);
 }
 
@@ -60,9 +60,9 @@ TEST(TryLoadFromPatch, ChecksOnlyFirstPath) {
   EXPECT_EQ(result, nullptr);
 }
 
-TEST(ElfCache, GetOrLoadReturnsNullptrForNonexistentFile) {
+TEST(PatchCache, GetOrLoadReturnsNullptrForNonexistentFile) {
   auto result =
-      ElfCache::Instance().GetOrLoad("/nonexistent/path/to/file.vmcode");
+      PatchCache::Instance().GetOrLoad("/nonexistent/path/to/file.vmcode");
   EXPECT_EQ(result, nullptr);
 }
 

@@ -1,11 +1,11 @@
 import("//flutter/common/config.gni")
 
-source_set("elf_cache") {
+source_set("patch_cache") {
   sources = [
-    "elf_cache.cc",
-    "elf_cache.h",
-    "elf_mapping.cc",
-    "elf_mapping.h",
+    "patch_cache.cc",
+    "patch_cache.h",
+    "patch_mapping.cc",
+    "patch_mapping.h",
   ]
 
   deps = [
