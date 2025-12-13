@@ -51,16 +51,17 @@ extern "C" __attribute__((weak)) unsigned long getauxval(unsigned long type) {
 static fml::RefPtr<const DartSnapshot> vm_snapshot;
 static fml::RefPtr<const DartSnapshot> isolate_snapshot;
 
-void SetBaseSnapshot(Settings& settings) {
+void StoreBaseSnapshots(Settings& settings) {
   // These mappings happen to be to static data in the App.framework, but
-  // we still need to seem to hold onto the DartSnapshot objects to keep
-  // the mappings alive.
+  // we still need to hold onto the DartSnapshot objects to keep
+  // the mappings alive. They are used by FileCallbacksImpl for the updater
+  // and returned via GetBaseIsolateSnapshot for isolate group creation.
   vm_snapshot = DartSnapshot::VMSnapshotFromSettings(settings);
   isolate_snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
-  Shorebird_SetBaseSnapshots(isolate_snapshot->GetDataMapping(),
-                             isolate_snapshot->GetInstructionsMapping(),
-                             vm_snapshot->GetDataMapping(),
-                             vm_snapshot->GetInstructionsMapping());
+}
+
+fml::RefPtr<const DartSnapshot> GetBaseIsolateSnapshot() {
+  return isolate_snapshot;
 }
 
 class FileCallbacksImpl {
@@ -257,9 +258,9 @@ void ConfigureShorebird(std::string code_cache_path,
   // within Dart, including updating as part of login, etc.
   // https://github.com/shorebirdtech/shorebird/issues/950
 
-  // We only set the base snapshot on iOS for now.
+  // We store the base snapshot on iOS for use when creating the isolate group.
 #if SHOREBIRD_USE_INTERPRETER
-  SetBaseSnapshot(settings);
+  StoreBaseSnapshots(settings);
 #endif
 
   shorebird_validate_next_boot_patch();

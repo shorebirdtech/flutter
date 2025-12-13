@@ -2,9 +2,12 @@
 #define FLUTTER_SHELL_COMMON_SHOREBIRD_SHOREBIRD_H_
 
 #include "flutter/common/settings.h"
+#include "flutter/fml/memory/ref_ptr.h"
 #include "shell/platform/embedder/embedder.h"
 
 namespace flutter {
+
+class DartSnapshot;
 
 struct ReleaseVersion {
   std::string version;
@@ -41,6 +44,11 @@ void ConfigureShorebird(std::string code_cache_path,
                         const std::string& version_code);
 
 std::string GetValueFromYaml(const std::string& yaml, const std::string& key);
+
+/// Returns the base isolate snapshot for Shorebird linking support.
+/// Must be called after ConfigureShorebird() has stored the base snapshots.
+/// May return null if not using Shorebird interpreter mode.
+fml::RefPtr<const DartSnapshot> GetBaseIsolateSnapshot();
 
 }  // namespace flutter
 

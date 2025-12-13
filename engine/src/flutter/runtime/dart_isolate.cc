@@ -20,6 +20,7 @@
 #include "flutter/runtime/dart_vm_lifecycle.h"
 #include "flutter/runtime/isolate_configuration.h"
 #include "flutter/runtime/platform_isolate_manager.h"
+#include "flutter/shell/common/shorebird/shorebird.h"
 #include "fml/message_loop_task_queues.h"
 #include "fml/task_source.h"
 #include "fml/time/time_point.h"
@@ -245,6 +246,8 @@ std::weak_ptr<DartIsolate> DartIsolate::CreateRootIsolate(
   } else {
     // The child isolate preparer is null but will be set when the isolate is
     // being prepared to run.
+    // Get the base snapshot for Shorebird linking support (may be null).
+    fml::RefPtr<const DartSnapshot> base_snapshot = GetBaseIsolateSnapshot();
     isolate_group_data =
         std::make_unique<std::shared_ptr<DartIsolateGroupData>>(
             std::shared_ptr<DartIsolateGroupData>(new DartIsolateGroupData(
@@ -255,12 +258,27 @@ std::weak_ptr<DartIsolate> DartIsolate::CreateRootIsolate(
                 nullptr,                             // child isolate preparer
                 isolate_create_callback,             // isolate create callback
                 isolate_shutdown_callback,        // isolate shutdown callback
-                std::move(native_assets_manager)  //
+                std::move(native_assets_manager),    // native assets manager
+                std::move(base_snapshot)             // base snapshot (Shorebird)
                 )));
     isolate_maker = [](std::shared_ptr<DartIsolateGroupData>*
                            isolate_group_data,
                        std::shared_ptr<DartIsolate>* isolate_data,
                        Dart_IsolateFlags* flags, char** error) {
+      auto base_snapshot = (*isolate_group_data)->GetBaseSnapshot();
+      if (base_snapshot) {
+        // Use the Shorebird API that accepts base snapshot for linking.
+        return Dart_CreateIsolateGroupWithBaseSnapshot(
+            (*isolate_group_data)->GetAdvisoryScriptURI().c_str(),
+            (*isolate_group_data)->GetAdvisoryScriptEntrypoint().c_str(),
+            (*isolate_group_data)->GetIsolateSnapshot()->GetDataMapping(),
+            (*isolate_group_data)
+                ->GetIsolateSnapshot()
+                ->GetInstructionsMapping(),
+            base_snapshot->GetDataMapping(),
+            base_snapshot->GetInstructionsMapping(), flags, isolate_group_data,
+            isolate_data, error);
+      }
       return Dart_CreateIsolateGroup(
           (*isolate_group_data)->GetAdvisoryScriptURI().c_str(),
           (*isolate_group_data)->GetAdvisoryScriptEntrypoint().c_str(),
