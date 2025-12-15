@@ -9,11 +9,15 @@ namespace flutter {
 
 class DartSnapshot;
 
+/// Version and build number of the release.
+/// Used by ShorebirdConfigArgs.
 struct ReleaseVersion {
   std::string version;
   std::string build_number;
 };
 
+/// Arguments for ConfigureShorebird.
+/// Used by Desktop implementations.
 struct ShorebirdConfigArgs {
   std::string code_cache_path;
   std::string app_storage_path;
@@ -33,9 +37,12 @@ struct ShorebirdConfigArgs {
         release_version(release_version) {}
 };
 
+/// Newer api, used by Desktop implementations.
+/// Does not directly manipulate Settings.
 bool ConfigureShorebird(const ShorebirdConfigArgs& args,
                         std::string& patch_path);
 
+/// Older api used by iOS and Android, directly manipulates Settings.
 void ConfigureShorebird(std::string code_cache_path,
                         std::string app_storage_path,
                         Settings& settings,
@@ -43,12 +50,16 @@ void ConfigureShorebird(std::string code_cache_path,
                         const std::string& version,
                         const std::string& version_code);
 
+/// Used for reading app_id from shorebird.yaml.
+/// Exposed for testing.
 std::string GetValueFromYaml(const std::string& yaml, const std::string& key);
 
+#if SHOREBIRD_USE_INTERPRETER
 /// Returns the base isolate snapshot for Shorebird linking support.
 /// Must be called after ConfigureShorebird() has stored the base snapshots.
 /// May return null if not using Shorebird interpreter mode.
 fml::RefPtr<const DartSnapshot> GetBaseIsolateSnapshot();
+#endif  // SHOREBIRD_USE_INTERPRETER
 
 }  // namespace flutter
 
