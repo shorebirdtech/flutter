@@ -257,9 +257,9 @@ std::weak_ptr<DartIsolate> DartIsolate::CreateRootIsolate(
                 context.advisory_script_entrypoint,  // advisory entrypoint
                 nullptr,                             // child isolate preparer
                 isolate_create_callback,             // isolate create callback
-                isolate_shutdown_callback,        // isolate shutdown callback
-                std::move(native_assets_manager),    // native assets manager
-                std::move(base_snapshot)             // base snapshot (Shorebird)
+                isolate_shutdown_callback,         // isolate shutdown callback
+                std::move(native_assets_manager),  // native assets manager
+                std::move(base_snapshot)           // base snapshot (Shorebird)
                 )));
     isolate_maker = [](std::shared_ptr<DartIsolateGroupData>*
                            isolate_group_data,
