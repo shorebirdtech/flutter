@@ -18,9 +18,11 @@ DartIsolateGroupData::DartIsolateGroupData(
     const ChildIsolatePreparer& child_isolate_preparer,
     const fml::closure& isolate_create_callback,
     const fml::closure& isolate_shutdown_callback,
-    std::shared_ptr<NativeAssetsManager> native_assets_manager)
+    std::shared_ptr<NativeAssetsManager> native_assets_manager,
+    fml::RefPtr<const DartSnapshot> base_snapshot)
     : settings_(settings),
       isolate_snapshot_(std::move(isolate_snapshot)),
+      base_snapshot_(std::move(base_snapshot)),
       advisory_script_uri_(std::move(advisory_script_uri)),
       advisory_script_entrypoint_(std::move(advisory_script_entrypoint)),
       child_isolate_preparer_(child_isolate_preparer),
@@ -39,6 +41,10 @@ const Settings& DartIsolateGroupData::GetSettings() const {
 fml::RefPtr<const DartSnapshot> DartIsolateGroupData::GetIsolateSnapshot()
     const {
   return isolate_snapshot_;
+}
+
+fml::RefPtr<const DartSnapshot> DartIsolateGroupData::GetBaseSnapshot() const {
+  return base_snapshot_;
 }
 
 const std::string& DartIsolateGroupData::GetAdvisoryScriptURI() const {
