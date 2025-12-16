@@ -21,11 +21,6 @@ jobs:
 
     name: 🐦 Shorebird Test
 
-    # TODO(eseidel): This is also set inside shorebird_tests, unclear if
-    # if it's needed here as well.
-    env:
-      FLUTTER_STORAGE_BASE_URL: https://download.shorebird.dev
-
     steps:
       - name: 📚 Git Checkout
         uses: actions/checkout@v4
