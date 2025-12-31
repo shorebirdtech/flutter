@@ -1136,7 +1136,9 @@ Dart_Isolate DartIsolate::DartIsolateGroupCreateCallback(
               advisory_script_entrypoint,
               parent_group_data.GetChildIsolatePreparer(),
               parent_group_data.GetIsolateCreateCallback(),
-              parent_group_data.GetIsolateShutdownCallback())));
+              parent_group_data.GetIsolateShutdownCallback(),
+              nullptr,  // native_assets_manager
+              parent_group_data.GetBaseSnapshot())));
 
   TaskRunners null_task_runners(advisory_script_uri,
                                 /* platform= */ nullptr,
@@ -1158,6 +1160,22 @@ Dart_Isolate DartIsolate::DartIsolateGroupCreateCallback(
       [](std::shared_ptr<DartIsolateGroupData>* isolate_group_data,
          std::shared_ptr<DartIsolate>* isolate_data, Dart_IsolateFlags* flags,
          char** error) {
+#if SHOREBIRD_USE_INTERPRETER
+        auto base_snapshot = (*isolate_group_data)->GetBaseSnapshot();
+        if (base_snapshot) {
+          // Use the Shorebird API that accepts base snapshot for linking.
+          return Dart_CreateIsolateGroupWithBaseSnapshot(
+              (*isolate_group_data)->GetAdvisoryScriptURI().c_str(),
+              (*isolate_group_data)->GetAdvisoryScriptEntrypoint().c_str(),
+              (*isolate_group_data)->GetIsolateSnapshot()->GetDataMapping(),
+              (*isolate_group_data)
+                  ->GetIsolateSnapshot()
+                  ->GetInstructionsMapping(),
+              base_snapshot->GetDataMapping(),
+              base_snapshot->GetInstructionsMapping(), flags,
+              isolate_group_data, isolate_data, error);
+        }
+#endif
         return Dart_CreateIsolateGroup(
             (*isolate_group_data)->GetAdvisoryScriptURI().c_str(),
             (*isolate_group_data)->GetAdvisoryScriptEntrypoint().c_str(),
