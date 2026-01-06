@@ -45,10 +45,9 @@ std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
   const uint8_t* isolate_data = nullptr;
   const uint8_t* isolate_instrs = nullptr;
 
-  Dart_LoadedElf* elf =
-      Dart_LoadELF(path.c_str(), elf_file_offset, &error, &ignored_vm_data,
-                   &ignored_vm_instrs, &isolate_data, &isolate_instrs,
-                   /* load as read-only, not rx */ false);
+  Dart_LoadedElf* elf = Dart_LoadELF(
+      path.c_str(), elf_file_offset, &error, &ignored_vm_data,
+      &ignored_vm_instrs, &isolate_data, &isolate_instrs, dart::bin::kReadOnly);
 
   if (elf == nullptr) {
     FML_LOG(ERROR) << "Failed to load patch at " << path << " error: " << error;
