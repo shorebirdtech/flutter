@@ -54,13 +54,6 @@ void ConfigureShorebird(std::string code_cache_path,
 /// Exposed for testing.
 std::string GetValueFromYaml(const std::string& yaml, const std::string& key);
 
-#if SHOREBIRD_USE_INTERPRETER
-/// Returns the base isolate snapshot for Shorebird linking support.
-/// Must be called after ConfigureShorebird() has stored the base snapshots.
-/// May return null if not using Shorebird interpreter mode.
-fml::RefPtr<const DartSnapshot> GetBaseIsolateSnapshot();
-#endif  // SHOREBIRD_USE_INTERPRETER
-
 }  // namespace flutter
 
 #endif  // FLUTTER_SHELL_COMMON_SHOREBIRD_SHOREBIRD_H_

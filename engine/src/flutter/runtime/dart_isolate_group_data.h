@@ -39,18 +39,13 @@ class DartIsolateGroupData : public PlatformMessageHandlerStorage {
       const ChildIsolatePreparer& child_isolate_preparer,
       const fml::closure& isolate_create_callback,
       const fml::closure& isolate_shutdown_callback,
-      std::shared_ptr<NativeAssetsManager> native_assets_manager = nullptr,
-      fml::RefPtr<const DartSnapshot> base_snapshot = nullptr);
+      std::shared_ptr<NativeAssetsManager> native_assets_manager = nullptr);
 
   ~DartIsolateGroupData();
 
   const Settings& GetSettings() const;
 
   fml::RefPtr<const DartSnapshot> GetIsolateSnapshot() const;
-
-  /// Returns the base snapshot for Shorebird linking support.
-  /// May be null if not using Shorebird or if no patch is active.
-  fml::RefPtr<const DartSnapshot> GetBaseSnapshot() const;
 
   const std::string& GetAdvisoryScriptURI() const;
 
@@ -86,7 +81,6 @@ class DartIsolateGroupData : public PlatformMessageHandlerStorage {
   std::vector<std::shared_ptr<const fml::Mapping>> kernel_buffers_;
   const Settings settings_;
   const fml::RefPtr<const DartSnapshot> isolate_snapshot_;
-  const fml::RefPtr<const DartSnapshot> base_snapshot_;
   const std::string advisory_script_uri_;
   const std::string advisory_script_entrypoint_;
   mutable std::mutex child_isolate_preparer_mutex_;
