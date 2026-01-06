@@ -46,7 +46,6 @@ extern "C" __attribute__((weak)) unsigned long getauxval(unsigned long type) {
 #endif
 
 #if SHOREBIRD_USE_INTERPRETER
-
 // Global references to the base (unpatched) snapshots from the App.framework.
 // These are process-global because:
 // 1. The Shorebird updater library is a process-global singleton with its own
@@ -54,27 +53,23 @@ extern "C" __attribute__((weak)) unsigned long getauxval(unsigned long type) {
 //    data for patch generation/validation.
 // 2. The base snapshots are immutable (baked into the IPA) so sharing them
 //    across isolate groups is safe.
-// 3. GetBaseIsolateSnapshot() returns the isolate snapshot for use when
-//    creating isolate groups with Dart_CreateIsolateGroupWithBaseSnapshot(),
-//    which needs the base snapshot for linking patched code.
 //
 // Note: This design doesn't support multiple engines with different base
 // snapshots, but I'm not aware of any use cases for that on iOS.
 static fml::RefPtr<const DartSnapshot> vm_snapshot;
 static fml::RefPtr<const DartSnapshot> isolate_snapshot;
 
-void StoreBaseSnapshots(Settings& settings) {
-  // Create DartSnapshot objects that hold references to the symbol mappings
-  // in the App.framework. The snapshots are static data in the framework,
-  // but we need DartSnapshot objects to keep the NativeLibrary refs alive.
+void SetBaseSnapshot(Settings& settings) {
+  // These mappings happen to be to static data in the App.framework, but
+  // we still need to seem to hold onto the DartSnapshot objects to keep
+  // the mappings alive.
   vm_snapshot = DartSnapshot::VMSnapshotFromSettings(settings);
   isolate_snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
+  Shorebird_SetBaseSnapshots(isolate_snapshot->GetDataMapping(),
+                             isolate_snapshot->GetInstructionsMapping(),
+                             vm_snapshot->GetDataMapping(),
+                             vm_snapshot->GetInstructionsMapping());
 }
-
-fml::RefPtr<const DartSnapshot> GetBaseIsolateSnapshot() {
-  return isolate_snapshot;
-}
-
 #endif  // SHOREBIRD_USE_INTERPRETER
 
 class FileCallbacksImpl {
@@ -120,7 +115,7 @@ std::string GetValueFromYaml(const std::string& yaml, const std::string& key) {
 
 /// Newer api, used by Desktop implementations.
 /// Does not directly manipulate Settings.
-// FIXME: Consolidate this with the other ConfigureShorebird() API.
+// TODO(eseidel): Consolidate this with the other ConfigureShorebird() API.
 bool ConfigureShorebird(const ShorebirdConfigArgs& args,
                         std::string& patch_path) {
   patch_path = fml::PathToUtf8(args.release_app_library_path);
@@ -170,10 +165,9 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
                                  args.shorebird_yaml.c_str());
   }
 
-  // We've decided not to support synchronous updates on launch for now.
-  // It's a terrible user experience (having the app hang on launch) and
-  // instead we will provide examples of how to build a custom update UI
-  // within Dart, including updating as part of login, etc.
+  // We do not support synchronous updates on launch, it's a terrible UX.
+  // Users can implement custom check-for-updates using
+  // package:shorebird_code_push.
   // https://github.com/shorebirdtech/shorebird/issues/950
 
   FML_LOG(INFO) << "Checking for active patch";
@@ -218,7 +212,7 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
 }
 
 /// Older api used by iOS and Android, directly manipulates Settings.
-// FIXME: Consolidate this with the other ConfigureShorebird() API.
+// TODO(eseidel): Consolidate this with the other ConfigureShorebird() API.
 void ConfigureShorebird(std::string code_cache_path,
                         std::string app_storage_path,
                         Settings& settings,
@@ -274,9 +268,9 @@ void ConfigureShorebird(std::string code_cache_path,
   // package:shorebird_code_push.
   // https://github.com/shorebirdtech/shorebird/issues/950
 
-  // We store the base snapshot on iOS for use when creating the isolate group.
+  // We only set the base snapshot on iOS for now.
 #if SHOREBIRD_USE_INTERPRETER
-  StoreBaseSnapshots(settings);
+  SetBaseSnapshot(settings);
 #endif
 
   shorebird_validate_next_boot_patch();
@@ -334,7 +328,7 @@ void* FileCallbacksImpl::Open() {
                                                  *isolate_snapshot)
       .release();
 #else
-  // SnapshotsDataHandle exists on all platforms (for testing)but is only used
+  // SnapshotsDataHandle exists on all platforms (for testing) but is only used
   // on iOS. iOS patches are generated from just the Dart parts of the snapshot,
   // excluding the Mach-O specific headers which contain dates and paths that
   // make them change on every build.
