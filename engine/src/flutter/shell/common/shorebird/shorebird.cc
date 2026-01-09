@@ -118,7 +118,7 @@ std::string GetValueFromYaml(const std::string& yaml, const std::string& key) {
 // TODO(eseidel): Consolidate this with the other ConfigureShorebird() API.
 bool ConfigureShorebird(const ShorebirdConfigArgs& args,
                         std::string& patch_path) {
-  patch_path = fml::PathToUtf8(args.release_app_library_path);
+  patch_path = args.release_app_library_path;
   auto shorebird_updater_dir_name = "shorebird_updater";
 
   // Parse app id from shorebird.yaml
