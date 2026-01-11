@@ -56,6 +56,7 @@ Map<String, dynamic> compileShorebirdYaml(YamlMap yamlMap, {required String? fla
   }
   copyIfSet('base_url');
   copyIfSet('auto_update');
+  copyIfSet('patch_verification');
   final String? shorebirdPublicKeyEnvVar = environment['SHOREBIRD_PUBLIC_KEY'];
   if (shorebirdPublicKeyEnvVar != null) {
     compiled['patch_public_key'] = shorebirdPublicKeyEnvVar;
