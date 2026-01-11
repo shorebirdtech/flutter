@@ -52,7 +52,7 @@ flavors:
   foo: 2-a
   bar: 3-a
 base_url: https://example.com
-patch_verification_mode: strict
+patch_verification: strict
 ''';
       final YamlDocument input = loadYamlDocument(yamlContents);
       final YamlMap yamlMap = input.contents as YamlMap;
@@ -62,7 +62,7 @@ patch_verification_mode: strict
         'app_id': '1-a',
         'auto_update': false,
         'base_url': 'https://example.com',
-        'patch_verification_mode': 'strict',
+        'patch_verification': 'strict',
       });
       final Map<String, dynamic> compiled2 =
           compileShorebirdYaml(yamlMap, flavor: 'foo', environment: <String, String>{'SHOREBIRD_PUBLIC_KEY': '4-a'});
@@ -70,7 +70,7 @@ patch_verification_mode: strict
         'app_id': '2-a',
         'auto_update': false,
         'base_url': 'https://example.com',
-        'patch_verification_mode': 'strict',
+        'patch_verification': 'strict',
         'patch_public_key': '4-a',
       });
     });
