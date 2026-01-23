@@ -143,10 +143,15 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
     release_version += "+" + args.release_version.build_number;
   }
 
-  std::vector<std::string> libapp_paths = {args.release_app_library_path};
-  bool init_result = shorebird::Updater::Instance().Init(
-      release_version, libapp_paths, app_storage_dir, code_cache_dir,
-      ShorebirdFileCallbacks(), args.shorebird_yaml);
+  shorebird::AppConfig config;
+  config.release_version = release_version;
+  config.original_libapp_paths = {args.release_app_library_path};
+  config.app_storage_dir = app_storage_dir;
+  config.code_cache_dir = code_cache_dir;
+  config.file_callbacks = ShorebirdFileCallbacks();
+  config.yaml_config = args.shorebird_yaml;
+
+  bool init_result = shorebird::Updater::Instance().Init(config);
 
   // We do not support synchronous updates on launch, it's a terrible UX.
   // Users can implement custom check-for-updates using
@@ -210,10 +215,15 @@ void ConfigureShorebird(std::string code_cache_path,
 
   // Combine version and version_code into a single string.
   // We could also pass these separately through to the updater if needed.
-  auto release_version = version + "+" + version_code;
-  bool init_result = shorebird::Updater::Instance().Init(
-      release_version, settings.application_library_paths, app_storage_dir,
-      code_cache_dir, ShorebirdFileCallbacks(), shorebird_yaml);
+  shorebird::AppConfig config;
+  config.release_version = version + "+" + version_code;
+  config.original_libapp_paths = settings.application_library_paths;
+  config.app_storage_dir = app_storage_dir;
+  config.code_cache_dir = code_cache_dir;
+  config.file_callbacks = ShorebirdFileCallbacks();
+  config.yaml_config = shorebird_yaml;
+
+  bool init_result = shorebird::Updater::Instance().Init(config);
 
   // We do not support synchronous updates on launch, it's a terrible UX.
   // Users can implement custom check-for-updates using

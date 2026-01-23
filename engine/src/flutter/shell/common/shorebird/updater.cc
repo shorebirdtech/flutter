@@ -5,7 +5,10 @@
 #include "flutter/shell/common/shorebird/updater.h"
 
 #include "flutter/fml/logging.h"
+
+#if SHOREBIRD_PLATFORM_SUPPORTED
 #include "third_party/updater/library/include/updater.h"
+#endif
 
 namespace flutter {
 namespace shorebird {
@@ -17,7 +20,11 @@ std::mutex Updater::instance_mutex_;
 Updater& Updater::Instance() {
   std::lock_guard<std::mutex> lock(instance_mutex_);
   if (!instance_) {
+#if SHOREBIRD_PLATFORM_SUPPORTED
     instance_ = std::make_unique<RealUpdater>();
+#else
+    instance_ = std::make_unique<NoOpUpdater>();
+#endif
   }
   return *instance_;
 }
@@ -32,36 +39,32 @@ void Updater::ResetInstanceForTesting() {
   instance_.reset();
 }
 
+#if SHOREBIRD_PLATFORM_SUPPORTED
 // RealUpdater implementation - wraps the Rust C API
 
-bool RealUpdater::Init(const std::string& release_version,
-                       const std::vector<std::string>& original_libapp_paths,
-                       const std::string& app_storage_dir,
-                       const std::string& code_cache_dir,
-                       FileCallbacks file_callbacks,
-                       const std::string& yaml_config) {
+bool RealUpdater::Init(const AppConfig& config) {
   // Convert paths to C strings
   std::vector<const char*> c_paths;
-  c_paths.reserve(original_libapp_paths.size());
-  for (const auto& path : original_libapp_paths) {
+  c_paths.reserve(config.original_libapp_paths.size());
+  for (const auto& path : config.original_libapp_paths) {
     c_paths.push_back(path.c_str());
   }
 
   AppParameters params;
-  params.release_version = release_version.c_str();
+  params.release_version = config.release_version.c_str();
   params.original_libapp_paths = c_paths.data();
   params.original_libapp_paths_size = static_cast<int>(c_paths.size());
-  params.app_storage_dir = app_storage_dir.c_str();
-  params.code_cache_dir = code_cache_dir.c_str();
+  params.app_storage_dir = config.app_storage_dir.c_str();
+  params.code_cache_dir = config.code_cache_dir.c_str();
 
   // Convert our FileCallbacks to the Rust struct
   ::FileCallbacks rust_callbacks;
-  rust_callbacks.open = file_callbacks.open;
-  rust_callbacks.read = file_callbacks.read;
-  rust_callbacks.seek = file_callbacks.seek;
-  rust_callbacks.close = file_callbacks.close;
+  rust_callbacks.open = config.file_callbacks.open;
+  rust_callbacks.read = config.file_callbacks.read;
+  rust_callbacks.seek = config.file_callbacks.seek;
+  rust_callbacks.close = config.file_callbacks.close;
 
-  return shorebird_init(&params, rust_callbacks, yaml_config.c_str());
+  return shorebird_init(&params, rust_callbacks, config.yaml_config.c_str());
 }
 
 void RealUpdater::ValidateNextBootPatch() {
@@ -97,18 +100,14 @@ bool RealUpdater::ShouldAutoUpdate() {
 void RealUpdater::StartUpdateThread() {
   shorebird_start_update_thread();
 }
+#endif  // SHOREBIRD_PLATFORM_SUPPORTED
 
 // MockUpdater implementation - for testing
 
-bool MockUpdater::Init(const std::string& release_version,
-                       const std::vector<std::string>& original_libapp_paths,
-                       const std::string& app_storage_dir,
-                       const std::string& code_cache_dir,
-                       FileCallbacks file_callbacks,
-                       const std::string& yaml_config) {
+bool MockUpdater::Init(const AppConfig& config) {
   init_count_++;
-  last_release_version_ = release_version;
-  last_yaml_config_ = yaml_config;
+  last_release_version_ = config.release_version;
+  last_yaml_config_ = config.yaml_config;
   call_log_.push_back("Init");
   return init_result_;
 }

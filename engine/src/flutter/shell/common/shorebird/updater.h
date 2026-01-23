@@ -24,6 +24,28 @@ struct FileCallbacks {
   void (*close)(void* file_handle);
 };
 
+/// Configuration for initializing the Shorebird updater.
+struct AppConfig {
+  /// Version string for this release (e.g., "1.0.0+1").
+  std::string release_version;
+
+  /// Paths to the original AOT libraries (libapp.so on Android, App.framework
+  /// on iOS).
+  std::vector<std::string> original_libapp_paths;
+
+  /// Directory for persistent updater state (survives app updates).
+  std::string app_storage_dir;
+
+  /// Directory for cached artifacts (cleared on app updates).
+  std::string code_cache_dir;
+
+  /// Callbacks for iOS patch file access (can be null callbacks on Android).
+  FileCallbacks file_callbacks;
+
+  /// YAML configuration from shorebird.yaml.
+  std::string yaml_config;
+};
+
 /// Abstract interface for the Shorebird updater.
 ///
 /// This abstraction allows for:
@@ -35,19 +57,10 @@ class Updater {
   virtual ~Updater() = default;
 
   /// Initialize the updater with configuration.
-  /// @param release_version Version string for this release
-  /// @param original_libapp_paths Paths to the original AOT libraries
-  /// @param app_storage_dir Directory for persistent updater state
-  /// @param code_cache_dir Directory for cached artifacts
-  /// @param file_callbacks Callbacks for iOS patch file access
-  /// @param yaml_config YAML configuration from shorebird.yaml
+  /// @param config Configuration containing release version, paths, and
+  /// callbacks
   /// @return true if initialization succeeded
-  virtual bool Init(const std::string& release_version,
-                    const std::vector<std::string>& original_libapp_paths,
-                    const std::string& app_storage_dir,
-                    const std::string& code_cache_dir,
-                    FileCallbacks file_callbacks,
-                    const std::string& yaml_config) = 0;
+  virtual bool Init(const AppConfig& config) = 0;
 
   /// Validate the next boot patch. If invalid, falls back to last good state.
   virtual void ValidateNextBootPatch() = 0;
@@ -80,18 +93,32 @@ class Updater {
   static std::mutex instance_mutex_;
 };
 
+/// No-op implementation for unsupported platforms.
+/// All methods are safe to call but do nothing.
+class NoOpUpdater : public Updater {
+ public:
+  NoOpUpdater() = default;
+  ~NoOpUpdater() override = default;
+
+  bool Init(const AppConfig& config) override { return true; }
+  void ValidateNextBootPatch() override {}
+  std::string NextBootPatchPath() override { return ""; }
+  void ReportLaunchStart() override {}
+  void ReportLaunchSuccess() override {}
+  void ReportLaunchFailure() override {}
+  bool ShouldAutoUpdate() override { return false; }
+  void StartUpdateThread() override {}
+};
+
+#if SHOREBIRD_PLATFORM_SUPPORTED
 /// Production implementation that wraps the Rust updater C API.
+/// Only available on supported platforms (Android, iOS, macOS, Windows, Linux).
 class RealUpdater : public Updater {
  public:
   RealUpdater() = default;
   ~RealUpdater() override = default;
 
-  bool Init(const std::string& release_version,
-            const std::vector<std::string>& original_libapp_paths,
-            const std::string& app_storage_dir,
-            const std::string& code_cache_dir,
-            FileCallbacks file_callbacks,
-            const std::string& yaml_config) override;
+  bool Init(const AppConfig& config) override;
   void ValidateNextBootPatch() override;
   std::string NextBootPatchPath() override;
   void ReportLaunchStart() override;
@@ -100,6 +127,7 @@ class RealUpdater : public Updater {
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
 };
+#endif  // SHOREBIRD_PLATFORM_SUPPORTED
 
 /// Mock implementation for testing.
 /// Tracks call counts and can be queried to verify behavior.
@@ -108,12 +136,7 @@ class MockUpdater : public Updater {
   MockUpdater() = default;
   ~MockUpdater() override = default;
 
-  bool Init(const std::string& release_version,
-            const std::vector<std::string>& original_libapp_paths,
-            const std::string& app_storage_dir,
-            const std::string& code_cache_dir,
-            FileCallbacks file_callbacks,
-            const std::string& yaml_config) override;
+  bool Init(const AppConfig& config) override;
   void ValidateNextBootPatch() override;
   std::string NextBootPatchPath() override;
   void ReportLaunchStart() override;
