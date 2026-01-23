@@ -15,6 +15,56 @@ source_set("snapshots_data_handle") {
   ]
 }
 
+# C++ wrapper around the Rust updater C API.
+# This provides a testable abstraction layer that can be mocked for testing.
+source_set("updater") {
+  sources = [
+    "updater.cc",
+    "updater.h",
+  ]
+
+  deps = [ "//flutter/fml" ]
+
+  # For the Rust updater C API (shorebird_report_launch_start, etc.)
+  include_dirs = [ "//flutter" ]
+
+  # Link the Rust updater static library based on target platform.
+  if (is_android) {
+    if (target_cpu == "arm") {
+      libs = [ "//flutter/third_party/updater/target/armv7-linux-androideabi/release/libupdater.a" ]
+    } else if (target_cpu == "arm64") {
+      libs = [ "//flutter/third_party/updater/target/aarch64-linux-android/release/libupdater.a" ]
+    } else if (target_cpu == "x64") {
+      libs = [ "//flutter/third_party/updater/target/x86_64-linux-android/release/libupdater.a" ]
+    } else if (target_cpu == "x86") {
+      libs = [ "//flutter/third_party/updater/target/i686-linux-android/release/libupdater.a" ]
+    }
+  } else if (is_ios) {
+    if (target_cpu == "arm64") {
+      libs = [ "//flutter/third_party/updater/target/aarch64-apple-ios/release/libupdater.a" ]
+    } else if (target_cpu == "x64") {
+      libs = [ "//flutter/third_party/updater/target/x86_64-apple-ios/release/libupdater.a" ]
+    }
+  } else if (is_mac) {
+    if (target_cpu == "arm64") {
+      libs = [ "//flutter/third_party/updater/target/aarch64-apple-darwin/release/libupdater.a" ]
+    } else if (target_cpu == "x64") {
+      libs = [ "//flutter/third_party/updater/target/x86_64-apple-darwin/release/libupdater.a" ]
+    }
+  } else if (is_win) {
+    if (target_cpu == "x64") {
+      libs = [
+        "userenv.lib",
+        "//flutter/third_party/updater/target/x86_64-pc-windows-msvc/release/updater.lib",
+      ]
+    }
+  } else if (is_linux) {
+    if (target_cpu == "x64") {
+      libs = [ "//flutter/third_party/updater/target/x86_64-unknown-linux-gnu/release/libupdater.a" ]
+    }
+  }
+}
+
 source_set("shorebird") {
   sources = [
     "shorebird.cc",
@@ -23,14 +73,13 @@ source_set("shorebird") {
 
   deps = [
     ":snapshots_data_handle",
+    ":updater",
     "//flutter/fml",
     "//flutter/runtime",
     "//flutter/runtime:libdart",
     "//flutter/shell/common",
     "//flutter/shell/platform/embedder:embedder_headers",
   ]
-
-  include_dirs = [ "//flutter/updater" ]
 }
 
 if (enable_unittests) {
@@ -45,14 +94,14 @@ if (enable_unittests) {
       "patch_cache_unittests.cc",
       "shorebird_unittests.cc",
       "snapshots_data_handle_unittests.cc",
+      "updater_unittests.cc",
     ]
 
-    # This only includes snapshots_data_handle and not shorebird because
-    # shorebird fails to link due to a missing updater lib.
     deps = [
       ":shorebird",
       ":shorebird_fixtures",
       ":snapshots_data_handle",
+      ":updater",
       "//flutter/runtime",
       "//flutter/runtime/shorebird:patch_cache",
       "//flutter/testing",
