@@ -11,10 +11,6 @@ source_set("patch_cache") {
   deps = [
     "//flutter/fml",
     "//flutter/runtime:libdart",
+    "//flutter/shell/common/shorebird:updater",
   ]
-
-  # For shorebird_report_launch_start() in updater.h
-  # The include path "third_party/updater/library/include/updater.h" is relative
-  # to //flutter/, which is already in the default include path.
-  include_dirs = [ "//flutter" ]
 }
