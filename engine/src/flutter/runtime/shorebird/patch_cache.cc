@@ -9,7 +9,8 @@
 #include "flutter/fml/logging.h"
 #include "flutter/fml/mapping.h"
 #include "flutter/runtime/shorebird/patch_mapping.h"
-#include "third_party/updater/library/include/updater.h"
+#include "flutter/shell/common/shorebird/updater.h"
+#include "third_party/dart/runtime/include/dart_api.h"
 
 namespace flutter {
 
@@ -161,7 +162,7 @@ std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
   if (symbol == kIsolateDataSymbol) {
     std::call_once(launch_start_flag, []() {
       FML_LOG(INFO) << "Reporting launch start for patch";
-      shorebird_report_launch_start();
+      shorebird::Updater::Instance().ReportLaunchStart();
     });
     return PatchMapping::CreateIsolateData(cache_entry);
   } else {

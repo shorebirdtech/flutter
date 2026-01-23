@@ -30,8 +30,6 @@
 #include "impeller/toolkit/android/proc_table.h"
 #include "txt/platform.h"
 
-#include "third_party/updater/library/include/updater.h"
-
 namespace flutter {
 
 constexpr int kMinimumAndroidApiLevelForImpeller = 29;
