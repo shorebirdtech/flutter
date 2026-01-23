@@ -181,24 +181,13 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
     FML_LOG(INFO) << "Shorebird updater: no active patch.";
   }
 
-  // We are careful only to report a launch start in the case where it's the
-  // first time we've configured shorebird this process. Otherwise we could end
-  // up in a case where we report a launch start, but never a completion (e.g.
-  // from package:flutter_work_manager which sometimes creates a FlutterEngine
-  // (and thus configures shorebird) but never runs it. The proper fix for this
-  // is probably to move the launch_start() call to be later in the lifecycle
-  // (when the snapshot is loaded and run, rather than when FlutterEngine is
-  // initialized).  This "hack" will still have a problem where FlutterEngine is
-  // initialized but never run before the app is quit, could still cause us to
-  // suddenly mark-bad a patch that was never actually attempted to launch.
+  // Note: shorebird_report_launch_start() is now called from TryLoadFromPatch()
+  // in runtime/shorebird/patch_cache.cc, right before the patched snapshot is
+  // actually loaded. This fixes issues with FlutterEngineGroup and other cases
+  // where ConfigureShorebird() is called but no Shell is created.
   if (!init_result) {
     return false;
   }
-
-  // Once start_update_thread is called, the next_boot_patch* functions may
-  // change their return values if the shorebird_report_launch_failed
-  // function is called.
-  shorebird_report_launch_start();
 
   if (shorebird_should_auto_update()) {
     FML_LOG(INFO) << "Starting Shorebird update";
@@ -294,24 +283,14 @@ void ConfigureShorebird(std::string code_cache_path,
     FML_LOG(INFO) << "Shorebird updater: no active patch.";
   }
 
-  // We are careful only to report a launch start in the case where it's the
-  // first time we've configured shorebird this process. Otherwise we could end
-  // up in a case where we report a launch start, but never a completion (e.g.
-  // from package:flutter_work_manager which sometimes creates a FlutterEngine
-  // (and thus configures shorebird) but never runs it. The proper fix for this
-  // is probably to move the launch_start() call to be later in the lifecycle
-  // (when the snapshot is loaded and run, rather than when FlutterEngine is
-  // initialized).  This "hack" will still have a problem where FlutterEngine is
-  // initialized but never run before the app is quit, could still cause us to
-  // suddenly mark-bad a patch that was never actually attempted to launch.
+  // Note: shorebird_report_launch_start() is now called from TryLoadFromPatch()
+  // in runtime/shorebird/patch_cache.cc, right before the patched snapshot is
+  // actually loaded. This fixes issues with FlutterEngineGroup and other cases
+  // where ConfigureShorebird() is called but no Shell is created.
+
   if (!init_result) {
     return;
   }
-
-  // Once start_update_thread is called, the next_boot_patch* functions may
-  // change their return values if the shorebird_report_launch_failed
-  // function is called.
-  shorebird_report_launch_start();
 
   if (shorebird_should_auto_update()) {
     FML_LOG(INFO) << "Starting Shorebird update";
