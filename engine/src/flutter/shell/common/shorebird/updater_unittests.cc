@@ -95,8 +95,9 @@ TEST_F(UpdaterTest, MockUpdaterResetClearsState) {
 
   EXPECT_EQ(mock_->launch_start_count(), 0);
   EXPECT_EQ(mock_->launch_success_count(), 0);
-  EXPECT_FALSE(mock_->ShouldAutoUpdate());
+  // Check call_log before ShouldAutoUpdate() since the method adds to call_log
   EXPECT_TRUE(mock_->call_log().empty());
+  EXPECT_FALSE(mock_->ShouldAutoUpdate());
 }
 
 // Test that demonstrates the std::once_flag pattern works correctly.
