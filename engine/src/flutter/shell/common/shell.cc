@@ -46,7 +46,7 @@
 #include "third_party/skia/include/core/SkGraphics.h"
 #include "third_party/tonic/common/log.h"
 
-#include "third_party/updater/library/include/updater.h"
+#include "flutter/shell/common/shorebird/updater.h"
 
 namespace flutter {
 
@@ -526,9 +526,9 @@ Shell::Shell(DartVMRef vm,
   // FIXME: This is probably the wrong place to hook into.
 #if SHOREBIRD_PLATFORM_SUPPORTED
   if (!vm_) {
-    shorebird_report_launch_failure();
+    shorebird::Updater::Instance().ReportLaunchFailure();
   } else {
-    shorebird_report_launch_success();
+    shorebird::Updater::Instance().ReportLaunchSuccess();
   }
 #endif
   FML_CHECK(!settings.enable_software_rendering || !settings.enable_impeller)
