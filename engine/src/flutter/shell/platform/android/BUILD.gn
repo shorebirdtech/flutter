@@ -185,8 +185,6 @@ source_set("flutter_shell_native_src") {
 
   public_configs = [ "//flutter:config" ]
 
-  include_dirs = [ "//flutter/updater" ]
-
   defines = []
 
   libs = [
@@ -194,17 +192,6 @@ source_set("flutter_shell_native_src") {
     "EGL",
     "GLESv2",
   ]
-  if (target_cpu == "arm") {
-    libs += [ "//flutter/third_party/updater/target/armv7-linux-androideabi/release/libupdater.a" ]
-  } else if (target_cpu == "arm64") {
-    libs += [ "//flutter/third_party/updater/target/aarch64-linux-android/release/libupdater.a" ]
-  } else if (target_cpu == "x64") {
-    libs += [ "//flutter/third_party/updater/target/x86_64-linux-android/release/libupdater.a" ]
-  } else if (target_cpu == "x86") {
-    libs += [ "//flutter/third_party/updater/target/i686-linux-android/release/libupdater.a" ]
-  } else {
-    assert(false, "Unsupported target_cpu")
-  }
 }
 
 action("gen_android_build_config_java") {
