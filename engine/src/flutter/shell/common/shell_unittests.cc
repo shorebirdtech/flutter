@@ -52,6 +52,8 @@
 #include "third_party/skia/include/codec/SkCodecAnimation.h"
 #include "third_party/tonic/converter/dart_converter.h"
 
+#include "flutter/shell/common/shorebird/updater.h"
+
 #ifdef SHELL_ENABLE_VULKAN
 #include "flutter/vulkan/vulkan_application.h"  // nogncheck
 #endif
@@ -5105,6 +5107,66 @@ TEST_F(ShellTest, ShoulDiscardLayerTreeIfFrameIsSizedIncorrectly) {
   ASSERT_TRUE(ShellTest::ShouldDiscardLayerTree(shell.get(), kImplicitViewId,
                                                 *min_height));
   DestroyShell(std::move(shell), task_runners);
+}
+
+// Test that Shell creation triggers the Shorebird Updater's ReportLaunchSuccess
+// call. This is important for the crash recovery mechanism to work correctly.
+TEST_F(ShellTest, ShorebirdUpdaterReportLaunchSuccessOnShellCreation) {
+  // Install a mock updater before creating the shell
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  auto* mock_ptr = mock.get();
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+
+  EXPECT_EQ(mock_ptr->launch_success_count(), 0);
+  EXPECT_EQ(mock_ptr->launch_failure_count(), 0);
+
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+
+  // Shell constructor should have called ReportLaunchSuccess
+  EXPECT_EQ(mock_ptr->launch_success_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_failure_count(), 0);
+
+  // Verify the call was logged
+  const auto& log = mock_ptr->call_log();
+  EXPECT_TRUE(std::find(log.begin(), log.end(), "ReportLaunchSuccess") !=
+              log.end());
+
+  DestroyShell(std::move(shell), task_runners);
+
+  // Clean up - reset the updater instance
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
+// Test that creating multiple shells only calls ReportLaunchSuccess for each
+// shell. This verifies that each Shell reports its own launch status.
+TEST_F(ShellTest, ShorebirdUpdaterReportLaunchSuccessForMultipleShells) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  auto* mock_ptr = mock.get();
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+
+  EXPECT_EQ(mock_ptr->launch_success_count(), 0);
+
+  auto settings = CreateSettingsForFixture();
+
+  // Create first shell
+  auto task_runners1 = GetTaskRunnersForFixture();
+  auto shell1 = CreateShell(settings, task_runners1);
+  ASSERT_TRUE(shell1);
+  EXPECT_EQ(mock_ptr->launch_success_count(), 1);
+
+  // Create second shell
+  auto task_runners2 = GetTaskRunnersForFixture();
+  auto shell2 = CreateShell(settings, task_runners2);
+  ASSERT_TRUE(shell2);
+  EXPECT_EQ(mock_ptr->launch_success_count(), 2);
+
+  DestroyShell(std::move(shell1), task_runners1);
+  DestroyShell(std::move(shell2), task_runners2);
+
+  shorebird::Updater::ResetInstanceForTesting();
 }
 
 }  // namespace testing

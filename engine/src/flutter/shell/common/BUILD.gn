@@ -148,12 +148,11 @@ source_set("common") {
     "//flutter/lib/ui",
     "//flutter/runtime",
     "//flutter/shell/common:base64",
+    "//flutter/shell/common/shorebird:updater",
     "//flutter/shell/geometry",
     "//flutter/shell/profiling",
     "//flutter/skia",
   ]
-
-  include_dirs = [ "//flutter/updater" ]
 
   if (impeller_supports_rendering) {
     sources += [
@@ -162,31 +161,6 @@ source_set("common") {
     ]
 
     deps += [ "//flutter/impeller" ]
-  }
-
-  # Needed to compile flutter_tester for macOS.
-  if (host_os == "mac" && target_os == "mac") {
-    if (target_cpu == "arm64") {
-      libs = [ "//flutter/third_party/updater/target/aarch64-apple-darwin/release/libupdater.a" ]
-    } else if (target_cpu == "x64") {
-      libs = [ "//flutter/third_party/updater/target/x86_64-apple-darwin/release/libupdater.a" ]
-    }
-  }
-
-  # Needed to compile flutter_tester for Windows.
-  if (host_os == "win" && target_os == "win") {
-    if (target_cpu == "x64") {
-      libs = [
-        "userenv.lib",
-        "//flutter/third_party/updater/target/x86_64-pc-windows-msvc/release/updater.lib",
-      ]
-    }
-  }
-
-  if (host_os == "linux" && target_os == "linux") {
-    if (target_cpu == "x64") {
-      libs = [ "//flutter/third_party/updater/target/x86_64-unknown-linux-gnu/release/libupdater.a" ]
-    }
   }
 }
 
@@ -364,6 +338,7 @@ if (enable_unittests) {
       "//flutter/common/graphics",
       "//flutter/display_list/testing:display_list_testing",
       "//flutter/shell/common:base64",
+      "//flutter/shell/common/shorebird:updater",
       "//flutter/shell/profiling:profiling_unittests",
       "//flutter/shell/version",
       "//flutter/testing:fixture_test",
