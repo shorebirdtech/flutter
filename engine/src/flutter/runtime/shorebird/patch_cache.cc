@@ -4,9 +4,12 @@
 
 #include "flutter/runtime/shorebird/patch_cache.h"
 
+#include <mutex>
+
 #include "flutter/fml/logging.h"
 #include "flutter/fml/mapping.h"
 #include "flutter/runtime/shorebird/patch_mapping.h"
+#include "third_party/updater/library/include/updater.h"
 
 namespace flutter {
 
@@ -148,7 +151,18 @@ std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
 
   FML_LOG(INFO) << "Loading symbol from patch: " << symbol_name;
 
+  // Report launch_start when we're actually about to use a patch.
+  // This is called at exactly the right time - right before the patched
+  // snapshot is loaded. We use std::once_flag to ensure it's only called
+  // once per process, and only for the first symbol (isolate data).
+  // This fixes the FlutterEngineGroup issue where report_launch_start was
+  // called too early (in ConfigureShorebird) before any patch was used.
+  static std::once_flag launch_start_flag;
   if (symbol == kIsolateDataSymbol) {
+    std::call_once(launch_start_flag, []() {
+      FML_LOG(INFO) << "Reporting launch start for patch";
+      shorebird_report_launch_start();
+    });
     return PatchMapping::CreateIsolateData(cache_entry);
   } else {
     FML_CHECK(symbol == kIsolateInstructionsSymbol);
