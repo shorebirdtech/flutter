@@ -5186,59 +5186,57 @@ TEST_F(ShellTest, ShoulDiscardLayerTreeIfFrameIsSizedIncorrectly) {
   DestroyShell(std::move(shell), task_runners);
 }
 
-// Test that Shell creation triggers the Shorebird Updater's ReportLaunchSuccess
-// call. This is important for the crash recovery mechanism to work correctly.
-TEST_F(ShellTest, ShorebirdUpdaterReportLaunchSuccessOnShellCreation) {
-  // Install a mock updater before creating the shell
+// Test the full boot flow: ReportLaunchStart is called from
+// ResolveIsolateData, then ReportLaunchSuccess from the Shell constructor.
+// Each shell gets a paired Start+Success.
+TEST_F(ShellTest, ShorebirdBootFlowCallsLaunchStartThenSuccess) {
   auto mock = std::make_unique<shorebird::MockUpdater>();
   auto* mock_ptr = mock.get();
   shorebird::Updater::SetInstanceForTesting(std::move(mock));
-
-  EXPECT_EQ(mock_ptr->launch_success_count(), 0);
-  EXPECT_EQ(mock_ptr->launch_failure_count(), 0);
 
   auto settings = CreateSettingsForFixture();
   auto task_runners = GetTaskRunnersForFixture();
   auto shell = CreateShell(settings, task_runners);
   ASSERT_TRUE(shell);
 
-  // Shell constructor should have called ReportLaunchSuccess
-  EXPECT_EQ(mock_ptr->launch_success_count(), 1);
-  EXPECT_EQ(mock_ptr->launch_failure_count(), 0);
-
-  // Verify the call was logged
   const auto& log = mock_ptr->call_log();
-  EXPECT_TRUE(std::find(log.begin(), log.end(), "ReportLaunchSuccess") !=
-              log.end());
+  ASSERT_EQ(log.size(), 2u);
+  EXPECT_EQ(log[0], "ReportLaunchStart");
+  EXPECT_EQ(log[1], "ReportLaunchSuccess");
 
   DestroyShell(std::move(shell), task_runners);
-
-  // Clean up - reset the updater instance
   shorebird::Updater::ResetInstanceForTesting();
 }
 
-// Test that creating multiple shells only calls ReportLaunchSuccess for each
-// shell. This verifies that each Shell reports its own launch status.
+// Test that each shell gets a paired ReportLaunchStart + ReportLaunchSuccess.
 TEST_F(ShellTest, ShorebirdUpdaterReportLaunchSuccessForMultipleShells) {
   auto mock = std::make_unique<shorebird::MockUpdater>();
   auto* mock_ptr = mock.get();
   shorebird::Updater::SetInstanceForTesting(std::move(mock));
 
-  EXPECT_EQ(mock_ptr->launch_success_count(), 0);
-
   auto settings = CreateSettingsForFixture();
 
-  // Create first shell
+  // Create first shell — gets Start + Success
   auto task_runners1 = GetTaskRunnersForFixture();
   auto shell1 = CreateShell(settings, task_runners1);
   ASSERT_TRUE(shell1);
+  EXPECT_EQ(mock_ptr->launch_start_count(), 1);
   EXPECT_EQ(mock_ptr->launch_success_count(), 1);
 
-  // Create second shell
+  // Create second shell — also gets Start + Success
   auto task_runners2 = GetTaskRunnersForFixture();
   auto shell2 = CreateShell(settings, task_runners2);
   ASSERT_TRUE(shell2);
+  EXPECT_EQ(mock_ptr->launch_start_count(), 2);
   EXPECT_EQ(mock_ptr->launch_success_count(), 2);
+
+  // Full call log: Start+Success per shell
+  const auto& log = mock_ptr->call_log();
+  ASSERT_EQ(log.size(), 4u);
+  EXPECT_EQ(log[0], "ReportLaunchStart");
+  EXPECT_EQ(log[1], "ReportLaunchSuccess");
+  EXPECT_EQ(log[2], "ReportLaunchStart");
+  EXPECT_EQ(log[3], "ReportLaunchSuccess");
 
   DestroyShell(std::move(shell1), task_runners1);
   DestroyShell(std::move(shell2), task_runners2);
