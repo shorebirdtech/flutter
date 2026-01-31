@@ -4,8 +4,6 @@
 
 #include "flutter/shell/common/shorebird/updater.h"
 
-#include <mutex>
-
 #include "gtest/gtest.h"
 
 namespace flutter {
@@ -100,26 +98,31 @@ TEST_F(UpdaterTest, MockUpdaterResetClearsState) {
   EXPECT_FALSE(mock_->ShouldAutoUpdate());
 }
 
-// Test that demonstrates the std::once_flag pattern works correctly.
-// This is the same pattern used in TryLoadFromPatch.
-TEST_F(UpdaterTest, OncePerProcessPatternOnlyCallsOnce) {
-  static std::once_flag test_flag;
-  int call_count = 0;
+// ReportLaunchStart and ReportLaunchSuccess are always paired per shell.
+// The Rust updater no-ops both when no patch is booting.
+TEST_F(UpdaterTest, LaunchStartAndSuccessAreAlwaysPaired) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
 
-  auto simulate_patch_load = [&]() {
-    std::call_once(test_flag, [&]() {
-      call_count++;
-      Updater::Instance().ReportLaunchStart();
-    });
-  };
-
-  // Simulate multiple engines loading patches
-  simulate_patch_load();  // Engine 1
-  simulate_patch_load();  // Engine 2
-  simulate_patch_load();  // Engine 3
-
-  EXPECT_EQ(call_count, 1);
   EXPECT_EQ(mock_->launch_start_count(), 1);
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+  const auto& log = mock_->call_log();
+  ASSERT_EQ(log.size(), 2u);
+  EXPECT_EQ(log[0], "ReportLaunchStart");
+  EXPECT_EQ(log[1], "ReportLaunchSuccess");
+}
+
+// ReportLaunchStart and ReportLaunchFailure are paired on failed boots.
+TEST_F(UpdaterTest, LaunchStartAndFailureAreAlwaysPaired) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchFailure();
+
+  EXPECT_EQ(mock_->launch_start_count(), 1);
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  const auto& log = mock_->call_log();
+  ASSERT_EQ(log.size(), 2u);
+  EXPECT_EQ(log[0], "ReportLaunchStart");
+  EXPECT_EQ(log[1], "ReportLaunchFailure");
 }
 
 }  // namespace testing
