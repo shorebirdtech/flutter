@@ -17,6 +17,7 @@
 #if SHOREBIRD_USE_INTERPRETER
 #include "flutter/runtime/shorebird/patch_cache.h"  // nogncheck
 #endif
+#include "flutter/shell/common/shorebird/updater.h"  // nogncheck
 
 namespace flutter {
 
@@ -151,6 +152,11 @@ static std::shared_ptr<const fml::Mapping> ResolveIsolateData(
                                                 true      // dontneed_safe
   );
 #else  // DART_SNAPSHOT_STATIC_LINK
+  // Report launch start to pair with ReportLaunchSuccess/ReportLaunchFailure
+  // in Shell::Shell. Called once per engine, matching the per-engine success/
+  // failure calls. The Rust updater no-ops when no patch is booting.
+  FML_LOG(INFO) << "Reporting launch start for patch";
+  shorebird::Updater::Instance().ReportLaunchStart();
 #if SHOREBIRD_USE_INTERPRETER
   // Try loading from a Shorebird patch first.
   if (auto mapping = TryLoadFromPatch(settings.application_library_paths,
