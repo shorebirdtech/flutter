@@ -524,7 +524,12 @@ Shell::Shell(DartVMRef vm,
       is_gpu_disabled_sync_switch_(new fml::SyncSwitch(is_gpu_disabled)),
       weak_factory_gpu_(nullptr),
       weak_factory_(this) {
-  // Report launch status to Shorebird updater for crash recovery tracking.
+  // Report launch outcome to the Shorebird updater for crash recovery.
+  // If the VM failed to start, we report failure so the updater can roll
+  // back the patch. These calls are guarded inside Updater to execute at
+  // most once per process — only the first Shell's outcome is reported.
+  // In add-to-app, subsequent engines are silently ignored since they
+  // boot from the same snapshot that was already reported on.
   // On unsupported platforms, NoOpUpdater handles these calls gracefully.
   if (!vm_) {
     shorebird::Updater::Instance().ReportLaunchFailure();
