@@ -91,46 +91,104 @@ Future<void> _createFlutterProject(Directory projectDirectory) async {
   }
 }
 
+/// Cached template project directory, created once and reused across tests.
+///
+/// This avoids running `flutter create` for every test, which saves
+/// significant time (especially the first Gradle/SDK download).
+Directory? _templateProject;
+
+/// Creates (or returns the cached) template Flutter project with
+/// shorebird.yaml configured. The first call runs `flutter create` and
+/// `flutter build apk` to warm up Gradle caches.
+///
+/// Call this from `setUpAll` so the expensive setup runs outside per-test
+/// timeouts.
+Future<void> warmUpTemplateProject() => _getTemplateProject();
+
+Future<Directory> _getTemplateProject() async {
+  if (_templateProject != null) {
+    return _templateProject!;
+  }
+
+  final Directory templateDir = Directory(
+    path.join(Directory.systemTemp.createTempSync().path, 'shorebird_template'),
+  )..createSync();
+
+  await _createFlutterProject(templateDir);
+
+  templateDir.pubspecFile.writeAsStringSync('''
+${templateDir.pubspecFile.readAsStringSync()}
+  assets:
+    - shorebird.yaml
+''');
+
+  File(
+    path.join(templateDir.path, 'shorebird.yaml'),
+  ).writeAsStringSync('''
+app_id: "123"
+''');
+
+  // Warm up the Gradle cache with a throwaway build so subsequent
+  // per-test builds are fast and don't hit the per-test timeout.
+  // Skip if Gradle cache is already populated (e.g., from GHA cache restore).
+  final Directory gradleCache = Directory(
+    path.join(Platform.environment['HOME'] ?? '', '.gradle', 'caches'),
+  );
+  final bool hasGradleCache =
+      gradleCache.existsSync() && gradleCache.listSync().isNotEmpty;
+  if (hasGradleCache) {
+    print('[warmup] Gradle cache exists, skipping warm-up build');
+  } else {
+    await _runFlutterCommand(
+      ['build', 'apk'],
+      workingDirectory: templateDir,
+    );
+  }
+
+  _templateProject = templateDir;
+  return templateDir;
+}
+
+/// Copies the template project to a fresh directory for test isolation.
+Future<Directory> _copyTemplateProject() async {
+  final Directory template = await _getTemplateProject();
+  final Directory testDir = Directory(
+    path.join(Directory.systemTemp.createTempSync().path, 'shorebird_test'),
+  );
+
+  // Use platform copy to preserve the full directory tree efficiently.
+  if (Platform.isWindows) {
+    await Process.run('xcopy', [
+      template.path,
+      testDir.path,
+      '/E',
+      '/I',
+      '/Q',
+    ]);
+  } else {
+    await Process.run('cp', ['-R', template.path, testDir.path]);
+  }
+
+  return testDir;
+}
+
 @isTest
 Future<void> testWithShorebirdProject(String name,
     FutureOr<void> Function(Directory projectDirectory) testFn) async {
   test(
     name,
     () async {
-      final parentDirectory = Directory.systemTemp.createTempSync();
-      final projectDirectory = Directory(
-        path.join(
-          parentDirectory.path,
-          'shorebird_test',
-        ),
-      )..createSync();
+      final Directory projectDirectory = await _copyTemplateProject();
 
       try {
-        await _createFlutterProject(projectDirectory);
-
-        projectDirectory.pubspecFile.writeAsStringSync('''
-${projectDirectory.pubspecFile.readAsStringSync()}
-  assets:
-    - shorebird.yaml
-''');
-
-        File(
-          path.join(
-            projectDirectory.path,
-            'shorebird.yaml',
-          ),
-        ).writeAsStringSync('''
-app_id: "123"
-''');
-
         await testFn(projectDirectory);
       } finally {
         projectDirectory.deleteSync(recursive: true);
       }
     },
     timeout: Timeout(
-      // These tests usually run flutter create, flutter build, etc, which can take a while,
-      // specially in CI, so setting from the default of 30 seconds to 6 minutes.
+      // Per-test timeout can be shorter now since the template project
+      // creation and Gradle warm-up happen outside the test timeout.
       Duration(minutes: 6),
     ),
   );
