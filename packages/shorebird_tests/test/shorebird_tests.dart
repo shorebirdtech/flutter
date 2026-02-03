@@ -130,10 +130,20 @@ app_id: "123"
 
   // Warm up the Gradle cache with a throwaway build so subsequent
   // per-test builds are fast and don't hit the per-test timeout.
-  await _runFlutterCommand(
-    ['build', 'apk'],
-    workingDirectory: templateDir,
+  // Skip if Gradle cache is already populated (e.g., from GHA cache restore).
+  final Directory gradleCache = Directory(
+    path.join(Platform.environment['HOME'] ?? '', '.gradle', 'caches'),
   );
+  final bool hasGradleCache =
+      gradleCache.existsSync() && gradleCache.listSync().isNotEmpty;
+  if (hasGradleCache) {
+    print('[warmup] Gradle cache exists, skipping warm-up build');
+  } else {
+    await _runFlutterCommand(
+      ['build', 'apk'],
+      workingDirectory: templateDir,
+    );
+  }
 
   _templateProject = templateDir;
   return templateDir;
