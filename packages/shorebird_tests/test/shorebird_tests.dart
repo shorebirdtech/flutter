@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive_io.dart';
@@ -23,12 +24,19 @@ File get _flutterBinaryFile => File(
     );
 
 /// Runs a flutter command using the correct binary ([_flutterBinaryFile]) with the given arguments.
+///
+/// Streams stdout and stderr to the test output in real time so that
+/// CI logs show progress even if the process hangs or times out.
 Future<ProcessResult> _runFlutterCommand(
   List<String> arguments, {
   required Directory workingDirectory,
   Map<String, String>? environment,
-}) {
-  return Process.run(
+}) async {
+  final String command = 'flutter ${arguments.join(' ')}';
+  print('[$command] starting...');
+  final stopwatch = Stopwatch()..start();
+
+  final Process process = await Process.start(
     _flutterBinaryFile.absolute.path,
     arguments,
     workingDirectory: workingDirectory.path,
@@ -36,6 +44,40 @@ Future<ProcessResult> _runFlutterCommand(
       'FLUTTER_STORAGE_BASE_URL': 'https://download.shorebird.dev',
       if (environment != null) ...environment,
     },
+  );
+
+  final StringBuffer stdoutBuffer = StringBuffer();
+  final StringBuffer stderrBuffer = StringBuffer();
+
+  process.stdout.transform(utf8.decoder).listen((String data) {
+    stdoutBuffer.write(data);
+    // Print each line with a prefix so it's easy to identify in CI logs.
+    for (final String line in data.split('\n')) {
+      if (line.isNotEmpty) {
+        print('  [$command] $line');
+      }
+    }
+  });
+
+  process.stderr.transform(utf8.decoder).listen((String data) {
+    stderrBuffer.write(data);
+    for (final String line in data.split('\n')) {
+      if (line.isNotEmpty) {
+        print('  [$command] (stderr) $line');
+      }
+    }
+  });
+
+  final int exitCode = await process.exitCode;
+  stopwatch.stop();
+  print('[$command] completed in ${stopwatch.elapsed} '
+      '(exit code $exitCode)');
+
+  return ProcessResult(
+    process.pid,
+    exitCode,
+    stdoutBuffer.toString(),
+    stderrBuffer.toString(),
   );
 }
 
