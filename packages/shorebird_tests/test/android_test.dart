@@ -3,6 +3,8 @@ import 'package:test/test.dart';
 import 'shorebird_tests.dart';
 
 void main() {
+  setUpAll(warmUpTemplateProject);
+
   group('shorebird android projects', () {
     testWithShorebirdProject('can build an apk', (projectDirectory) async {
       await projectDirectory.runFlutterBuildApk();
