@@ -16,6 +16,8 @@ namespace shorebird {
 // Static member definitions
 std::unique_ptr<Updater> Updater::instance_;
 std::mutex Updater::instance_mutex_;
+std::atomic<bool> Updater::launch_started_{false};
+std::atomic<bool> Updater::launch_completed_{false};
 
 Updater& Updater::Instance() {
   std::lock_guard<std::mutex> lock(instance_mutex_);
@@ -37,6 +39,40 @@ void Updater::SetInstanceForTesting(std::unique_ptr<Updater> instance) {
 void Updater::ResetInstanceForTesting() {
   std::lock_guard<std::mutex> lock(instance_mutex_);
   instance_.reset();
+}
+
+void Updater::ResetLaunchStateForTesting() {
+  launch_started_.store(false);
+  launch_completed_.store(false);
+}
+
+void Updater::ReportLaunchStart() {
+  // Guard: only the first engine in a process should promote next_boot →
+  // current_boot in the Rust updater. See class-level comment for rationale.
+  bool expected = false;
+  if (!launch_started_.compare_exchange_strong(expected, true)) {
+    return;
+  }
+  DoReportLaunchStart();
+}
+
+void Updater::ReportLaunchSuccess() {
+  // Guard: only report success once per process. Subsequent engines reuse
+  // the same patch and don't need to re-confirm the boot.
+  bool expected = false;
+  if (!launch_completed_.compare_exchange_strong(expected, true)) {
+    return;
+  }
+  DoReportLaunchSuccess();
+}
+
+void Updater::ReportLaunchFailure() {
+  // Guard: only report failure once per process.
+  bool expected = false;
+  if (!launch_completed_.compare_exchange_strong(expected, true)) {
+    return;
+  }
+  DoReportLaunchFailure();
 }
 
 #if SHOREBIRD_PLATFORM_SUPPORTED
@@ -81,15 +117,15 @@ std::string RealUpdater::NextBootPatchPath() {
   return path;
 }
 
-void RealUpdater::ReportLaunchStart() {
+void RealUpdater::DoReportLaunchStart() {
   shorebird_report_launch_start();
 }
 
-void RealUpdater::ReportLaunchSuccess() {
+void RealUpdater::DoReportLaunchSuccess() {
   shorebird_report_launch_success();
 }
 
-void RealUpdater::ReportLaunchFailure() {
+void RealUpdater::DoReportLaunchFailure() {
   shorebird_report_launch_failure();
 }
 
@@ -122,17 +158,17 @@ std::string MockUpdater::NextBootPatchPath() {
   return next_boot_patch_path_;
 }
 
-void MockUpdater::ReportLaunchStart() {
+void MockUpdater::DoReportLaunchStart() {
   launch_start_count_++;
   call_log_.push_back("ReportLaunchStart");
 }
 
-void MockUpdater::ReportLaunchSuccess() {
+void MockUpdater::DoReportLaunchSuccess() {
   launch_success_count_++;
   call_log_.push_back("ReportLaunchSuccess");
 }
 
-void MockUpdater::ReportLaunchFailure() {
+void MockUpdater::DoReportLaunchFailure() {
   launch_failure_count_++;
   call_log_.push_back("ReportLaunchFailure");
 }
