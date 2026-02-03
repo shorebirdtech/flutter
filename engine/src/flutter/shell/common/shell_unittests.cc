@@ -5112,11 +5112,12 @@ TEST_F(ShellTest, ShoulDiscardLayerTreeIfFrameIsSizedIncorrectly) {
 
 // Test the full boot flow: ReportLaunchStart is called from
 // ResolveIsolateData, then ReportLaunchSuccess from the Shell constructor.
-// Each shell gets a paired Start+Success.
+// Both are guarded to run at most once per process.
 TEST_F(ShellTest, ShorebirdBootFlowCallsLaunchStartThenSuccess) {
   auto mock = std::make_unique<shorebird::MockUpdater>();
   auto* mock_ptr = mock.get();
   shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
 
   auto settings = CreateSettingsForFixture();
   auto task_runners = GetTaskRunnersForFixture();
@@ -5129,14 +5130,20 @@ TEST_F(ShellTest, ShorebirdBootFlowCallsLaunchStartThenSuccess) {
   EXPECT_EQ(log[1], "ReportLaunchSuccess");
 
   DestroyShell(std::move(shell), task_runners);
+  shorebird::Updater::ResetLaunchStateForTesting();
   shorebird::Updater::ResetInstanceForTesting();
 }
 
-// Test that each shell gets a paired ReportLaunchStart + ReportLaunchSuccess.
-TEST_F(ShellTest, ShorebirdUpdaterReportLaunchSuccessForMultipleShells) {
+// In add-to-app, multiple engines may be created within a single process.
+// Only the first engine should report launch start/success to the Rust
+// updater. This prevents the updater from promoting a newly-downloaded patch
+// to "current_boot" when subsequent engines are still running the original
+// snapshot that was selected at process init time.
+TEST_F(ShellTest, ShorebirdUpdaterReportsOnlyOnceForMultipleShells) {
   auto mock = std::make_unique<shorebird::MockUpdater>();
   auto* mock_ptr = mock.get();
   shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
 
   auto settings = CreateSettingsForFixture();
 
@@ -5147,24 +5154,23 @@ TEST_F(ShellTest, ShorebirdUpdaterReportLaunchSuccessForMultipleShells) {
   EXPECT_EQ(mock_ptr->launch_start_count(), 1);
   EXPECT_EQ(mock_ptr->launch_success_count(), 1);
 
-  // Create second shell — also gets Start + Success
+  // Create second shell — guarded, no additional Start or Success calls.
   auto task_runners2 = GetTaskRunnersForFixture();
   auto shell2 = CreateShell(settings, task_runners2);
   ASSERT_TRUE(shell2);
-  EXPECT_EQ(mock_ptr->launch_start_count(), 2);
-  EXPECT_EQ(mock_ptr->launch_success_count(), 2);
+  EXPECT_EQ(mock_ptr->launch_start_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_success_count(), 1);
 
-  // Full call log: Start+Success per shell
+  // Only one Start+Success pair in the call log.
   const auto& log = mock_ptr->call_log();
-  ASSERT_EQ(log.size(), 4u);
+  ASSERT_EQ(log.size(), 2u);
   EXPECT_EQ(log[0], "ReportLaunchStart");
   EXPECT_EQ(log[1], "ReportLaunchSuccess");
-  EXPECT_EQ(log[2], "ReportLaunchStart");
-  EXPECT_EQ(log[3], "ReportLaunchSuccess");
 
   DestroyShell(std::move(shell1), task_runners1);
   DestroyShell(std::move(shell2), task_runners2);
 
+  shorebird::Updater::ResetLaunchStateForTesting();
   shorebird::Updater::ResetInstanceForTesting();
 }
 
