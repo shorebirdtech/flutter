@@ -157,8 +157,9 @@ Future<Directory> _copyTemplateProject() async {
   );
 
   // Use platform copy to preserve the full directory tree efficiently.
+  final ProcessResult result;
   if (Platform.isWindows) {
-    await Process.run('xcopy', [
+    result = await Process.run('xcopy', [
       template.path,
       testDir.path,
       '/E',
@@ -166,7 +167,10 @@ Future<Directory> _copyTemplateProject() async {
       '/Q',
     ]);
   } else {
-    await Process.run('cp', ['-R', template.path, testDir.path]);
+    result = await Process.run('cp', ['-R', template.path, testDir.path]);
+  }
+  if (result.exitCode != 0) {
+    throw Exception('Failed to copy template project: ${result.stderr}');
   }
 
   return testDir;
