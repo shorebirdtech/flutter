@@ -11,25 +11,45 @@ on:
       - shorebird/dev
 
 jobs:
-  test:
+  # NOTE: Windows is not included because shorebird_tests depends on
+  # flutter_flavorizr which requires Xcode. Additionally, flutter_tools
+  # tests on Windows would need additional setup work.
+
+  flutter-tools-tests:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
 
-    name: 🐦 Shorebird Test
+    name: 🛠️ Flutter Tools Tests (${{ matrix.os }})
 
     steps:
       - name: 📚 Git Checkout
         uses: actions/checkout@v4
         with:
-          # Fetch all branches and tags to ensure that Flutter can determine its version
           fetch-depth: 0
 
-      # TODO(eseidel): shorebird_tests seems to assume flutter is available
-      # yet it doesn't seem to set it up here?
+      - name: 🎯 Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: 🐦 Run Flutter Tools Tests
+        run: ../../bin/flutter test test/general.shard
+        working-directory: packages/flutter_tools
+
+  shorebird-android-tests:
+    # Android tests run on Ubuntu (faster runners, no macOS needed)
+    runs-on: ubuntu-latest
+
+    name: 🤖 Shorebird Android Tests
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: 🎯 Setup Dart
         uses: dart-lang/setup-dart@v1
 
@@ -39,7 +59,6 @@ jobs:
           java-version: "17"
 
       - name: 📦 Cache Gradle
-        if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest' }}
         uses: actions/cache@v4
         with:
           path: |
@@ -49,15 +68,45 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: 🐦 Run Flutter Tools Tests
-        # TODO(eseidel): Find a nice way to run this on windows.
-        if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest' }}
-        run: ../../bin/flutter test test/general.shard
-        working-directory: packages/flutter_tools
+      - name: 🤖 Run Android Tests
+        run: dart test test/base_test.dart test/android_test.dart
+        working-directory: packages/shorebird_tests
 
-      - name: 🐦 Run Shorebird Tests
-        # TODO(felangel): These tests have a dependency on pkg:flutter_flavorizr which
-        # requires XCode -- therefore they don't work on Windows.
-        if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest' }}
-        run: dart test
+  shorebird-ios-tests:
+    # iOS tests require macOS for Xcode
+    runs-on: macos-latest
+
+    name: 🍎 Shorebird iOS + Android Smoke Tests
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎯 Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
+      - name: 📦 Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: 🍎 Run iOS Tests
+        run: dart test test/base_test.dart test/ios_test.dart
+        working-directory: packages/shorebird_tests
+
+      - name: 🤖 Run Android Smoke Test (macOS)
+        # Quick sanity check that Android builds work on macOS too
+        run: dart test test/android_test.dart --name "can build an apk"
         working-directory: packages/shorebird_tests
