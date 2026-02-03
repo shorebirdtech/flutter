@@ -11,6 +11,10 @@ on:
       - shorebird/dev
 
 jobs:
+  # NOTE: Windows is not included because shorebird_tests depends on
+  # flutter_flavorizr which requires Xcode. Additionally, flutter_tools
+  # tests on Windows would need additional setup work.
+
   flutter-tools-tests:
     strategy:
       fail-fast: false
