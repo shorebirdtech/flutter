@@ -38,6 +38,17 @@ jobs:
           distribution: "zulu"
           java-version: "17"
 
+      - name: 📦 Cache Gradle
+        if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest' }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
       - name: 🐦 Run Flutter Tools Tests
         # TODO(eseidel): Find a nice way to run this on windows.
         if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest' }}
