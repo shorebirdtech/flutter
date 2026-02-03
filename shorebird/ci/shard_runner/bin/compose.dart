@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 import 'package:shard_runner/cli.dart';
+import 'package:shard_runner/compose_config.dart';
 import 'package:shard_runner/gcs.dart';
 
 /// Composes artifacts from multiple shards into final outputs.
@@ -38,30 +38,27 @@ Future<void> main(List<String> args) async {
   });
 
   // Load compose config
-  final composeFile = File(p.join(cli.configDir, 'compose.json'));
-  if (!await composeFile.exists()) {
-    print('Error: compose.json not found at ${composeFile.path}');
+  final ComposeConfig config;
+  try {
+    config = await ComposeConfig.load(cli.configDir);
+  } on FileSystemException catch (e) {
+    print('Error: ${e.message} at ${e.path}');
     exit(1);
   }
 
-  final composeConfig = jsonDecode(await composeFile.readAsString()) as Map<String, dynamic>;
-  final composeDef = composeConfig[composeName] as Map<String, dynamic>?;
-
-  if (composeDef == null) {
-    print('Error: Unknown compose name: $composeName');
-    print('Available: ${composeConfig.keys.join(', ')}');
+  final ComposeDef composeDef;
+  try {
+    composeDef = config.getCompose(composeName);
+  } on ArgumentError catch (e) {
+    print('Error: ${e.message}');
     exit(1);
   }
 
-  final requires = (composeDef['requires'] as List).cast<String>();
-  final script = composeDef['script'] as String;
-  final scriptArgs = (composeDef['args'] as List?)?.cast<String>() ?? [];
-
-  print('\n[Compose] Requires shards: ${requires.join(', ')}');
+  print('\n[Compose] Requires shards: ${composeDef.requires.join(', ')}');
 
   // Download artifacts from each required shard
   if (shouldDownload) {
-    for (final shard in requires) {
+    for (final shard in composeDef.requires) {
       print('\n[Download] Fetching $shard artifacts...');
       await downloadFromStaging(
         runId: cli.runId,
@@ -80,7 +77,7 @@ Future<void> main(List<String> args) async {
 
   // Process args - expand relative paths
   final expandedArgs = <String>['--dst', outDir];
-  for (final arg in scriptArgs) {
+  for (final arg in composeDef.args) {
     if (arg.startsWith('--') || arg.startsWith('-')) {
       expandedArgs.add(arg);
     } else if (!arg.startsWith('/') && !arg.startsWith('out/')) {
@@ -92,12 +89,12 @@ Future<void> main(List<String> args) async {
   }
 
   // Run the composition script
-  print('\n[Compose] Running $script...');
+  print('\n[Compose] Running ${composeDef.script}...');
   print('[Compose] Args: ${expandedArgs.join(' ')}');
 
   final result = await Process.run(
     'python3',
-    [p.join(cli.engineSrc, script), ...expandedArgs],
+    [p.join(cli.engineSrc, composeDef.script), ...expandedArgs],
     workingDirectory: cli.engineSrc,
   );
 
