@@ -151,10 +151,11 @@ static std::shared_ptr<const fml::Mapping> ResolveIsolateData(
                                                 true      // dontneed_safe
   );
 #else  // DART_SNAPSHOT_STATIC_LINK
-  // Report launch start to pair with ReportLaunchSuccess/ReportLaunchFailure
-  // in Shell::Shell. Called once per engine, matching the per-engine success/
-  // failure calls. The Rust updater no-ops when no patch is booting.
-  FML_LOG(INFO) << "Reporting launch start for patch";
+  // Tell the Rust updater we're booting from whatever patch it selected.
+  // This copies next_boot → current_boot in the Rust state. The call is
+  // guarded inside Updater to execute at most once per process — see the
+  // Updater class comment for why this matters in add-to-app and
+  // FlutterEngineGroup scenarios.
   shorebird::Updater::Instance().ReportLaunchStart();
 #if SHOREBIRD_USE_INTERPRETER
   // Try loading from a Shorebird patch first.
