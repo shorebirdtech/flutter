@@ -3,6 +3,8 @@ import 'package:test/test.dart';
 import 'shorebird_tests.dart';
 
 void main() {
+  setUpAll(warmUpTemplateProject);
+
   group('shorebird helpers', () {
     testWithShorebirdProject('can build a base project',
         (projectDirectory) async {
