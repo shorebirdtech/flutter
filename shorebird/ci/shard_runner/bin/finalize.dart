@@ -28,8 +28,7 @@ Future<void> main(List<String> args) async {
     ..addFlag('download',
         defaultsTo: true, help: 'Download artifacts from GCS staging')
     ..addFlag('upload',
-        defaultsTo: true, help: 'Upload artifacts to GCS bucket')
-    ..addFlag('help', abbr: 'h', negatable: false, help: 'Show this help');
+        defaultsTo: true, help: 'Upload artifacts to GCS bucket');
 
   CliConfig.addCommonOptions(parser, includeUpload: false);
 
