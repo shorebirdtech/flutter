@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 import 'package:shard_runner/cli.dart';
+import 'package:shard_runner/config.dart';
 import 'package:shard_runner/gcs.dart';
 
 /// Finalizes a sharded build by generating manifest and uploading artifacts.
@@ -49,40 +50,31 @@ Future<void> main(List<String> args) async {
     'Upload:': shouldUpload.toString(),
   });
 
-  // Define all shards by platform
-  final shardsByPlatform = {
-    'linux': ['android-arm64', 'android-arm32', 'android-x64', 'host'],
-    'macos': [
-      'android',
-      'ios-release',
-      'ios-release-ext',
-      'ios-sim-x64',
-      'ios-sim-x64-ext',
-      'ios-sim-arm64',
-      'ios-sim-arm64-ext',
-      'mac-arm64',
-      'mac-x64',
-    ],
-    'windows': ['android-arm64', 'android-arm32', 'android-x64', 'host'],
-  };
+  // Load shard configs for each platform
+  const platforms = ['linux', 'macos', 'windows'];
+  final configs = <String, PlatformConfig>{};
+  for (final platform in platforms) {
+    configs[platform] = await PlatformConfig.load(platform, cli.configDir);
+  }
 
   // Download all artifacts from staging
   if (shouldDownload) {
     final outDir = p.join(cli.engineSrc, 'out');
     await Directory(outDir).create(recursive: true);
 
-    for (final platform in shardsByPlatform.keys) {
-      for (final shard in shardsByPlatform[platform]!) {
-        print('\n[Download] Fetching $platform/$shard...');
+    for (final platform in platforms) {
+      final config = configs[platform]!;
+      for (final shardName in config.shards.keys) {
+        print('\n[Download] Fetching $platform/$shardName...');
         try {
           await downloadFromStaging(
             runId: cli.runId,
             platform: platform,
-            shard: shard,
+            shard: shardName,
             destDir: outDir,
           );
         } catch (e) {
-          print('[Warning] Failed to download $platform/$shard: $e');
+          print('[Warning] Failed to download $platform/$shardName: $e');
           // Continue with other shards
         }
       }
