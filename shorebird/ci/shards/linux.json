@@ -2,6 +2,10 @@
   "android-arm64": {
     "steps": [
       {
+        "type": "rust",
+        "targets": ["aarch64-linux-android"]
+      },
+      {
         "type": "gn_ninja",
         "gn_args": ["--android", "--android-cpu=arm64", "--runtime-mode=release"],
         "ninja_targets": ["default", "gen_snapshot"],
@@ -19,6 +23,10 @@
   },
   "android-arm32": {
     "steps": [
+      {
+        "type": "rust",
+        "targets": ["armv7-linux-androideabi"]
+      },
       {
         "type": "gn_ninja",
         "gn_args": ["--android", "--runtime-mode=release"],
@@ -40,6 +48,10 @@
   },
   "android-x64": {
     "steps": [
+      {
+        "type": "rust",
+        "targets": ["x86_64-linux-android"]
+      },
       {
         "type": "gn_ninja",
         "gn_args": ["--android", "--android-cpu=x64", "--runtime-mode=release"],
