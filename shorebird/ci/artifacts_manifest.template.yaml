@@ -1,0 +1,65 @@
+# Template for artifacts_manifest.yaml
+# This file is processed by shard_runner:finalize
+# Variable substitution: {{flutter_engine_revision}} is replaced at generation time
+# The $engine placeholder is kept as-is for Shorebird's artifact proxy
+
+flutter_engine_revision: {{flutter_engine_revision}}
+storage_bucket: download.shorebird.dev
+artifact_overrides:
+  # Android release artifacts
+  - flutter_infra_release/flutter/$engine/android-arm64-release/artifacts.zip
+  - flutter_infra_release/flutter/$engine/android-arm64-release/darwin-x64.zip
+  - flutter_infra_release/flutter/$engine/android-arm64-release/linux-x64.zip
+  - flutter_infra_release/flutter/$engine/android-arm64-release/symbols.zip
+  - flutter_infra_release/flutter/$engine/android-arm64-release/windows-x64.zip
+
+  - flutter_infra_release/flutter/$engine/android-arm-release/artifacts.zip
+  - flutter_infra_release/flutter/$engine/android-arm-release/darwin-x64.zip
+  - flutter_infra_release/flutter/$engine/android-arm-release/linux-x64.zip
+  - flutter_infra_release/flutter/$engine/android-arm-release/symbols.zip
+  - flutter_infra_release/flutter/$engine/android-arm-release/windows-x64.zip
+
+  - flutter_infra_release/flutter/$engine/android-x64-release/artifacts.zip
+  - flutter_infra_release/flutter/$engine/android-x64-release/darwin-x64.zip
+  - flutter_infra_release/flutter/$engine/android-x64-release/linux-x64.zip
+  - flutter_infra_release/flutter/$engine/android-x64-release/symbols.zip
+  - flutter_infra_release/flutter/$engine/android-x64-release/windows-x64.zip
+
+  # engine_stamp.json
+  - flutter_infra_release/flutter/$engine/engine_stamp.json
+
+  # Dart SDK
+  - flutter_infra_release/flutter/$engine/dart-sdk-darwin-arm64.zip
+  - flutter_infra_release/flutter/$engine/dart-sdk-darwin-x64.zip
+  - flutter_infra_release/flutter/$engine/dart-sdk-linux-x64.zip
+  - flutter_infra_release/flutter/$engine/dart-sdk-windows-x64.zip
+
+  # Maven artifacts
+  - download.flutter.io/io/flutter/flutter_embedding_release/1.0.0-$engine/flutter_embedding_release-1.0.0-$engine.pom
+  - download.flutter.io/io/flutter/flutter_embedding_release/1.0.0-$engine/flutter_embedding_release-1.0.0-$engine.jar
+  - download.flutter.io/io/flutter/arm64_v8a_release/1.0.0-$engine/arm64_v8a_release-1.0.0-$engine.pom
+  - download.flutter.io/io/flutter/arm64_v8a_release/1.0.0-$engine/arm64_v8a_release-1.0.0-$engine.jar
+  - download.flutter.io/io/flutter/armeabi_v7a_release/1.0.0-$engine/armeabi_v7a_release-1.0.0-$engine.pom
+  - download.flutter.io/io/flutter/armeabi_v7a_release/1.0.0-$engine/armeabi_v7a_release-1.0.0-$engine.jar
+  - download.flutter.io/io/flutter/x86_64_release/1.0.0-$engine/x86_64_release-1.0.0-$engine.pom
+  - download.flutter.io/io/flutter/x86_64_release/1.0.0-$engine/x86_64_release-1.0.0-$engine.jar
+
+  # Common release artifacts
+  - flutter_infra_release/flutter/$engine/flutter_patched_sdk_product.zip
+
+  # iOS release artifacts
+  - flutter_infra_release/flutter/$engine/ios-release/artifacts.zip
+  - flutter_infra_release/flutter/$engine/ios-release/Flutter.dSYM.zip
+
+  # Linux release artifacts
+  - flutter_infra_release/flutter/$engine/linux-x64/artifacts.zip
+  - flutter_infra_release/flutter/$engine/linux-x64-release/linux-x64-flutter-gtk.zip
+
+  # macOS release artifacts
+  - flutter_infra_release/flutter/$engine/darwin-x64-release/artifacts.zip
+  - flutter_infra_release/flutter/$engine/darwin-x64-release/framework.zip
+  - flutter_infra_release/flutter/$engine/darwin-x64-release/gen_snapshot.zip
+
+  # Windows release artifacts
+  - flutter_infra_release/flutter/$engine/windows-x64/artifacts.zip
+  - flutter_infra_release/flutter/$engine/windows-x64-release/windows-x64-flutter.zip
