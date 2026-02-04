@@ -69,17 +69,12 @@ Future<void> main(List<String> args) async {
       final PlatformConfig config = configs[platform]!;
       for (final String shardName in config.shards.keys) {
         print('\n[Download] Fetching $platform/$shardName...');
-        try {
-          await downloadFromStaging(
-            runId: cli.runId,
-            platform: platform,
-            shard: shardName,
-            destDir: outDir,
-          );
-        } catch (e) {
-          print('[Warning] Failed to download $platform/$shardName: $e');
-          // Continue with other shards
-        }
+        await downloadFromStaging(
+          runId: cli.runId,
+          platform: platform,
+          shard: shardName,
+          destDir: outDir,
+        );
       }
     }
   }
