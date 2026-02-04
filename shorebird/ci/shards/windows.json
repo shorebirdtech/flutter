@@ -1,0 +1,66 @@
+{
+  "android-arm64": {
+    "steps": [
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--android", "--android-cpu=arm64", "--runtime-mode=release"],
+        "ninja_targets": ["archive_win_gen_snapshot"],
+        "out_dir": "android_release_arm64"
+      }
+    ],
+    "artifacts": [
+      {"src": "zip_archives/android-arm64-release/windows-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/windows-x64.zip"}
+    ]
+  },
+  "android-arm32": {
+    "steps": [
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--android", "--runtime-mode=release"],
+        "ninja_targets": ["archive_win_gen_snapshot"],
+        "out_dir": "android_release"
+      }
+    ],
+    "artifacts": [
+      {"src": "zip_archives/android-arm-release/windows-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/windows-x64.zip"}
+    ]
+  },
+  "android-x64": {
+    "steps": [
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--android", "--android-cpu=x64", "--runtime-mode=release"],
+        "ninja_targets": ["archive_win_gen_snapshot"],
+        "out_dir": "android_release_x64"
+      }
+    ],
+    "artifacts": [
+      {"src": "zip_archives/android-x64-release/windows-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/windows-x64.zip"}
+    ]
+  },
+  "host": {
+    "steps": [
+      {
+        "type": "rust",
+        "targets": ["x86_64-pc-windows-msvc"]
+      },
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--runtime-mode=release", "--no-prebuilt-dart-sdk"],
+        "ninja_targets": ["dart_sdk", "flutter/build/archives:windows_flutter", "gen_snapshot", "windows", "flutter/build/archives:artifacts"],
+        "out_dir": "host_release"
+      },
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--no-prebuilt-dart-sdk"],
+        "ninja_targets": ["flutter/build/archives:artifacts"],
+        "out_dir": "host_debug"
+      }
+    ],
+    "artifacts": [
+      {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-windows-x64.zip", "zip": true, "content_hash": true},
+      {"src": "host_release/zip_archives/windows-x64-release/windows-x64-flutter.zip", "dst": "flutter_infra_release/flutter/$engine/windows-x64-release/windows-x64-flutter.zip"},
+      {"src": "host_debug/zip_archives/windows-x64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/windows-x64/artifacts.zip"}
+    ]
+  }
+}

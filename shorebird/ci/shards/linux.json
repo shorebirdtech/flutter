@@ -1,0 +1,92 @@
+{
+  "android-arm64": {
+    "steps": [
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--android", "--android-cpu=arm64", "--runtime-mode=release"],
+        "ninja_targets": ["default", "gen_snapshot"],
+        "out_dir": "android_release_arm64"
+      }
+    ],
+    "artifacts": [
+      {"src": "zip_archives/android-arm64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/artifacts.zip"},
+      {"src": "zip_archives/android-arm64-release/linux-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/linux-x64.zip"},
+      {"src": "zip_archives/android-arm64-release/symbols.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/symbols.zip"},
+      {"src": "arm64_v8a_release.pom", "dst": "download.flutter.io/io/flutter/arm64_v8a_release/1.0.0-$engine/arm64_v8a_release-1.0.0-$engine.pom"},
+      {"src": "arm64_v8a_release.jar", "dst": "download.flutter.io/io/flutter/arm64_v8a_release/1.0.0-$engine/arm64_v8a_release-1.0.0-$engine.jar"},
+      {"src": "arm64_v8a_release.maven-metadata.xml", "dst": "download.flutter.io/io/flutter/arm64_v8a_release/1.0.0-$engine/arm64_v8a_release-1.0.0-$engine.maven-metadata.xml"}
+    ]
+  },
+  "android-arm32": {
+    "steps": [
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--android", "--runtime-mode=release"],
+        "ninja_targets": ["default", "gen_snapshot"],
+        "out_dir": "android_release"
+      }
+    ],
+    "artifacts": [
+      {"src": "zip_archives/android-arm-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/artifacts.zip"},
+      {"src": "zip_archives/android-arm-release/linux-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/linux-x64.zip"},
+      {"src": "zip_archives/android-arm-release/symbols.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/symbols.zip"},
+      {"src": "armeabi_v7a_release.pom", "dst": "download.flutter.io/io/flutter/armeabi_v7a_release/1.0.0-$engine/armeabi_v7a_release-1.0.0-$engine.pom"},
+      {"src": "armeabi_v7a_release.jar", "dst": "download.flutter.io/io/flutter/armeabi_v7a_release/1.0.0-$engine/armeabi_v7a_release-1.0.0-$engine.jar"},
+      {"src": "armeabi_v7a_release.maven-metadata.xml", "dst": "download.flutter.io/io/flutter/armeabi_v7a_release/1.0.0-$engine/armeabi_v7a_release-1.0.0-$engine.maven-metadata.xml"},
+      {"src": "flutter_embedding_release.pom", "dst": "download.flutter.io/io/flutter/flutter_embedding_release/1.0.0-$engine/flutter_embedding_release-1.0.0-$engine.pom"},
+      {"src": "flutter_embedding_release.jar", "dst": "download.flutter.io/io/flutter/flutter_embedding_release/1.0.0-$engine/flutter_embedding_release-1.0.0-$engine.jar"},
+      {"src": "flutter_embedding_release.maven-metadata.xml", "dst": "download.flutter.io/io/flutter/flutter_embedding_release/1.0.0-$engine/flutter_embedding_release-1.0.0-$engine.maven-metadata.xml"}
+    ]
+  },
+  "android-x64": {
+    "steps": [
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--android", "--android-cpu=x64", "--runtime-mode=release"],
+        "ninja_targets": ["default", "gen_snapshot"],
+        "out_dir": "android_release_x64"
+      }
+    ],
+    "artifacts": [
+      {"src": "zip_archives/android-x64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/artifacts.zip"},
+      {"src": "zip_archives/android-x64-release/linux-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/linux-x64.zip"},
+      {"src": "zip_archives/android-x64-release/symbols.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/symbols.zip"},
+      {"src": "x86_64_release.pom", "dst": "download.flutter.io/io/flutter/x86_64_release/1.0.0-$engine/x86_64_release-1.0.0-$engine.pom"},
+      {"src": "x86_64_release.jar", "dst": "download.flutter.io/io/flutter/x86_64_release/1.0.0-$engine/x86_64_release-1.0.0-$engine.jar"},
+      {"src": "x86_64_release.maven-metadata.xml", "dst": "download.flutter.io/io/flutter/x86_64_release/1.0.0-$engine/x86_64_release-1.0.0-$engine.maven-metadata.xml"}
+    ]
+  },
+  "host": {
+    "steps": [
+      {
+        "type": "rust",
+        "targets": [
+          "armv7-linux-androideabi",
+          "aarch64-linux-android",
+          "i686-linux-android",
+          "x86_64-linux-android",
+          "x86_64-unknown-linux-gnu"
+        ]
+      },
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--runtime-mode=release", "--no-prebuilt-dart-sdk"],
+        "ninja_targets": ["dart_sdk", "flutter/shell/platform/linux:flutter_gtk", "flutter/build/archives:flutter_patched_sdk"],
+        "out_dir": "host_release"
+      },
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--no-prebuilt-dart-sdk"],
+        "ninja_targets": ["flutter/build/archives:artifacts"],
+        "out_dir": "host_debug"
+      }
+    ],
+    "artifacts": [
+      {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-linux-x64.zip", "zip": true, "content_hash": true},
+      {"src": "host_release/zip_archives/flutter_patched_sdk_product.zip", "dst": "flutter_infra_release/flutter/$engine/flutter_patched_sdk_product.zip"},
+      {"src": "host_release/zip_archives/linux-x64-release/linux-x64-flutter-gtk.zip", "dst": "flutter_infra_release/flutter/$engine/linux-x64-release/linux-x64-flutter-gtk.zip"},
+      {"src": "host_debug/zip_archives/linux-x64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/linux-x64/artifacts.zip"},
+      {"src": "host_release/aot_tools/aot-tools.dill", "dst": "shorebird/$engine/aot-tools.dill"}
+    ]
+  }
+}
