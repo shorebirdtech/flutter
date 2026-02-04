@@ -1,0 +1,30 @@
+{
+  "ios-framework": {
+    "requires": ["ios-release", "ios-release-ext", "ios-sim-x64", "ios-sim-x64-ext", "ios-sim-arm64", "ios-sim-arm64-ext"],
+    "script": "flutter/sky/tools/create_ios_framework.py",
+    "flags": ["--dsym", "--strip"],
+    "path_args": {
+      "--arm64-out-dir": "ios_release",
+      "--simulator-x64-out-dir": "ios_debug_sim",
+      "--simulator-arm64-out-dir": "ios_debug_sim_arm64"
+    }
+  },
+  "macos-framework": {
+    "requires": ["mac-arm64", "mac-x64"],
+    "script": "flutter/sky/tools/create_macos_framework.py",
+    "flags": ["--dsym", "--strip", "--zip"],
+    "path_args": {
+      "--arm64-out-dir": "mac_release_arm64",
+      "--x64-out-dir": "mac_release"
+    }
+  },
+  "macos-gen-snapshot": {
+    "requires": ["mac-arm64", "mac-x64"],
+    "script": "flutter/sky/tools/create_macos_gen_snapshots.py",
+    "flags": ["--zip"],
+    "path_args": {
+      "--arm64-path": "mac_release_arm64/universal/gen_snapshot_arm64",
+      "--x64-path": "mac_release/universal/gen_snapshot_x64"
+    }
+  }
+}
