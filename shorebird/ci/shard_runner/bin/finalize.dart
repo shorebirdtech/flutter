@@ -6,6 +6,7 @@ import 'package:shard_runner/cli.dart';
 import 'package:shard_runner/config.dart';
 import 'package:shard_runner/gcs.dart';
 import 'package:shard_runner/manifest.dart';
+import 'package:shard_runner/process.dart';
 
 /// Finalizes a sharded build by generating manifest and uploading artifacts.
 ///
@@ -57,13 +58,13 @@ Future<void> main(List<String> args) async {
   const List<String> platforms = <String>['linux', 'macos', 'windows'];
   final Map<String, PlatformConfig> configs = <String, PlatformConfig>{};
   for (final String platform in platforms) {
-    configs[platform] = await PlatformConfig.load(platform, cli.configDir);
+    configs[platform] = PlatformConfig.load(platform, cli.configDir);
   }
 
   // Download all artifacts from staging
   if (shouldDownload) {
     final String outDir = p.join(cli.engineSrc, 'out');
-    await Directory(outDir).create(recursive: true);
+    Directory(outDir).createSync(recursive: true);
 
     for (final String platform in platforms) {
       final PlatformConfig config = configs[platform]!;
@@ -120,23 +121,21 @@ Future<void> uploadToProduction({
   // Helper to run gsutil cp
   Future<void> gscp(String src, String dest) async {
     print('[Upload] $src -> $dest');
-    final ProcessResult result = await Process.run('gsutil', <String>['cp', src, dest]);
-    if (result.exitCode != 0) {
-      throw Exception('gsutil cp failed (exit ${result.exitCode}): ${result.stderr}');
-    }
+    await runChecked('gsutil', <String>['cp', src, dest], description: 'gsutil cp $src');
   }
 
   // Helper to zip a directory and upload
   Future<void> zipAndUpload(String srcPath, String dest) async {
     final String tempZip = '$srcPath.zip';
     print('[Zip] Creating $tempZip...');
-    final ProcessResult zipResult =
-        await Process.run('zip', <String>['-r', tempZip, '.'], workingDirectory: srcPath);
-    if (zipResult.exitCode != 0) {
-      throw Exception('zip failed (exit ${zipResult.exitCode}): ${zipResult.stderr}');
-    }
+    await runChecked(
+      'zip',
+      <String>['-r', tempZip, '.'],
+      workingDirectory: srcPath,
+      description: 'zip $tempZip',
+    );
     await gscp(tempZip, dest);
-    await File(tempZip).delete();
+    File(tempZip).deleteSync();
   }
 
   // Process artifacts from all configs
@@ -161,7 +160,7 @@ Future<void> uploadToProduction({
         // Check if source exists
         final File srcFile = File(srcPath);
         final Directory srcDir = Directory(srcPath);
-        final bool srcExists = await srcFile.exists() || await srcDir.exists();
+        final bool srcExists = srcFile.existsSync() || srcDir.existsSync();
 
         if (!srcExists) {
           print('[Skip] $srcPath (not found)');
@@ -169,7 +168,7 @@ Future<void> uploadToProduction({
         }
 
         // Handle zip flag
-        if (artifact.zip && await srcDir.exists()) {
+        if (artifact.zip && srcDir.existsSync()) {
           await zipAndUpload(srcPath, fullDest);
         } else {
           await gscp(srcPath, fullDest);
@@ -179,15 +178,7 @@ Future<void> uploadToProduction({
         if (artifact.contentHash && contentHash != null) {
           final String contentDstPath = artifact.dst.replaceAll(r'$engine', contentHash);
           final String contentFullDest = '$bucketUri/$contentDstPath';
-          if (artifact.zip && await srcDir.exists()) {
-            // Re-upload the already created zip
-            final String tempZip = '$srcPath.zip';
-            if (await File(tempZip).exists()) {
-              await gscp(tempZip, contentFullDest);
-            }
-          } else {
-            await gscp(srcPath, contentFullDest);
-          }
+          await gscp(srcPath, contentFullDest);
         }
       }
     }
@@ -195,7 +186,7 @@ Future<void> uploadToProduction({
 
   // Upload manifest
   final String manifestFile = p.join(engineSrc, 'artifacts_manifest.yaml');
-  if (await File(manifestFile).exists()) {
+  if (File(manifestFile).existsSync()) {
     final String manifestDest = '$bucketUri/shorebird/$engineRevision/artifacts_manifest.yaml';
     await gscp(manifestFile, manifestDest);
   }

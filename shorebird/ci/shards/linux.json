@@ -1,8 +1,13 @@
 {
   "android-arm64": {
-    "gn_args": ["--android", "--android-cpu=arm64", "--runtime-mode=release"],
-    "ninja_targets": ["default", "gen_snapshot"],
-    "out_dir": "android_release_arm64",
+    "steps": [
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--android", "--android-cpu=arm64", "--runtime-mode=release"],
+        "ninja_targets": ["default", "gen_snapshot"],
+        "out_dir": "android_release_arm64"
+      }
+    ],
     "artifacts": [
       {"src": "zip_archives/android-arm64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/artifacts.zip"},
       {"src": "zip_archives/android-arm64-release/linux-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/linux-x64.zip"},
@@ -13,9 +18,14 @@
     ]
   },
   "android-arm32": {
-    "gn_args": ["--android", "--runtime-mode=release"],
-    "ninja_targets": ["default", "gen_snapshot"],
-    "out_dir": "android_release",
+    "steps": [
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--android", "--runtime-mode=release"],
+        "ninja_targets": ["default", "gen_snapshot"],
+        "out_dir": "android_release"
+      }
+    ],
     "artifacts": [
       {"src": "zip_archives/android-arm-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/artifacts.zip"},
       {"src": "zip_archives/android-arm-release/linux-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/linux-x64.zip"},
@@ -29,9 +39,14 @@
     ]
   },
   "android-x64": {
-    "gn_args": ["--android", "--android-cpu=x64", "--runtime-mode=release"],
-    "ninja_targets": ["default", "gen_snapshot"],
-    "out_dir": "android_release_x64",
+    "steps": [
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--android", "--android-cpu=x64", "--runtime-mode=release"],
+        "ninja_targets": ["default", "gen_snapshot"],
+        "out_dir": "android_release_x64"
+      }
+    ],
     "artifacts": [
       {"src": "zip_archives/android-x64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/artifacts.zip"},
       {"src": "zip_archives/android-x64-release/linux-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/linux-x64.zip"},

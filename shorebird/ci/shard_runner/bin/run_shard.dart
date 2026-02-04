@@ -12,10 +12,10 @@ import 'package:shard_runner/gcs.dart';
 /// Example:
 ///   dart run shard_runner:run_shard linux android-arm64 --engine-src ~/.engine_checkout/engine/src
 Future<void> main(List<String> args) async {
-  final parser = ArgParser();
+  final ArgParser parser = ArgParser();
   CliConfig.addCommonOptions(parser);
 
-  final results = parser.parse(args);
+  final ArgResults results = parser.parse(args);
 
   if (results['help'] as bool || results.rest.length < 2) {
     print('Usage: dart run shard_runner:run_shard <platform> <shard> [options]');
@@ -26,41 +26,39 @@ Future<void> main(List<String> args) async {
     exit(results['help'] as bool ? 0 : 1);
   }
 
-  final platform = results.rest[0];
-  final shard = results.rest[1];
-  final cli = CliConfig.fromArgs(results, scriptPath: Platform.script.toFilePath());
+  final String platform = results.rest[0];
+  final String shard = results.rest[1];
+  final CliConfig cli = CliConfig.fromArgs(results, scriptPath: Platform.script.toFilePath());
 
-  cli.printHeader('Shard Runner', {
+  cli.printHeader('Shard Runner', <String, String>{
     'Platform:': platform,
     'Shard:': shard,
     'Upload:': cli.shouldUpload.toString(),
   });
 
-  await cli.verifyEngineSrc();
+  cli.verifyEngineSrc();
 
   // Load config
   print('\n[Config] Loading $platform.json...');
-  final config = await PlatformConfig.load(platform, cli.configDir);
-  final shardDef = config.getShard(shard);
+  final PlatformConfig config = PlatformConfig.load(platform, cli.configDir);
+  final ShardDef shardDef = config.getShard(shard);
 
   print('[Config] Found ${shardDef.steps.length} step(s)');
 
-  // Track output directories for upload
-  final outDirs = <String>[];
+  // Collect output directories from GnNinja steps for upload
+  final List<String> outDirs = <String>[
+    for (final BuildStep step in shardDef.steps)
+      if (step is GnNinjaStep) step.outDir,
+  ];
 
   // Execute steps
-  final stopwatch = Stopwatch()..start();
+  final Stopwatch stopwatch = Stopwatch()..start();
 
-  for (var i = 0; i < shardDef.steps.length; i++) {
-    final step = shardDef.steps[i];
+  for (int i = 0; i < shardDef.steps.length; i++) {
+    final BuildStep step = shardDef.steps[i];
     print('\n[${'Step ${i + 1}/${shardDef.steps.length}'}] ${step.runtimeType}');
 
     await step.execute(cli.engineSrc);
-
-    // Track output directories
-    if (step is GnNinjaStep) {
-      outDirs.add(step.outDir);
-    }
   }
 
   stopwatch.stop();
@@ -79,5 +77,5 @@ Future<void> main(List<String> args) async {
 
   print('\n${'='.padRight(60, '=')}');
   print('Shard $platform/$shard completed successfully');
-  print('${'='.padRight(60, '=')}');
+  print('='.padRight(60, '='));
 }

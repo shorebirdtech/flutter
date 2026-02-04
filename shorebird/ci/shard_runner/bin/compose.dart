@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:shard_runner/cli.dart';
 import 'package:shard_runner/compose_config.dart';
 import 'package:shard_runner/gcs.dart';
+import 'package:shard_runner/process.dart';
 
 /// Composes artifacts from multiple shards into final outputs.
 ///
@@ -13,11 +14,11 @@ import 'package:shard_runner/gcs.dart';
 /// Example:
 ///   dart run shard_runner:compose ios-framework --engine-src ~/.engine_checkout/engine/src
 Future<void> main(List<String> args) async {
-  final parser = ArgParser();
+  final ArgParser parser = ArgParser();
   CliConfig.addCommonOptions(parser, includeUpload: false);
   parser.addFlag('download', defaultsTo: true, help: 'Download artifacts from GCS staging');
 
-  final results = parser.parse(args);
+  final ArgResults results = parser.parse(args);
 
   if (results['help'] as bool || results.rest.isEmpty) {
     print('Usage: dart run shard_runner:compose <compose-name> [options]');
@@ -28,11 +29,11 @@ Future<void> main(List<String> args) async {
     exit(results['help'] as bool ? 0 : 1);
   }
 
-  final composeName = results.rest[0];
-  final cli = CliConfig.fromArgs(results, scriptPath: Platform.script.toFilePath());
-  final shouldDownload = results['download'] as bool;
+  final String composeName = results.rest[0];
+  final CliConfig cli = CliConfig.fromArgs(results, scriptPath: Platform.script.toFilePath());
+  final bool shouldDownload = results['download'] as bool;
 
-  cli.printHeader('Compose Runner', {
+  cli.printHeader('Compose Runner', <String, String>{
     'Compose:': composeName,
     'Download:': shouldDownload.toString(),
   });
@@ -40,7 +41,7 @@ Future<void> main(List<String> args) async {
   // Load compose config
   final ComposeConfig config;
   try {
-    config = await ComposeConfig.load(cli.configDir);
+    config = ComposeConfig.load(cli.configDir);
   } on FileSystemException catch (e) {
     print('Error: ${e.message} at ${e.path}');
     exit(1);
@@ -58,7 +59,7 @@ Future<void> main(List<String> args) async {
 
   // Download artifacts from each required shard
   if (shouldDownload) {
-    for (final shard in composeDef.requires) {
+    for (final String shard in composeDef.requires) {
       print('\n[Download] Fetching $shard artifacts...');
       await downloadFromStaging(
         runId: cli.runId,
@@ -70,42 +71,31 @@ Future<void> main(List<String> args) async {
   }
 
   // Build script arguments
-  final outDir = p.join(cli.engineSrc, 'out', 'release');
+  final String outDir = p.join(cli.engineSrc, 'out', 'release');
 
   // Ensure output directory exists
-  await Directory(outDir).create(recursive: true);
+  Directory(outDir).createSync(recursive: true);
 
-  // Process args - expand relative paths
-  final expandedArgs = <String>['--dst', outDir];
-  for (final arg in composeDef.args) {
-    if (arg.startsWith('--') || arg.startsWith('-')) {
-      expandedArgs.add(arg);
-    } else if (!arg.startsWith('/') && !arg.startsWith('out/')) {
-      // Relative path - prefix with out/
-      expandedArgs.add(p.join(cli.engineSrc, 'out', arg));
-    } else {
-      expandedArgs.add(arg);
-    }
+  // Build script arguments: expand path_args to absolute paths, pass flags as-is.
+  final List<String> expandedArgs = <String>['--dst', outDir];
+  for (final MapEntry<String, String> entry in composeDef.pathArgs.entries) {
+    expandedArgs.addAll(<String>[entry.key, p.join(cli.engineSrc, 'out', entry.value)]);
   }
+  expandedArgs.addAll(composeDef.flags);
 
   // Run the composition script
   print('\n[Compose] Running ${composeDef.script}...');
   print('[Compose] Args: ${expandedArgs.join(' ')}');
 
-  final result = await Process.run(
+  await runChecked(
     'python3',
-    [p.join(cli.engineSrc, composeDef.script), ...expandedArgs],
+    <String>[p.join(cli.engineSrc, composeDef.script), ...expandedArgs],
     workingDirectory: cli.engineSrc,
+    description: 'Compose ($composeName)',
   );
-
-  if (result.exitCode != 0) {
-    print('STDOUT: ${result.stdout}');
-    print('STDERR: ${result.stderr}');
-    throw Exception('Compose script failed with exit code ${result.exitCode}');
-  }
 
   print('[Compose] Complete');
   print('\n${'='.padRight(60, '=')}');
   print('Compose $composeName completed successfully');
-  print('${'='.padRight(60, '=')}');
+  print('='.padRight(60, '='));
 }

@@ -1,15 +1,12 @@
 import 'dart:io';
 
 import 'package:args/args.dart';
+import 'package:meta/meta.dart';
 import 'package:path/path.dart' as p;
 
 /// Common CLI configuration used by shard runner scripts.
+@immutable
 class CliConfig {
-  final String engineSrc;
-  final String configDir;
-  final String runId;
-  final bool shouldUpload;
-
   CliConfig({
     required this.engineSrc,
     required this.configDir,
@@ -17,37 +14,19 @@ class CliConfig {
     required this.shouldUpload,
   });
 
-  /// Creates common argument parser options.
-  static void addCommonOptions(ArgParser parser, {bool includeUpload = true}) {
-    parser
-      ..addOption('engine-src', abbr: 'e', help: 'Path to engine/src directory')
-      ..addOption('config-dir', abbr: 'c', help: 'Path to config directory (shorebird/ci)')
-      ..addFlag('help', abbr: 'h', negatable: false, help: 'Show this help');
-
-    if (includeUpload) {
-      parser.addFlag('upload', defaultsTo: true, help: 'Upload artifacts to GCS staging');
-    }
-  }
-
   /// Parses common options from ArgResults.
   ///
   /// [scriptPath] should be Platform.script.toFilePath() from the calling script.
   factory CliConfig.fromArgs(ArgResults results, {required String scriptPath}) {
-    // Resolve engine path to absolute
-    final engineSrcRaw = results['engine-src'] as String? ??
-        Platform.environment['ENGINE_SRC'] ??
-        p.join(Platform.environment['HOME']!, '.engine_checkout', 'engine', 'src');
-    final engineSrc = p.canonicalize(engineSrcRaw);
+    final String engineSrc = p.canonicalize(results['engine-src'] as String);
 
     // Config directory defaults to shorebird/ci (grandparent of bin/*.dart)
-    final configDir = results['config-dir'] as String? ??
-        p.dirname(p.dirname(p.dirname(scriptPath)));
+    final String configDir =
+        results['config-dir'] as String? ?? p.dirname(p.dirname(p.dirname(scriptPath)));
 
-    final runId = Platform.environment['GITHUB_RUN_ID'] ?? 'local';
+    final String runId = results['run-id'] as String;
 
-    final shouldUpload = results.options.contains('upload')
-        ? results['upload'] as bool
-        : true;
+    final bool shouldUpload = !results.options.contains('upload') || results['upload'] as bool;
 
     return CliConfig(
       engineSrc: engineSrc,
@@ -55,6 +34,24 @@ class CliConfig {
       runId: runId,
       shouldUpload: shouldUpload,
     );
+  }
+  final String engineSrc;
+  final String configDir;
+  final String runId;
+  final bool shouldUpload;
+
+  /// Creates common argument parser options.
+  static void addCommonOptions(ArgParser parser, {bool includeUpload = true}) {
+    parser
+      ..addOption('engine-src', abbr: 'e', help: 'Path to engine/src directory', mandatory: true)
+      ..addOption('run-id',
+          help: 'Build run identifier (use "local" for local development)', mandatory: true)
+      ..addOption('config-dir', abbr: 'c', help: 'Path to config directory (shorebird/ci)')
+      ..addFlag('help', abbr: 'h', negatable: false, help: 'Show this help');
+
+    if (includeUpload) {
+      parser.addFlag('upload', defaultsTo: true, help: 'Upload artifacts to GCS staging');
+    }
   }
 
   /// Prints a standard header with configuration info.
@@ -65,15 +62,15 @@ class CliConfig {
     print('Engine:     $engineSrc');
     print('Config:     $configDir');
     print('Run ID:     $runId');
-    for (final entry in extra.entries) {
-      print('${entry.key.padRight(12)}${ entry.value}');
+    for (final MapEntry<String, String> entry in extra.entries) {
+      print('${entry.key.padRight(12)}${entry.value}');
     }
     print('='.padRight(60, '='));
   }
 
   /// Verifies that the engine source directory exists.
-  Future<void> verifyEngineSrc() async {
-    if (!await Directory(engineSrc).exists()) {
+  void verifyEngineSrc() {
+    if (!Directory(engineSrc).existsSync()) {
       print('Error: Engine source not found at $engineSrc');
       exit(1);
     }

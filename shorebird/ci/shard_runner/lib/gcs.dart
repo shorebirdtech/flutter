@@ -1,9 +1,10 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:shard_runner/process.dart';
 
 /// Staging bucket for intermediate artifacts.
-const stagingBucket = 'gs://shorebird-build-staging';
+const String stagingBucket = 'gs://shorebird-build-staging';
 
 /// Uploads shard artifacts to GCS staging bucket.
 ///
@@ -16,53 +17,46 @@ Future<void> uploadToStaging({
   required String engineSrc,
   required List<String> outDirs,
 }) async {
-  final stagingRoot = '$stagingBucket/builds/$runId/$platform/$shard';
+  final String stagingRoot = '$stagingBucket/builds/$runId/$platform/$shard';
 
   print('[GCS] Uploading to $stagingRoot');
 
-  for (final outDir in outDirs) {
-    final outPath = p.join(engineSrc, 'out', outDir);
-    if (!await Directory(outPath).exists()) {
+  for (final String outDir in outDirs) {
+    final String outPath = p.join(engineSrc, 'out', outDir);
+    if (!Directory(outPath).existsSync()) {
       print('[GCS] Skipping $outDir (not found)');
       continue;
     }
 
     // Create a tarball of the out directory
-    final tarFile = '$outDir.tar.gz';
+    final String tarFile = '$outDir.tar.gz';
     print('[GCS] Creating $tarFile...');
 
-    final tarResult = await Process.run(
+    await runChecked(
       'tar',
-      ['-czf', tarFile, '-C', p.join(engineSrc, 'out'), outDir],
+      <String>['-czf', tarFile, '-C', p.join(engineSrc, 'out'), outDir],
       workingDirectory: engineSrc,
+      description: 'tar create $tarFile',
     );
-
-    if (tarResult.exitCode != 0) {
-      print('STDERR: ${tarResult.stderr}');
-      throw Exception('tar failed with exit code ${tarResult.exitCode}');
-    }
 
     // Upload to GCS
     print('[GCS] Uploading $tarFile...');
-    final gsResult = await Process.run(
+    await runChecked(
       'gsutil',
-      ['-m', 'cp', p.join(engineSrc, tarFile), '$stagingRoot/'],
+      <String>['-m', 'cp', p.join(engineSrc, tarFile), '$stagingRoot/'],
+      description: 'gsutil upload $tarFile',
     );
 
-    if (gsResult.exitCode != 0) {
-      print('STDERR: ${gsResult.stderr}');
-      throw Exception('gsutil cp failed with exit code ${gsResult.exitCode}');
-    }
-
     // Clean up local tarball
-    await File(p.join(engineSrc, tarFile)).delete();
+    File(p.join(engineSrc, tarFile)).deleteSync();
   }
 
   // Upload status file
-  final statusFile = File(p.join(engineSrc, 'status.json'));
-  await statusFile.writeAsString('{"status": "success", "shard": "$shard"}');
-  await Process.run('gsutil', ['cp', statusFile.path, '$stagingRoot/']);
-  await statusFile.delete();
+  final File statusFile = File(p.join(engineSrc, 'status.json'));
+  statusFile.writeAsStringSync('{"status": "success", "shard": "$shard"}');
+  await runChecked('gsutil', <String>['cp', statusFile.path, '$stagingRoot/'],
+      description: 'gsutil upload status.json');
+  statusFile.deleteSync();
 
   print('[GCS] Upload complete');
 }
@@ -74,47 +68,42 @@ Future<void> downloadFromStaging({
   required String shard,
   required String destDir,
 }) async {
-  final stagingRoot = '$stagingBucket/builds/$runId/$platform/$shard';
+  final String stagingRoot = '$stagingBucket/builds/$runId/$platform/$shard';
 
   print('[GCS] Downloading from $stagingRoot');
 
   // List files in the staging location
-  final lsResult = await Process.run('gsutil', ['ls', stagingRoot]);
-  if (lsResult.exitCode != 0) {
-    throw Exception('gsutil ls failed: ${lsResult.stderr}');
-  }
+  final ProcessResult lsResult = await runChecked(
+    'gsutil',
+    <String>['ls', stagingRoot],
+    description: 'gsutil ls $stagingRoot',
+  );
 
-  final files = (lsResult.stdout as String)
-      .split('\n')
-      .where((f) => f.endsWith('.tar.gz'))
-      .toList();
+  final List<String> files =
+      (lsResult.stdout as String).split('\n').where((String f) => f.endsWith('.tar.gz')).toList();
 
-  for (final file in files) {
-    final fileName = p.basename(file);
+  for (final String file in files) {
+    final String fileName = p.basename(file);
     print('[GCS] Downloading $fileName...');
 
     // Download
-    final downloadResult = await Process.run(
+    await runChecked(
       'gsutil',
-      ['cp', file, p.join(destDir, fileName)],
+      <String>['cp', file, p.join(destDir, fileName)],
+      description: 'gsutil download $fileName',
     );
-    if (downloadResult.exitCode != 0) {
-      throw Exception('gsutil cp failed: ${downloadResult.stderr}');
-    }
 
     // Extract
     print('[GCS] Extracting $fileName...');
-    final tarResult = await Process.run(
+    await runChecked(
       'tar',
-      ['-xzf', fileName],
+      <String>['-xzf', fileName],
       workingDirectory: destDir,
+      description: 'tar extract $fileName',
     );
-    if (tarResult.exitCode != 0) {
-      throw Exception('tar extract failed: ${tarResult.stderr}');
-    }
 
     // Clean up tarball
-    await File(p.join(destDir, fileName)).delete();
+    File(p.join(destDir, fileName)).deleteSync();
   }
 
   print('[GCS] Download complete');

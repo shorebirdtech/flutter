@@ -4,20 +4,23 @@ import 'package:shard_runner/compose_config.dart';
 void main() {
   group('ComposeConfig', () {
     test('parses compose definitions', () {
-      final json = {
-        'ios-framework': {
-          'requires': ['ios-release', 'ios-sim-x64', 'ios-sim-arm64'],
+      final Map<String, dynamic> json = <String, dynamic>{
+        'ios-framework': <String, dynamic>{
+          'requires': <String>['ios-release', 'ios-sim-x64', 'ios-sim-arm64'],
           'script': 'flutter/sky/tools/create_ios_framework.py',
-          'args': ['--dsym', '--strip'],
+          'flags': <String>['--dsym', '--strip'],
+          'path_args': <String, String>{
+            '--arm64-out-dir': 'ios_release',
+          },
         },
-        'macos-framework': {
-          'requires': ['mac-arm64', 'mac-x64'],
+        'macos-framework': <String, dynamic>{
+          'requires': <String>['mac-arm64', 'mac-x64'],
           'script': 'flutter/sky/tools/create_macos_framework.py',
-          'args': ['--zip'],
+          'flags': <String>['--zip'],
         },
       };
 
-      final config = ComposeConfig.fromJson(json);
+      final ComposeConfig config = ComposeConfig.fromJson(json);
 
       expect(config.composes.length, 2);
       expect(config.composes.containsKey('ios-framework'), true);
@@ -25,23 +28,22 @@ void main() {
     });
 
     test('getCompose returns correct definition', () {
-      final json = {
-        'ios-framework': {
-          'requires': ['ios-release'],
+      final Map<String, dynamic> json = <String, dynamic>{
+        'ios-framework': <String, dynamic>{
+          'requires': <String>['ios-release'],
           'script': 'create_ios_framework.py',
-          'args': [],
         },
       };
 
-      final config = ComposeConfig.fromJson(json);
-      final compose = config.getCompose('ios-framework');
+      final ComposeConfig config = ComposeConfig.fromJson(json);
+      final ComposeDef compose = config.getCompose('ios-framework');
 
-      expect(compose.requires, ['ios-release']);
+      expect(compose.requires, <String>['ios-release']);
       expect(compose.script, 'create_ios_framework.py');
     });
 
     test('getCompose throws for unknown name', () {
-      final config = ComposeConfig(composes: {});
+      final ComposeConfig config = ComposeConfig(composes: <String, ComposeDef>{});
 
       expect(
         () => config.getCompose('nonexistent'),
@@ -52,34 +54,42 @@ void main() {
 
   group('ComposeDef', () {
     test('parses all fields', () {
-      final json = {
-        'requires': ['shard-a', 'shard-b', 'shard-c'],
+      final Map<String, dynamic> json = <String, dynamic>{
+        'requires': <String>['shard-a', 'shard-b'],
         'script': 'path/to/script.py',
-        'args': ['--flag1', 'value1', '--flag2'],
+        'flags': <String>['--dsym', '--strip'],
+        'path_args': <String, String>{
+          '--arm64-out-dir': 'ios_release',
+          '--x64-out-dir': 'ios_debug_sim',
+        },
       };
 
-      final compose = ComposeDef.fromJson(json);
+      final ComposeDef compose = ComposeDef.fromJson(json);
 
-      expect(compose.requires, ['shard-a', 'shard-b', 'shard-c']);
+      expect(compose.requires, <String>['shard-a', 'shard-b']);
       expect(compose.script, 'path/to/script.py');
-      expect(compose.args, ['--flag1', 'value1', '--flag2']);
+      expect(compose.flags, <String>['--dsym', '--strip']);
+      expect(compose.pathArgs, <String, String>{
+        '--arm64-out-dir': 'ios_release',
+        '--x64-out-dir': 'ios_debug_sim',
+      });
     });
 
-    test('defaults args to empty list', () {
-      final json = {
-        'requires': ['shard-a'],
+    test('defaults flags and path_args when missing', () {
+      final Map<String, dynamic> json = <String, dynamic>{
+        'requires': <String>['shard-a'],
         'script': 'script.py',
       };
 
-      final compose = ComposeDef.fromJson(json);
+      final ComposeDef compose = ComposeDef.fromJson(json);
 
-      expect(compose.args, isEmpty);
+      expect(compose.flags, isEmpty);
+      expect(compose.pathArgs, isEmpty);
     });
 
     test('parses ios-framework config correctly', () {
-      // Test with actual config structure
-      final json = {
-        'requires': [
+      final Map<String, dynamic> json = <String, dynamic>{
+        'requires': <String>[
           'ios-release',
           'ios-release-ext',
           'ios-sim-x64',
@@ -88,22 +98,21 @@ void main() {
           'ios-sim-arm64-ext',
         ],
         'script': 'flutter/sky/tools/create_ios_framework.py',
-        'args': [
-          '--arm64-out-dir', 'ios_release',
-          '--simulator-x64-out-dir', 'ios_debug_sim',
-          '--simulator-arm64-out-dir', 'ios_debug_sim_arm64',
-          '--dsym',
-          '--strip',
-        ],
+        'flags': <String>['--dsym', '--strip'],
+        'path_args': <String, String>{
+          '--arm64-out-dir': 'ios_release',
+          '--simulator-x64-out-dir': 'ios_debug_sim',
+          '--simulator-arm64-out-dir': 'ios_debug_sim_arm64',
+        },
       };
 
-      final compose = ComposeDef.fromJson(json);
+      final ComposeDef compose = ComposeDef.fromJson(json);
 
       expect(compose.requires.length, 6);
       expect(compose.script, 'flutter/sky/tools/create_ios_framework.py');
-      expect(compose.args, contains('--dsym'));
-      expect(compose.args, contains('--strip'));
-      expect(compose.args, contains('--arm64-out-dir'));
+      expect(compose.flags, <String>['--dsym', '--strip']);
+      expect(compose.pathArgs.keys, contains('--arm64-out-dir'));
+      expect(compose.pathArgs['--arm64-out-dir'], 'ios_release');
     });
   });
 }

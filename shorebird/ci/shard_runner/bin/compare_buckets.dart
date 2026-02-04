@@ -14,21 +14,18 @@ import 'package:shard_runner/config.dart';
 ///     --test-bucket shorebird-build-test \
 ///     --production-bucket download.shorebird.dev
 Future<void> main(List<String> args) async {
-  final parser = ArgParser()
-    ..addOption('engine-revision',
-        abbr: 'r', help: 'Engine revision (git hash)', mandatory: true)
-    ..addOption('test-bucket',
-        abbr: 't', help: 'Test bucket to compare', mandatory: true)
+  final ArgParser parser = ArgParser()
+    ..addOption('engine-revision', abbr: 'r', help: 'Engine revision (git hash)', mandatory: true)
+    ..addOption('test-bucket', abbr: 't', help: 'Test bucket to compare', mandatory: true)
     ..addOption('production-bucket',
         abbr: 'p',
         help: 'Production bucket (default: download.shorebird.dev)',
         defaultsTo: 'download.shorebird.dev')
-    ..addOption('config-dir',
-        abbr: 'c', help: 'Config directory containing shards/*.json')
+    ..addOption('config-dir', abbr: 'c', help: 'Config directory containing shards/*.json')
     ..addFlag('verbose', abbr: 'v', help: 'Show detailed output')
     ..addFlag('help', abbr: 'h', negatable: false, help: 'Show this help');
 
-  final results = parser.parse(args);
+  final ArgResults results = parser.parse(args);
 
   if (results['help'] as bool) {
     print('Usage: dart run shard_runner:compare_buckets [options]');
@@ -40,15 +37,15 @@ Future<void> main(List<String> args) async {
     exit(0);
   }
 
-  final engineRevision = results['engine-revision'] as String;
-  final testBucket = results['test-bucket'] as String;
-  final productionBucket = results['production-bucket'] as String;
-  final configDirPath = results['config-dir'] as String?;
-  final verbose = results['verbose'] as bool;
+  final String engineRevision = results['engine-revision'] as String;
+  final String testBucket = results['test-bucket'] as String;
+  final String productionBucket = results['production-bucket'] as String;
+  final String? configDirPath = results['config-dir'] as String?;
+  final bool verbose = results['verbose'] as bool;
 
   // Find config directory
-  final configDir = configDirPath ??
-      p.join(p.dirname(p.dirname(Platform.script.toFilePath())), 'shards');
+  final String configDir =
+      configDirPath ?? p.join(p.dirname(p.dirname(Platform.script.toFilePath())), 'shards');
 
   print('=' * 60);
   print('Compare Buckets');
@@ -60,18 +57,18 @@ Future<void> main(List<String> args) async {
   print('');
 
   // Load configs to get artifact paths
-  const platforms = ['linux', 'macos', 'windows'];
-  final configs = <String, PlatformConfig>{};
-  for (final platform in platforms) {
+  const List<String> platforms = <String>['linux', 'macos', 'windows'];
+  final Map<String, PlatformConfig> configs = <String, PlatformConfig>{};
+  for (final String platform in platforms) {
     configs[platform] = await PlatformConfig.load(platform, configDir);
   }
 
   // Collect all artifact paths
-  final artifacts = <String>[];
-  for (final config in configs.values) {
-    for (final shard in config.shards.values) {
-      for (final artifact in shard.artifacts) {
-        final dstPath = artifact.dst.replaceAll(r'$engine', engineRevision);
+  final List<String> artifacts = <String>[];
+  for (final PlatformConfig config in configs.values) {
+    for (final ShardDef shard in config.shards.values) {
+      for (final ArtifactDef artifact in shard.artifacts) {
+        final String dstPath = artifact.dst.replaceAll(r'$engine', engineRevision);
         artifacts.add(dstPath);
       }
     }
@@ -82,16 +79,16 @@ Future<void> main(List<String> args) async {
 
   print('Comparing ${artifacts.length} artifacts...\n');
 
-  var matches = 0;
-  var mismatches = 0;
-  var missing = 0;
+  int matches = 0;
+  int mismatches = 0;
+  int missing = 0;
 
-  for (final artifact in artifacts) {
-    final testUri = 'gs://$testBucket/$artifact';
-    final prodUri = 'gs://$productionBucket/$artifact';
+  for (final String artifact in artifacts) {
+    final String testUri = 'gs://$testBucket/$artifact';
+    final String prodUri = 'gs://$productionBucket/$artifact';
 
     // Get hash from test bucket
-    final testHash = await _getHash(testUri);
+    final String? testHash = await _getHash(testUri);
     if (testHash == null) {
       if (verbose) print('[MISSING] $artifact (not in test bucket)');
       missing++;
@@ -99,7 +96,7 @@ Future<void> main(List<String> args) async {
     }
 
     // Get hash from production bucket
-    final prodHash = await _getHash(prodUri);
+    final String? prodHash = await _getHash(prodUri);
     if (prodHash == null) {
       if (verbose) print('[MISSING] $artifact (not in production bucket)');
       missing++;
@@ -139,7 +136,7 @@ Future<void> main(List<String> args) async {
 
 /// Gets the MD5 hash of a GCS object using gsutil hash.
 Future<String?> _getHash(String uri) async {
-  final result = await Process.run('gsutil', ['hash', uri]);
+  final ProcessResult result = await Process.run('gsutil', <String>['hash', uri]);
   if (result.exitCode != 0) {
     return null;
   }
@@ -149,7 +146,7 @@ Future<String?> _getHash(String uri) async {
   // Hashes [hex] for gs://bucket/path:
   //     Hash (crc32c):      abc123==
   //     Hash (md5):         xyz789==
-  final output = result.stdout as String;
-  final md5Match = RegExp(r'Hash \(md5\):\s+(\S+)').firstMatch(output);
+  final String output = result.stdout as String;
+  final RegExpMatch? md5Match = RegExp(r'Hash \(md5\):\s+(\S+)').firstMatch(output);
   return md5Match?.group(1);
 }

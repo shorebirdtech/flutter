@@ -3,12 +3,17 @@ import 'package:shard_runner/config.dart';
 
 void main() {
   group('PlatformConfig', () {
-    test('parses simple single-step shard', () {
+    test('parses single-step shard', () {
       final json = {
         'android-arm64': {
-          'gn_args': ['--android', '--android-cpu=arm64', '--runtime-mode=release'],
-          'ninja_targets': ['default', 'gen_snapshot'],
-          'out_dir': 'android_release_arm64',
+          'steps': [
+            {
+              'type': 'gn_ninja',
+              'gn_args': ['--android', '--android-cpu=arm64', '--runtime-mode=release'],
+              'ninja_targets': ['default', 'gen_snapshot'],
+              'out_dir': 'android_release_arm64',
+            },
+          ],
         },
       };
 
@@ -31,9 +36,14 @@ void main() {
     test('parses shard with artifacts', () {
       final json = {
         'android-arm64': {
-          'gn_args': ['--android'],
-          'ninja_targets': ['default'],
-          'out_dir': 'android_release_arm64',
+          'steps': [
+            {
+              'type': 'gn_ninja',
+              'gn_args': ['--android'],
+              'ninja_targets': ['default'],
+              'out_dir': 'android_release_arm64',
+            },
+          ],
           'artifacts': [
             {'src': 'zip_archives/artifacts.zip', 'dst': 'flutter_infra/\$engine/artifacts.zip'},
             {'src': 'maven.pom', 'dst': 'maven/\$engine/maven.pom'},
@@ -85,9 +95,14 @@ void main() {
     test('parses compose_input', () {
       final json = {
         'ios-release': {
-          'gn_args': ['--ios', '--runtime-mode=release'],
-          'ninja_targets': ['flutter_framework'],
-          'out_dir': 'ios_release',
+          'steps': [
+            {
+              'type': 'gn_ninja',
+              'gn_args': ['--ios', '--runtime-mode=release'],
+              'ninja_targets': ['flutter_framework'],
+              'out_dir': 'ios_release',
+            },
+          ],
           'compose_input': 'ios-framework',
         },
       };
