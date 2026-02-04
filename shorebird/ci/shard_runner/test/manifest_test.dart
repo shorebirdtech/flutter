@@ -1,10 +1,17 @@
+import 'dart:io';
+
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:shard_runner/manifest.dart';
 
 void main() {
   group('generateManifest', () {
+    // Path to the ci/ directory where the template lives
+    // Tests run from shard_runner/, so go up one level to ci/
+    final String configDir = p.normalize(p.join(Directory.current.path, '..'));
+
     test('generates valid YAML structure', () {
-      final manifest = generateManifest('abc123def456');
+      final manifest = generateManifest('abc123def456', configDir: configDir);
 
       expect(manifest, contains('flutter_engine_revision: abc123def456'));
       expect(manifest, contains('storage_bucket: download.shorebird.dev'));
@@ -12,7 +19,7 @@ void main() {
     });
 
     test('includes Android release artifacts', () {
-      final manifest = generateManifest('test-hash');
+      final manifest = generateManifest('test-hash', configDir: configDir);
 
       // Android arm64
       expect(manifest, contains(r'flutter_infra_release/flutter/$engine/android-arm64-release/artifacts.zip'));
@@ -29,7 +36,7 @@ void main() {
     });
 
     test('includes Dart SDK for all platforms', () {
-      final manifest = generateManifest('test-hash');
+      final manifest = generateManifest('test-hash', configDir: configDir);
 
       expect(manifest, contains(r'flutter_infra_release/flutter/$engine/dart-sdk-darwin-arm64.zip'));
       expect(manifest, contains(r'flutter_infra_release/flutter/$engine/dart-sdk-darwin-x64.zip'));
@@ -38,7 +45,7 @@ void main() {
     });
 
     test('includes Maven artifacts', () {
-      final manifest = generateManifest('test-hash');
+      final manifest = generateManifest('test-hash', configDir: configDir);
 
       // flutter_embedding_release
       expect(manifest, contains(r'download.flutter.io/io/flutter/flutter_embedding_release/1.0.0-$engine/flutter_embedding_release-1.0.0-$engine.pom'));
@@ -56,21 +63,21 @@ void main() {
     });
 
     test('includes iOS release artifacts', () {
-      final manifest = generateManifest('test-hash');
+      final manifest = generateManifest('test-hash', configDir: configDir);
 
       expect(manifest, contains(r'flutter_infra_release/flutter/$engine/ios-release/artifacts.zip'));
       expect(manifest, contains(r'flutter_infra_release/flutter/$engine/ios-release/Flutter.dSYM.zip'));
     });
 
     test('includes Linux release artifacts', () {
-      final manifest = generateManifest('test-hash');
+      final manifest = generateManifest('test-hash', configDir: configDir);
 
       expect(manifest, contains(r'flutter_infra_release/flutter/$engine/linux-x64/artifacts.zip'));
       expect(manifest, contains(r'flutter_infra_release/flutter/$engine/linux-x64-release/linux-x64-flutter-gtk.zip'));
     });
 
     test('includes macOS release artifacts', () {
-      final manifest = generateManifest('test-hash');
+      final manifest = generateManifest('test-hash', configDir: configDir);
 
       expect(manifest, contains(r'flutter_infra_release/flutter/$engine/darwin-x64-release/artifacts.zip'));
       expect(manifest, contains(r'flutter_infra_release/flutter/$engine/darwin-x64-release/framework.zip'));
@@ -78,26 +85,26 @@ void main() {
     });
 
     test('includes Windows release artifacts', () {
-      final manifest = generateManifest('test-hash');
+      final manifest = generateManifest('test-hash', configDir: configDir);
 
       expect(manifest, contains(r'flutter_infra_release/flutter/$engine/windows-x64/artifacts.zip'));
       expect(manifest, contains(r'flutter_infra_release/flutter/$engine/windows-x64-release/windows-x64-flutter.zip'));
     });
 
     test('includes engine_stamp.json', () {
-      final manifest = generateManifest('test-hash');
+      final manifest = generateManifest('test-hash', configDir: configDir);
 
       expect(manifest, contains(r'flutter_infra_release/flutter/$engine/engine_stamp.json'));
     });
 
     test('includes flutter_patched_sdk_product', () {
-      final manifest = generateManifest('test-hash');
+      final manifest = generateManifest('test-hash', configDir: configDir);
 
       expect(manifest, contains(r'flutter_infra_release/flutter/$engine/flutter_patched_sdk_product.zip'));
     });
 
     test('uses \$engine placeholder (not hardcoded hash)', () {
-      final manifest = generateManifest('abc123');
+      final manifest = generateManifest('abc123', configDir: configDir);
 
       // The flutter_engine_revision should use the actual hash
       expect(manifest, contains('flutter_engine_revision: abc123'));
@@ -106,6 +113,13 @@ void main() {
       expect(manifest, contains(r'$engine'));
       // Should NOT contain the actual hash in artifact paths
       expect(manifest.split('flutter_engine_revision:')[1], isNot(contains('abc123/')));
+    });
+
+    test('throws when template file not found', () {
+      expect(
+        () => generateManifest('test-hash', configDir: '/nonexistent'),
+        throwsA(isA<ArgumentError>()),
+      );
     });
   });
 }

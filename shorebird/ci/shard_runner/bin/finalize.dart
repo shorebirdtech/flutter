@@ -14,25 +14,21 @@ import 'package:shard_runner/manifest.dart';
 /// Example:
 ///   dart run shard_runner:finalize --engine-revision abc123
 Future<void> main(List<String> args) async {
-  final parser = ArgParser()
-    ..addOption('engine-revision',
-        abbr: 'r', help: 'Engine revision (git hash)', mandatory: true)
-    ..addOption('base-engine-revision',
-        help: 'Base Flutter engine revision for manifest')
+  final ArgParser parser = ArgParser()
+    ..addOption('engine-revision', abbr: 'r', help: 'Engine revision (git hash)', mandatory: true)
+    ..addOption('base-engine-revision', help: 'Base Flutter engine revision for manifest')
     ..addOption('content-hash', help: 'Content-aware hash for Dart SDK')
     ..addOption('bucket',
         abbr: 'b',
         help: 'GCS bucket for uploads (default: download.shorebird.dev)',
         defaultsTo: 'download.shorebird.dev')
-    ..addFlag('download',
-        defaultsTo: true, help: 'Download artifacts from GCS staging')
-    ..addFlag('upload',
-        defaultsTo: true, help: 'Upload artifacts to GCS bucket')
+    ..addFlag('download', defaultsTo: true, help: 'Download artifacts from GCS staging')
+    ..addFlag('upload', defaultsTo: true, help: 'Upload artifacts to GCS bucket')
     ..addFlag('help', abbr: 'h', negatable: false, help: 'Show this help');
 
   CliConfig.addCommonOptions(parser, includeUpload: false);
 
-  final results = parser.parse(args);
+  final ArgResults results = parser.parse(args);
 
   if (results['help'] as bool) {
     print('Usage: dart run shard_runner:finalize [options]');
@@ -41,15 +37,15 @@ Future<void> main(List<String> args) async {
     exit(0);
   }
 
-  final cli = CliConfig.fromArgs(results, scriptPath: Platform.script.toFilePath());
-  final engineRevision = results['engine-revision'] as String;
-  final baseEngineRevision = results['base-engine-revision'] as String? ?? engineRevision;
-  final contentHash = results['content-hash'] as String?;
-  final bucket = results['bucket'] as String;
-  final shouldDownload = results['download'] as bool;
-  final shouldUpload = results['upload'] as bool;
+  final CliConfig cli = CliConfig.fromArgs(results, scriptPath: Platform.script.toFilePath());
+  final String engineRevision = results['engine-revision'] as String;
+  final String baseEngineRevision = results['base-engine-revision'] as String? ?? engineRevision;
+  final String? contentHash = results['content-hash'] as String?;
+  final String bucket = results['bucket'] as String;
+  final bool shouldDownload = results['download'] as bool;
+  final bool shouldUpload = results['upload'] as bool;
 
-  cli.printHeader('Finalize Build', {
+  cli.printHeader('Finalize Build', <String, String>{
     'Engine:': engineRevision,
     'Base Engine:': baseEngineRevision,
     'Bucket:': bucket,
@@ -58,20 +54,20 @@ Future<void> main(List<String> args) async {
   });
 
   // Load shard configs for each platform
-  const platforms = ['linux', 'macos', 'windows'];
-  final configs = <String, PlatformConfig>{};
-  for (final platform in platforms) {
+  const List<String> platforms = <String>['linux', 'macos', 'windows'];
+  final Map<String, PlatformConfig> configs = <String, PlatformConfig>{};
+  for (final String platform in platforms) {
     configs[platform] = await PlatformConfig.load(platform, cli.configDir);
   }
 
   // Download all artifacts from staging
   if (shouldDownload) {
-    final outDir = p.join(cli.engineSrc, 'out');
+    final String outDir = p.join(cli.engineSrc, 'out');
     await Directory(outDir).create(recursive: true);
 
-    for (final platform in platforms) {
-      final config = configs[platform]!;
-      for (final shardName in config.shards.keys) {
+    for (final String platform in platforms) {
+      final PlatformConfig config = configs[platform]!;
+      for (final String shardName in config.shards.keys) {
         print('\n[Download] Fetching $platform/$shardName...');
         try {
           await downloadFromStaging(
@@ -90,9 +86,9 @@ Future<void> main(List<String> args) async {
 
   // Generate manifest
   print('\n[Manifest] Generating artifacts_manifest.yaml...');
-  final manifest = generateManifest(baseEngineRevision);
-  final manifestFile = File(p.join(cli.engineSrc, 'artifacts_manifest.yaml'));
-  await manifestFile.writeAsString(manifest);
+  final String manifest = generateManifest(baseEngineRevision, configDir: cli.configDir);
+  final File manifestFile = File(p.join(cli.engineSrc, 'artifacts_manifest.yaml'));
+  manifestFile.writeAsStringSync(manifest);
   print('[Manifest] Written to ${manifestFile.path}');
 
   // Upload to production
@@ -113,7 +109,7 @@ Future<void> main(List<String> args) async {
 }
 
 /// Production storage bucket name (without gs:// prefix).
-const productionBucket = 'download.shorebird.dev';
+const String productionBucket = 'download.shorebird.dev';
 
 /// Uploads artifacts to a GCS bucket based on config definitions.
 Future<void> uploadToProduction({
@@ -123,13 +119,13 @@ Future<void> uploadToProduction({
   required Map<String, PlatformConfig> configs,
   required String bucket,
 }) async {
-  final outDir = p.join(engineSrc, 'out');
-  final bucketUri = 'gs://$bucket';
+  final String outDir = p.join(engineSrc, 'out');
+  final String bucketUri = 'gs://$bucket';
 
   // Helper to run gsutil cp
   Future<void> gscp(String src, String dest) async {
     print('[Upload] $src -> $dest');
-    final result = await Process.run('gsutil', ['cp', src, dest]);
+    final ProcessResult result = await Process.run('gsutil', <String>['cp', src, dest]);
     if (result.exitCode != 0) {
       print('[Warning] gsutil cp failed: ${result.stderr}');
     }
@@ -137,10 +133,10 @@ Future<void> uploadToProduction({
 
   // Helper to zip a directory and upload
   Future<void> zipAndUpload(String srcPath, String dest) async {
-    final tempZip = '$srcPath.zip';
+    final String tempZip = '$srcPath.zip';
     print('[Zip] Creating $tempZip...');
-    final zipResult = await Process.run('zip', ['-r', tempZip, '.'],
-        workingDirectory: srcPath);
+    final ProcessResult zipResult =
+        await Process.run('zip', <String>['-r', tempZip, '.'], workingDirectory: srcPath);
     if (zipResult.exitCode != 0) {
       print('[Warning] zip failed: ${zipResult.stderr}');
       return;
@@ -150,28 +146,28 @@ Future<void> uploadToProduction({
   }
 
   // Process artifacts from all configs
-  for (final entry in configs.entries) {
-    final platform = entry.key;
-    final config = entry.value;
+  for (final MapEntry<String, PlatformConfig> entry in configs.entries) {
+    final String platform = entry.key;
+    final PlatformConfig config = entry.value;
 
-    for (final shardEntry in config.shards.entries) {
-      final shardName = shardEntry.key;
-      final shard = shardEntry.value;
+    for (final MapEntry<String, ShardDef> shardEntry in config.shards.entries) {
+      final String shardName = shardEntry.key;
+      final ShardDef shard = shardEntry.value;
 
       print('\n[Upload] Processing $platform/$shardName...');
 
-      for (final artifact in shard.artifacts) {
+      for (final ArtifactDef artifact in shard.artifacts) {
         // Resolve source path
-        final srcPath = p.join(outDir, artifact.src);
+        final String srcPath = p.join(outDir, artifact.src);
 
         // Resolve destination path (replace $engine with actual revision)
-        final dstPath = artifact.dst.replaceAll(r'$engine', engineRevision);
-        final fullDest = '$bucketUri/$dstPath';
+        final String dstPath = artifact.dst.replaceAll(r'$engine', engineRevision);
+        final String fullDest = '$bucketUri/$dstPath';
 
         // Check if source exists
-        final srcFile = File(srcPath);
-        final srcDir = Directory(srcPath);
-        final srcExists = await srcFile.exists() || await srcDir.exists();
+        final File srcFile = File(srcPath);
+        final Directory srcDir = Directory(srcPath);
+        final bool srcExists = await srcFile.exists() || await srcDir.exists();
 
         if (!srcExists) {
           print('[Skip] $srcPath (not found)');
@@ -187,11 +183,11 @@ Future<void> uploadToProduction({
 
         // Handle content-hash uploads (for Dart SDK)
         if (artifact.contentHash && contentHash != null) {
-          final contentDstPath = artifact.dst.replaceAll(r'$engine', contentHash);
-          final contentFullDest = '$bucketUri/$contentDstPath';
+          final String contentDstPath = artifact.dst.replaceAll(r'$engine', contentHash);
+          final String contentFullDest = '$bucketUri/$contentDstPath';
           if (artifact.zip && await srcDir.exists()) {
             // Re-upload the already created zip
-            final tempZip = '$srcPath.zip';
+            final String tempZip = '$srcPath.zip';
             if (await File(tempZip).exists()) {
               await gscp(tempZip, contentFullDest);
             }
@@ -204,9 +200,9 @@ Future<void> uploadToProduction({
   }
 
   // Upload manifest
-  final manifestFile = p.join(engineSrc, 'artifacts_manifest.yaml');
+  final String manifestFile = p.join(engineSrc, 'artifacts_manifest.yaml');
   if (await File(manifestFile).exists()) {
-    final manifestDest = '$bucketUri/shorebird/$engineRevision/artifacts_manifest.yaml';
+    final String manifestDest = '$bucketUri/shorebird/$engineRevision/artifacts_manifest.yaml';
     await gscp(manifestFile, manifestDest);
   }
 
