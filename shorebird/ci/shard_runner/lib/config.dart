@@ -177,23 +177,44 @@ Future<void> _runNinja(String engineSrc, String outDir, List<String> targets) as
 Future<void> _runRust(String engineSrc, List<String> targets) async {
   final updaterPath = p.join(engineSrc, 'flutter', 'third_party', 'updater', 'library');
 
-  for (final target in targets) {
-    print('[Rust] Building for target: $target');
+  // Separate Android and non-Android targets
+  final androidTargets = targets.where((t) => t.contains('android')).toList();
+  final otherTargets = targets.where((t) => !t.contains('android')).toList();
 
-    List<String> args;
-    if (target.contains('android')) {
-      // Use cargo-ndk for Android targets
-      args = ['ndk', '-t', _androidArch(target), '-o', '.', 'build', '--release'];
-    } else {
-      // Regular cargo build
-      args = ['build', '--release', '--target', target];
+  // Build all Android targets together with cargo-ndk
+  if (androidTargets.isNotEmpty) {
+    print('[Rust] Building Android targets: ${androidTargets.join(', ')}');
+
+    final args = ['ndk'];
+    for (final target in androidTargets) {
+      args.addAll(['--target', target]);
     }
+    args.addAll(['build', '--release']);
 
     final result = await Process.run(
       'cargo',
       args,
       workingDirectory: updaterPath,
-      environment: {'CARGO_TARGET_DIR': p.join(updaterPath, 'target')},
+      environment: {
+        'ANDROID_NDK_HOME': p.join(engineSrc, 'flutter', 'third_party', 'android_tools', 'ndk'),
+      },
+    );
+
+    if (result.exitCode != 0) {
+      print('STDOUT: ${result.stdout}');
+      print('STDERR: ${result.stderr}');
+      throw Exception('Cargo ndk failed with exit code ${result.exitCode}');
+    }
+  }
+
+  // Build non-Android targets individually
+  for (final target in otherTargets) {
+    print('[Rust] Building for target: $target');
+
+    final result = await Process.run(
+      'cargo',
+      ['build', '--release', '--target', target],
+      workingDirectory: updaterPath,
     );
 
     if (result.exitCode != 0) {
@@ -202,15 +223,6 @@ Future<void> _runRust(String engineSrc, List<String> targets) async {
       throw Exception('Cargo failed with exit code ${result.exitCode}');
     }
   }
-  print('[Rust] Complete');
-}
 
-String _androidArch(String target) {
-  return switch (target) {
-    'aarch64-linux-android' => 'arm64-v8a',
-    'armv7-linux-androideabi' => 'armeabi-v7a',
-    'x86_64-linux-android' => 'x86_64',
-    'i686-linux-android' => 'x86',
-    _ => throw ArgumentError('Unknown Android target: $target'),
-  };
+  print('[Rust] Complete');
 }
