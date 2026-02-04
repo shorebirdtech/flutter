@@ -13,7 +13,8 @@ class PlatformConfig {
   factory PlatformConfig.fromJson(Map<String, dynamic> json) {
     return PlatformConfig(
       shards: json.map(
-        (String key, value) => MapEntry(key, ShardDef.fromJson(value as Map<String, dynamic>)),
+        (String key, value) =>
+            MapEntry(key, ShardDef.fromJson(value as Map<String, dynamic>)),
       ),
     );
   }
@@ -22,7 +23,8 @@ class PlatformConfig {
   ShardDef getShard(String name) {
     final ShardDef? shard = shards[name];
     if (shard == null) {
-      throw ArgumentError('Unknown shard: $name. Available: ${shards.keys.join(', ')}');
+      throw ArgumentError(
+          'Unknown shard: $name. Available: ${shards.keys.join(', ')}');
     }
     return shard;
   }
@@ -33,7 +35,8 @@ class PlatformConfig {
       throw FileSystemException('Config file not found', file.path);
     }
     final String content = file.readAsStringSync();
-    final Map<String, dynamic> json = jsonDecode(content) as Map<String, dynamic>;
+    final Map<String, dynamic> json =
+        jsonDecode(content) as Map<String, dynamic>;
     return PlatformConfig.fromJson(json);
   }
 }
@@ -41,7 +44,10 @@ class PlatformConfig {
 /// Definition of a single build shard.
 @immutable
 class ShardDef {
-  ShardDef({required this.steps, this.composeInput, this.artifacts = const <ArtifactDef>[]});
+  ShardDef(
+      {required this.steps,
+      this.composeInput,
+      this.artifacts = const <ArtifactDef>[]});
 
   factory ShardDef.fromJson(Map<String, dynamic> json) {
     final List<BuildStep> steps = (json['steps'] as List)
@@ -182,7 +188,8 @@ Future<void> _runGn(String engineSrc, List<String> args, String outDir) async {
   print('[GN] Complete');
 }
 
-Future<void> _runNinja(String engineSrc, String outDir, List<String> targets) async {
+Future<void> _runNinja(
+    String engineSrc, String outDir, List<String> targets) async {
   print('[Ninja] Building ${targets.join(' ')} in out/$outDir');
   await runChecked(
     'ninja',
@@ -198,11 +205,14 @@ Future<void> _runNinja(String engineSrc, String outDir, List<String> targets) as
 }
 
 Future<void> _runRust(String engineSrc, List<String> targets) async {
-  final String updaterPath = p.join(engineSrc, 'flutter', 'third_party', 'updater', 'library');
+  final String updaterPath =
+      p.join(engineSrc, 'flutter', 'third_party', 'updater', 'library');
 
   // Separate Android and non-Android targets
-  final List<String> androidTargets = targets.where((String t) => t.contains('android')).toList();
-  final List<String> otherTargets = targets.where((String t) => !t.contains('android')).toList();
+  final List<String> androidTargets =
+      targets.where((String t) => t.contains('android')).toList();
+  final List<String> otherTargets =
+      targets.where((String t) => !t.contains('android')).toList();
 
   // Build all Android targets together with cargo-ndk
   if (androidTargets.isNotEmpty) {
@@ -219,7 +229,8 @@ Future<void> _runRust(String engineSrc, List<String> targets) async {
       args,
       workingDirectory: updaterPath,
       environment: <String, String>{
-        'ANDROID_NDK_HOME': p.join(engineSrc, 'flutter', 'third_party', 'android_tools', 'ndk'),
+        'ANDROID_NDK_HOME':
+            p.join(engineSrc, 'flutter', 'third_party', 'android_tools', 'ndk'),
       },
       description: 'Cargo ndk (${androidTargets.join(', ')})',
     );

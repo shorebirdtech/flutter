@@ -15,13 +15,16 @@ import 'package:shard_runner/config.dart';
 ///     --production-bucket download.shorebird.dev
 Future<void> main(List<String> args) async {
   final ArgParser parser = ArgParser()
-    ..addOption('engine-revision', abbr: 'r', help: 'Engine revision (git hash)', mandatory: true)
-    ..addOption('test-bucket', abbr: 't', help: 'Test bucket to compare', mandatory: true)
+    ..addOption('engine-revision',
+        abbr: 'r', help: 'Engine revision (git hash)', mandatory: true)
+    ..addOption('test-bucket',
+        abbr: 't', help: 'Test bucket to compare', mandatory: true)
     ..addOption('production-bucket',
         abbr: 'p',
         help: 'Production bucket (default: download.shorebird.dev)',
         defaultsTo: 'download.shorebird.dev')
-    ..addOption('config-dir', abbr: 'c', help: 'Config directory containing shards/*.json')
+    ..addOption('config-dir',
+        abbr: 'c', help: 'Config directory containing shards/*.json')
     ..addFlag('verbose', abbr: 'v', help: 'Show detailed output')
     ..addFlag('help', abbr: 'h', negatable: false, help: 'Show this help');
 
@@ -44,8 +47,8 @@ Future<void> main(List<String> args) async {
   final bool verbose = results['verbose'] as bool;
 
   // Find config directory
-  final String configDir =
-      configDirPath ?? p.join(p.dirname(p.dirname(Platform.script.toFilePath())), 'shards');
+  final String configDir = configDirPath ??
+      p.join(p.dirname(p.dirname(Platform.script.toFilePath())), 'shards');
 
   print('=' * 60);
   print('Compare Buckets');
@@ -60,7 +63,7 @@ Future<void> main(List<String> args) async {
   const List<String> platforms = <String>['linux', 'macos', 'windows'];
   final Map<String, PlatformConfig> configs = <String, PlatformConfig>{};
   for (final String platform in platforms) {
-    configs[platform] = await PlatformConfig.load(platform, configDir);
+    configs[platform] = PlatformConfig.load(platform, configDir);
   }
 
   // Collect all artifact paths
@@ -68,7 +71,8 @@ Future<void> main(List<String> args) async {
   for (final PlatformConfig config in configs.values) {
     for (final ShardDef shard in config.shards.values) {
       for (final ArtifactDef artifact in shard.artifacts) {
-        final String dstPath = artifact.dst.replaceAll(r'$engine', engineRevision);
+        final String dstPath =
+            artifact.dst.replaceAll(r'$engine', engineRevision);
         artifacts.add(dstPath);
       }
     }
@@ -136,7 +140,8 @@ Future<void> main(List<String> args) async {
 
 /// Gets the MD5 hash of a GCS object using gsutil hash.
 Future<String?> _getHash(String uri) async {
-  final ProcessResult result = await Process.run('gsutil', <String>['hash', uri]);
+  final ProcessResult result =
+      await Process.run('gsutil', <String>['hash', uri]);
   if (result.exitCode != 0) {
     return null;
   }
@@ -147,6 +152,7 @@ Future<String?> _getHash(String uri) async {
   //     Hash (crc32c):      abc123==
   //     Hash (md5):         xyz789==
   final String output = result.stdout as String;
-  final RegExpMatch? md5Match = RegExp(r'Hash \(md5\):\s+(\S+)').firstMatch(output);
+  final RegExpMatch? md5Match =
+      RegExp(r'Hash \(md5\):\s+(\S+)').firstMatch(output);
   return md5Match?.group(1);
 }

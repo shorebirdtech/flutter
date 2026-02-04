@@ -16,7 +16,8 @@ import 'package:shard_runner/process.dart';
 Future<void> main(List<String> args) async {
   final ArgParser parser = ArgParser();
   CliConfig.addCommonOptions(parser, includeUpload: false);
-  parser.addFlag('download', defaultsTo: true, help: 'Download artifacts from GCS staging');
+  parser.addFlag('download',
+      defaultsTo: true, help: 'Download artifacts from GCS staging');
 
   final ArgResults results = parser.parse(args);
 
@@ -30,7 +31,8 @@ Future<void> main(List<String> args) async {
   }
 
   final String composeName = results.rest[0];
-  final CliConfig cli = CliConfig.fromArgs(results, scriptPath: Platform.script.toFilePath());
+  final CliConfig cli =
+      CliConfig.fromArgs(results, scriptPath: Platform.script.toFilePath());
   final bool shouldDownload = results['download'] as bool;
 
   cli.printHeader('Compose Runner', <String, String>{
@@ -79,7 +81,8 @@ Future<void> main(List<String> args) async {
   // Build script arguments: expand path_args to absolute paths, pass flags as-is.
   final List<String> expandedArgs = <String>['--dst', outDir];
   for (final MapEntry<String, String> entry in composeDef.pathArgs.entries) {
-    expandedArgs.addAll(<String>[entry.key, p.join(cli.engineSrc, 'out', entry.value)]);
+    expandedArgs
+        .addAll(<String>[entry.key, p.join(cli.engineSrc, 'out', entry.value)]);
   }
   expandedArgs.addAll(composeDef.flags);
 

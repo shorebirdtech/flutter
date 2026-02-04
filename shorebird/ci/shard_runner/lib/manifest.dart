@@ -21,5 +21,6 @@ String generateManifest(
   }
 
   final template = templateFile.readAsStringSync();
-  return template.replaceAll('{{flutter_engine_revision}}', flutterEngineRevision);
+  return template.replaceAll(
+      '{{flutter_engine_revision}}', flutterEngineRevision);
 }

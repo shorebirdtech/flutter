@@ -9,7 +9,11 @@ void main() {
           'steps': [
             {
               'type': 'gn_ninja',
-              'gn_args': ['--android', '--android-cpu=arm64', '--runtime-mode=release'],
+              'gn_args': [
+                '--android',
+                '--android-cpu=arm64',
+                '--runtime-mode=release'
+              ],
               'ninja_targets': ['default', 'gen_snapshot'],
               'out_dir': 'android_release_arm64',
             },
@@ -28,7 +32,8 @@ void main() {
       expect(shard.artifacts, isEmpty);
 
       final step = shard.steps.first as GnNinjaStep;
-      expect(step.gnArgs, ['--android', '--android-cpu=arm64', '--runtime-mode=release']);
+      expect(step.gnArgs,
+          ['--android', '--android-cpu=arm64', '--runtime-mode=release']);
       expect(step.ninjaTargets, ['default', 'gen_snapshot']);
       expect(step.outDir, 'android_release_arm64');
     });
@@ -45,7 +50,10 @@ void main() {
             },
           ],
           'artifacts': [
-            {'src': 'zip_archives/artifacts.zip', 'dst': 'flutter_infra/\$engine/artifacts.zip'},
+            {
+              'src': 'zip_archives/artifacts.zip',
+              'dst': 'flutter_infra/\$engine/artifacts.zip'
+            },
             {'src': 'maven.pom', 'dst': 'maven/\$engine/maven.pom'},
           ],
         },
@@ -86,7 +94,8 @@ void main() {
       expect(shard.steps[1], isA<GnNinjaStep>());
 
       final rustStep = shard.steps[0] as RustStep;
-      expect(rustStep.targets, ['aarch64-linux-android', 'x86_64-unknown-linux-gnu']);
+      expect(rustStep.targets,
+          ['aarch64-linux-android', 'x86_64-unknown-linux-gnu']);
 
       final gnStep = shard.steps[1] as GnNinjaStep;
       expect(gnStep.outDir, 'host_release');
@@ -246,7 +255,8 @@ void main() {
       final artifact = ArtifactDef.fromJson(json);
 
       expect(artifact.src, 'host_release/dart-sdk');
-      expect(artifact.dst, 'flutter_infra/flutter/\$engine/dart-sdk-linux-x64.zip');
+      expect(artifact.dst,
+          'flutter_infra/flutter/\$engine/dart-sdk-linux-x64.zip');
       expect(artifact.zip, true);
       expect(artifact.contentHash, true);
     });

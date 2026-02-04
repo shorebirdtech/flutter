@@ -21,7 +21,8 @@ Future<ProcessResult> runChecked(
     final String desc = description ?? '$executable ${arguments.join(' ')}';
     final String stderr = (result.stderr as String).trim();
     final String stdout = (result.stdout as String).trim();
-    final StringBuffer message = StringBuffer('$desc failed (exit ${result.exitCode})');
+    final StringBuffer message =
+        StringBuffer('$desc failed (exit ${result.exitCode})');
     if (stdout.isNotEmpty) {
       message.write('\nSTDOUT: $stdout');
     }

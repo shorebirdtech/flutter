@@ -16,15 +16,19 @@ import 'package:shard_runner/process.dart';
 ///   dart run shard_runner:finalize --engine-revision abc123
 Future<void> main(List<String> args) async {
   final ArgParser parser = ArgParser()
-    ..addOption('engine-revision', abbr: 'r', help: 'Engine revision (git hash)', mandatory: true)
-    ..addOption('base-engine-revision', help: 'Base Flutter engine revision for manifest')
+    ..addOption('engine-revision',
+        abbr: 'r', help: 'Engine revision (git hash)', mandatory: true)
+    ..addOption('base-engine-revision',
+        help: 'Base Flutter engine revision for manifest')
     ..addOption('content-hash', help: 'Content-aware hash for Dart SDK')
     ..addOption('bucket',
         abbr: 'b',
         help: 'GCS bucket for uploads (default: download.shorebird.dev)',
         defaultsTo: 'download.shorebird.dev')
-    ..addFlag('download', defaultsTo: true, help: 'Download artifacts from GCS staging')
-    ..addFlag('upload', defaultsTo: true, help: 'Upload artifacts to GCS bucket')
+    ..addFlag('download',
+        defaultsTo: true, help: 'Download artifacts from GCS staging')
+    ..addFlag('upload',
+        defaultsTo: true, help: 'Upload artifacts to GCS bucket')
     ..addFlag('help', abbr: 'h', negatable: false, help: 'Show this help');
 
   CliConfig.addCommonOptions(parser, includeUpload: false);
@@ -38,9 +42,11 @@ Future<void> main(List<String> args) async {
     exit(0);
   }
 
-  final CliConfig cli = CliConfig.fromArgs(results, scriptPath: Platform.script.toFilePath());
+  final CliConfig cli =
+      CliConfig.fromArgs(results, scriptPath: Platform.script.toFilePath());
   final String engineRevision = results['engine-revision'] as String;
-  final String baseEngineRevision = results['base-engine-revision'] as String? ?? engineRevision;
+  final String baseEngineRevision =
+      results['base-engine-revision'] as String? ?? engineRevision;
   final String? contentHash = results['content-hash'] as String?;
   final String bucket = results['bucket'] as String;
   final bool shouldDownload = results['download'] as bool;
@@ -82,8 +88,10 @@ Future<void> main(List<String> args) async {
 
   // Generate manifest
   print('\n[Manifest] Generating artifacts_manifest.yaml...');
-  final String manifest = generateManifest(baseEngineRevision, configDir: cli.configDir);
-  final File manifestFile = File(p.join(cli.engineSrc, 'artifacts_manifest.yaml'));
+  final String manifest =
+      generateManifest(baseEngineRevision, configDir: cli.configDir);
+  final File manifestFile =
+      File(p.join(cli.engineSrc, 'artifacts_manifest.yaml'));
   manifestFile.writeAsStringSync(manifest);
   print('[Manifest] Written to ${manifestFile.path}');
 
@@ -121,7 +129,8 @@ Future<void> uploadToProduction({
   // Helper to run gsutil cp
   Future<void> gscp(String src, String dest) async {
     print('[Upload] $src -> $dest');
-    await runChecked('gsutil', <String>['cp', src, dest], description: 'gsutil cp $src');
+    await runChecked('gsutil', <String>['cp', src, dest],
+        description: 'gsutil cp $src');
   }
 
   // Helper to zip a directory and upload
@@ -154,7 +163,8 @@ Future<void> uploadToProduction({
         final String srcPath = p.join(outDir, artifact.src);
 
         // Resolve destination path (replace $engine with actual revision)
-        final String dstPath = artifact.dst.replaceAll(r'$engine', engineRevision);
+        final String dstPath =
+            artifact.dst.replaceAll(r'$engine', engineRevision);
         final String fullDest = '$bucketUri/$dstPath';
 
         // Check if source exists
@@ -176,7 +186,8 @@ Future<void> uploadToProduction({
 
         // Handle content-hash uploads (for Dart SDK)
         if (artifact.contentHash && contentHash != null) {
-          final String contentDstPath = artifact.dst.replaceAll(r'$engine', contentHash);
+          final String contentDstPath =
+              artifact.dst.replaceAll(r'$engine', contentHash);
           final String contentFullDest = '$bucketUri/$contentDstPath';
           await gscp(srcPath, contentFullDest);
         }
@@ -187,7 +198,8 @@ Future<void> uploadToProduction({
   // Upload manifest
   final String manifestFile = p.join(engineSrc, 'artifacts_manifest.yaml');
   if (File(manifestFile).existsSync()) {
-    final String manifestDest = '$bucketUri/shorebird/$engineRevision/artifacts_manifest.yaml';
+    final String manifestDest =
+        '$bucketUri/shorebird/$engineRevision/artifacts_manifest.yaml';
     await gscp(manifestFile, manifestDest);
   }
 

@@ -18,7 +18,8 @@ Future<void> main(List<String> args) async {
   final ArgResults results = parser.parse(args);
 
   if (results['help'] as bool || results.rest.length < 2) {
-    print('Usage: dart run shard_runner:run_shard <platform> <shard> [options]');
+    print(
+        'Usage: dart run shard_runner:run_shard <platform> <shard> [options]');
     print('');
     print('Platforms: linux, macos, windows');
     print('');
@@ -28,7 +29,8 @@ Future<void> main(List<String> args) async {
 
   final String platform = results.rest[0];
   final String shard = results.rest[1];
-  final CliConfig cli = CliConfig.fromArgs(results, scriptPath: Platform.script.toFilePath());
+  final CliConfig cli =
+      CliConfig.fromArgs(results, scriptPath: Platform.script.toFilePath());
 
   cli.printHeader('Shard Runner', <String, String>{
     'Platform:': platform,
@@ -56,7 +58,8 @@ Future<void> main(List<String> args) async {
 
   for (int i = 0; i < shardDef.steps.length; i++) {
     final BuildStep step = shardDef.steps[i];
-    print('\n[${'Step ${i + 1}/${shardDef.steps.length}'}] ${step.runtimeType}');
+    print(
+        '\n[${'Step ${i + 1}/${shardDef.steps.length}'}] ${step.runtimeType}');
 
     await step.execute(cli.engineSrc);
   }

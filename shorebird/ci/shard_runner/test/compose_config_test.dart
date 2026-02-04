@@ -43,7 +43,8 @@ void main() {
     });
 
     test('getCompose throws for unknown name', () {
-      final ComposeConfig config = ComposeConfig(composes: <String, ComposeDef>{});
+      final ComposeConfig config =
+          ComposeConfig(composes: <String, ComposeDef>{});
 
       expect(
         () => config.getCompose('nonexistent'),

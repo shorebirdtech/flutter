@@ -21,12 +21,13 @@ class CliConfig {
     final String engineSrc = p.canonicalize(results['engine-src'] as String);
 
     // Config directory defaults to shorebird/ci (grandparent of bin/*.dart)
-    final String configDir =
-        results['config-dir'] as String? ?? p.dirname(p.dirname(p.dirname(scriptPath)));
+    final String configDir = results['config-dir'] as String? ??
+        p.dirname(p.dirname(p.dirname(scriptPath)));
 
     final String runId = results['run-id'] as String;
 
-    final bool shouldUpload = !results.options.contains('upload') || results['upload'] as bool;
+    final bool shouldUpload =
+        !results.options.contains('upload') || results['upload'] as bool;
 
     return CliConfig(
       engineSrc: engineSrc,
@@ -43,14 +44,18 @@ class CliConfig {
   /// Creates common argument parser options.
   static void addCommonOptions(ArgParser parser, {bool includeUpload = true}) {
     parser
-      ..addOption('engine-src', abbr: 'e', help: 'Path to engine/src directory', mandatory: true)
+      ..addOption('engine-src',
+          abbr: 'e', help: 'Path to engine/src directory', mandatory: true)
       ..addOption('run-id',
-          help: 'Build run identifier (use "local" for local development)', mandatory: true)
-      ..addOption('config-dir', abbr: 'c', help: 'Path to config directory (shorebird/ci)')
+          help: 'Build run identifier (use "local" for local development)',
+          mandatory: true)
+      ..addOption('config-dir',
+          abbr: 'c', help: 'Path to config directory (shorebird/ci)')
       ..addFlag('help', abbr: 'h', negatable: false, help: 'Show this help');
 
     if (includeUpload) {
-      parser.addFlag('upload', defaultsTo: true, help: 'Upload artifacts to GCS staging');
+      parser.addFlag('upload',
+          defaultsTo: true, help: 'Upload artifacts to GCS staging');
     }
   }
 

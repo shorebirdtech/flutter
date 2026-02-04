@@ -12,7 +12,8 @@ class ComposeConfig {
   factory ComposeConfig.fromJson(Map<String, dynamic> json) {
     return ComposeConfig(
       composes: json.map(
-        (String key, value) => MapEntry(key, ComposeDef.fromJson(value as Map<String, dynamic>)),
+        (String key, value) =>
+            MapEntry(key, ComposeDef.fromJson(value as Map<String, dynamic>)),
       ),
     );
   }
@@ -24,14 +25,16 @@ class ComposeConfig {
       throw FileSystemException('compose.json not found', file.path);
     }
     final String content = file.readAsStringSync();
-    final Map<String, dynamic> json = jsonDecode(content) as Map<String, dynamic>;
+    final Map<String, dynamic> json =
+        jsonDecode(content) as Map<String, dynamic>;
     return ComposeConfig.fromJson(json);
   }
 
   ComposeDef getCompose(String name) {
     final ComposeDef? compose = composes[name];
     if (compose == null) {
-      throw ArgumentError('Unknown compose: $name. Available: ${composes.keys.join(', ')}');
+      throw ArgumentError(
+          'Unknown compose: $name. Available: ${composes.keys.join(', ')}');
     }
     return compose;
   }
@@ -52,7 +55,8 @@ class ComposeDef {
       requires: (json['requires'] as List).cast<String>(),
       script: json['script'] as String,
       flags: (json['flags'] as List?)?.cast<String>() ?? <String>[],
-      pathArgs: (json['path_args'] as Map<String, dynamic>?)?.cast<String, String>() ??
+      pathArgs: (json['path_args'] as Map<String, dynamic>?)
+              ?.cast<String, String>() ??
           <String, String>{},
     );
   }
