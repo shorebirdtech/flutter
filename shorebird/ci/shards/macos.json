@@ -38,6 +38,10 @@
   "ios-release": {
     "steps": [
       {
+        "type": "rust",
+        "targets": ["aarch64-apple-ios"]
+      },
+      {
         "type": "gn_ninja",
         "gn_args": ["--ios", "--runtime-mode=release", "--gn-arg=shorebird_runtime=true"],
         "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
@@ -48,6 +52,10 @@
   },
   "ios-release-ext": {
     "steps": [
+      {
+        "type": "rust",
+        "targets": ["aarch64-apple-ios"]
+      },
       {
         "type": "gn_ninja",
         "gn_args": ["--ios", "--runtime-mode=release", "--darwin-extension-safe", "--xcode-symlinks", "--gn-arg=shorebird_runtime=true"],
@@ -60,6 +68,10 @@
   "ios-sim-x64": {
     "steps": [
       {
+        "type": "rust",
+        "targets": ["x86_64-apple-ios"]
+      },
+      {
         "type": "gn_ninja",
         "gn_args": ["--ios", "--runtime-mode=debug", "--simulator"],
         "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
@@ -70,6 +82,10 @@
   },
   "ios-sim-x64-ext": {
     "steps": [
+      {
+        "type": "rust",
+        "targets": ["x86_64-apple-ios"]
+      },
       {
         "type": "gn_ninja",
         "gn_args": ["--ios", "--runtime-mode=debug", "--darwin-extension-safe", "--simulator"],
@@ -82,6 +98,10 @@
   "ios-sim-arm64": {
     "steps": [
       {
+        "type": "rust",
+        "targets": ["aarch64-apple-ios-sim"]
+      },
+      {
         "type": "gn_ninja",
         "gn_args": ["--ios", "--runtime-mode=debug", "--simulator", "--simulator-cpu=arm64"],
         "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
@@ -93,6 +113,10 @@
   "ios-sim-arm64-ext": {
     "steps": [
       {
+        "type": "rust",
+        "targets": ["aarch64-apple-ios-sim"]
+      },
+      {
         "type": "gn_ninja",
         "gn_args": ["--ios", "--runtime-mode=debug", "--darwin-extension-safe", "--simulator", "--simulator-cpu=arm64"],
         "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
@@ -103,6 +127,10 @@
   },
   "mac-arm64": {
     "steps": [
+      {
+        "type": "rust",
+        "targets": ["aarch64-apple-darwin"]
+      },
       {
         "type": "gn_ninja",
         "gn_args": ["--runtime-mode=release", "--mac-cpu=arm64", "--no-prebuilt-dart-sdk"],
@@ -123,6 +151,10 @@
   },
   "mac-x64": {
     "steps": [
+      {
+        "type": "rust",
+        "targets": ["x86_64-apple-darwin"]
+      },
       {
         "type": "gn_ninja",
         "gn_args": ["--runtime-mode=release", "--mac-cpu=x64", "--no-prebuilt-dart-sdk"],
