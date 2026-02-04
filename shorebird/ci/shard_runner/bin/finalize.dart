@@ -122,7 +122,7 @@ Future<void> uploadToProduction({
     print('[Upload] $src -> $dest');
     final ProcessResult result = await Process.run('gsutil', <String>['cp', src, dest]);
     if (result.exitCode != 0) {
-      print('[Warning] gsutil cp failed: ${result.stderr}');
+      throw Exception('gsutil cp failed (exit ${result.exitCode}): ${result.stderr}');
     }
   }
 
@@ -133,8 +133,7 @@ Future<void> uploadToProduction({
     final ProcessResult zipResult =
         await Process.run('zip', <String>['-r', tempZip, '.'], workingDirectory: srcPath);
     if (zipResult.exitCode != 0) {
-      print('[Warning] zip failed: ${zipResult.stderr}');
-      return;
+      throw Exception('zip failed (exit ${zipResult.exitCode}): ${zipResult.stderr}');
     }
     await gscp(tempZip, dest);
     await File(tempZip).delete();
