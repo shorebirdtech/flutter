@@ -38,6 +38,34 @@ jobs:
         run: ../../bin/flutter test test/general.shard
         working-directory: packages/flutter_tools
 
+  shard-runner-tests:
+    runs-on: ubuntu-latest
+
+    name: 🧩 Shard Runner Tests
+
+    defaults:
+      run:
+        working-directory: shorebird/ci/shard_runner
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@v4
+
+      - name: 🎯 Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: 📦 Install Dependencies
+        run: dart pub get
+
+      - name: 🔍 Check Formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: 🔎 Analyze
+        run: dart analyze --fatal-infos
+
+      - name: 🧪 Run Tests
+        run: dart test
+
   shorebird-android-tests:
     # Android tests run on Ubuntu (faster runners, no macOS needed)
     runs-on: ubuntu-latest
