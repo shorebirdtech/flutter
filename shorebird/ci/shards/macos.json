@@ -28,6 +28,11 @@
         "ninja_targets": ["flutter/shell/platform/android:gen_snapshot"],
         "out_dir": "android_release_x64"
       }
+    ],
+    "artifacts": [
+      {"src": "android_release_arm64/zip_archives/android-arm64-release/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/darwin-x64.zip"},
+      {"src": "android_release/zip_archives/android-arm-release/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/darwin-x64.zip"},
+      {"src": "android_release_x64/zip_archives/android-x64-release/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/darwin-x64.zip"}
     ]
   },
   "ios-release": {
@@ -81,7 +86,10 @@
         "out_dir": "mac_release_arm64"
       }
     ],
-    "compose_input": "macos-framework"
+    "compose_input": "macos-framework",
+    "artifacts": [
+      {"src": "host_release_arm64/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-darwin-arm64.zip", "zip": true, "content_hash": true}
+    ]
   },
   "mac-x64": {
     "steps": [
@@ -98,6 +106,10 @@
         "out_dir": "mac_release"
       }
     ],
-    "compose_input": "macos-framework"
+    "compose_input": "macos-framework",
+    "artifacts": [
+      {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-darwin-x64.zip", "zip": true, "content_hash": true},
+      {"src": "engine_stamp.json", "dst": "flutter_infra_release/flutter/$engine/engine_stamp.json"}
+    ]
   }
 }

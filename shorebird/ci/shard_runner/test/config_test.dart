@@ -20,11 +20,34 @@ void main() {
       final shard = config.getShard('android-arm64');
       expect(shard.steps.length, 1);
       expect(shard.steps.first, isA<GnNinjaStep>());
+      expect(shard.artifacts, isEmpty);
 
       final step = shard.steps.first as GnNinjaStep;
       expect(step.gnArgs, ['--android', '--android-cpu=arm64', '--runtime-mode=release']);
       expect(step.ninjaTargets, ['default', 'gen_snapshot']);
       expect(step.outDir, 'android_release_arm64');
+    });
+
+    test('parses shard with artifacts', () {
+      final json = {
+        'android-arm64': {
+          'gn_args': ['--android'],
+          'ninja_targets': ['default'],
+          'out_dir': 'android_release_arm64',
+          'artifacts': [
+            {'src': 'zip_archives/artifacts.zip', 'dst': 'flutter_infra/\$engine/artifacts.zip'},
+            {'src': 'maven.pom', 'dst': 'maven/\$engine/maven.pom'},
+          ],
+        },
+      };
+
+      final config = PlatformConfig.fromJson(json);
+      final shard = config.getShard('android-arm64');
+
+      expect(shard.artifacts.length, 2);
+      expect(shard.artifacts[0].src, 'zip_archives/artifacts.zip');
+      expect(shard.artifacts[0].dst, 'flutter_infra/\$engine/artifacts.zip');
+      expect(shard.artifacts[1].src, 'maven.pom');
     });
 
     test('parses multi-step shard', () {
@@ -155,6 +178,62 @@ void main() {
         'armv7-linux-androideabi',
         'x86_64-unknown-linux-gnu',
       ]);
+    });
+  });
+
+  group('ArtifactDef', () {
+    test('fromJson parses src and dst', () {
+      final json = {
+        'src': 'zip_archives/artifacts.zip',
+        'dst': 'flutter_infra/\$engine/artifacts.zip',
+      };
+
+      final artifact = ArtifactDef.fromJson(json);
+
+      expect(artifact.src, 'zip_archives/artifacts.zip');
+      expect(artifact.dst, 'flutter_infra/\$engine/artifacts.zip');
+      expect(artifact.zip, false);
+      expect(artifact.contentHash, false);
+    });
+
+    test('fromJson parses zip flag', () {
+      final json = {
+        'src': 'dart-sdk',
+        'dst': 'flutter_infra/dart-sdk.zip',
+        'zip': true,
+      };
+
+      final artifact = ArtifactDef.fromJson(json);
+
+      expect(artifact.zip, true);
+    });
+
+    test('fromJson parses content_hash flag', () {
+      final json = {
+        'src': 'dart-sdk',
+        'dst': 'flutter_infra/dart-sdk.zip',
+        'content_hash': true,
+      };
+
+      final artifact = ArtifactDef.fromJson(json);
+
+      expect(artifact.contentHash, true);
+    });
+
+    test('fromJson parses all flags together', () {
+      final json = {
+        'src': 'host_release/dart-sdk',
+        'dst': 'flutter_infra/flutter/\$engine/dart-sdk-linux-x64.zip',
+        'zip': true,
+        'content_hash': true,
+      };
+
+      final artifact = ArtifactDef.fromJson(json);
+
+      expect(artifact.src, 'host_release/dart-sdk');
+      expect(artifact.dst, 'flutter_infra/flutter/\$engine/dart-sdk-linux-x64.zip');
+      expect(artifact.zip, true);
+      expect(artifact.contentHash, true);
     });
   });
 }

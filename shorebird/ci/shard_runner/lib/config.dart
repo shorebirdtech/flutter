@@ -44,7 +44,11 @@ class ShardDef {
   /// If set, this shard contributes to a compose operation.
   final String? composeInput;
 
-  ShardDef({required this.steps, this.composeInput});
+  /// Artifacts produced by this shard (paths relative to out_dir).
+  /// Used by finalize to know what to upload.
+  final List<ArtifactDef> artifacts;
+
+  ShardDef({required this.steps, this.composeInput, this.artifacts = const []});
 
   factory ShardDef.fromJson(Map<String, dynamic> json) {
     List<BuildStep> steps;
@@ -65,9 +69,46 @@ class ShardDef {
       ];
     }
 
+    final artifacts = (json['artifacts'] as List?)
+        ?.map((a) => ArtifactDef.fromJson(a as Map<String, dynamic>))
+        .toList() ?? [];
+
     return ShardDef(
       steps: steps,
       composeInput: json['compose_input'] as String?,
+      artifacts: artifacts,
+    );
+  }
+}
+
+/// Definition of an artifact to upload.
+class ArtifactDef {
+  /// Source path relative to out/ (or out/<out_dir>/ for single-step shards)
+  final String src;
+
+  /// Destination path (relative to storage bucket root).
+  /// Supports placeholders: $engine (engine hash)
+  final String dst;
+
+  /// If true, zip the source directory before uploading.
+  final bool zip;
+
+  /// If true, also upload to content-hash path (for Dart SDK).
+  final bool contentHash;
+
+  ArtifactDef({
+    required this.src,
+    required this.dst,
+    this.zip = false,
+    this.contentHash = false,
+  });
+
+  factory ArtifactDef.fromJson(Map<String, dynamic> json) {
+    return ArtifactDef(
+      src: json['src'] as String,
+      dst: json['dst'] as String,
+      zip: json['zip'] as bool? ?? false,
+      contentHash: json['content_hash'] as bool? ?? false,
     );
   }
 }
