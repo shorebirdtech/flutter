@@ -8,7 +8,8 @@ String _resolveExecutable(String executable) {
   if (!Platform.isWindows) return executable;
 
   // Don't modify if it already has an extension
-  if (executable.endsWith('.exe') || executable.endsWith('.cmd') ||
+  if (executable.endsWith('.exe') ||
+      executable.endsWith('.cmd') ||
       executable.endsWith('.bat')) {
     return executable;
   }
