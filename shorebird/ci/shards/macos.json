@@ -68,6 +68,10 @@
   "ios-sim-x64": {
     "steps": [
       {
+        "type": "rust",
+        "targets": ["x86_64-apple-ios"]
+      },
+      {
         "type": "gn_ninja",
         "gn_args": ["--ios", "--runtime-mode=debug", "--simulator"],
         "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
@@ -78,6 +82,10 @@
   },
   "ios-sim-x64-ext": {
     "steps": [
+      {
+        "type": "rust",
+        "targets": ["x86_64-apple-ios"]
+      },
       {
         "type": "gn_ninja",
         "gn_args": ["--ios", "--runtime-mode=debug", "--darwin-extension-safe", "--simulator"],
