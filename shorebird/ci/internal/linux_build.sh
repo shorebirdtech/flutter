@@ -25,7 +25,8 @@ cd $UPDATER_SRC/library
 # previous iterations of cargo-ndk required the version to be passed as
 # -p <version>, but that no longer seems needed.
 # We always use the hermetic NDK from the engine repo.
-ANDROID_NDK_HOME="$ENGINE_SRC/flutter/third_party/android_tools/ndk" \
+# The "unmodified" CIPD package keeps the NDK at the standard Android SDK path.
+ANDROID_NDK_HOME=$(echo "$ENGINE_SRC/flutter/third_party/android_tools/sdk/ndk"/*) \
 cargo ndk \
     --target armv7-linux-androideabi \
     --target aarch64-linux-android \
