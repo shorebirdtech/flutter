@@ -10,7 +10,7 @@ cd $ENGINE_SRC
 
 UPDATER_SRC=$ENGINE_SRC/flutter/third_party/updater
 (cd $UPDATER_SRC &&
-  ANDROID_NDK_HOME="$ENGINE_SRC/flutter/third_party/android_tools/ndk" \
+  ANDROID_NDK_HOME=$(echo "$ENGINE_SRC/flutter/third_party/android_tools/sdk/ndk"/*) \
     cargo ndk \
     --target armv7-linux-androideabi \
     --target aarch64-linux-android \
