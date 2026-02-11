@@ -224,13 +224,19 @@ Future<void> _runRust(String engineSrc, List<String> targets) async {
     }
     args.addAll(<String>['build', '--release']);
 
+    // The "unmodified" CIPD package keeps the NDK at the standard Android
+    // SDK path: android_tools/sdk/ndk/<version>.
+    final Directory ndkParent = Directory(
+      p.join(engineSrc, 'flutter', 'third_party', 'android_tools', 'sdk', 'ndk'),
+    );
+    final String ndkHome = ndkParent.listSync().whereType<Directory>().first.path;
+
     await runChecked(
       'cargo',
       args,
       workingDirectory: updaterPath,
       environment: <String, String>{
-        'ANDROID_NDK_HOME':
-            p.join(engineSrc, 'flutter', 'third_party', 'android_tools', 'ndk'),
+        'ANDROID_NDK_HOME': ndkHome,
       },
       description: 'Cargo ndk (${androidTargets.join(', ')})',
     );
