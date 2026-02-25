@@ -24,7 +24,8 @@ class PlatformConfig {
     final ShardDef? shard = shards[name];
     if (shard == null) {
       throw ArgumentError(
-          'Unknown shard: $name. Available: ${shards.keys.join(', ')}');
+        'Unknown shard: $name. Available: ${shards.keys.join(', ')}',
+      );
     }
     return shard;
   }
@@ -44,17 +45,19 @@ class PlatformConfig {
 /// Definition of a single build shard.
 @immutable
 class ShardDef {
-  ShardDef(
-      {required this.steps,
-      this.composeInput,
-      this.artifacts = const <ArtifactDef>[]});
+  ShardDef({
+    required this.steps,
+    this.composeInput,
+    this.artifacts = const <ArtifactDef>[],
+  });
 
   factory ShardDef.fromJson(Map<String, dynamic> json) {
     final List<BuildStep> steps = (json['steps'] as List)
         .map((s) => BuildStep.fromJson(s as Map<String, dynamic>))
         .toList();
 
-    final List<ArtifactDef> artifacts = (json['artifacts'] as List?)
+    final List<ArtifactDef> artifacts =
+        (json['artifacts'] as List?)
             ?.map((a) => ArtifactDef.fromJson(a as Map<String, dynamic>))
             .toList() ??
         <ArtifactDef>[];
@@ -157,9 +160,7 @@ class RustStep implements BuildStep {
   RustStep({required this.targets});
 
   factory RustStep.fromJson(Map<String, dynamic> json) {
-    return RustStep(
-      targets: (json['targets'] as List).cast<String>(),
-    );
+    return RustStep(targets: (json['targets'] as List).cast<String>());
   }
   final List<String> targets;
 
@@ -189,15 +190,14 @@ Future<void> _runGn(String engineSrc, List<String> args, String outDir) async {
 }
 
 Future<void> _runNinja(
-    String engineSrc, String outDir, List<String> targets) async {
+  String engineSrc,
+  String outDir,
+  List<String> targets,
+) async {
   print('[Ninja] Building ${targets.join(' ')} in out/$outDir');
   await runChecked(
     'ninja',
-    <String>[
-      '-C',
-      p.join(engineSrc, 'out', outDir),
-      ...targets,
-    ],
+    <String>['-C', p.join(engineSrc, 'out', outDir), ...targets],
     workingDirectory: engineSrc,
     description: 'Ninja ($outDir)',
   );
@@ -205,14 +205,21 @@ Future<void> _runNinja(
 }
 
 Future<void> _runRust(String engineSrc, List<String> targets) async {
-  final String updaterPath =
-      p.join(engineSrc, 'flutter', 'third_party', 'updater', 'library');
+  final String updaterPath = p.join(
+    engineSrc,
+    'flutter',
+    'third_party',
+    'updater',
+    'library',
+  );
 
   // Separate Android and non-Android targets
-  final List<String> androidTargets =
-      targets.where((String t) => t.contains('android')).toList();
-  final List<String> otherTargets =
-      targets.where((String t) => !t.contains('android')).toList();
+  final List<String> androidTargets = targets
+      .where((String t) => t.contains('android'))
+      .toList();
+  final List<String> otherTargets = targets
+      .where((String t) => !t.contains('android'))
+      .toList();
 
   // Build all Android targets together with cargo-ndk
   if (androidTargets.isNotEmpty) {
@@ -227,17 +234,26 @@ Future<void> _runRust(String engineSrc, List<String> targets) async {
     // The "unmodified" CIPD package keeps the NDK at the standard Android
     // SDK path: android_tools/sdk/ndk/<version>.
     final Directory ndkParent = Directory(
-      p.join(engineSrc, 'flutter', 'third_party', 'android_tools', 'sdk', 'ndk'),
+      p.join(
+        engineSrc,
+        'flutter',
+        'third_party',
+        'android_tools',
+        'sdk',
+        'ndk',
+      ),
     );
-    final String ndkHome = ndkParent.listSync().whereType<Directory>().first.path;
+    final String ndkHome = ndkParent
+        .listSync()
+        .whereType<Directory>()
+        .first
+        .path;
 
     await runChecked(
       'cargo',
       args,
       workingDirectory: updaterPath,
-      environment: <String, String>{
-        'ANDROID_NDK_HOME': ndkHome,
-      },
+      environment: <String, String>{'ANDROID_NDK_HOME': ndkHome},
       description: 'Cargo ndk (${androidTargets.join(', ')})',
     );
   }
