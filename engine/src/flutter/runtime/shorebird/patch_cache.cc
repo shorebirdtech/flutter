@@ -146,7 +146,7 @@ std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
   auto cache_entry = PatchCache::Instance().GetOrLoad(patch_path);
   if (!cache_entry) {
     FML_LOG(ERROR) << "Failed to load symbol from patch at " << patch_path
-                    << ". Falling back to base snapshot.";
+                   << ". Falling back to base snapshot.";
     return nullptr;
   }
 
