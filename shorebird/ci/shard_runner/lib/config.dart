@@ -56,8 +56,7 @@ class ShardDef {
         .map((s) => BuildStep.fromJson(s as Map<String, dynamic>))
         .toList();
 
-    final List<ArtifactDef> artifacts =
-        (json['artifacts'] as List?)
+    final List<ArtifactDef> artifacts = (json['artifacts'] as List?)
             ?.map((a) => ArtifactDef.fromJson(a as Map<String, dynamic>))
             .toList() ??
         <ArtifactDef>[];
@@ -214,12 +213,10 @@ Future<void> _runRust(String engineSrc, List<String> targets) async {
   );
 
   // Separate Android and non-Android targets
-  final List<String> androidTargets = targets
-      .where((String t) => t.contains('android'))
-      .toList();
-  final List<String> otherTargets = targets
-      .where((String t) => !t.contains('android'))
-      .toList();
+  final List<String> androidTargets =
+      targets.where((String t) => t.contains('android')).toList();
+  final List<String> otherTargets =
+      targets.where((String t) => !t.contains('android')).toList();
 
   // Build all Android targets together with cargo-ndk
   if (androidTargets.isNotEmpty) {
@@ -243,11 +240,8 @@ Future<void> _runRust(String engineSrc, List<String> targets) async {
         'ndk',
       ),
     );
-    final String ndkHome = ndkParent
-        .listSync()
-        .whereType<Directory>()
-        .first
-        .path;
+    final String ndkHome =
+        ndkParent.listSync().whereType<Directory>().first.path;
 
     await runChecked(
       'cargo',
