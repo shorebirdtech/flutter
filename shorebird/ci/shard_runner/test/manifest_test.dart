@@ -123,7 +123,7 @@ void main() {
       expect(
           manifest,
           contains(
-              r'flutter_infra_release/flutter/$engine/ios-release/Flutter.dSYM.zip'));
+              r'flutter_infra_release/flutter/$engine/ios-release/Flutter.framework.dSYM.zip'));
     });
 
     test('includes Linux release artifacts', () {
