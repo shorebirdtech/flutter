@@ -76,7 +76,7 @@ artifact_overrides:
   # iOS release artifacts
   # Includes unified Flutter.framework for device and simulator (debug)
   - flutter_infra_release/flutter/\$engine/ios-release/artifacts.zip
-  - flutter_infra_release/flutter/\$engine/ios-release/Flutter.dSYM.zip
+  - flutter_infra_release/flutter/\$engine/ios-release/Flutter.framework.dSYM.zip
 
   # Linux release artifacts
   - flutter_infra_release/flutter/\$engine/linux-x64/artifacts.zip
