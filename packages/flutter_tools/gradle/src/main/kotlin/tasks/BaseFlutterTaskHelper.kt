@@ -110,6 +110,9 @@ object BaseFlutterTaskHelper {
             baseFlutterTask.performanceMeasurementFile?.let {
                 args("--performance-measurement-file=$it")
             }
+            baseFlutterTask.traceFile?.let {
+                args("--trace-file=$it")
+            }
             args("-dTargetFile=${baseFlutterTask.targetPath}")
             args("-dTargetPlatform=android")
             args("-dBuildMode=${baseFlutterTask.buildMode}")

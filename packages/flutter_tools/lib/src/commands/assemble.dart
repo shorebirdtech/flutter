@@ -112,6 +112,10 @@ class AssembleCommand extends FlutterCommand {
       'performance-measurement-file',
       help: 'Output individual target performance to a JSON file.',
     );
+    argParser.addOption(
+      'trace-file',
+      help: 'Output build trace in Chrome Trace Event Format JSON.',
+    );
     argParser.addMultiOption(
       'input',
       abbr: 'i',
@@ -394,6 +398,10 @@ class AssembleCommand extends FlutterCommand {
       final File outFile = globals.fs.file(argumentResults['performance-measurement-file']);
       writePerformanceData(result.performance.values, outFile);
     }
+    if (argumentResults.wasParsed('trace-file')) {
+      final File outFile = globals.fs.file(argumentResults['trace-file']);
+      writeTraceData(result.performance.values, outFile);
+    }
     if (argumentResults.wasParsed('depfile')) {
       final File depfileFile = globals.fs.file(stringArg('depfile'));
       final depfile = Depfile(result.inputFiles, result.outputFiles);
@@ -439,4 +447,30 @@ void writePerformanceData(Iterable<PerformanceMeasurement> measurements, File ou
     outFile.parent.createSync(recursive: true);
   }
   outFile.writeAsStringSync(json.encode(jsonData));
+}
+
+/// Output build trace data in Chrome Trace Event Format in [outFile].
+@visibleForTesting
+void writeTraceData(Iterable<PerformanceMeasurement> measurements, File outFile) {
+  final events = <Map<String, Object?>>[
+    for (final PerformanceMeasurement measurement in measurements)
+      <String, Object?>{
+        'ph': 'X',
+        'name': measurement.analyticsName,
+        'cat': 'assemble',
+        'ts': measurement.startTimeMicroseconds,
+        'dur': measurement.elapsedMilliseconds * 1000,
+        'pid': 1,
+        'tid': 3,
+        'args': <String, Object?>{
+          'target': measurement.target,
+          'skipped': measurement.skipped,
+          'succeeded': measurement.succeeded,
+        },
+      },
+  ];
+  if (!outFile.parent.existsSync()) {
+    outFile.parent.createSync(recursive: true);
+  }
+  outFile.writeAsStringSync(json.encode(events));
 }

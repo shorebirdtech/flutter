@@ -364,6 +364,7 @@ void main() {
                   elapsedMilliseconds: 123,
                   skipped: false,
                   succeeded: true,
+                  startTimeMicroseconds: 0,
                 ),
               },
             ),
@@ -502,6 +503,7 @@ void main() {
         skipped: false,
         succeeded: true,
         elapsedMilliseconds: 123,
+        startTimeMicroseconds: 0,
       ),
     ];
     final FileSystem fileSystem = MemoryFileSystem.test();
@@ -544,6 +546,41 @@ void main() {
 
     await commandRunner.run(['--help' /* -- verbose omitted (verboseHelp: true) is set above */]);
     expect(testLogger.statusText, contains('assemble'));
+  });
+
+  testWithoutContext('writeTraceData outputs Chrome Trace Event Format', () {
+    final measurements = <PerformanceMeasurement>[
+      PerformanceMeasurement(
+        analyticsName: 'KernelSnapshot',
+        target: 'kernel_snapshot',
+        skipped: false,
+        succeeded: true,
+        elapsedMilliseconds: 500,
+        startTimeMicroseconds: 1000000,
+      ),
+    ];
+    final FileSystem fileSystem = MemoryFileSystem.test();
+    final outFile = fileSystem.currentDirectory.childDirectory('foo').childFile('trace.json');
+
+    writeTraceData(measurements, outFile);
+
+    expect(outFile, exists);
+    final events = json.decode(outFile.readAsStringSync()) as List<Object?>;
+    expect(events, hasLength(1));
+
+    final event = events.first! as Map<String, Object?>;
+    expect(event['ph'], 'X');
+    expect(event['name'], 'KernelSnapshot');
+    expect(event['cat'], 'assemble');
+    expect(event['ts'], 1000000);
+    expect(event['dur'], 500000);
+    expect(event['pid'], 1);
+    expect(event['tid'], 3);
+    expect(event['args'], <String, Object?>{
+      'target': 'kernel_snapshot',
+      'skipped': false,
+      'succeeded': true,
+    });
   });
 }
 

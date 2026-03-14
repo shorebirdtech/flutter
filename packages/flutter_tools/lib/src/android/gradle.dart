@@ -24,6 +24,7 @@ import '../base/project_migrator.dart';
 import '../base/terminal.dart';
 import '../base/utils.dart';
 import '../build_info.dart';
+import '../build_system/build_trace.dart';
 import '../cache.dart';
 import '../convert.dart';
 import '../flutter_manifest.dart';
@@ -480,6 +481,11 @@ class AndroidGradleBuilder implements AndroidBuilder {
     }
 
     // Assembly work starts here.
+    final int buildStartMicros = DateTime.now().microsecondsSinceEpoch;
+    final BuildTracer? tracer = androidBuildInfo.buildInfo.traceFilePath != null
+        ? BuildTracer()
+        : null;
+
     final BuildInfo buildInfo = androidBuildInfo.buildInfo;
     final String assembleTask = isBuildingBundle
         ? getBundleTaskFor(buildInfo)
@@ -556,6 +562,20 @@ class AndroidGradleBuilder implements AndroidBuilder {
       }
     }
     options.addAll(androidBuildInfo.buildInfo.toGradleConfig());
+    // Pass trace file path as a Gradle property for flutter assemble.
+    // We use an intermediate file that gradle.dart will merge into the final trace.
+    final String? assembleTraceFilePath;
+    if (buildInfo.traceFilePath != null) {
+      assembleTraceFilePath = _fileSystem.path.join(
+        project.android.buildDirectory.path,
+        'intermediates',
+        'flutter',
+        'flutter_assemble_trace.json',
+      );
+      options.add('-Ptrace-file=$assembleTraceFilePath');
+    } else {
+      assembleTraceFilePath = null;
+    }
     if (buildInfo.fileSystemRoots.isNotEmpty) {
       options.add('-Pfilesystem-roots=${buildInfo.fileSystemRoots.join('|')}');
     }
@@ -565,10 +585,21 @@ class AndroidGradleBuilder implements AndroidBuilder {
     if (androidBuildInfo.splitPerAbi) {
       options.add('-Psplit-per-abi=true');
     }
+    final int preGradleEndMicros = DateTime.now().microsecondsSinceEpoch;
+    tracer?.addCompleteEvent(
+      name: 'pre-gradle setup',
+      cat: 'flutter',
+      tid: 1,
+      startMicros: buildStartMicros,
+      endMicros: preGradleEndMicros,
+    );
+
     late Stopwatch sw;
+    late int gradleStartMicros;
     final int exitCode = await _runGradleTask(
       assembleTask,
       preRunTask: () {
+        gradleStartMicros = DateTime.now().microsecondsSinceEpoch;
         sw = Stopwatch()..start();
       },
       postRunTask: () {
@@ -588,10 +619,52 @@ class AndroidGradleBuilder implements AndroidBuilder {
       gradleExecutablePath: gradleExecutablePath,
     );
 
+    // Record Gradle span and merge assemble trace if tracing is enabled.
+    if (tracer != null) {
+      final int gradleEndMicros = DateTime.now().microsecondsSinceEpoch;
+      tracer.addCompleteEvent(
+        name: 'gradle $assembleTask',
+        cat: 'gradle',
+        tid: 2,
+        startMicros: gradleStartMicros,
+        endMicros: gradleEndMicros,
+      );
+      // Merge the assemble trace file that flutter assemble wrote.
+      if (assembleTraceFilePath != null) {
+        final File assembleTraceFile = _fileSystem.file(assembleTraceFilePath);
+        tracer.mergeEventsFromFile(assembleTraceFile);
+      }
+    }
+
     if (exitCode != 0) {
       throwToolExit(
         'Gradle task $assembleTask failed with exit code $exitCode',
         exitCode: exitCode,
+      );
+    }
+
+    // Write the build trace if tracing is enabled.
+    if (tracer != null && buildInfo.traceFilePath != null) {
+      final int postGradleEndMicros = DateTime.now().microsecondsSinceEpoch;
+      tracer.addCompleteEvent(
+        name: 'post-gradle processing',
+        cat: 'flutter',
+        tid: 1,
+        startMicros: gradleStartMicros + sw.elapsedMicroseconds,
+        endMicros: postGradleEndMicros,
+      );
+      tracer.addCompleteEvent(
+        name: isBuildingBundle ? 'flutter build appbundle' : 'flutter build apk',
+        cat: 'flutter',
+        tid: 1,
+        startMicros: buildStartMicros,
+        endMicros: postGradleEndMicros,
+      );
+      final File traceFile = _fileSystem.file(buildInfo.traceFilePath);
+      tracer.writeToFile(traceFile);
+      _logger.printStatus(
+        'Build trace written to ${buildInfo.traceFilePath}. '
+        'View at https://ui.perfetto.dev',
       );
     }
 

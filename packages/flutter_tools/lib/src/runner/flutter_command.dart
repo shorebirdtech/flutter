@@ -131,6 +131,7 @@ abstract final class FlutterOptions {
   static const kDartDefineFromFileOption = 'dart-define-from-file';
   static const kWebDefinesOption = 'web-define';
   static const kPerformanceMeasurementFile = 'performance-measurement-file';
+  static const kBuildTrace = 'trace';
   static const kDeviceUser = 'device-user';
   static const kDeviceTimeout = 'device-timeout';
   static const kDeviceConnection = 'device-connection';
@@ -1048,6 +1049,17 @@ abstract class FlutterCommand extends Command<void> {
     );
   }
 
+  void usesBuildTraceOption({bool hide = false}) {
+    argParser.addOption(
+      FlutterOptions.kBuildTrace,
+      help:
+          'Output a Chrome Trace Event Format JSON file for build profiling. '
+          'The resulting file can be viewed at https://ui.perfetto.dev.',
+      hide: hide,
+      valueHelp: 'path/to/trace.json',
+    );
+  }
+
   void addAndroidSpecificBuildOptions({bool hide = false}) {
     argParser.addFlag(
       FlutterOptions.kAndroidGradleDaemon,
@@ -1426,6 +1438,11 @@ abstract class FlutterCommand extends Command<void> {
         ? stringArg(FlutterOptions.kPerformanceMeasurementFile)
         : null;
 
+    final String? traceFilePath =
+        argParser.options.containsKey(FlutterOptions.kBuildTrace)
+        ? stringArg(FlutterOptions.kBuildTrace)
+        : null;
+
     final Map<String, Object?> defineConfigJsonMap = extractDartDefineConfigJsonMap();
     final List<String> dartDefines = extractDartDefines(defineConfigJsonMap: defineConfigJsonMap);
 
@@ -1477,6 +1494,7 @@ abstract class FlutterCommand extends Command<void> {
       dartDefines: dartDefines,
       dartExperiments: experiments,
       performanceMeasurementFile: performanceMeasurementFile,
+      traceFilePath: traceFilePath,
       packageConfigPath: packagesPath ?? packageConfigFile.path,
       codeSizeDirectory: codeSizeDirectory,
       androidGradleDaemon: androidGradleDaemon,

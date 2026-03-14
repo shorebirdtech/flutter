@@ -113,6 +113,10 @@ open class BaseFlutterTask : DefaultTask() {
 
     @Optional
     @Input
+    var traceFile: String? = null
+
+    @Optional
+    @Input
     var deferredComponents: Boolean? = null
 
     @Optional

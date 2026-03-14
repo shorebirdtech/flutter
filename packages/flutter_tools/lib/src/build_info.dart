@@ -44,6 +44,7 @@ class BuildInfo {
     List<String>? dartExperiments,
     required this.treeShakeIcons,
     this.performanceMeasurementFile,
+    this.traceFilePath,
     required this.packageConfigPath,
     this.codeSizeDirectory,
     this.androidGradleDaemon = true,
@@ -134,6 +135,10 @@ class BuildInfo {
   /// This is not considered a build input and will not force assemble to
   /// rerun tasks.
   final String? performanceMeasurementFile;
+
+  /// The path to a file where a Chrome Trace Event Format JSON trace will be
+  /// written for build profiling.
+  final String? traceFilePath;
 
   /// If provided, an output directory where one or more v8-style heap snapshots
   /// will be written for code size profiling.
@@ -354,6 +359,8 @@ class BuildInfo {
       'TREE_SHAKE_ICONS': treeShakeIcons.toString(),
       if (performanceMeasurementFile != null)
         'PERFORMANCE_MEASUREMENT_FILE': performanceMeasurementFile!,
+      if (traceFilePath != null)
+        'TRACE_FILE': traceFilePath!,
       'PACKAGE_CONFIG': packageConfigPath,
       'CODE_SIZE_DIRECTORY': ?codeSizeDirectory,
       'FLAVOR': ?flavor,
