@@ -722,6 +722,13 @@ class Context {
       );
     }
 
+    if (environment['TRACE_FILE'] != null &&
+        environment['TRACE_FILE']!.isNotEmpty) {
+      flutterArgs.add(
+        '--trace-file=${environment['TRACE_FILE']}',
+      );
+    }
+
     if (environment['CODE_SIZE_DIRECTORY'] != null &&
         environment['CODE_SIZE_DIRECTORY']!.isNotEmpty) {
       flutterArgs.add('-dCodeSizeDirectory=${environment['CODE_SIZE_DIRECTORY']}');

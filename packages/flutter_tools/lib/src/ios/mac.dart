@@ -18,6 +18,7 @@ import '../base/project_migrator.dart';
 import '../base/utils.dart';
 import '../base/version.dart';
 import '../build_info.dart';
+import '../build_system/build_trace.dart';
 import '../cache.dart';
 import '../darwin/darwin.dart';
 import '../device.dart';
@@ -353,6 +354,26 @@ Future<XcodeBuildResult> buildXcodeProject({
     return XcodeBuildResult(success: true);
   }
 
+  final int buildStartMicros = DateTime.now().microsecondsSinceEpoch;
+  final BuildTracer? tracer = buildInfo.traceFilePath != null
+      ? BuildTracer()
+      : null;
+
+  // Pass trace file path as an intermediate location for flutter assemble.
+  // mac.dart will merge this into the final trace file.
+  final String? assembleTraceFilePath;
+  if (buildInfo.traceFilePath != null) {
+    assembleTraceFilePath = globals.fs.path.join(
+      globals.fs.currentDirectory.path,
+      getBuildDirectory(),
+      'ios',
+      'flutter_assemble_trace.json',
+    );
+    buildCommands.add('TRACE_FILE=$assembleTraceFilePath');
+  } else {
+    assembleTraceFilePath = null;
+  }
+
   if (globals.logger.isVerbose) {
     // An environment variable to be passed to xcode_backend.sh determining
     // whether to echo back executed commands.
@@ -531,6 +552,16 @@ Future<XcodeBuildResult> buildXcodeProject({
       ]);
     }
 
+    final int preXcodeEndMicros = DateTime.now().microsecondsSinceEpoch;
+    tracer?.addCompleteEvent(
+      name: 'pre-xcode setup',
+      cat: 'flutter',
+      tid: 1,
+      startMicros: buildStartMicros,
+      endMicros: preXcodeEndMicros,
+    );
+
+    final int xcodeStartMicros = DateTime.now().microsecondsSinceEpoch;
     final sw = Stopwatch()..start();
     initialBuildStatus = globals.logger.startProgress('Running Xcode build...');
 
@@ -554,6 +585,43 @@ Future<XcodeBuildResult> buildXcodeProject({
         elapsedMilliseconds: elapsedDuration.inMilliseconds,
       ),
     );
+
+    // Record Xcode span and merge assemble trace if tracing is enabled.
+    if (tracer != null) {
+      final int xcodeEndMicros = DateTime.now().microsecondsSinceEpoch;
+      tracer.addCompleteEvent(
+        name: 'xcode ${xcodeBuildActionToString(buildAction)}',
+        cat: 'xcode',
+        tid: 2,
+        startMicros: xcodeStartMicros,
+        endMicros: xcodeEndMicros,
+      );
+      // Merge the assemble trace file that flutter assemble wrote.
+      if (assembleTraceFilePath != null) {
+        final File assembleTraceFile = globals.fs.file(assembleTraceFilePath);
+        tracer.mergeEventsFromFile(assembleTraceFile);
+      }
+      tracer.addCompleteEvent(
+        name: 'post-xcode processing',
+        cat: 'flutter',
+        tid: 1,
+        startMicros: xcodeEndMicros,
+        endMicros: DateTime.now().microsecondsSinceEpoch,
+      );
+      tracer.addCompleteEvent(
+        name: 'flutter build ios',
+        cat: 'flutter',
+        tid: 1,
+        startMicros: buildStartMicros,
+        endMicros: DateTime.now().microsecondsSinceEpoch,
+      );
+      final File traceFile = globals.fs.file(buildInfo.traceFilePath);
+      tracer.writeToFile(traceFile);
+      globals.printStatus(
+        'Build trace written to ${buildInfo.traceFilePath}. '
+        'View at https://ui.perfetto.dev',
+      );
+    }
 
     if (tempDir.existsSync()) {
       // Display additional warning and error message from xcresult bundle.
