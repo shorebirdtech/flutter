@@ -564,6 +564,12 @@ class AndroidGradleBuilder implements AndroidBuilder {
     options.addAll(androidBuildInfo.buildInfo.toGradleConfig());
     // Pass trace file path as a Gradle property for flutter assemble.
     // We use an intermediate file that gradle.dart will merge into the final trace.
+    // NOTE: This path is passed as a project-level Gradle property, so it's
+    // shared across all variants. This is safe because `flutter build apk`
+    // only runs a single variant's FlutterTask per invocation. If we ever
+    // support tracing builds that run multiple variants simultaneously (e.g.
+    // multiple flavors in one Gradle invocation), this path would need to
+    // include the variant name to avoid collisions.
     final String? assembleTraceFilePath;
     if (buildInfo.traceFilePath != null) {
       assembleTraceFilePath = _fileSystem.path.join(
