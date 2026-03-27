@@ -1538,6 +1538,120 @@ void main() {
     expect(processManager, hasNoRemainingExpectations);
   }, overrides: {Git: () => git});
 
+  testUsingContext('determine resolves version from shorebird flutter_release branch', () {
+    processManager.addCommands(<FakeCommand>[
+      const FakeCommand(
+        command: <String>['git', 'tag', '--points-at', 'HEAD'],
+        // No tag at HEAD.
+      ),
+      const FakeCommand(
+        command: <String>[
+          'git',
+          'for-each-ref',
+          '--contains',
+          'HEAD',
+          '--format',
+          '%(refname:short)',
+          'refs/remotes/origin/flutter_release/*',
+        ],
+        stdout: 'origin/flutter_release/3.41.4',
+      ),
+    ]);
+    final platform = FakePlatform();
+
+    final GitTagVersion gitTagVersion = GitTagVersion.determine(
+      platform,
+      git: git,
+      workingDirectory: '.',
+    );
+    expect(gitTagVersion.frameworkVersionFor('abcd1234'), '3.41.4');
+    expect(processManager, hasNoRemainingExpectations);
+  });
+
+  testUsingContext('determine skips non-stable shorebird flutter_release branches', () {
+    const headRevision = 'abcd1234';
+    processManager.addCommands(<FakeCommand>[
+      const FakeCommand(
+        command: <String>['git', 'tag', '--points-at', 'HEAD'],
+        // No tag at HEAD.
+      ),
+      // Shorebird release branch check returns only a non-stable branch.
+      const FakeCommand(
+        command: <String>[
+          'git',
+          'for-each-ref',
+          '--contains',
+          'HEAD',
+          '--format',
+          '%(refname:short)',
+          'refs/remotes/origin/flutter_release/*',
+        ],
+        stdout: 'origin/flutter_release/3.41.4-rc2',
+      ),
+      // Falls through to tag-based fallback.
+      const FakeCommand(
+        command: <String>[
+          'git',
+          'for-each-ref',
+          '--sort=-v:refname',
+          '--count=1',
+          '--format=%(refname:short)',
+          'refs/tags/[0-9]*.*.*',
+        ],
+        stdout: '3.41.4',
+      ),
+      const FakeCommand(
+        command: <String>['git', 'merge-base', 'HEAD', '3.41.4'],
+        stdout: headRevision,
+      ),
+      const FakeCommand(
+        command: <String>['git', 'rev-list', '--count', '$headRevision..HEAD'],
+        stdout: '48',
+      ),
+    ]);
+    final platform = FakePlatform();
+
+    final GitTagVersion gitTagVersion = GitTagVersion.determine(
+      platform,
+      git: git,
+      workingDirectory: '.',
+    );
+    // Should NOT be 0.0.0-unknown; the tag fallback should produce a valid version.
+    expect(gitTagVersion.frameworkVersionFor(headRevision), '3.41.5-0.0.pre-48');
+    expect(processManager, hasNoRemainingExpectations);
+  });
+
+  testUsingContext('determine picks stable branch over rc branch from shorebird flutter_release', () {
+    processManager.addCommands(<FakeCommand>[
+      const FakeCommand(
+        command: <String>['git', 'tag', '--points-at', 'HEAD'],
+        // No tag at HEAD.
+      ),
+      const FakeCommand(
+        command: <String>[
+          'git',
+          'for-each-ref',
+          '--contains',
+          'HEAD',
+          '--format',
+          '%(refname:short)',
+          'refs/remotes/origin/flutter_release/*',
+        ],
+        // Both stable and rc branches contain this commit.
+        stdout: 'origin/flutter_release/3.41.4\norigin/flutter_release/3.41.4-rc2',
+      ),
+    ]);
+    final platform = FakePlatform();
+
+    final GitTagVersion gitTagVersion = GitTagVersion.determine(
+      platform,
+      git: git,
+      workingDirectory: '.',
+    );
+    expect(gitTagVersion.frameworkVersionFor('abcd1234'), '3.41.4');
+    expect(processManager, hasNoRemainingExpectations);
+  });
+
   group('$FlutterEngineStampFromFile', () {
     late FileSystem fs;
     const flutterRoot = '/path/to/flutter';
