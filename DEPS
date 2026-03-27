@@ -16,10 +16,10 @@ vars = {
   'skia_git': 'https://skia.googlesource.com',
   'llvm_git': 'https://llvm.googlesource.com',
   'skia_revision': 'a183ded9ad67d998a5b0fe4cd86d3ef5402ffb45',
-  "dart_sdk_revision": "b65ce89c8057d6880e00693a7b0ecd7b9e5f61ca",
+  "dart_sdk_revision": "667fc4ab87165889877a529f72c17bdb3b36738d",
   "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
   "updater_git": "https://github.com/shorebirdtech/updater.git",
-  "updater_rev": "8691c8f60e69f8eb1f35361f4a22e8c9a7fdf93c",
+  "updater_rev": "dc2cd0a86a89e53cd5c0f87efe4ccea93fae9eae",
 
   # WARNING: DO NOT EDIT canvaskit_cipd_instance MANUALLY
   # See `lib/web_ui/README.md` for how to roll CanvasKit to a new version.
