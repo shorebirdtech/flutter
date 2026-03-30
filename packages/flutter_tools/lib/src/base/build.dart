@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:io' as io;
+
 import 'package:process/process.dart';
 
 import '../artifacts.dart';
@@ -95,6 +97,7 @@ class AOTSnapshotter {
   }) : _logger = logger,
        _fileSystem = fileSystem,
        _xcode = xcode,
+       _processManager = processManager,
        _genSnapshot = GenSnapshot(
          artifacts: artifacts,
          processManager: processManager,
@@ -104,7 +107,13 @@ class AOTSnapshotter {
   final Logger _logger;
   final FileSystem _fileSystem;
   final Xcode _xcode;
+  final ProcessManager _processManager;
   final GenSnapshot _genSnapshot;
+
+  /// The maximum cascade byte threshold for the DD table cascade limiter.
+  /// Functions whose transitive caller tree exceeds this many compiled code
+  /// bytes are routed through the indirect dispatch table.
+  static const int _ddMaxBytes = 10000;
 
   /// Builds an architecture-specific ahead-of-time compiled snapshot of the specified script.
   Future<int> build({
@@ -230,9 +239,44 @@ class AOTSnapshotter {
     genSnapshotArgs.add(mainPath);
 
     final snapshotType = SnapshotType(platform, buildMode);
+
+    // Dynamic Dispatch (DD) table: for arm64 Apple platforms with the linker
+    // enabled, we do a 2-pass build. Pass 1 produces a temp ELF for
+    // analyze_snapshot to compute the DD table and slot mapping. Pass 2
+    // produces the final assembly snapshot with indirect calls wired up.
+    final bool usesDDTable = usesLinker && darwinArch == DarwinArch.arm64;
+    String? ddSlotMappingPath;
+
+    if (usesDDTable) {
+      final ddResult = await _computeDDTable(
+        snapshotType: snapshotType,
+        darwinArch: darwinArch!,
+        mainPath: mainPath,
+        outputDir: outputDir,
+        genSnapshotArgs: genSnapshotArgs,
+      );
+      if (ddResult != 0) {
+        return ddResult;
+      }
+      final slotMappingFile = _fileSystem.file(
+        _fileSystem.path.join(outputDir.parent.path, 'App.dd_slots.link'),
+      );
+      if (slotMappingFile.existsSync()) {
+        ddSlotMappingPath = slotMappingFile.path;
+      }
+    }
+
+    // Insert DD slot mapping arg before mainPath (the last arg).
+    final finalGenSnapshotArgs = <String>[
+      ...genSnapshotArgs.take(genSnapshotArgs.length - 1),
+      if (ddSlotMappingPath != null)
+        '--dd_slot_mapping=$ddSlotMappingPath',
+      genSnapshotArgs.last, // mainPath
+    ];
+
     final int genSnapshotExitCode = await _genSnapshot.run(
       snapshotType: snapshotType,
-      additionalArgs: genSnapshotArgs,
+      additionalArgs: finalGenSnapshotArgs,
       darwinArch: darwinArch,
     );
     if (genSnapshotExitCode != 0) {
@@ -255,6 +299,115 @@ class AOTSnapshotter {
       );
     } else {
       return 0;
+    }
+  }
+
+  /// Computes the Dynamic Dispatch (DD) table for the release snapshot.
+  ///
+  /// Runs gen_snapshot in ELF mode to produce a temporary snapshot, then uses
+  /// analyze_snapshot to compute the DD table manifest, caller links, and slot
+  /// mapping. The DD files are written next to the other link files in
+  /// [outputDir]'s parent.
+  ///
+  /// Returns 0 on success, non-zero on failure.
+  Future<int> _computeDDTable({
+    required SnapshotType snapshotType,
+    required DarwinArch darwinArch,
+    required String mainPath,
+    required Directory outputDir,
+    required List<String> genSnapshotArgs,
+  }) async {
+    _logger.printTrace('Computing DD table for release snapshot...');
+
+    final String linkDir = outputDir.parent.path;
+    final String tempElfPath = _fileSystem.path.join(outputDir.path, '_dd_analysis.elf');
+    final String ddTablePath = _fileSystem.path.join(linkDir, 'App.dd.link');
+    final String ddCallerLinksPath = _fileSystem.path.join(linkDir, 'App.dd_callers.link');
+    final String ddSlotMappingPath = _fileSystem.path.join(linkDir, 'App.dd_slots.link');
+
+    // Build a temporary ELF snapshot (no DD) for analyze_snapshot.
+    // Strip out assembly/link-dump args — we only need a bare ELF.
+    final elfArgs = <String>[
+      '--deterministic',
+      '--snapshot_kind=app-aot-elf',
+      '--elf=$tempElfPath',
+      mainPath,
+    ];
+    final int elfExitCode = await _genSnapshot.run(
+      snapshotType: snapshotType,
+      additionalArgs: elfArgs,
+      darwinArch: darwinArch,
+    );
+    if (elfExitCode != 0) {
+      _logger.printError('DD analysis: gen_snapshot (ELF pass) failed with exit code $elfExitCode');
+      return elfExitCode;
+    }
+
+    // Derive analyze_snapshot path from gen_snapshot path.
+    final genSnapshotArtifact = darwinArch == DarwinArch.arm64
+        ? Artifact.genSnapshotArm64
+        : Artifact.genSnapshotX64;
+    final genSnapshotPath = _genSnapshot.getSnapshotterPath(snapshotType, genSnapshotArtifact);
+    final analyzeSnapshotPath = _fileSystem.path.join(
+      _fileSystem.path.dirname(genSnapshotPath),
+      _fileSystem.path.basename(genSnapshotPath).replaceFirst('gen_snapshot', 'analyze_snapshot'),
+    );
+
+    if (!_fileSystem.file(analyzeSnapshotPath).existsSync()) {
+      _logger.printTrace('analyze_snapshot not found at $analyzeSnapshotPath, skipping DD table.');
+      _cleanupFile(tempElfPath);
+      return 0;
+    }
+
+    // Step 1: Compute DD table + caller links.
+    final int computeTableResult = await _runProcess(analyzeSnapshotPath, <String>[
+      '--compute_dd_table=$ddTablePath',
+      '--dd_caller_links=$ddCallerLinksPath',
+      '--dd_max_bytes=$_ddMaxBytes',
+      tempElfPath,
+    ]);
+    if (computeTableResult != 0) {
+      _logger.printError('DD analysis: compute_dd_table failed with exit code $computeTableResult');
+      _cleanupFile(tempElfPath);
+      return computeTableResult;
+    }
+
+    // Step 2: Compute DD slot mapping.
+    final int computeMappingResult = await _runProcess(analyzeSnapshotPath, <String>[
+      '--compute_dd_slot_mapping=$ddSlotMappingPath',
+      '--dd_table_data=$ddTablePath',
+      '--dd_caller_links=$ddCallerLinksPath',
+      tempElfPath,
+    ]);
+    if (computeMappingResult != 0) {
+      _logger.printError('DD analysis: compute_dd_slot_mapping failed with exit code $computeMappingResult');
+      _cleanupFile(tempElfPath);
+      return computeMappingResult;
+    }
+
+    _logger.printTrace('DD table computed successfully.');
+    _cleanupFile(tempElfPath);
+    return 0;
+  }
+
+  /// Runs a process and returns the exit code.
+  Future<int> _runProcess(String executable, List<String> args) async {
+    _logger.printTrace('Running: $executable ${args.join(' ')}');
+    final io.ProcessResult result = await _processManager.run(
+      <String>[executable, ...args],
+    );
+    if (result.exitCode != 0) {
+      _logger.printTrace('stdout: ${result.stdout}');
+      _logger.printTrace('stderr: ${result.stderr}');
+    }
+    return result.exitCode;
+  }
+
+  /// Deletes a file if it exists.
+  void _cleanupFile(String path) {
+    final file = _fileSystem.file(path);
+    if (file.existsSync()) {
+      file.deleteSync();
     }
   }
 
