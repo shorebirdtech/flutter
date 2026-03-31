@@ -946,6 +946,16 @@ flavors:
 
       final build = environment.buildDir.path;
       processManager.addCommands(<FakeCommand>[
+        // DD analysis: gen_snapshot ELF pass for DD table computation (arm64 only).
+        FakeCommand(
+          command: <String>[
+            'Artifact.genSnapshotArm64.TargetPlatform.darwin.release',
+            '--deterministic',
+            '--snapshot_kind=app-aot-elf',
+            '--elf=${environment.buildDir.childFile('arm64/_dd_analysis.elf').path}',
+            environment.buildDir.childFile('app.dill').path,
+          ],
+        ),
         FakeCommand(
           command: <String>[
             'Artifact.genSnapshotArm64.TargetPlatform.darwin.release',

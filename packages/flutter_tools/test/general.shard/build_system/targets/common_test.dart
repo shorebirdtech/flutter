@@ -809,6 +809,16 @@ void main() {
       iosEnvironment.defines[kSdkRoot] = 'path/to/iPhoneOS.sdk';
       final String build = iosEnvironment.buildDir.path;
       processManager.addCommands(<FakeCommand>[
+        // DD analysis: gen_snapshot ELF pass for DD table computation.
+        FakeCommand(
+          command: <String>[
+            'Artifact.genSnapshotArm64.TargetPlatform.ios.profile',
+            '--deterministic',
+            kElfAot,
+            '--elf=$build/arm64/_dd_analysis.elf',
+            '$build/app.dill',
+          ],
+        ),
         FakeCommand(
           command: <String>[
             // This path is not known by the cache due to the iOS gen_snapshot split.
