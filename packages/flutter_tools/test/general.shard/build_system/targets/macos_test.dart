@@ -891,12 +891,25 @@ flavors:
       final build = environment.buildDir.path;
       processManager.addCommands(<FakeCommand>[
         // DD analysis: gen_snapshot ELF pass for DD table computation (arm64 only).
+        // arm64 and x86_64 builds run concurrently via Future.wait. arm64 starts
+        // the DD ELF pass first, then x86_64 (which skips DD) starts its assembly
+        // pass before arm64's DD ELF completes and proceeds to its assembly pass.
         FakeCommand(
           command: <String>[
             'Artifact.genSnapshotArm64.TargetPlatform.darwin.release',
             '--deterministic',
             '--snapshot_kind=app-aot-elf',
             '--elf=${environment.buildDir.childFile('arm64/_dd_analysis.elf').path}',
+            environment.buildDir.childFile('app.dill').path,
+          ],
+        ),
+        FakeCommand(
+          command: <String>[
+            'Artifact.genSnapshotX64.TargetPlatform.darwin.release',
+            '--deterministic',
+            ...linkInfoArgsFor(build),
+            '--snapshot_kind=app-aot-assembly',
+            '--assembly=${environment.buildDir.childFile('x86_64/snapshot_assembly.S').path}',
             environment.buildDir.childFile('app.dill').path,
           ],
         ),
@@ -910,14 +923,18 @@ flavors:
             environment.buildDir.childFile('app.dill').path,
           ],
         ),
+        // x86_64 framework build completes before arm64 because arm64's DD
+        // analysis pass delays it.
         FakeCommand(
           command: <String>[
-            'Artifact.genSnapshotX64.TargetPlatform.darwin.release',
-            '--deterministic',
-            ...linkInfoArgsFor(build),
-            '--snapshot_kind=app-aot-assembly',
-            '--assembly=${environment.buildDir.childFile('x86_64/snapshot_assembly.S').path}',
-            environment.buildDir.childFile('app.dill').path,
+            'xcrun',
+            'cc',
+            '-arch',
+            'x86_64',
+            '-c',
+            environment.buildDir.childFile('x86_64/snapshot_assembly.S').path,
+            '-o',
+            environment.buildDir.childFile('x86_64/snapshot_assembly.o').path,
           ],
         ),
         FakeCommand(
@@ -935,12 +952,23 @@ flavors:
         FakeCommand(
           command: <String>[
             'xcrun',
-            'cc',
+            'clang',
             '-arch',
             'x86_64',
-            '-c',
-            environment.buildDir.childFile('x86_64/snapshot_assembly.S').path,
+            '-dynamiclib',
+            '-Xlinker',
+            '-rpath',
+            '-Xlinker',
+            '@executable_path/Frameworks',
+            '-Xlinker',
+            '-rpath',
+            '-Xlinker',
+            '@loader_path/Frameworks',
+            '-fapplication-extension',
+            '-install_name',
+            '@rpath/App.framework/App',
             '-o',
+            environment.buildDir.childFile('x86_64/App.framework/App').path,
             environment.buildDir.childFile('x86_64/snapshot_assembly.o').path,
           ],
         ),
@@ -970,24 +998,10 @@ flavors:
         FakeCommand(
           command: <String>[
             'xcrun',
-            'clang',
-            '-arch',
-            'x86_64',
-            '-dynamiclib',
-            '-Xlinker',
-            '-rpath',
-            '-Xlinker',
-            '@executable_path/Frameworks',
-            '-Xlinker',
-            '-rpath',
-            '-Xlinker',
-            '@loader_path/Frameworks',
-            '-fapplication-extension',
-            '-install_name',
-            '@rpath/App.framework/App',
+            'dsymutil',
             '-o',
+            environment.buildDir.childFile('x86_64/App.framework.dSYM').path,
             environment.buildDir.childFile('x86_64/App.framework/App').path,
-            environment.buildDir.childFile('x86_64/snapshot_assembly.o').path,
           ],
         ),
         FakeCommand(
@@ -1002,9 +1016,10 @@ flavors:
         FakeCommand(
           command: <String>[
             'xcrun',
-            'dsymutil',
+            'strip',
+            '-x',
+            environment.buildDir.childFile('x86_64/App.framework/App').path,
             '-o',
-            environment.buildDir.childFile('x86_64/App.framework.dSYM').path,
             environment.buildDir.childFile('x86_64/App.framework/App').path,
           ],
         ),
@@ -1016,16 +1031,6 @@ flavors:
             environment.buildDir.childFile('arm64/App.framework/App').path,
             '-o',
             environment.buildDir.childFile('arm64/App.framework/App').path,
-          ],
-        ),
-        FakeCommand(
-          command: <String>[
-            'xcrun',
-            'strip',
-            '-x',
-            environment.buildDir.childFile('x86_64/App.framework/App').path,
-            '-o',
-            environment.buildDir.childFile('x86_64/App.framework/App').path,
           ],
         ),
         FakeCommand(
