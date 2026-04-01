@@ -318,6 +318,24 @@ class AOTSnapshotter {
   }) async {
     _logger.printTrace('Computing DD table for release snapshot...');
 
+    // Derive analyze_snapshot path from gen_snapshot path.
+    // Check for it early so we can skip the entire DD computation (including
+    // the gen_snapshot ELF pass) when using a standard Flutter SDK that doesn't
+    // ship analyze_snapshot.
+    final genSnapshotArtifact = darwinArch == DarwinArch.arm64
+        ? Artifact.genSnapshotArm64
+        : Artifact.genSnapshotX64;
+    final genSnapshotPath = _genSnapshot.getSnapshotterPath(snapshotType, genSnapshotArtifact);
+    final analyzeSnapshotPath = _fileSystem.path.join(
+      _fileSystem.path.dirname(genSnapshotPath),
+      _fileSystem.path.basename(genSnapshotPath).replaceFirst('gen_snapshot', 'analyze_snapshot'),
+    );
+
+    if (!_fileSystem.file(analyzeSnapshotPath).existsSync()) {
+      _logger.printTrace('analyze_snapshot not found at $analyzeSnapshotPath, skipping DD table.');
+      return 0;
+    }
+
     final String linkDir = outputDir.parent.path;
     final String tempElfPath = _fileSystem.path.join(outputDir.path, '_dd_analysis.elf');
     final String ddTablePath = _fileSystem.path.join(linkDir, 'App.dd.link');
@@ -340,22 +358,6 @@ class AOTSnapshotter {
     if (elfExitCode != 0) {
       _logger.printError('DD analysis: gen_snapshot (ELF pass) failed with exit code $elfExitCode');
       return elfExitCode;
-    }
-
-    // Derive analyze_snapshot path from gen_snapshot path.
-    final genSnapshotArtifact = darwinArch == DarwinArch.arm64
-        ? Artifact.genSnapshotArm64
-        : Artifact.genSnapshotX64;
-    final genSnapshotPath = _genSnapshot.getSnapshotterPath(snapshotType, genSnapshotArtifact);
-    final analyzeSnapshotPath = _fileSystem.path.join(
-      _fileSystem.path.dirname(genSnapshotPath),
-      _fileSystem.path.basename(genSnapshotPath).replaceFirst('gen_snapshot', 'analyze_snapshot'),
-    );
-
-    if (!_fileSystem.file(analyzeSnapshotPath).existsSync()) {
-      _logger.printTrace('analyze_snapshot not found at $analyzeSnapshotPath, skipping DD table.');
-      _cleanupFile(tempElfPath);
-      return 0;
     }
 
     // Step 1: Compute DD table + caller links.

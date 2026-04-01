@@ -210,16 +210,6 @@ void main() {
         mode: BuildMode.profile,
       );
       processManager.addCommands(<FakeCommand>[
-        // DD analysis: gen_snapshot ELF pass for DD table computation.
-        FakeCommand(
-          command: <String>[
-            genSnapshotPath,
-            '--deterministic',
-            '--snapshot_kind=app-aot-elf',
-            '--elf=${fileSystem.path.join(outputPath, '_dd_analysis.elf')}',
-            'main.dill',
-          ],
-        ),
         FakeCommand(
           command: <String>[
             genSnapshotPath,
@@ -296,16 +286,6 @@ void main() {
         mode: BuildMode.profile,
       );
       processManager.addCommands(<FakeCommand>[
-        // DD analysis: gen_snapshot ELF pass for DD table computation.
-        FakeCommand(
-          command: <String>[
-            genSnapshotPath,
-            '--deterministic',
-            '--snapshot_kind=app-aot-elf',
-            '--elf=${fileSystem.path.join(outputPath, '_dd_analysis.elf')}',
-            'main.dill',
-          ],
-        ),
         FakeCommand(
           command: <String>[
             genSnapshotPath,
@@ -378,16 +358,6 @@ void main() {
         mode: BuildMode.release,
       );
       processManager.addCommands(<FakeCommand>[
-        // DD analysis: gen_snapshot ELF pass for DD table computation.
-        FakeCommand(
-          command: <String>[
-            genSnapshotPath,
-            '--deterministic',
-            '--snapshot_kind=app-aot-elf',
-            '--elf=${fileSystem.path.join(outputPath, '_dd_analysis.elf')}',
-            'main.dill',
-          ],
-        ),
         FakeCommand(
           command: <String>[
             genSnapshotPath,
