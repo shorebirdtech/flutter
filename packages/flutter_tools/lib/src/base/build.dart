@@ -341,13 +341,17 @@ class AOTSnapshotter {
     final String ddTablePath = _fileSystem.path.join(linkDir, 'App.dd.link');
     final String ddCallerLinksPath = _fileSystem.path.join(linkDir, 'App.dd_callers.link');
     final String ddSlotMappingPath = _fileSystem.path.join(linkDir, 'App.dd_slots.link');
+    final String ddIdentityPath = _fileSystem.path.join(linkDir, 'App.dd_identity.link');
 
     // Build a temporary ELF snapshot (no DD) for analyze_snapshot.
     // Strip out assembly/link-dump args — we only need a bare ELF.
+    // Export DD function identity (InstructionsTable index → kernel_offset)
+    // so the slot mapping can use kernel_offset-based function matching.
     final elfArgs = <String>[
       '--deterministic',
       '--snapshot_kind=app-aot-elf',
       '--elf=$tempElfPath',
+      '--print_dd_function_identity_to=$ddIdentityPath',
       mainPath,
     ];
     final int elfExitCode = await _genSnapshot.run(
@@ -370,24 +374,29 @@ class AOTSnapshotter {
     if (computeTableResult != 0) {
       _logger.printError('DD analysis: compute_dd_table failed with exit code $computeTableResult');
       _cleanupFile(tempElfPath);
+      _cleanupFile(ddIdentityPath);
       return computeTableResult;
     }
 
-    // Step 2: Compute DD slot mapping.
+    // Step 2: Compute DD slot mapping using identity file for
+    // kernel_offset-based function matching.
     final int computeMappingResult = await _runProcess(analyzeSnapshotPath, <String>[
       '--compute_dd_slot_mapping=$ddSlotMappingPath',
       '--dd_table_data=$ddTablePath',
       '--dd_caller_links=$ddCallerLinksPath',
+      '--dd_function_identity=$ddIdentityPath',
       tempElfPath,
     ]);
     if (computeMappingResult != 0) {
       _logger.printError('DD analysis: compute_dd_slot_mapping failed with exit code $computeMappingResult');
       _cleanupFile(tempElfPath);
+      _cleanupFile(ddIdentityPath);
       return computeMappingResult;
     }
 
     _logger.printTrace('DD table computed successfully.');
     _cleanupFile(tempElfPath);
+    _cleanupFile(ddIdentityPath);
     return 0;
   }
 
