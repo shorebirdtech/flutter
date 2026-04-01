@@ -1,4 +1,5 @@
 import("//flutter/common/config.gni")
+import("//flutter/shell/common/shorebird/build_rust_updater.gni")
 import("//flutter/testing/testing.gni")
 
 source_set("snapshots_data_handle") {
@@ -15,6 +16,48 @@ source_set("snapshots_data_handle") {
   ]
 }
 
+if (shorebird_updater_supported) {
+  action("build_rust_updater") {
+    script = "//flutter/shell/common/shorebird/build_rust_updater.py"
+
+    # The stamp file is the declared output for Ninja dependency tracking.
+    _stamp =
+        "$target_gen_dir/rust_updater_${shorebird_updater_rust_target}.stamp"
+    outputs = [ _stamp ]
+
+    args = [
+      "--rust-target",
+      shorebird_updater_rust_target,
+      "--manifest-dir",
+      rebase_path("$shorebird_updater_dir", root_build_dir),
+      "--output-lib",
+      rebase_path("$shorebird_updater_output_lib", root_build_dir),
+      "--stamp",
+      rebase_path(_stamp, root_build_dir),
+    ]
+
+    if (is_android) {
+      args += [
+        "--ndk-path",
+        rebase_path(android_ndk_root, root_build_dir),
+        "--android-api-level",
+        "$android_api_level",
+      ]
+    }
+
+    # Declare inputs so Ninja knows when to re-run the action.
+    inputs = [
+      "$shorebird_updater_dir/Cargo.toml",
+      "$shorebird_updater_dir/Cargo.lock",
+      "$shorebird_updater_dir/library/Cargo.toml",
+      "$shorebird_updater_dir/library/build.rs",
+      "$shorebird_updater_dir/library/cbindgen.toml",
+      "$shorebird_updater_dir/library/.cargo/config.toml",
+    ]
+    inputs += shorebird_updater_rs_sources
+  }
+}
+
 # C++ wrapper around the Rust updater C API.
 # This provides a testable abstraction layer that can be mocked for testing.
 source_set("updater") {
@@ -28,39 +71,12 @@ source_set("updater") {
   # For the Rust updater C API (shorebird_report_launch_start, etc.)
   include_dirs = [ "//flutter" ]
 
-  # Link the Rust updater static library based on target platform.
-  if (is_android) {
-    if (target_cpu == "arm") {
-      libs = [ "//flutter/third_party/updater/target/armv7-linux-androideabi/release/libupdater.a" ]
-    } else if (target_cpu == "arm64") {
-      libs = [ "//flutter/third_party/updater/target/aarch64-linux-android/release/libupdater.a" ]
-    } else if (target_cpu == "x64") {
-      libs = [ "//flutter/third_party/updater/target/x86_64-linux-android/release/libupdater.a" ]
-    } else if (target_cpu == "x86") {
-      libs = [ "//flutter/third_party/updater/target/i686-linux-android/release/libupdater.a" ]
-    }
-  } else if (is_ios) {
-    if (target_cpu == "arm64") {
-      libs = [ "//flutter/third_party/updater/target/aarch64-apple-ios/release/libupdater.a" ]
-    } else if (target_cpu == "x64") {
-      libs = [ "//flutter/third_party/updater/target/x86_64-apple-ios/release/libupdater.a" ]
-    }
-  } else if (is_mac) {
-    if (target_cpu == "arm64") {
-      libs = [ "//flutter/third_party/updater/target/aarch64-apple-darwin/release/libupdater.a" ]
-    } else if (target_cpu == "x64") {
-      libs = [ "//flutter/third_party/updater/target/x86_64-apple-darwin/release/libupdater.a" ]
-    }
-  } else if (is_win) {
-    if (target_cpu == "x64") {
-      libs = [
-        "userenv.lib",
-        "//flutter/third_party/updater/target/x86_64-pc-windows-msvc/release/updater.lib",
-      ]
-    }
-  } else if (is_linux) {
-    if (target_cpu == "x64") {
-      libs = [ "//flutter/third_party/updater/target/x86_64-unknown-linux-gnu/release/libupdater.a" ]
+  if (shorebird_updater_supported) {
+    deps += [ ":build_rust_updater" ]
+    libs = [ shorebird_updater_output_lib ]
+
+    if (is_win) {
+      libs += [ "userenv.lib" ]
     }
   }
 }
