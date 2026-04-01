@@ -114,6 +114,7 @@ source_set("runtime") {
     "//flutter/fml",
     "//flutter/lib/io",
     "//flutter/shell/common:display",
+    "//flutter/shell/common/shorebird:updater",
     "//flutter/skia",
     "//flutter/third_party/tonic",
     "//flutter/txt",
