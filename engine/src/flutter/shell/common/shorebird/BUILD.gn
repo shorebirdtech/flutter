@@ -1,6 +1,10 @@
 import("//flutter/common/config.gni")
 import("//flutter/testing/testing.gni")
 
+if (is_android) {
+  import("//build/config/android/config.gni")
+}
+
 source_set("snapshots_data_handle") {
   sources = [
     "snapshots_data_handle.cc",
@@ -13,6 +17,110 @@ source_set("snapshots_data_handle") {
     "//flutter/runtime:libdart",
     "//flutter/shell/common",
   ]
+}
+
+# Compute Rust target triple and library name for the updater build.
+_updater_dir = "//flutter/third_party/updater"
+
+if (is_android || is_ios || is_mac || is_win || is_linux) {
+  if (is_android) {
+    if (target_cpu == "arm") {
+      _rust_target_triple = "armv7-linux-androideabi"
+    } else if (target_cpu == "arm64") {
+      _rust_target_triple = "aarch64-linux-android"
+    } else if (target_cpu == "x64") {
+      _rust_target_triple = "x86_64-linux-android"
+    } else if (target_cpu == "x86") {
+      _rust_target_triple = "i686-linux-android"
+    }
+  } else if (is_ios) {
+    if (target_cpu == "arm64") {
+      _rust_target_triple = "aarch64-apple-ios"
+    } else if (target_cpu == "x64") {
+      _rust_target_triple = "x86_64-apple-ios"
+    }
+  } else if (is_mac) {
+    if (target_cpu == "arm64") {
+      _rust_target_triple = "aarch64-apple-darwin"
+    } else if (target_cpu == "x64") {
+      _rust_target_triple = "x86_64-apple-darwin"
+    }
+  } else if (is_win) {
+    if (target_cpu == "x64") {
+      _rust_target_triple = "x86_64-pc-windows-msvc"
+    }
+  } else if (is_linux) {
+    if (target_cpu == "x64") {
+      _rust_target_triple = "x86_64-unknown-linux-gnu"
+    }
+  }
+
+  if (is_win) {
+    _updater_lib_name = "updater.lib"
+  } else {
+    _updater_lib_name = "libupdater.a"
+  }
+
+  _updater_output_lib =
+      "$_updater_dir/target/$_rust_target_triple/release/$_updater_lib_name"
+
+  action("build_rust_updater") {
+    script = "//flutter/shell/common/shorebird/build_rust_updater.py"
+
+    # The stamp file is the declared output for Ninja dependency tracking.
+    _stamp = "$target_gen_dir/rust_updater_${_rust_target_triple}.stamp"
+    outputs = [ _stamp ]
+
+    args = [
+      "--rust-target",
+      _rust_target_triple,
+      "--manifest-dir",
+      rebase_path("$_updater_dir", root_build_dir),
+      "--output-lib",
+      rebase_path("$_updater_output_lib", root_build_dir),
+      "--stamp",
+      rebase_path(_stamp, root_build_dir),
+    ]
+
+    if (is_android) {
+      args += [
+        "--ndk-path",
+        rebase_path(android_ndk_root, root_build_dir),
+        "--android-api-level",
+        "$android_api_level",
+      ]
+    }
+
+    # Declare inputs so Ninja knows when to re-run the action.
+    inputs = [
+      "$_updater_dir/Cargo.toml",
+      "$_updater_dir/Cargo.lock",
+      "$_updater_dir/library/Cargo.toml",
+      "$_updater_dir/library/build.rs",
+      "$_updater_dir/library/cbindgen.toml",
+      "$_updater_dir/library/.cargo/config.toml",
+      "$_updater_dir/library/src/lib.rs",
+      "$_updater_dir/library/src/android.rs",
+      "$_updater_dir/library/src/config.rs",
+      "$_updater_dir/library/src/events.rs",
+      "$_updater_dir/library/src/file_errors.rs",
+      "$_updater_dir/library/src/logging.rs",
+      "$_updater_dir/library/src/logging_macros.rs",
+      "$_updater_dir/library/src/network.rs",
+      "$_updater_dir/library/src/test_utils.rs",
+      "$_updater_dir/library/src/time.rs",
+      "$_updater_dir/library/src/updater.rs",
+      "$_updater_dir/library/src/updater_lock.rs",
+      "$_updater_dir/library/src/yaml.rs",
+      "$_updater_dir/library/src/c_api/c_file.rs",
+      "$_updater_dir/library/src/c_api/mod.rs",
+      "$_updater_dir/library/src/cache/disk_io.rs",
+      "$_updater_dir/library/src/cache/mod.rs",
+      "$_updater_dir/library/src/cache/patch_manager.rs",
+      "$_updater_dir/library/src/cache/signing.rs",
+      "$_updater_dir/library/src/cache/updater_state.rs",
+    ]
+  }
 }
 
 # C++ wrapper around the Rust updater C API.
@@ -28,39 +136,12 @@ source_set("updater") {
   # For the Rust updater C API (shorebird_report_launch_start, etc.)
   include_dirs = [ "//flutter" ]
 
-  # Link the Rust updater static library based on target platform.
-  if (is_android) {
-    if (target_cpu == "arm") {
-      libs = [ "//flutter/third_party/updater/target/armv7-linux-androideabi/release/libupdater.a" ]
-    } else if (target_cpu == "arm64") {
-      libs = [ "//flutter/third_party/updater/target/aarch64-linux-android/release/libupdater.a" ]
-    } else if (target_cpu == "x64") {
-      libs = [ "//flutter/third_party/updater/target/x86_64-linux-android/release/libupdater.a" ]
-    } else if (target_cpu == "x86") {
-      libs = [ "//flutter/third_party/updater/target/i686-linux-android/release/libupdater.a" ]
-    }
-  } else if (is_ios) {
-    if (target_cpu == "arm64") {
-      libs = [ "//flutter/third_party/updater/target/aarch64-apple-ios/release/libupdater.a" ]
-    } else if (target_cpu == "x64") {
-      libs = [ "//flutter/third_party/updater/target/x86_64-apple-ios/release/libupdater.a" ]
-    }
-  } else if (is_mac) {
-    if (target_cpu == "arm64") {
-      libs = [ "//flutter/third_party/updater/target/aarch64-apple-darwin/release/libupdater.a" ]
-    } else if (target_cpu == "x64") {
-      libs = [ "//flutter/third_party/updater/target/x86_64-apple-darwin/release/libupdater.a" ]
-    }
-  } else if (is_win) {
-    if (target_cpu == "x64") {
-      libs = [
-        "userenv.lib",
-        "//flutter/third_party/updater/target/x86_64-pc-windows-msvc/release/updater.lib",
-      ]
-    }
-  } else if (is_linux) {
-    if (target_cpu == "x64") {
-      libs = [ "//flutter/third_party/updater/target/x86_64-unknown-linux-gnu/release/libupdater.a" ]
+  if (is_android || is_ios || is_mac || is_win || is_linux) {
+    deps += [ ":build_rust_updater" ]
+    libs = [ _updater_output_lib ]
+
+    if (is_win) {
+      libs += [ "userenv.lib" ]
     }
   }
 }
