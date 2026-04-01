@@ -1,0 +1,71 @@
+# Copyright 2024 The Shorebird Authors. All rights reserved.
+# Use of this source code is governed by a MIT-style license that can be
+# found in the LICENSE file.
+
+# Computes variables needed to build and link the Rust updater library.
+#
+# Exported variables:
+#   shorebird_updater_supported - Whether the current platform is supported.
+#   shorebird_updater_output_lib - Path to the built static library.
+#   shorebird_updater_rust_target - Rust target triple for the current platform.
+#   shorebird_updater_rs_sources - List of .rs source files (for GN inputs).
+
+if (is_android) {
+  import("//build/config/android/config.gni")
+}
+
+shorebird_updater_dir = "//flutter/third_party/updater"
+
+# Only build and link the Rust updater on supported platforms.
+shorebird_updater_supported =
+    is_android || is_ios || is_mac || is_win || is_linux
+
+if (shorebird_updater_supported) {
+  # Compute the Rust target triple from the GN target_os/target_cpu.
+  if (is_android) {
+    if (target_cpu == "arm") {
+      shorebird_updater_rust_target = "armv7-linux-androideabi"
+    } else if (target_cpu == "arm64") {
+      shorebird_updater_rust_target = "aarch64-linux-android"
+    } else if (target_cpu == "x64") {
+      shorebird_updater_rust_target = "x86_64-linux-android"
+    } else if (target_cpu == "x86") {
+      shorebird_updater_rust_target = "i686-linux-android"
+    }
+  } else if (is_ios) {
+    if (target_cpu == "arm64") {
+      shorebird_updater_rust_target = "aarch64-apple-ios"
+    } else if (target_cpu == "x64") {
+      shorebird_updater_rust_target = "x86_64-apple-ios"
+    }
+  } else if (is_mac) {
+    if (target_cpu == "arm64") {
+      shorebird_updater_rust_target = "aarch64-apple-darwin"
+    } else if (target_cpu == "x64") {
+      shorebird_updater_rust_target = "x86_64-apple-darwin"
+    }
+  } else if (is_win) {
+    if (target_cpu == "x64") {
+      shorebird_updater_rust_target = "x86_64-pc-windows-msvc"
+    }
+  } else if (is_linux) {
+    if (target_cpu == "x64") {
+      shorebird_updater_rust_target = "x86_64-unknown-linux-gnu"
+    }
+  }
+
+  if (is_win) {
+    _updater_lib_name = "updater.lib"
+  } else {
+    _updater_lib_name = "libupdater.a"
+  }
+
+  shorebird_updater_output_lib = "$shorebird_updater_dir/target/$shorebird_updater_rust_target/release/$_updater_lib_name"
+
+  # Glob all .rs source files so the input list stays in sync automatically.
+  shorebird_updater_rs_sources =
+      exec_script("//flutter/shell/common/shorebird/list_rust_files.py",
+                  [ rebase_path("$shorebird_updater_dir/library/src",
+                                root_build_dir) ],
+                  "list lines")
+}
