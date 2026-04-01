@@ -41,7 +41,11 @@ def main():
       return 1
     _configure_android_env(env, args.rust_target, args.ndk_path, args.android_api_level)
 
-  manifest_path = os.path.join(args.manifest_dir, 'Cargo.toml')
+  # GN passes paths relative to the build output dir (which is cwd when
+  # Ninja runs the action). Resolve them to absolute paths so they work
+  # regardless of cargo's working directory.
+  manifest_path = os.path.abspath(os.path.join(args.manifest_dir, 'Cargo.toml'))
+  output_lib = os.path.abspath(args.output_lib)
 
   cmd = [
       'cargo',
@@ -61,8 +65,8 @@ def main():
     print(f'ERROR: cargo build failed with exit code {result.returncode}', file=sys.stderr)
     return result.returncode
 
-  if not os.path.exists(args.output_lib):
-    print(f'ERROR: Expected output library not found: {args.output_lib}', file=sys.stderr)
+  if not os.path.exists(output_lib):
+    print(f'ERROR: Expected output library not found: {output_lib}', file=sys.stderr)
     return 1
 
   # Write stamp file to signal success to Ninja.
@@ -74,6 +78,10 @@ def main():
 
 def _configure_android_env(env, rust_target, ndk_path, api_level):
   """Set environment variables so cargo can cross-compile for Android."""
+  # GN passes paths relative to the build output dir. Resolve to absolute
+  # so that cargo and the cc crate can find the NDK tools.
+  ndk_path = os.path.abspath(ndk_path)
+
   # Determine the host platform tag for NDK toolchain paths.
   if sys.platform.startswith('linux'):
     host_tag = 'linux-x86_64'
