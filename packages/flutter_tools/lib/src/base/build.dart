@@ -110,10 +110,19 @@ class AOTSnapshotter {
   final ProcessManager _processManager;
   final GenSnapshot _genSnapshot;
 
-  /// The maximum cascade byte threshold for the DD table cascade limiter.
+  /// The default cascade byte threshold for the DD table cascade limiter.
+  static const int _ddMaxBytesDefault = 10000;
+
+  /// The cascade byte threshold for the DD table cascade limiter.
   /// Functions whose transitive caller tree exceeds this many compiled code
   /// bytes are routed through the indirect dispatch table.
-  static const int _ddMaxBytes = 10000;
+  ///
+  /// Overridable via the SHOREBIRD_DD_MAX_BYTES environment variable. An
+  /// environment variable is used (rather than a command-line flag) so that
+  /// older Flutter builds without DD table support silently ignore it.
+  static int get _ddMaxBytes =>
+      int.tryParse(io.Platform.environment['SHOREBIRD_DD_MAX_BYTES'] ?? '') ??
+      _ddMaxBytesDefault;
 
   /// Builds an architecture-specific ahead-of-time compiled snapshot of the specified script.
   Future<int> build({
