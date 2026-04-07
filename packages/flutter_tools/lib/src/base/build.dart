@@ -253,6 +253,7 @@ class AOTSnapshotter {
     // analyze_snapshot to compute the DD table and slot mapping. Pass 2
     // produces the final assembly snapshot with indirect calls wired up.
     final bool usesDDTable = usesLinker && darwinArch == DarwinArch.arm64;
+    io.stderr.writeln('DD TABLE: usesLinker=$usesLinker, darwinArch=$darwinArch, usesDDTable=$usesDDTable');
     String? ddSlotMappingPath;
 
     if (usesDDTable) {
