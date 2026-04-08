@@ -19,6 +19,11 @@ def main():
   parser.add_argument(
       '--manifest-dir', required=True, help='Directory containing the workspace Cargo.toml'
   )
+  parser.add_argument(
+      '--target-dir',
+      required=True,
+      help='Cargo target directory; should live inside the GN build output dir',
+  )
   parser.add_argument('--output-lib', required=True, help='Expected output library path')
   parser.add_argument('--stamp', required=True, help='Stamp file to write on success')
   parser.add_argument('--ndk-path', help='Path to the Android NDK (required for Android targets)')
@@ -77,6 +82,7 @@ def main():
   # Ninja runs the action). Resolve them to absolute paths so they work
   # regardless of cargo's working directory.
   manifest_path = os.path.abspath(os.path.join(args.manifest_dir, 'Cargo.toml'))
+  target_dir = os.path.abspath(args.target_dir)
   output_lib = os.path.abspath(args.output_lib)
 
   cmd = [
@@ -87,6 +93,8 @@ def main():
       args.rust_target,
       '--manifest-path',
       manifest_path,
+      '--target-dir',
+      target_dir,
       '-p',
       'updater',
   ]
