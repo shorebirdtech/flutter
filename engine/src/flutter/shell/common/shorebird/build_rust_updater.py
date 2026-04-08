@@ -25,11 +25,21 @@ def main():
   parser.add_argument(
       '--android-api-level', type=int, help='Android API level (required for Android targets)'
   )
+  parser.add_argument(
+      '--ios-deployment-target',
+      help='iOS deployment target (e.g. 13.0); required for *-apple-ios targets',
+  )
+  parser.add_argument(
+      '--mac-deployment-target',
+      help='macOS deployment target (e.g. 10.15); required for *-apple-darwin targets',
+  )
   args = parser.parse_args()
 
   env = os.environ.copy()
 
   is_android = 'android' in args.rust_target
+  is_apple_ios = 'apple-ios' in args.rust_target
+  is_apple_darwin = 'apple-darwin' in args.rust_target
 
   if is_android:
     if not args.ndk_path or not args.android_api_level:
@@ -40,6 +50,28 @@ def main():
       )
       return 1
     _configure_android_env(env, args.rust_target, args.ndk_path, args.android_api_level)
+
+  if is_apple_ios:
+    if not args.ios_deployment_target:
+      print(
+          'ERROR: --ios-deployment-target is required for *-apple-ios targets.',
+          file=sys.stderr,
+      )
+      return 1
+    # Setting IPHONEOS_DEPLOYMENT_TARGET makes both the cc crate (compiling
+    # transitive C deps like zstd-sys) and rustc's cdylib link step honor
+    # the engine's iOS deployment target instead of falling back to their
+    # respective defaults (host SDK for cc, target-spec default for rustc).
+    env['IPHONEOS_DEPLOYMENT_TARGET'] = args.ios_deployment_target
+
+  if is_apple_darwin:
+    if not args.mac_deployment_target:
+      print(
+          'ERROR: --mac-deployment-target is required for *-apple-darwin targets.',
+          file=sys.stderr,
+      )
+      return 1
+    env['MACOSX_DEPLOYMENT_TARGET'] = args.mac_deployment_target
 
   # GN passes paths relative to the build output dir (which is cwd when
   # Ninja runs the action). Resolve them to absolute paths so they work
