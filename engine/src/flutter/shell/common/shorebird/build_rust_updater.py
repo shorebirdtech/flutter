@@ -45,6 +45,7 @@ def main():
   is_android = 'android' in args.rust_target
   is_apple_ios = 'apple-ios' in args.rust_target
   is_apple_darwin = 'apple-darwin' in args.rust_target
+  is_msvc = 'pc-windows-msvc' in args.rust_target
 
   if is_android:
     if not args.ndk_path or not args.android_api_level:
@@ -77,6 +78,9 @@ def main():
       )
       return 1
     env['MACOSX_DEPLOYMENT_TARGET'] = args.mac_deployment_target
+
+  if is_msvc:
+    _configure_msvc_env(env, args.rust_target)
 
   # GN passes paths relative to the build output dir (which is cwd when
   # Ninja runs the action). Resolve them to absolute paths so they work
@@ -114,6 +118,29 @@ def main():
     f.write('')
 
   return 0
+
+
+def _configure_msvc_env(env, rust_target):
+  """Force the cc crate to compile transitive C deps with the static CRT.
+
+  The engine's Windows build uses the static CRT (/MT). The updater's
+  .cargo/config.toml sets `-C target-feature=+crt-static` so the rlib is
+  compiled to expect static-CRT linkage. However, cargo populates
+  CARGO_CFG_TARGET_FEATURE from the rustc target spec's default features,
+  not from user rustflags, so +crt-static is invisible to build scripts.
+  The cc crate (used by transitive *-sys deps like zstd-sys to compile
+  their C sources) therefore falls back to /MD, producing .obj files
+  full of __imp_* references that the engine's /MT link cannot resolve
+  (e.g. __imp_clock, __imp__wassert, __imp_qsort_s).
+
+  Force /MT via the per-target CFLAGS env that the cc crate honors. cc
+  appends these flags at the end of its command line, so cl.exe sees
+  `/MD ... /MT` and emits warning D9025 ("overriding '/MD' with '/MT'")
+  and uses the last one -- /MT wins.
+  """
+  triple_env = rust_target.replace('-', '_')
+  env[f'CFLAGS_{triple_env}'] = '/MT'
+  env[f'CXXFLAGS_{triple_env}'] = '/MT'
 
 
 def _configure_android_env(env, rust_target, ndk_path, api_level):
