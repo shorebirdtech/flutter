@@ -346,6 +346,24 @@ class AOTSnapshotter {
       return 0;
     }
 
+    // Backwards compatibility: older gen_snapshot binaries (any Shorebird
+    // engine predating the DD table work) don't know the
+    // `--print_dd_function_identity_to` flag and will hard-error
+    // "Unrecognized flags: print_dd_function_identity_to" on the ELF pass
+    // below. Probe for flag support once here and skip the entire DD
+    // pipeline if the flag isn't present. Leaves the build to proceed as
+    // a normal (non-DD) Shorebird release.
+    final bool genSnapshotSupportsDD = await _genSnapshotSupportsDD(
+      genSnapshotPath: genSnapshotPath,
+    );
+    if (!genSnapshotSupportsDD) {
+      _logger.printTrace(
+          'gen_snapshot at $genSnapshotPath does not support '
+          '--print_dd_function_identity_to, skipping DD table. This is '
+          'expected when running against a pre-DD-table engine.');
+      return 0;
+    }
+
     final String linkDir = outputDir.parent.path;
     final String tempElfPath = _fileSystem.path.join(outputDir.path, '_dd_analysis.elf');
     final String ddTablePath = _fileSystem.path.join(linkDir, 'App.dd.link');
@@ -421,6 +439,65 @@ class AOTSnapshotter {
       _logger.printTrace('stderr: ${result.stderr}');
     }
     return result.exitCode;
+  }
+
+  // Cached result of the DD flag probe. Keyed by absolute gen_snapshot path
+  // so a single process can cover multiple arches (arm64 / x64) cleanly.
+  static final Map<String, bool> _genSnapshotDDSupportCache = <String, bool>{};
+
+  /// Returns true if the gen_snapshot binary at [genSnapshotPath] recognizes
+  /// the `--print_dd_function_identity_to` flag (and by extension the rest of
+  /// the DD-table flag family: `--dd_slot_mapping`, the DD identity file
+  /// write path, etc.).
+  ///
+  /// Probe strategy: invoke gen_snapshot with the DD flag plus a bogus
+  /// kernel input. Two possible failure modes:
+  ///
+  ///   * The flag is recognized → gen_snapshot parses flags, then fails
+  ///     trying to load the invalid kernel: "Can't load Kernel binary:
+  ///     File size is too small to be a valid kernel file."
+  ///
+  ///   * The flag is not recognized → the VM refuses to initialize at all:
+  ///     "Setting VM flags failed: Unrecognized flags:
+  ///     print_dd_function_identity_to"
+  ///
+  /// We check stderr for the "Unrecognized flags" token. If present, the
+  /// flag is not supported and the DD pipeline must be skipped to avoid
+  /// hard-erroring the entire release build. We deliberately do NOT use
+  /// `--help` or `--print_flags` because neither prints per-flag info
+  /// without a kernel input (gen_snapshot exits early on
+  /// "At least one input is required").
+  ///
+  /// Result is cached per gen_snapshot path so multi-arch builds don't pay
+  /// the probe cost more than once per unique binary.
+  Future<bool> _genSnapshotSupportsDD({
+    required String genSnapshotPath,
+  }) async {
+    final bool? cached = _genSnapshotDDSupportCache[genSnapshotPath];
+    if (cached != null) {
+      return cached;
+    }
+    final io.ProcessResult result = await _processManager.run(
+      <String>[
+        genSnapshotPath,
+        '--print_dd_function_identity_to=/dev/null',
+        '--snapshot_kind=app-aot-elf',
+        '--elf=/dev/null',
+        '/dev/null',
+      ],
+    );
+    // gen_snapshot always exits non-zero here because the kernel load
+    // fails. The question is WHY it exited non-zero: if stderr contains
+    // "Unrecognized flags: print_dd_function_identity_to" the DD flag
+    // isn't supported by this binary; otherwise it parsed the flag OK
+    // and only failed later on the bogus kernel.
+    final String stderr = result.stderr.toString();
+    final bool unrecognized =
+        stderr.contains('Unrecognized flags: print_dd_function_identity_to') ||
+        stderr.contains('Unrecognized flag: print_dd_function_identity_to');
+    final bool supported = !unrecognized;
+    _genSnapshotDDSupportCache[genSnapshotPath] = supported;
+    return supported;
   }
 
   /// Deletes a file if it exists.
