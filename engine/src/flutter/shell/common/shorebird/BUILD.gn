@@ -24,10 +24,18 @@ if (shorebird_updater_supported) {
   action("build_rust_updater") {
     script = "//flutter/shell/common/shorebird/build_rust_updater.py"
 
-    # The stamp file is the declared output for Ninja dependency tracking.
+    # The stamp file gives Ninja a deterministic output to depend on, but
+    # we also have to declare the actual static library so consumers
+    # referencing it via `libs = [ shorebird_updater_output_lib ]` find a
+    # rule that produces it. Without the lib in `outputs`, Ninja errors
+    # with `'cargo_target/.../libupdater.a' missing and no known rule to
+    # make it` once the cargo target dir lives inside root_out_dir (#124).
     _stamp =
         "$target_gen_dir/rust_updater_${shorebird_updater_rust_target}.stamp"
-    outputs = [ _stamp ]
+    outputs = [
+      _stamp,
+      shorebird_updater_output_lib,
+    ]
 
     args = [
       "--rust-target",
