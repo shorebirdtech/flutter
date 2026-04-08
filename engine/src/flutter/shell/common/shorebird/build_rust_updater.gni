@@ -16,44 +16,50 @@ if (is_android) {
 
 shorebird_updater_dir = "//flutter/third_party/updater"
 
-# Only build and link the Rust updater on supported platforms.
-shorebird_updater_supported =
-    is_android || is_ios || is_mac || is_win || is_linux
+# Compute the Rust target triple from the GN target_os/target_cpu. GN
+# evaluates BUILD files under every toolchain in use, not just the
+# top-level one, so we get called for host/sub toolchains too. Any
+# (os, cpu) combo we don't explicitly handle leaves the rust target
+# empty and marks the updater unsupported for that toolchain, which is
+# the correct behavior — the updater only needs to be built for
+# toolchains whose final binary is the engine.
+shorebird_updater_rust_target = ""
+
+if (is_android) {
+  if (target_cpu == "arm") {
+    shorebird_updater_rust_target = "armv7-linux-androideabi"
+  } else if (target_cpu == "arm64") {
+    shorebird_updater_rust_target = "aarch64-linux-android"
+  } else if (target_cpu == "x64") {
+    shorebird_updater_rust_target = "x86_64-linux-android"
+  } else if (target_cpu == "x86") {
+    shorebird_updater_rust_target = "i686-linux-android"
+  }
+} else if (is_ios) {
+  if (target_cpu == "arm64") {
+    shorebird_updater_rust_target = "aarch64-apple-ios"
+  } else if (target_cpu == "x64") {
+    shorebird_updater_rust_target = "x86_64-apple-ios"
+  }
+} else if (is_mac) {
+  if (target_cpu == "arm64") {
+    shorebird_updater_rust_target = "aarch64-apple-darwin"
+  } else if (target_cpu == "x64") {
+    shorebird_updater_rust_target = "x86_64-apple-darwin"
+  }
+} else if (is_win) {
+  if (target_cpu == "x64") {
+    shorebird_updater_rust_target = "x86_64-pc-windows-msvc"
+  }
+} else if (is_linux) {
+  if (target_cpu == "x64") {
+    shorebird_updater_rust_target = "x86_64-unknown-linux-gnu"
+  }
+}
+
+shorebird_updater_supported = shorebird_updater_rust_target != ""
 
 if (shorebird_updater_supported) {
-  # Compute the Rust target triple from the GN target_os/target_cpu.
-  if (is_android) {
-    if (target_cpu == "arm") {
-      shorebird_updater_rust_target = "armv7-linux-androideabi"
-    } else if (target_cpu == "arm64") {
-      shorebird_updater_rust_target = "aarch64-linux-android"
-    } else if (target_cpu == "x64") {
-      shorebird_updater_rust_target = "x86_64-linux-android"
-    } else if (target_cpu == "x86") {
-      shorebird_updater_rust_target = "i686-linux-android"
-    }
-  } else if (is_ios) {
-    if (target_cpu == "arm64") {
-      shorebird_updater_rust_target = "aarch64-apple-ios"
-    } else if (target_cpu == "x64") {
-      shorebird_updater_rust_target = "x86_64-apple-ios"
-    }
-  } else if (is_mac) {
-    if (target_cpu == "arm64") {
-      shorebird_updater_rust_target = "aarch64-apple-darwin"
-    } else if (target_cpu == "x64") {
-      shorebird_updater_rust_target = "x86_64-apple-darwin"
-    }
-  } else if (is_win) {
-    if (target_cpu == "x64") {
-      shorebird_updater_rust_target = "x86_64-pc-windows-msvc"
-    }
-  } else if (is_linux) {
-    if (target_cpu == "x64") {
-      shorebird_updater_rust_target = "x86_64-unknown-linux-gnu"
-    }
-  }
-
   if (is_win) {
     _updater_lib_name = "updater.lib"
   } else {
