@@ -1,9 +1,5 @@
 #!/bin/bash -e
 
-# FIXME: This script should be deleted and instead these steps be part
-# of the GN build process.
-# I haven't investigated how to build rust from GN with the Android NDK yet.
-
 # Usage:
 # ./mac_build.sh engine_path
 
@@ -21,19 +17,15 @@ ENGINE_OUT=$ENGINE_SRC/out
 UPDATER_SRC=$ENGINE_SRC/flutter/third_party/updater
 HOST_ARCH='darwin-x64'
 
-# Build the Rust library.
-cd $UPDATER_SRC/library
-
-# Build iOS and MacOS
-cargo build \
-  --target aarch64-apple-ios \
-  --target x86_64-apple-ios \
-  --target aarch64-apple-darwin \
-  --target x86_64-apple-darwin \
-  --release
-
-# Build the patch tool.
-# Again, this belongs as part of the gn build.
+# The Rust updater library is now built as part of the GN/Ninja engine
+# build — see //flutter/shell/common/shorebird/BUILD.gn's
+# build_rust_updater action. Any engine target that depends (transitively)
+# on //flutter/shell/common/shorebird:updater will pull in libupdater.a
+# automatically.
+#
+# Build the patch tool. This is a standalone CLI, not linked into the
+# engine, so the GN build doesn't cover it.
+# TODO(shorebird): move the patch tool into the GN build too.
 cd $UPDATER_SRC/patch
 cargo build --release
 
