@@ -17,26 +17,16 @@ ENGINE_OUT=$ENGINE_SRC/out
 UPDATER_SRC=$ENGINE_SRC/flutter/third_party/updater
 HOST_ARCH='linux-x64'
 
-# Build the Rust library.
-cd $UPDATER_SRC/library
-
-# 24 is Flutter's current minimum supported version,
-# see https://docs.flutter.dev/reference/supported-platforms
-# previous iterations of cargo-ndk required the version to be passed as
-# -p <version>, but that no longer seems needed.
-# We always use the hermetic NDK from the engine repo.
-# The "unmodified" CIPD package keeps the NDK at the standard Android SDK path.
-ANDROID_NDK_HOME=$(echo "$ENGINE_SRC/flutter/third_party/android_tools/sdk/ndk"/*) \
-cargo ndk \
-    --target armv7-linux-androideabi \
-    --target aarch64-linux-android \
-    --target i686-linux-android \
-    --target x86_64-linux-android \
-    build --release
-
-cargo build --release --target x86_64-unknown-linux-gnu
-
-# Build the patch tool.
+# The Rust updater library is now built as part of the GN/Ninja engine
+# build — see //flutter/shell/common/shorebird/BUILD.gn's
+# build_rust_updater action. Android cross-compile env (NDK paths,
+# CC/AR/LINKER) is configured by build_rust_updater.py. Any engine target
+# that depends (transitively) on //flutter/shell/common/shorebird:updater
+# pulls in libupdater.a automatically.
+#
+# Build the patch tool. This is a standalone CLI, not linked into the
+# engine, so the GN build doesn't cover it.
+# TODO(shorebird): move the patch tool into the GN build too.
 cd $UPDATER_SRC/patch
 cargo build --release
 
