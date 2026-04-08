@@ -34,6 +34,8 @@ if (shorebird_updater_supported) {
       shorebird_updater_rust_target,
       "--manifest-dir",
       rebase_path("$shorebird_updater_dir", root_build_dir),
+      "--target-dir",
+      rebase_path("$shorebird_updater_target_dir", root_build_dir),
       "--output-lib",
       rebase_path("$shorebird_updater_output_lib", root_build_dir),
       "--stamp",
