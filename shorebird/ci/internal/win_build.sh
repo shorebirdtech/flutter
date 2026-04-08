@@ -10,11 +10,11 @@ ENGINE_OUT=$ENGINE_SRC/out
 UPDATER_SRC=$ENGINE_SRC/flutter/third_party/updater
 HOST_ARCH='windows-x64'
 
-# Build the Rust library.
-cd $UPDATER_SRC/library
-
-cargo build --release \
-  --target x86_64-pc-windows-msvc
+# The Rust updater library is now built as part of the GN/Ninja engine
+# build — see //flutter/shell/common/shorebird/BUILD.gn's
+# build_rust_updater action. Any engine target that depends (transitively)
+# on //flutter/shell/common/shorebird:updater pulls in updater.lib
+# automatically.
 
 # Compile the engine using the steps here:
 # https://github.com/flutter/flutter/wiki/Compiling-the-engine#compiling-for-android-from-macos-or-linux
