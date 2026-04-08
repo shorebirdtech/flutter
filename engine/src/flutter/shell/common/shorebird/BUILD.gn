@@ -2,6 +2,10 @@ import("//flutter/common/config.gni")
 import("//flutter/shell/common/shorebird/build_rust_updater.gni")
 import("//flutter/testing/testing.gni")
 
+if (is_ios || is_mac) {
+  import("//build/config/darwin/darwin_sdk.gni")
+}
+
 source_set("snapshots_data_handle") {
   sources = [
     "snapshots_data_handle.cc",
@@ -42,6 +46,27 @@ if (shorebird_updater_supported) {
         rebase_path(android_ndk_root, root_build_dir),
         "--android-api-level",
         "$android_api_level",
+      ]
+    }
+
+    if (is_ios) {
+      # Thread the engine's iOS deployment target into the cargo build so
+      # the cc crate (compiling C deps like zstd-sys) and rustc's cdylib
+      # link step both target the same iOS version as the C++ engine.
+      # Without this, cargo defaults to whatever rustc/cc bake in (rustc's
+      # built-in target spec for aarch64-apple-ios is iOS 10/11, while cc
+      # picks up the host SDK), which causes link warnings and unresolved
+      # symbols like ___chkstk_darwin.
+      args += [
+        "--ios-deployment-target",
+        ios_deployment_target,
+      ]
+    }
+
+    if (is_mac) {
+      args += [
+        "--mac-deployment-target",
+        mac_deployment_target,
       ]
     }
 
