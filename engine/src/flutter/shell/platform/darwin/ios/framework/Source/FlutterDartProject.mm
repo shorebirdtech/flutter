@@ -15,7 +15,9 @@
 #include "flutter/fml/build_config.h"
 #include "flutter/fml/paths.h"
 #include "flutter/shell/common/shorebird/shorebird.h"
+#include "flutter/shell/common/shorebird/updater.h"
 #include "flutter/shell/common/switches.h"
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterShorebirdProtectedDataGate.h"
 #import "flutter/shell/platform/darwin/common/InternalFlutterSwiftCommon/InternalFlutterSwiftCommon.h"
 #include "flutter/shell/platform/darwin/common/command_line.h"
 
@@ -176,6 +178,19 @@ flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* p
                                                              encoding:NSUTF8StringEncoding
                                                                 error:nil];
   if (shorebirdYamlContents != nil) {
+    // Install the iOS gate onto the Updater singleton. The gate defers the
+    // updater's kickoff until `UIApplication.protectedDataAvailable` is true,
+    // so the updater does not attempt to write its state files under
+    // `Library/Application Support/` before the device has been unlocked
+    // for the first time since boot (when the default Data Protection class
+    // rejects writes with EPERM/EACCES). The Updater owns the gate, so
+    // CancelPendingUpdateStart() is available on the updater if we ever
+    // need to tear down a pending observer. See
+    // FlutterShorebirdProtectedDataGate.h and
+    // shell/common/shorebird/protected_data.h.
+    flutter::shorebird::Updater::Instance().SetProtectedDataGate(
+        flutter::shorebird::MakeIOSProtectedDataGate());
+
     // Note: we intentionally pass cache_path twice. We provide two different directories
     //   to ConfigureShorebird because Android differentiates between data that persists
     //   between releases and data that does not. iOS does not make this distinction.

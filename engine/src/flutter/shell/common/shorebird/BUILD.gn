@@ -89,6 +89,8 @@ if (shorebird_updater_supported) {
 # This provides a testable abstraction layer that can be mocked for testing.
 source_set("updater") {
   sources = [
+    "protected_data.cc",
+    "protected_data.h",
     "updater.cc",
     "updater.h",
   ]

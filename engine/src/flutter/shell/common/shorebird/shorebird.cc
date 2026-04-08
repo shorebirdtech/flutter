@@ -177,8 +177,14 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   }
 
   if (shorebird::Updater::Instance().ShouldAutoUpdate()) {
-    FML_LOG(INFO) << "Starting Shorebird update";
-    shorebird::Updater::Instance().StartUpdateThread();
+    // Route the kickoff through the Updater's ProtectedDataGate. On
+    // platforms with the default immediate gate this is equivalent to
+    // calling StartUpdateThread() directly. On iOS the installed gate
+    // waits for UIApplication.protectedDataAvailable so the updater
+    // does not try to write its state file under Library/Application
+    // Support/ and fail with EPERM/EACCES before first unlock after
+    // boot. See protected_data.h.
+    shorebird::Updater::Instance().StartUpdateThreadWhenReady();
   } else {
     FML_LOG(INFO)
         << "Shorebird auto_update disabled, not checking for updates.";
@@ -264,8 +270,14 @@ void ConfigureShorebird(std::string code_cache_path,
   }
 
   if (shorebird::Updater::Instance().ShouldAutoUpdate()) {
-    FML_LOG(INFO) << "Starting Shorebird update";
-    shorebird::Updater::Instance().StartUpdateThread();
+    // Route the kickoff through the Updater's ProtectedDataGate. On
+    // platforms with the default immediate gate this is equivalent to
+    // calling StartUpdateThread() directly. On iOS the installed gate
+    // waits for UIApplication.protectedDataAvailable so the updater
+    // does not try to write its state file under Library/Application
+    // Support/ and fail with EPERM/EACCES before first unlock after
+    // boot. See protected_data.h.
+    shorebird::Updater::Instance().StartUpdateThreadWhenReady();
   } else {
     FML_LOG(INFO)
         << "Shorebird auto_update disabled, not checking for updates.";

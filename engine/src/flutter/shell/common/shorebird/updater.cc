@@ -46,6 +46,32 @@ void Updater::ResetLaunchStateForTesting() {
   launch_completed_.store(false);
 }
 
+void Updater::SetProtectedDataGate(std::unique_ptr<ProtectedDataGate> gate) {
+  // Cancel any pending start on the previous gate so we don't leak
+  // observers or fire into a torn-down gate.
+  if (protected_data_gate_) {
+    protected_data_gate_->CancelPending();
+  }
+  protected_data_gate_ =
+      gate ? std::move(gate) : MakeImmediateProtectedDataGate();
+}
+
+void Updater::StartUpdateThreadWhenReady() {
+  if (!protected_data_gate_) {
+    protected_data_gate_ = MakeImmediateProtectedDataGate();
+  }
+  protected_data_gate_->StartWhenAvailable([] {
+    FML_LOG(INFO) << "Starting Shorebird update";
+    Updater::Instance().StartUpdateThread();
+  });
+}
+
+void Updater::CancelPendingUpdateStart() {
+  if (protected_data_gate_) {
+    protected_data_gate_->CancelPending();
+  }
+}
+
 void Updater::ReportLaunchStart() {
   // Guard: only the first engine in a process should promote next_boot →
   // current_boot in the Rust updater. See class-level comment for rationale.

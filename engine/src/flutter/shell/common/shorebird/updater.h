@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 
+#include "flutter/shell/common/shorebird/protected_data.h"
+
 namespace flutter {
 namespace shorebird {
 
@@ -104,6 +106,38 @@ class Updater {
   virtual bool ShouldAutoUpdate() = 0;
   virtual void StartUpdateThread() = 0;
 
+  /// Installs a `ProtectedDataGate` used by `StartUpdateThreadWhenReady`
+  /// to decide when the updater thread may actually run. Passing
+  /// `nullptr` restores the default immediate gate.
+  ///
+  /// If a previous gate had a pending `StartWhenAvailable` callback,
+  /// its `CancelPending()` is called before the gate is replaced so
+  /// we do not leak observers.
+  ///
+  /// Intended to be called once per process during engine
+  /// initialization by the platform embedder (e.g. iOS installs a gate
+  /// that waits for `UIApplication.protectedDataAvailable`). Must be
+  /// called before any concurrent access; the updater does not
+  /// synchronize gate installation against `StartUpdateThreadWhenReady`.
+  void SetProtectedDataGate(std::unique_ptr<ProtectedDataGate> gate);
+
+  /// Starts the updater thread as soon as the installed
+  /// `ProtectedDataGate` says it is safe to do so. On platforms with
+  /// the default immediate gate this is equivalent to calling
+  /// `StartUpdateThread()` directly. On iOS (or any platform that has
+  /// installed a deferring gate) the actual `StartUpdateThread()` call
+  /// is delayed until the gate fires.
+  ///
+  /// Can be called while a previous start is still pending on the gate;
+  /// the gate will cancel the prior pending start before queuing a
+  /// new one.
+  void StartUpdateThreadWhenReady();
+
+  /// Cancels any pending `StartUpdateThreadWhenReady` that is still
+  /// waiting on the gate. No-op if nothing is pending. Does not affect
+  /// an updater thread that has already been started.
+  void CancelPendingUpdateStart();
+
   // Singleton access
   static Updater& Instance();
 
@@ -130,6 +164,11 @@ class Updater {
   // Once-per-process guards for launch lifecycle.
   static std::atomic<bool> launch_started_;
   static std::atomic<bool> launch_completed_;
+
+  // Gate used by StartUpdateThreadWhenReady / CancelPendingUpdateStart.
+  // Initialized lazily to the immediate gate on first access; replaced
+  // via SetProtectedDataGate. Never null after first access.
+  std::unique_ptr<ProtectedDataGate> protected_data_gate_;
 };
 
 /// No-op implementation for unsupported platforms.

@@ -118,6 +118,8 @@ source_set("flutter_framework_source") {
     "framework/Source/FlutterSemanticsScrollView.mm",
     "framework/Source/FlutterSharedApplication.h",
     "framework/Source/FlutterSharedApplication.mm",
+    "framework/Source/FlutterShorebirdProtectedDataGate.h",
+    "framework/Source/FlutterShorebirdProtectedDataGate.mm",
     "framework/Source/FlutterSpellCheckPlugin.h",
     "framework/Source/FlutterSpellCheckPlugin.mm",
     "framework/Source/FlutterTextInputDelegate.h",
