@@ -60,7 +60,16 @@ if (shorebird_updater_supported) {
     _updater_lib_name = "libupdater.a"
   }
 
-  shorebird_updater_output_lib = "$shorebird_updater_dir/target/$shorebird_updater_rust_target/release/$_updater_lib_name"
+  # Cargo target dir lives inside the GN build output dir, not inside the
+  # source tree. This means:
+  #   - `rm -rf out/<config>` clobbers compiled rust artifacts the same
+  #     way it clobbers compiled C++ artifacts; no special-case cleanup
+  #     in checkout.sh.
+  #   - Each GN config (debug/release/ios/android/etc.) gets its own
+  #     cargo target dir, so they don't step on each other's rlibs.
+  #   - The source checkout stays clean, which is what GN/ninja expects.
+  shorebird_updater_target_dir = "$root_out_dir/cargo_target"
+  shorebird_updater_output_lib = "$shorebird_updater_target_dir/$shorebird_updater_rust_target/release/$_updater_lib_name"
 
   # Glob all .rs source files so the input list stays in sync automatically.
   shorebird_updater_rs_sources =
