@@ -166,14 +166,16 @@ gsutil cp $ZIPS_OUT/FlutterMacOS.framework.dSYM.zip $ZIPS_DEST/FlutterMacOS.fram
 
 TMP_DIR=$(mktemp -d)
 
-PATCH_VERSION=0.2.1
+PATCH_VERSION=0.3.0
 GH_RELEASE=https://github.com/shorebirdtech/updater/releases/download/patch-v$PATCH_VERSION/
 cd $TMP_DIR
 curl -L $GH_RELEASE/patch-x86_64-apple-darwin.zip -o patch-x86_64-apple-darwin.zip
+curl -L $GH_RELEASE/patch-aarch64-apple-darwin.zip -o patch-aarch64-apple-darwin.zip
 curl -L $GH_RELEASE/patch-x86_64-pc-windows-msvc.zip -o patch-x86_64-pc-windows-msvc.zip
 curl -L $GH_RELEASE/patch-x86_64-unknown-linux-musl.zip -o patch-x86_64-unknown-linux-musl.zip
 
 gsutil cp patch-x86_64-apple-darwin.zip $SHOREBIRD_ROOT/patch-darwin-x64.zip
+gsutil cp patch-aarch64-apple-darwin.zip $SHOREBIRD_ROOT/patch-darwin-arm64.zip
 gsutil cp patch-x86_64-pc-windows-msvc.zip $SHOREBIRD_ROOT/patch-windows-x64.zip
 gsutil cp patch-x86_64-unknown-linux-musl.zip $SHOREBIRD_ROOT/patch-linux-x64.zip
 
