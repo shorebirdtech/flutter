@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:convert';
+
 import 'package:file/file.dart';
 import 'package:process/process.dart';
 import 'package:unified_analytics/unified_analytics.dart';
@@ -17,6 +19,7 @@ import '../base/process.dart';
 import '../base/project_migrator.dart';
 import '../base/version.dart';
 import '../build_info.dart';
+import '../build_system/build_trace.dart';
 import '../cache.dart';
 import '../ios/xcodeproj.dart';
 import '../migrations/cocoapods_script_symlink.dart';
@@ -336,16 +339,28 @@ class CocoaPods {
 
   Future<void> _runPodInstall(XcodeBasedProject xcodeProject, BuildMode buildMode) async {
     final Status status = _logger.startProgress('Running pod install...');
-    final ProcessResult result = await _processManager.run(
-      <String>['pod', 'install', '--verbose'],
-      workingDirectory: _fileSystem.path.dirname(xcodeProject.podfile.path),
-      environment: <String, String>{
-        // See https://github.com/flutter/flutter/issues/10873.
-        // CocoaPods analytics adds a lot of latency.
-        'COCOAPODS_DISABLE_STATS': 'true',
-        'LANG': 'en_US.UTF-8',
-      },
-    );
+
+    // Shorebird-specific: when a build trace is active, stream pod install
+    // output so we can timestamp phase transitions. On plugin-heavy apps
+    // pod install can be minutes, and a single opaque span hides where the
+    // time goes (dependency analysis vs downloads vs project generation vs
+    // integration).
+    final BuildTracer? tracer = BuildTracer.current;
+    final ProcessResult result;
+    if (tracer == null) {
+      result = await _processManager.run(
+        <String>['pod', 'install', '--verbose'],
+        workingDirectory: _fileSystem.path.dirname(xcodeProject.podfile.path),
+        environment: <String, String>{
+          // See https://github.com/flutter/flutter/issues/10873.
+          // CocoaPods analytics adds a lot of latency.
+          'COCOAPODS_DISABLE_STATS': 'true',
+          'LANG': 'en_US.UTF-8',
+        },
+      );
+    } else {
+      result = await _runPodInstallStreamed(tracer, xcodeProject);
+    }
     status.stop();
     if (_logger.isVerbose || result.exitCode != 0) {
       final stdout = result.stdout as String;
@@ -372,6 +387,79 @@ class CocoaPods {
         xcodeProject.podfileLock.path,
       ], workingDirectory: _fileSystem.path.dirname(xcodeProject.podfile.path));
     }
+  }
+
+  /// Runs `pod install --verbose` with live stdout streaming so phase
+  /// transitions can be timestamped into [tracer]. Returns a [ProcessResult]
+  /// shaped the same as [ProcessManager.run] would have returned, so
+  /// downstream error handling keeps working unchanged.
+  Future<ProcessResult> _runPodInstallStreamed(
+    BuildTracer tracer,
+    XcodeBasedProject xcodeProject,
+  ) async {
+    final Process process = await _processManager.start(
+      <String>['pod', 'install', '--verbose'],
+      workingDirectory: _fileSystem.path.dirname(xcodeProject.podfile.path),
+      environment: <String, String>{
+        'COCOAPODS_DISABLE_STATS': 'true',
+        'LANG': 'en_US.UTF-8',
+      },
+    );
+
+    final stdoutBuf = StringBuffer();
+    final stderrBuf = StringBuffer();
+    String? currentPhase;
+    int? currentPhaseStartMicros;
+
+    void transitionTo(String? newPhase) {
+      final int now = DateTime.now().microsecondsSinceEpoch;
+      if (currentPhase != null && currentPhaseStartMicros != null) {
+        tracer.addCompleteEvent(
+          name: 'pod install: $currentPhase',
+          cat: 'subprocess',
+          tid: 1,
+          startMicros: currentPhaseStartMicros!,
+          endMicros: now,
+        );
+      }
+      currentPhase = newPhase;
+      currentPhaseStartMicros = newPhase == null ? null : now;
+    }
+
+    final Future<void> stdoutDone = process.stdout
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen((String line) {
+      stdoutBuf
+        ..write(line)
+        ..write('\n');
+      // CocoaPods verbose-mode phase markers. Stable across recent versions.
+      if (line.contains('Analyzing dependencies')) {
+        transitionTo('analyzing');
+      } else if (line.contains('Downloading dependencies')) {
+        transitionTo('downloading');
+      } else if (line.contains('Generating Pods project')) {
+        transitionTo('generating');
+      } else if (line.contains('Integrating client project')) {
+        transitionTo('integrating');
+      }
+    }).asFuture<void>();
+
+    final Future<void> stderrDone = process.stderr
+        .transform(utf8.decoder)
+        .listen(stderrBuf.write)
+        .asFuture<void>();
+
+    final int exitCode = await process.exitCode;
+    await Future.wait(<Future<void>>[stdoutDone, stderrDone]);
+    transitionTo(null);
+
+    return ProcessResult(
+      process.pid,
+      exitCode,
+      stdoutBuf.toString(),
+      stderrBuf.toString(),
+    );
   }
 
   void _diagnosePodInstallFailure(ProcessResult result, XcodeBasedProject xcodeProject) {
