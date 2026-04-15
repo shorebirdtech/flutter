@@ -356,6 +356,8 @@ Future<XcodeBuildResult> buildXcodeProject({
   final BuildTracer? tracer = buildInfo.shorebirdTraceFilePath != null
       ? BuildTracer()
       : null;
+  // Expose to Net/subprocess layers so they can record spans themselves.
+  BuildTracer.current = tracer;
 
   final int podInstallStartMicros = DateTime.now().microsecondsSinceEpoch;
   await processPodsIfNeeded(project.ios, buildDirectoryPath, buildInfo.mode);
@@ -635,6 +637,9 @@ Future<XcodeBuildResult> buildXcodeProject({
         'Shorebird build trace written to ${buildInfo.shorebirdTraceFilePath}. '
         'View at https://ui.perfetto.dev',
       );
+    }
+    if (tracer != null) {
+      BuildTracer.current = null;
     }
 
     if (tempDir.existsSync()) {

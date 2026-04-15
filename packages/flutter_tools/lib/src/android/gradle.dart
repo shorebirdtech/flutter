@@ -486,6 +486,11 @@ class AndroidGradleBuilder implements AndroidBuilder {
         androidBuildInfo.buildInfo.shorebirdTraceFilePath != null
         ? BuildTracer()
         : null;
+    // Make the tracer visible to other layers of the flutter tool (Net,
+    // subprocess wrappers) so they can record spans without plumbing a
+    // parameter through. Cleared in the finally-equivalent below, after
+    // the trace is written.
+    BuildTracer.current = tracer;
 
     final BuildInfo buildInfo = androidBuildInfo.buildInfo;
     final String assembleTask = isBuildingBundle
@@ -701,6 +706,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
         'View at https://ui.perfetto.dev',
       );
     }
+    BuildTracer.current = null;
 
     if (isBuildingBundle) {
       final File bundleFile = findBundleFile(project, buildInfo, _logger, _analytics);

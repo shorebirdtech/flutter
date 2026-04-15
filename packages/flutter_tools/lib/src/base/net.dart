@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:meta/meta.dart';
 
+import '../build_system/build_trace.dart';
 import '../convert.dart';
 import 'common.dart';
 import 'file_system.dart';
@@ -87,6 +88,31 @@ class Net {
   Future<bool> _attempt(Uri url, {IOSink? destSink, bool onlyHeaders = false}) async {
     assert(onlyHeaders || destSink != null);
     _logger.printTrace('Downloading: $url');
+    // Shorebird trace: record each artifact download as a network span so
+    // the build trace reflects time Flutter itself spent on HTTP, not just
+    // what the Shorebird CLI did. No-op when tracing is off.
+    final int networkStartMicros = DateTime.now().microsecondsSinceEpoch;
+    int? statusCode;
+    void recordNetworkSpan({String? errorKind}) {
+      final BuildTracer? tracer = BuildTracer.current;
+      if (tracer == null) {
+        return;
+      }
+      tracer.addCompleteEvent(
+        name: '${onlyHeaders ? 'HEAD' : 'GET'} ${url.host}',
+        cat: 'network',
+        tid: 5,
+        startMicros: networkStartMicros,
+        endMicros: DateTime.now().microsecondsSinceEpoch,
+        args: <String, Object?>{
+          'method': onlyHeaders ? 'HEAD' : 'GET',
+          'host': url.host,
+          if (statusCode != null) 'status': statusCode,
+          if (errorKind != null) 'error': errorKind,
+        },
+      );
+    }
+
     final HttpClient httpClient = _httpClientFactory();
     HttpClientRequest request;
     HttpClientResponse? response;
@@ -98,6 +124,7 @@ class Net {
       }
       response = await request.close();
     } on ArgumentError catch (error) {
+      recordNetworkSpan(errorKind: 'ArgumentError');
       final String? overrideUrl = _platform.environment[kFlutterStorageBaseUrl];
       if (overrideUrl != null && url.toString().contains(overrideUrl)) {
         _logger.printError(error.toString());
@@ -112,6 +139,7 @@ class Net {
       _logger.printError(error.toString());
       rethrow;
     } on HandshakeException catch (error) {
+      recordNetworkSpan(errorKind: 'HandshakeException');
       _logger.printTrace(error.toString());
       throwToolExit(
         'Could not authenticate download server. You may be experiencing a man-in-the-middle attack,\n'
@@ -120,19 +148,25 @@ class Net {
         exitCode: kNetworkProblemExitCode,
       );
     } on SocketException catch (error) {
+      recordNetworkSpan(errorKind: 'SocketException');
       _logger.printTrace('Download error: $error');
       return false;
     } on HttpException catch (error) {
+      recordNetworkSpan(errorKind: 'HttpException');
       _logger.printTrace('Download error: $error');
       return false;
     }
 
+    statusCode = response.statusCode;
+
     // If we're making a HEAD request, we're only checking to see if the URL is
     // valid.
     if (onlyHeaders) {
+      recordNetworkSpan();
       return response.statusCode == HttpStatus.ok;
     }
     if (response.statusCode != HttpStatus.ok) {
+      recordNetworkSpan();
       if (response.statusCode > 0 && response.statusCode < 500) {
         throwToolExit(
           'Download failed.\n'
@@ -156,6 +190,9 @@ class Net {
     } finally {
       await destSink?.flush();
       await destSink?.close();
+      // Record after the body has been fully drained so `dur` reflects
+      // end-to-end download time, not just time-to-first-byte.
+      recordNetworkSpan();
     }
   }
 }

@@ -53,8 +53,19 @@ class BuildTraceEvent {
 
 /// Collects [BuildTraceEvent]s and writes them as a Chrome Trace Event Format
 /// JSON array.
+///
+/// Shorebird-specific: not upstream. A single tracer is made `current` by
+/// the build driver ([BuildTracer.current]) while a build is running so any
+/// layer of the Flutter tool — HTTP artifact downloads, subprocess wrappers,
+/// etc. — can record spans without having to plumb a tracer parameter
+/// through every call site.
 class BuildTracer {
   final List<BuildTraceEvent> _events = <BuildTraceEvent>[];
+
+  /// The build tracer for the in-progress `flutter build` invocation, if
+  /// any. Set by gradle.dart / mac.dart for the duration of a build. Null
+  /// when tracing is not enabled.
+  static BuildTracer? current;
 
   /// Adds a complete event (`ph: "X"`) to the trace.
   void addCompleteEvent({
