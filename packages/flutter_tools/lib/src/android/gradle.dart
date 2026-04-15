@@ -482,7 +482,8 @@ class AndroidGradleBuilder implements AndroidBuilder {
 
     // Assembly work starts here.
     final int buildStartMicros = DateTime.now().microsecondsSinceEpoch;
-    final BuildTracer? tracer = androidBuildInfo.buildInfo.traceFilePath != null
+    final BuildTracer? tracer =
+        androidBuildInfo.buildInfo.shorebirdTraceFilePath != null
         ? BuildTracer()
         : null;
 
@@ -572,34 +573,34 @@ class AndroidGradleBuilder implements AndroidBuilder {
     // include the variant name to avoid collisions.
     final String? assembleTraceFilePath;
     final String? gradleTaskTraceFilePath;
-    if (buildInfo.traceFilePath != null) {
+    if (buildInfo.shorebirdTraceFilePath != null) {
       assembleTraceFilePath = _fileSystem.path.join(
         project.android.buildDirectory.path,
         'intermediates',
-        'flutter',
-        'flutter_assemble_trace.json',
+        'shorebird',
+        'shorebird_assemble_trace.json',
       );
-      options.add('-Ptrace-file=$assembleTraceFilePath');
+      options.add('-Pshorebird-trace-file=$assembleTraceFilePath');
 
-      // Load the Flutter gradle trace init script so every Gradle task
+      // Load the Shorebird gradle trace init script so every Gradle task
       // emits a Chrome Trace Event Format entry we can merge into the
       // main trace — gives per-plugin / per-task visibility that the
       // single "gradle assembleRelease" span can't provide on its own.
       gradleTaskTraceFilePath = _fileSystem.path.join(
         project.android.buildDirectory.path,
         'intermediates',
-        'flutter',
-        'flutter_gradle_task_trace.json',
+        'shorebird',
+        'shorebird_gradle_task_trace.json',
       );
       final String gradleTraceInitScript = _fileSystem.path.join(
         Cache.flutterRoot!,
         'packages',
         'flutter_tools',
         'gradle',
-        'flutter_trace_init.gradle',
+        'shorebird_trace_init.gradle',
       );
       options.add('-I=$gradleTraceInitScript');
-      options.add('-Pflutter.gradle-trace-file=$gradleTaskTraceFilePath');
+      options.add('-Pshorebird.gradle-trace-file=$gradleTaskTraceFilePath');
     } else {
       assembleTraceFilePath = null;
       gradleTaskTraceFilePath = null;
@@ -676,8 +677,8 @@ class AndroidGradleBuilder implements AndroidBuilder {
       );
     }
 
-    // Write the build trace if tracing is enabled.
-    if (tracer != null && buildInfo.traceFilePath != null) {
+    // Write the Shorebird build trace if tracing is enabled.
+    if (tracer != null && buildInfo.shorebirdTraceFilePath != null) {
       final int postGradleEndMicros = DateTime.now().microsecondsSinceEpoch;
       tracer.addCompleteEvent(
         name: 'post-gradle processing',
@@ -693,10 +694,10 @@ class AndroidGradleBuilder implements AndroidBuilder {
         startMicros: buildStartMicros,
         endMicros: postGradleEndMicros,
       );
-      final File traceFile = _fileSystem.file(buildInfo.traceFilePath);
+      final File traceFile = _fileSystem.file(buildInfo.shorebirdTraceFilePath);
       tracer.writeToFile(traceFile);
       _logger.printStatus(
-        'Build trace written to ${buildInfo.traceFilePath}. '
+        'Shorebird build trace written to ${buildInfo.shorebirdTraceFilePath}. '
         'View at https://ui.perfetto.dev',
       );
     }

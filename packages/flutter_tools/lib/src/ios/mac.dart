@@ -349,27 +349,41 @@ Future<XcodeBuildResult> buildXcodeProject({
       );
     }
   }
+  // Create the Shorebird tracer early enough to capture pod install, which
+  // can be minutes on plugin-heavy apps — otherwise it's an invisible gap
+  // between "flutter build ios" starting and the xcode archive span.
+  final int buildStartMicros = DateTime.now().microsecondsSinceEpoch;
+  final BuildTracer? tracer = buildInfo.shorebirdTraceFilePath != null
+      ? BuildTracer()
+      : null;
+
+  final int podInstallStartMicros = DateTime.now().microsecondsSinceEpoch;
   await processPodsIfNeeded(project.ios, buildDirectoryPath, buildInfo.mode);
+  tracer?.addCompleteEvent(
+    name: 'pod install',
+    cat: 'subprocess',
+    tid: 1,
+    startMicros: podInstallStartMicros,
+    endMicros: DateTime.now().microsecondsSinceEpoch,
+  );
   if (configOnly) {
     return XcodeBuildResult(success: true);
   }
 
-  final int buildStartMicros = DateTime.now().microsecondsSinceEpoch;
-  final BuildTracer? tracer = buildInfo.traceFilePath != null
-      ? BuildTracer()
-      : null;
-
-  // Pass trace file path as an intermediate location for flutter assemble.
-  // mac.dart will merge this into the final trace file.
+  // Pass the Shorebird trace file path as an intermediate location for
+  // flutter assemble. mac.dart merges this into the final trace file.
+  // The env var is read by xcode_backend.dart when Xcode invokes the
+  // build phase script; naming it SHOREBIRD_TRACE_FILE avoids squatting
+  // on an Xcode-reserved prefix.
   final String? assembleTraceFilePath;
-  if (buildInfo.traceFilePath != null) {
+  if (buildInfo.shorebirdTraceFilePath != null) {
     assembleTraceFilePath = globals.fs.path.join(
       globals.fs.currentDirectory.path,
       getBuildDirectory(),
       'ios',
-      'flutter_assemble_trace.json',
+      'shorebird_assemble_trace.json',
     );
-    buildCommands.add('TRACE_FILE=$assembleTraceFilePath');
+    buildCommands.add('SHOREBIRD_TRACE_FILE=$assembleTraceFilePath');
   } else {
     assembleTraceFilePath = null;
   }
@@ -615,10 +629,10 @@ Future<XcodeBuildResult> buildXcodeProject({
         startMicros: buildStartMicros,
         endMicros: DateTime.now().microsecondsSinceEpoch,
       );
-      final File traceFile = globals.fs.file(buildInfo.traceFilePath);
+      final File traceFile = globals.fs.file(buildInfo.shorebirdTraceFilePath);
       tracer.writeToFile(traceFile);
       globals.printStatus(
-        'Build trace written to ${buildInfo.traceFilePath}. '
+        'Shorebird build trace written to ${buildInfo.shorebirdTraceFilePath}. '
         'View at https://ui.perfetto.dev',
       );
     }

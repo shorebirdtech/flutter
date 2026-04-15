@@ -1,10 +1,12 @@
 // Emits Chrome Trace Event Format events for every Gradle task so the
-// flutter build trace (`flutter build ... --trace`) can show per-task
-// timings alongside flutter tool + flutter assemble spans.
+// Shorebird build trace (`flutter build ... --shorebird-trace`) can show
+// per-task timings alongside flutter tool + flutter assemble spans.
 //
-// Activated by passing `-I=<this>` together with
-// `-Pflutter.gradle-trace-file=<path>`. Output file is consumed by
-// Flutter's gradle.dart and merged into the main trace.
+// This file is Shorebird-specific — it exists in the Shorebird fork of
+// Flutter and has no equivalent upstream. Activated by passing
+// `-I=<this>` together with `-Pshorebird.gradle-trace-file=<path>`.
+// Output file is consumed by Flutter's gradle.dart and merged into the
+// main trace.
 //
 // Events land on tid=4 (flutter tool = 1, native build outer = 2, flutter
 // assemble = 3) so Perfetto shows a clean per-tier layout.
@@ -14,9 +16,9 @@ import org.gradle.api.Task
 import org.gradle.api.execution.TaskExecutionListener
 import org.gradle.api.tasks.TaskState
 
-def traceFilePath = gradle.startParameter.projectProperties['flutter.gradle-trace-file']
+def traceFilePath = gradle.startParameter.projectProperties['shorebird.gradle-trace-file']
 if (!traceFilePath) {
-    traceFilePath = System.getProperty('flutter.gradle-trace-file')
+    traceFilePath = System.getProperty('shorebird.gradle-trace-file')
 }
 if (!traceFilePath) {
     return

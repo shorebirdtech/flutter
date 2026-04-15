@@ -131,7 +131,10 @@ abstract final class FlutterOptions {
   static const kDartDefineFromFileOption = 'dart-define-from-file';
   static const kWebDefinesOption = 'web-define';
   static const kPerformanceMeasurementFile = 'performance-measurement-file';
-  static const kBuildTrace = 'trace';
+  // Shorebird-specific build-trace option. Prefixed so the flag name and
+  // generated env vars / Gradle properties don't squat on identifiers
+  // upstream Flutter might want later.
+  static const kShorebirdTrace = 'shorebird-trace';
   static const kDeviceUser = 'device-user';
   static const kDeviceTimeout = 'device-timeout';
   static const kDeviceConnection = 'device-connection';
@@ -1049,14 +1052,16 @@ abstract class FlutterCommand extends Command<void> {
     );
   }
 
-  void usesBuildTraceOption({bool hide = false}) {
+  void usesShorebirdTraceOption({bool hide = false}) {
     argParser.addOption(
-      FlutterOptions.kBuildTrace,
+      FlutterOptions.kShorebirdTrace,
       help:
-          'Output a Chrome Trace Event Format JSON file for build profiling. '
-          'The resulting file can be viewed at https://ui.perfetto.dev.',
+          'Output a Chrome Trace Event Format JSON file for build '
+          'profiling. The resulting file can be viewed at '
+          'https://ui.perfetto.dev. Shorebird-specific; named to avoid '
+          'colliding with any future upstream trace option.',
       hide: hide,
-      valueHelp: 'path/to/trace.json',
+      valueHelp: 'path/to/shorebird-trace.json',
     );
   }
 
@@ -1438,9 +1443,9 @@ abstract class FlutterCommand extends Command<void> {
         ? stringArg(FlutterOptions.kPerformanceMeasurementFile)
         : null;
 
-    final String? traceFilePath =
-        argParser.options.containsKey(FlutterOptions.kBuildTrace)
-        ? stringArg(FlutterOptions.kBuildTrace)
+    final String? shorebirdTraceFilePath =
+        argParser.options.containsKey(FlutterOptions.kShorebirdTrace)
+        ? stringArg(FlutterOptions.kShorebirdTrace)
         : null;
 
     final Map<String, Object?> defineConfigJsonMap = extractDartDefineConfigJsonMap();
@@ -1494,7 +1499,7 @@ abstract class FlutterCommand extends Command<void> {
       dartDefines: dartDefines,
       dartExperiments: experiments,
       performanceMeasurementFile: performanceMeasurementFile,
-      traceFilePath: traceFilePath,
+      shorebirdTraceFilePath: shorebirdTraceFilePath,
       packageConfigPath: packagesPath ?? packageConfigFile.path,
       codeSizeDirectory: codeSizeDirectory,
       androidGradleDaemon: androidGradleDaemon,
