@@ -400,8 +400,11 @@ Future<XcodeBuildResult> buildXcodeProject({
     // An environment variable to be passed to xcode_backend.sh determining
     // whether to echo back executed commands.
     buildCommands.add('VERBOSE_SCRIPT_LOGGING=YES');
-  } else {
+  } else if (buildInfo.shorebirdTraceFilePath == null) {
     // This will print warnings and errors only.
+    // Skipped when the Shorebird build trace is active because `-quiet`
+    // also suppresses the `** Build Timing Summary **` block we parse to
+    // produce per-phase Xcode spans.
     buildCommands.add('-quiet');
   }
 
