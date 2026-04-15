@@ -38,21 +38,26 @@ gradle.addListener(new TaskExecutionListener() {
         def end = System.currentTimeMillis() * 1000L
         def dur = Math.max(0L, end - start)
         // Classify the task path into a small set of "kinds" so downstream
-        // summarizers can bucket without retaining names.
+        // summarizers can bucket without retaining names. Match against the
+        // task's simple name (last colon segment) so plugin names like
+        // `:package_info_plus:...` don't accidentally trigger the `packaging`
+        // bucket.
         def path = task.path
+        def lastColon = path.lastIndexOf(':')
+        def simpleName = (lastColon >= 0 ? path.substring(lastColon + 1) : path).toLowerCase()
         def kind = 'other'
-        def lower = path.toLowerCase()
-        if (lower.contains('compilekotlin')) kind = 'kotlin_compile'
-        else if (lower.contains('compilejavawithjavac') || lower.contains('compilejava')) kind = 'java_compile'
-        else if (lower.contains('aidl')) kind = 'aidl'
-        else if (lower.contains('dex')) kind = 'dex'
-        else if (lower.contains('mergeresources') || lower.contains('processresources') || lower.contains('mergemanifest')) kind = 'resources'
-        else if (lower.contains('package') && lower.contains('release')) kind = 'packaging'
-        else if (lower.contains('bundle')) kind = 'bundle'
-        else if (lower.contains('transform')) kind = 'transform'
-        else if (lower.contains('link') && lower.contains('native')) kind = 'native_link'
-        else if (lower.contains('lint')) kind = 'lint'
-        else if (lower.contains('flutter')) kind = 'flutter_gradle_plugin'
+        if (simpleName.contains('kotlin') && simpleName.startsWith('compile')) kind = 'kotlin_compile'
+        else if (simpleName.startsWith('compile') && (simpleName.contains('java') || simpleName.contains('jni'))) kind = 'java_compile'
+        else if (simpleName.contains('aidl')) kind = 'aidl'
+        else if (simpleName.contains('r8') || simpleName.startsWith('minify')) kind = 'r8_minify'
+        else if (simpleName.contains('dex')) kind = 'dex'
+        else if (simpleName.startsWith('lint')) kind = 'lint'
+        else if (simpleName.contains('link') && simpleName.contains('native')) kind = 'native_link'
+        else if (simpleName.contains('processresources') || simpleName.contains('mergeresources') || simpleName.contains('mergemanifest')) kind = 'resources'
+        else if (simpleName.startsWith('package') || simpleName.contains('packagerelease') || simpleName.contains('packagedebug')) kind = 'packaging'
+        else if (simpleName.contains('bundle')) kind = 'bundle'
+        else if (simpleName.contains('transform')) kind = 'transform'
+        else if (simpleName.startsWith('compileflutter') || simpleName.contains('flutterbuild') || simpleName.startsWith('flutter')) kind = 'flutter_gradle_plugin'
 
         // The task "owner" is the first colon-separated segment. For
         // subproject tasks this is typically the plugin name (e.g.
