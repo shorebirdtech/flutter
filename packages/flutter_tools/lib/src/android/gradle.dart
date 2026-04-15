@@ -889,6 +889,12 @@ class AndroidGradleBuilder implements AndroidBuilder {
     if (target.isNotEmpty) {
       command.add('-Ptarget=$target');
     }
+    // When build tracing is on, enable Gradle's own --profile report so the
+    // HTML/XML profile at `build/reports/profile/` captures per-task timings
+    // we can aggregate into per-plugin histograms.
+    if (buildInfo.traceFilePath != null) {
+      command.add('--profile');
+    }
     command.addAll(androidBuildInfo.buildInfo.toGradleConfig());
     if (buildInfo.dartObfuscation && buildInfo.mode != BuildMode.release) {
       _logger.printStatus(
