@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:meta/meta.dart';
 import 'package:process/process.dart';
@@ -386,12 +387,6 @@ Future<XcodeBuildResult> buildXcodeProject({
       'shorebird_assemble_trace.json',
     );
     buildCommands.add('SHOREBIRD_TRACE_FILE=$assembleTraceFilePath');
-    // Ask xcodebuild to print a per-phase timing summary at the end of the
-    // build ("** Build Timing Summary **"). Shorebird parses this out of
-    // the build log and turns it into trace events so the otherwise-opaque
-    // `xcode archive` span isn't a black box. xcodebuild docs describe it
-    // as a reporting-only flag with no effect on what's built.
-    buildCommands.add('-showBuildTimingSummary');
   } else {
     assembleTraceFilePath = null;
   }
@@ -400,11 +395,8 @@ Future<XcodeBuildResult> buildXcodeProject({
     // An environment variable to be passed to xcode_backend.sh determining
     // whether to echo back executed commands.
     buildCommands.add('VERBOSE_SCRIPT_LOGGING=YES');
-  } else if (buildInfo.shorebirdTraceFilePath == null) {
+  } else {
     // This will print warnings and errors only.
-    // Skipped when the Shorebird build trace is active because `-quiet`
-    // also suppresses the `** Build Timing Summary **` block we parse to
-    // produce per-phase Xcode spans.
     buildCommands.add('-quiet');
   }
 
@@ -621,30 +613,16 @@ Future<XcodeBuildResult> buildXcodeProject({
         startMicros: xcodeStartMicros,
         endMicros: xcodeEndMicros,
       );
-      // Parse the per-phase breakdown from `-showBuildTimingSummary` and
-      // emit one event per phase on tid=4 so the single "xcode archive"
-      // span isn't a black box. Events are synthetic (we only know
-      // aggregate durations per phase, not wall-clock start/end), so we
-      // lay them out sequentially back from xcodeEndMicros — that keeps
-      // the sum accurate and preserves the relative distribution even if
-      // individual spans don't line up with real wall clock inside Xcode.
-      final String? buildStdout = buildResult?.stdout;
-      if (buildStdout != null) {
-        final List<_XcodePhaseTiming> phases =
-            _parseXcodeBuildTimingSummary(buildStdout);
-        var cursor = xcodeEndMicros;
-        for (final _XcodePhaseTiming phase in phases.reversed) {
-          tracer.addCompleteEvent(
-            name: phase.name,
-            cat: 'xcode_phase',
-            tid: 4,
-            startMicros: cursor - phase.durationMicros,
-            endMicros: cursor,
-            args: <String, Object?>{'taskCount': phase.taskCount},
-          );
-          cursor -= phase.durationMicros;
-        }
-      }
+      // Break the monolithic "xcode archive" span into per-subsection
+      // events by asking xcresulttool for the structured build log. Each
+      // top-level subsection ("Build target X", "Archive target Y",
+      // "Compile Swift module Z", ...) has a real wall-clock startTime
+      // and duration, so events land on an accurate timeline inside the
+      // xcode outer span.
+      await _emitXcodeSubsectionEvents(
+        tracer: tracer,
+        resultBundleDirectory: resultBundleDirectory,
+      );
       // Merge the assemble trace file that flutter assemble wrote.
       if (assembleTraceFilePath != null) {
         final File assembleTraceFile = globals.fs.file(assembleTraceFilePath);
@@ -1461,59 +1439,68 @@ class _XCResultIssueHandlingResult {
 const _kResultBundlePath = 'temporary_xcresult_bundle';
 const _kResultBundleVersion = '3';
 
-/// A single phase from xcodebuild's `** Build Timing Summary **` section.
-/// Shorebird-specific.
-class _XcodePhaseTiming {
-  _XcodePhaseTiming({
-    required this.name,
-    required this.taskCount,
-    required this.durationMicros,
-  });
-
-  final String name;
-  final int taskCount;
-  final int durationMicros;
-}
-
-/// Parses the `** Build Timing Summary **` block xcodebuild prints when
-/// invoked with `-showBuildTimingSummary`.
-///
-/// Format (observed on Xcode 15/16, stable since the option was added in
-/// Xcode 10):
-///
-/// ```text
-/// ** Build Timing Summary **
-///
-/// CompileC (123 tasks) | 45.678 seconds
-/// SwiftCompile (89 tasks) | 34.567 seconds
-/// Ld (4 tasks) | 12.345 seconds
-/// PhaseScriptExecution (5 tasks) | 8.901 seconds
-/// CodeSign (12 tasks) | 3.456 seconds
-/// ```
-///
-/// Returns phases in the order they appear (longest to shortest in
-/// practice). Returns an empty list if the section isn't found.
-List<_XcodePhaseTiming> _parseXcodeBuildTimingSummary(String stdout) {
-  final int headerIdx = stdout.indexOf('Build Timing Summary');
-  if (headerIdx < 0) {
-    return const <_XcodePhaseTiming>[];
+/// Ask xcresulttool for the structured build log of the archive action
+/// and emit one Chrome Trace Event per top-level subsection (each Xcode
+/// "target" build). Best-effort: silently returns if the bundle can't be
+/// parsed (xcresulttool output format drifts across Xcode versions).
+Future<void> _emitXcodeSubsectionEvents({
+  required BuildTracer tracer,
+  required Directory resultBundleDirectory,
+}) async {
+  if (!resultBundleDirectory.existsSync()) {
+    return;
   }
-  final String tail = stdout.substring(headerIdx);
-  // Each entry: `<Phase> (<N> tasks?) | <D> seconds`
-  final line = RegExp(
-    r'^\s*([A-Za-z][A-Za-z0-9_]*)\s*\((\d+)\s*tasks?\)\s*\|\s*([0-9]+(?:\.[0-9]+)?)\s*seconds?\s*$',
-    multiLine: true,
-  );
-  final out = <_XcodePhaseTiming>[];
-  for (final RegExpMatch m in line.allMatches(tail)) {
-    final String name = m.group(1)!;
-    final int taskCount = int.parse(m.group(2)!);
-    final double seconds = double.parse(m.group(3)!);
-    out.add(_XcodePhaseTiming(
-      name: name,
-      taskCount: taskCount,
-      durationMicros: (seconds * 1000000).round(),
-    ));
+  final ProcessResult result;
+  try {
+    result = await globals.processManager.run(<String>[
+      'xcrun',
+      'xcresulttool',
+      'get',
+      'log',
+      '--type',
+      'build',
+      '--path',
+      resultBundleDirectory.path,
+    ]);
+  } on Exception {
+    return;
   }
-  return out;
+  if (result.exitCode != 0) {
+    return;
+  }
+
+  final Object? decoded;
+  try {
+    decoded = json.decode(result.stdout as String);
+  } on FormatException {
+    return;
+  }
+  if (decoded is! Map<String, Object?>) {
+    return;
+  }
+
+  final Object? subsections = decoded['subsections'];
+  if (subsections is! List) {
+    return;
+  }
+  for (final Object? sub in subsections) {
+    if (sub is! Map<String, Object?>) {
+      continue;
+    }
+    final String title = (sub['title'] as String?) ?? '';
+    final double? startTime = (sub['startTime'] as num?)?.toDouble();
+    final double? duration = (sub['duration'] as num?)?.toDouble();
+    if (startTime == null || duration == null || duration <= 0) {
+      continue;
+    }
+    final int startMicros = (startTime * 1000000).round();
+    final int endMicros = ((startTime + duration) * 1000000).round();
+    tracer.addCompleteEvent(
+      name: title,
+      cat: 'xcode_subsection',
+      tid: 4,
+      startMicros: startMicros,
+      endMicros: endMicros,
+    );
+  }
 }
