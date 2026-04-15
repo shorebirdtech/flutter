@@ -1,0 +1,86 @@
+// Emits Chrome Trace Event Format events for every Gradle task so the
+// flutter build trace (`flutter build ... --trace`) can show per-task
+// timings alongside flutter tool + flutter assemble spans.
+//
+// Activated by passing `-I=<this>` together with
+// `-Pflutter.gradle-trace-file=<path>`. Output file is consumed by
+// Flutter's gradle.dart and merged into the main trace.
+//
+// Events land on tid=4 (flutter tool = 1, native build outer = 2, flutter
+// assemble = 3) so Perfetto shows a clean per-tier layout.
+
+import groovy.json.JsonOutput
+import org.gradle.api.Task
+import org.gradle.api.execution.TaskExecutionListener
+import org.gradle.api.tasks.TaskState
+
+def traceFilePath = gradle.startParameter.projectProperties['flutter.gradle-trace-file']
+if (!traceFilePath) {
+    traceFilePath = System.getProperty('flutter.gradle-trace-file')
+}
+if (!traceFilePath) {
+    return
+}
+
+def events = Collections.synchronizedList([])
+def startTimesMicros = Collections.synchronizedMap([:])
+
+gradle.addListener(new TaskExecutionListener() {
+    @Override
+    void beforeExecute(Task task) {
+        startTimesMicros[task.path] = System.currentTimeMillis() * 1000L
+    }
+
+    @Override
+    void afterExecute(Task task, TaskState state) {
+        def start = startTimesMicros.remove(task.path)
+        if (start == null) return
+        def end = System.currentTimeMillis() * 1000L
+        def dur = Math.max(0L, end - start)
+        // Classify the task path into a small set of "kinds" so downstream
+        // summarizers can bucket without retaining names.
+        def path = task.path
+        def kind = 'other'
+        def lower = path.toLowerCase()
+        if (lower.contains('compilekotlin')) kind = 'kotlin_compile'
+        else if (lower.contains('compilejavawithjavac') || lower.contains('compilejava')) kind = 'java_compile'
+        else if (lower.contains('aidl')) kind = 'aidl'
+        else if (lower.contains('dex')) kind = 'dex'
+        else if (lower.contains('mergeresources') || lower.contains('processresources') || lower.contains('mergemanifest')) kind = 'resources'
+        else if (lower.contains('package') && lower.contains('release')) kind = 'packaging'
+        else if (lower.contains('bundle')) kind = 'bundle'
+        else if (lower.contains('transform')) kind = 'transform'
+        else if (lower.contains('link') && lower.contains('native')) kind = 'native_link'
+        else if (lower.contains('lint')) kind = 'lint'
+        else if (lower.contains('flutter')) kind = 'flutter_gradle_plugin'
+
+        // The task "owner" is the first colon-separated segment. For
+        // subproject tasks this is typically the plugin name (e.g.
+        // `:camera_android`). Kept for local debug — the privacy-safe
+        // summary that Shorebird writes aggregates this out.
+        def owner = path.startsWith(':') ? path.substring(1).split(':')[0] : ''
+
+        events.add([
+            name: path,
+            cat: 'gradle_task',
+            ph: 'X',
+            ts: start,
+            dur: dur,
+            pid: 1,
+            tid: 4,
+            args: [
+                kind: kind,
+                owner: owner,
+                skipped: state.skipped,
+                upToDate: state.upToDate,
+                fromCache: state.skipMessage == 'FROM-CACHE',
+            ],
+        ])
+    }
+})
+
+gradle.buildFinished {
+    def f = new File(traceFilePath)
+    f.parentFile?.mkdirs()
+    f.text = JsonOutput.toJson(events)
+}

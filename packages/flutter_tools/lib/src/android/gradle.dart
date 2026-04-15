@@ -571,6 +571,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
     // multiple flavors in one Gradle invocation), this path would need to
     // include the variant name to avoid collisions.
     final String? assembleTraceFilePath;
+    final String? gradleTaskTraceFilePath;
     if (buildInfo.traceFilePath != null) {
       assembleTraceFilePath = _fileSystem.path.join(
         project.android.buildDirectory.path,
@@ -579,8 +580,29 @@ class AndroidGradleBuilder implements AndroidBuilder {
         'flutter_assemble_trace.json',
       );
       options.add('-Ptrace-file=$assembleTraceFilePath');
+
+      // Load the Flutter gradle trace init script so every Gradle task
+      // emits a Chrome Trace Event Format entry we can merge into the
+      // main trace — gives per-plugin / per-task visibility that the
+      // single "gradle assembleRelease" span can't provide on its own.
+      gradleTaskTraceFilePath = _fileSystem.path.join(
+        project.android.buildDirectory.path,
+        'intermediates',
+        'flutter',
+        'flutter_gradle_task_trace.json',
+      );
+      final String gradleTraceInitScript = _fileSystem.path.join(
+        Cache.flutterRoot!,
+        'packages',
+        'flutter_tools',
+        'gradle',
+        'flutter_trace_init.gradle',
+      );
+      options.add('-I=$gradleTraceInitScript');
+      options.add('-Pflutter.gradle-trace-file=$gradleTaskTraceFilePath');
     } else {
       assembleTraceFilePath = null;
+      gradleTaskTraceFilePath = null;
     }
     if (buildInfo.fileSystemRoots.isNotEmpty) {
       options.add('-Pfilesystem-roots=${buildInfo.fileSystemRoots.join('|')}');
@@ -639,6 +661,11 @@ class AndroidGradleBuilder implements AndroidBuilder {
       if (assembleTraceFilePath != null) {
         final File assembleTraceFile = _fileSystem.file(assembleTraceFilePath);
         tracer.mergeEventsFromFile(assembleTraceFile);
+      }
+      // Merge the per-task events the init script wrote for this Gradle run.
+      if (gradleTaskTraceFilePath != null) {
+        final File gradleTaskTraceFile = _fileSystem.file(gradleTaskTraceFilePath);
+        tracer.mergeEventsFromFile(gradleTaskTraceFile);
       }
     }
 
@@ -888,12 +915,6 @@ class AndroidGradleBuilder implements AndroidBuilder {
 
     if (target.isNotEmpty) {
       command.add('-Ptarget=$target');
-    }
-    // When build tracing is on, enable Gradle's own --profile report so the
-    // HTML/XML profile at `build/reports/profile/` captures per-task timings
-    // we can aggregate into per-plugin histograms.
-    if (buildInfo.traceFilePath != null) {
-      command.add('--profile');
     }
     command.addAll(androidBuildInfo.buildInfo.toGradleConfig());
     if (buildInfo.dartObfuscation && buildInfo.mode != BuildMode.release) {
