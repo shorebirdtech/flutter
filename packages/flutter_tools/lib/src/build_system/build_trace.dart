@@ -2,26 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:ffi';
-import 'dart:io' as io show Platform;
+import 'dart:io' as io show pid;
 
 import '../base/file_system.dart';
 import '../convert.dart';
 
-/// Returns the OS process id of the current Dart process.
+/// The OS process id of the current Dart process.
 ///
-/// `dart:io` exposes pids for spawned subprocesses but not for the current
-/// process; FFI into libc `getpid()` (or `GetCurrentProcessId` on Windows)
-/// is the standard workaround.
-int currentProcessId() => _getpid();
-
-final DynamicLibrary _currentProcess = io.Platform.isWindows
-    ? DynamicLibrary.open('kernel32.dll')
-    : DynamicLibrary.process();
-
-final int Function() _getpid = _currentProcess.lookupFunction<Int32 Function(), int Function()>(
-  io.Platform.isWindows ? 'GetCurrentProcessId' : 'getpid',
-);
+/// Trivial re-export of `dart:io`'s top-level pid getter so call sites
+/// read as "the thing that tagged this span" rather than reaching into
+/// `dart:io` for one name.
+int currentProcessId() => io.pid;
 
 /// A single event in a Chrome Trace Event Format trace.
 ///

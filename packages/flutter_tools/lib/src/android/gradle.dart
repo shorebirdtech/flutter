@@ -70,10 +70,6 @@ typedef _OutputParser = void Function(String line);
 const int _flutterToolTid = 1;
 const int _gradleWaitTid = 2;
 
-/// Source of random flow-event ids. Shared across invocations within a
-/// flutter tool process — each gradle spawn picks a fresh id from it.
-final Random _flowIdSource = Random.secure();
-
 String _getOutputAppLinkSettingsTaskFor(String buildVariant) {
   return _taskForBuildVariant('output', buildVariant, 'AppLinkSettings');
 }
@@ -287,6 +283,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
     VoidCallback? postRunTask,
     int? maxRetries,
     _OutputParser? outputParser,
+    void Function(Process process)? onStart,
   }) async {
     final bool usesAndroidX = isAppUsingAndroidX(project.android.hostAppGradleRoot);
     final String? agpVersion = gradle.getAgpVersion(
@@ -363,6 +360,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
         allowReentrantFlutter: true,
         environment: _java?.environment,
         mapFunction: consumeLog,
+        onStart: onStart,
       );
     } on ProcessException catch (exception) {
       consumeLog(exception.toString());
@@ -595,18 +593,17 @@ class AndroidGradleBuilder implements AndroidBuilder {
     // include the variant name to avoid collisions.
     final String? assembleTraceFilePath;
     final String? gradleTaskTraceFilePath;
-    // Random flow id shared between flutter_tool and the Gradle init
-    // script so Perfetto can draw an arrow from our "gradle <task>" span
-    // to gradle's first per-task event. We don't know Gradle's pid at
-    // spawn time (the stream helper returns exitCode only), so we can't
-    // use pid as the flow id — picking a random int side-steps that.
-    final int gradleFlowId = _flowIdSource.nextInt(0x7fffffff);
     if (buildInfo.shorebirdTraceFilePath != null) {
+      // Embed the assemble task name (carries variant + build type, e.g.
+      // `assembleFooRelease` or `bundleRelease`) in the intermediate
+      // paths so a single Gradle invocation running multiple variants in
+      // parallel — something Gradle supports in principle — can't have
+      // per-variant FlutterTask instances stomp on each other's trace.
       assembleTraceFilePath = _fileSystem.path.join(
         project.android.buildDirectory.path,
         'intermediates',
         'shorebird',
-        'shorebird_assemble_trace.json',
+        'shorebird_assemble_trace_$assembleTask.json',
       );
       options.add('-Pshorebird-trace-file=$assembleTraceFilePath');
 
@@ -618,7 +615,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
         project.android.buildDirectory.path,
         'intermediates',
         'shorebird',
-        'shorebird_gradle_task_trace.json',
+        'shorebird_gradle_task_trace_$assembleTask.json',
       );
       final String gradleTraceInitScript = _fileSystem.path.join(
         Cache.flutterRoot!,
@@ -629,7 +626,6 @@ class AndroidGradleBuilder implements AndroidBuilder {
       );
       options.add('-I=$gradleTraceInitScript');
       options.add('-Pshorebird.gradle-trace-file=$gradleTaskTraceFilePath');
-      options.add('-Pshorebird.gradle-trace-flow-id=$gradleFlowId');
     } else {
       assembleTraceFilePath = null;
       gradleTaskTraceFilePath = null;
@@ -660,14 +656,17 @@ class AndroidGradleBuilder implements AndroidBuilder {
       preRunTask: () {
         gradleStartMicros = DateTime.now().microsecondsSinceEpoch;
         sw = Stopwatch()..start();
-        // Emit flow start at spawn so Perfetto draws an arrow from our
-        // "gradle $assembleTask" span into the first per-task event the
-        // Gradle init script emits (both reference gradleFlowId).
+      },
+      // Emit the flow start with id = Gradle's real pid as soon as the
+      // JVM is spawned. The init script pulls the same pid from
+      // `ProcessHandle.current().pid()` when it emits the matching flow
+      // end, so both sides agree on the id with no plumbing.
+      onStart: (process) {
         tracer?.addFlowStart(
-          id: gradleFlowId,
+          id: process.pid,
           pid: flutterPid,
           tid: _gradleWaitTid,
-          atMicros: gradleStartMicros,
+          atMicros: DateTime.now().microsecondsSinceEpoch,
         );
       },
       postRunTask: () {
