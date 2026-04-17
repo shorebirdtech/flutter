@@ -64,6 +64,16 @@ Otherwise, file an issue at https://github.com/flutter/flutter/issues.''';
 
 typedef _OutputParser = void Function(String line);
 
+/// Perfetto row ids within the flutter_tool process, local to this file.
+/// Since they're only ever used within a single pid, they don't have to
+/// agree with any other producer's tids.
+const int _flutterToolTid = 1;
+const int _gradleWaitTid = 2;
+
+/// Source of random flow-event ids. Shared across invocations within a
+/// flutter tool process — each gradle spawn picks a fresh id from it.
+final Random _flowIdSource = Random.secure();
+
 String _getOutputAppLinkSettingsTaskFor(String buildVariant) {
   return _taskForBuildVariant('output', buildVariant, 'AppLinkSettings');
 }
@@ -490,6 +500,13 @@ class AndroidGradleBuilder implements AndroidBuilder {
     // parameter through. Cleared in the finally-equivalent below, after
     // the trace is written.
     BuildTracer.current = tracer;
+    final int flutterPid = currentProcessId();
+    if (tracer != null) {
+      tracer
+        ..addProcessNameMetadata(pid: flutterPid, name: 'flutter_tool')
+        ..addThreadNameMetadata(pid: flutterPid, tid: _flutterToolTid, name: 'flutter tool')
+        ..addThreadNameMetadata(pid: flutterPid, tid: _gradleWaitTid, name: 'gradle (wait)');
+    }
 
     final BuildInfo buildInfo = androidBuildInfo.buildInfo;
     final String assembleTask = isBuildingBundle
@@ -577,6 +594,12 @@ class AndroidGradleBuilder implements AndroidBuilder {
     // include the variant name to avoid collisions.
     final String? assembleTraceFilePath;
     final String? gradleTaskTraceFilePath;
+    // Random flow id shared between flutter_tool and the Gradle init
+    // script so Perfetto can draw an arrow from our "gradle <task>" span
+    // to gradle's first per-task event. We don't know Gradle's pid at
+    // spawn time (the stream helper returns exitCode only), so we can't
+    // use pid as the flow id — picking a random int side-steps that.
+    final int gradleFlowId = _flowIdSource.nextInt(0x7fffffff);
     if (buildInfo.shorebirdTraceFilePath != null) {
       assembleTraceFilePath = _fileSystem.path.join(
         project.android.buildDirectory.path,
@@ -605,6 +628,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
       );
       options.add('-I=$gradleTraceInitScript');
       options.add('-Pshorebird.gradle-trace-file=$gradleTaskTraceFilePath');
+      options.add('-Pshorebird.gradle-trace-flow-id=$gradleFlowId');
     } else {
       assembleTraceFilePath = null;
       gradleTaskTraceFilePath = null;
@@ -622,7 +646,8 @@ class AndroidGradleBuilder implements AndroidBuilder {
     tracer?.addCompleteEvent(
       name: 'pre-gradle setup',
       cat: 'flutter',
-      tid: 1,
+      pid: flutterPid,
+      tid: _flutterToolTid,
       startMicros: buildStartMicros,
       endMicros: preGradleEndMicros,
     );
@@ -634,6 +659,15 @@ class AndroidGradleBuilder implements AndroidBuilder {
       preRunTask: () {
         gradleStartMicros = DateTime.now().microsecondsSinceEpoch;
         sw = Stopwatch()..start();
+        // Emit flow start at spawn so Perfetto draws an arrow from our
+        // "gradle $assembleTask" span into the first per-task event the
+        // Gradle init script emits (both reference gradleFlowId).
+        tracer?.addFlowStart(
+          id: gradleFlowId,
+          pid: flutterPid,
+          tid: _gradleWaitTid,
+          atMicros: gradleStartMicros,
+        );
       },
       postRunTask: () {
         final Duration elapsedDuration = sw.elapsed;
@@ -659,7 +693,8 @@ class AndroidGradleBuilder implements AndroidBuilder {
       tracer.addCompleteEvent(
         name: 'gradle $assembleTask',
         cat: 'gradle',
-        tid: 2,
+        pid: flutterPid,
+        tid: _gradleWaitTid,
         startMicros: gradleStartMicros,
         endMicros: gradleEndMicros,
       );
@@ -688,14 +723,16 @@ class AndroidGradleBuilder implements AndroidBuilder {
       tracer.addCompleteEvent(
         name: 'post-gradle processing',
         cat: 'flutter',
-        tid: 1,
+        pid: flutterPid,
+        tid: _flutterToolTid,
         startMicros: gradleEndMicros,
         endMicros: postGradleEndMicros,
       );
       tracer.addCompleteEvent(
         name: isBuildingBundle ? 'flutter build appbundle' : 'flutter build apk',
         cat: 'flutter',
-        tid: 1,
+        pid: flutterPid,
+        tid: _flutterToolTid,
         startMicros: buildStartMicros,
         endMicros: postGradleEndMicros,
       );

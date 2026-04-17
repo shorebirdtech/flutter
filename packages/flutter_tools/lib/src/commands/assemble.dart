@@ -11,6 +11,7 @@ import '../base/common.dart';
 import '../base/file_system.dart';
 import '../build_info.dart';
 import '../build_system/build_system.dart';
+import '../build_system/build_trace.dart';
 import '../build_system/depfile.dart';
 import '../build_system/targets/android.dart';
 import '../build_system/targets/assets.dart';
@@ -455,7 +456,24 @@ void writePerformanceData(Iterable<PerformanceMeasurement> measurements, File ou
 /// Output build trace data in Chrome Trace Event Format in [outFile].
 @visibleForTesting
 void writeTraceData(Iterable<PerformanceMeasurement> measurements, File outFile) {
+  // Real pid of this (re-entrant) flutter tool invocation. `flutter
+  // assemble` is spawned by Gradle / xcode_backend as its own process,
+  // so its spans deserve their own Perfetto row named accordingly.
+  final int pid = currentProcessId();
   final events = <Map<String, Object?>>[
+    <String, Object?>{
+      'name': 'process_name',
+      'ph': 'M',
+      'pid': pid,
+      'args': <String, Object?>{'name': 'flutter assemble'},
+    },
+    <String, Object?>{
+      'name': 'thread_name',
+      'ph': 'M',
+      'pid': pid,
+      'tid': 1,
+      'args': <String, Object?>{'name': 'flutter assemble'},
+    },
     for (final PerformanceMeasurement measurement in measurements)
       <String, Object?>{
         'ph': 'X',
@@ -463,8 +481,8 @@ void writeTraceData(Iterable<PerformanceMeasurement> measurements, File outFile)
         'cat': 'assemble',
         'ts': measurement.startTimeMicroseconds,
         'dur': measurement.elapsedMilliseconds * 1000,
-        'pid': 1,
-        'tid': 3,
+        'pid': pid,
+        'tid': 1,
         'args': <String, Object?>{
           'target': measurement.target,
           'skipped': measurement.skipped,

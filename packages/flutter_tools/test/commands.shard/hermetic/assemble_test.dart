@@ -566,16 +566,32 @@ void main() {
 
     expect(outFile, exists);
     final events = json.decode(outFile.readAsStringSync()) as List<Object?>;
-    expect(events, hasLength(1));
+    // 2 metadata events (process_name, thread_name) + 1 complete span.
+    expect(events, hasLength(3));
 
-    final event = events.first! as Map<String, Object?>;
+    // Metadata events name the process + thread so Perfetto labels the
+    // row rather than showing a bare pid.
+    final processMeta = events[0]! as Map<String, Object?>;
+    expect(processMeta['ph'], 'M');
+    expect(processMeta['name'], 'process_name');
+    expect((processMeta['args']! as Map)['name'], 'flutter assemble');
+
+    final threadMeta = events[1]! as Map<String, Object?>;
+    expect(threadMeta['ph'], 'M');
+    expect(threadMeta['name'], 'thread_name');
+    expect((threadMeta['args']! as Map)['name'], 'flutter assemble');
+
+    final event = events[2]! as Map<String, Object?>;
     expect(event['ph'], 'X');
     expect(event['name'], 'KernelSnapshot');
     expect(event['cat'], 'assemble');
     expect(event['ts'], 1000000);
     expect(event['dur'], 500000);
-    expect(event['pid'], 1);
-    expect(event['tid'], 3);
+    // pid is the real pid of the test process; just assert it's present
+    // and an int, and matches between metadata + span.
+    expect(event['pid'], isA<int>());
+    expect(event['pid'], processMeta['pid']);
+    expect(event['tid'], 1);
     expect(event['args'], <String, Object?>{
       'target': 'kernel_snapshot',
       'skipped': false,

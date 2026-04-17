@@ -24,7 +24,36 @@ if (!traceFilePath) {
     return
 }
 
-def events = Collections.synchronizedList([])
+// Flow id shared with flutter_tool so Perfetto draws an arrow from the
+// parent "gradle <task>" span into our first per-task event. Missing
+// when flutter_tool is older than the flow-id plumbing; that's fine,
+// the init script just skips the flow-end event in that case.
+def gradleFlowIdRaw = gradle.startParameter.projectProperties['shorebird.gradle-trace-flow-id']
+def gradleFlowId = gradleFlowIdRaw ? gradleFlowIdRaw.toLong() : null
+
+// Real pid of this Gradle JVM — Gradle tasks belong to this process, so
+// emitting spans on it matches the process topology. Named via a
+// `process_name` metadata event below so Perfetto labels the row
+// "gradle" rather than showing a bare number.
+def gradlePid = ProcessHandle.current().pid()
+def gradleTid = 1
+
+def events = Collections.synchronizedList([
+    [
+        name: 'process_name',
+        ph: 'M',
+        pid: gradlePid,
+        args: [name: 'gradle'],
+    ],
+    [
+        name: 'thread_name',
+        ph: 'M',
+        pid: gradlePid,
+        tid: gradleTid,
+        args: [name: 'gradle tasks'],
+    ],
+])
+def firstTaskFlowEmitted = new java.util.concurrent.atomic.AtomicBoolean(false)
 def startTimesMicros = Collections.synchronizedMap([:])
 
 gradle.addListener(new TaskExecutionListener() {
@@ -90,14 +119,29 @@ gradle.addListener(new TaskExecutionListener() {
         // summary that Shorebird writes aggregates this out.
         def owner = path.startsWith(':') ? path.substring(1).split(':')[0] : ''
 
+        // Emit the flow-end event on the first task, connecting back to
+        // flutter_tool's "gradle <task>" span. Atomic so we emit at most
+        // one across concurrent task callbacks.
+        if (gradleFlowId != null && firstTaskFlowEmitted.compareAndSet(false, true)) {
+            events.add([
+                ph: 'f',
+                name: 'spawn',
+                cat: 'flow',
+                id: gradleFlowId,
+                ts: start,
+                pid: gradlePid,
+                tid: gradleTid,
+                bp: 'e',
+            ])
+        }
         events.add([
             name: path,
             cat: 'gradle_task',
             ph: 'X',
             ts: start,
             dur: dur,
-            pid: 1,
-            tid: 4,
+            pid: gradlePid,
+            tid: gradleTid,
             args: [
                 kind: kind,
                 owner: owner,

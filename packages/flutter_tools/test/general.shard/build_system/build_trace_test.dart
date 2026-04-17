@@ -35,7 +35,7 @@ void main() {
     });
 
     testWithoutContext('toJson omits args when null', () {
-      final event = BuildTraceEvent(name: 'test', cat: 'flutter', ts: 0, dur: 100, tid: 1);
+      final event = BuildTraceEvent(name: 'test', cat: 'flutter', ts: 0, dur: 100, pid: 1, tid: 1);
 
       final result = event.toJson();
 
@@ -79,6 +79,7 @@ void main() {
       tracer.addCompleteEvent(
         name: 'gradle build',
         cat: 'gradle',
+        pid: 1,
         tid: 2,
         startMicros: 1000,
         endMicros: 5000,
@@ -122,6 +123,7 @@ void main() {
       tracer.addCompleteEvent(
         name: 'gradle build',
         cat: 'gradle',
+        pid: 1,
         tid: 2,
         startMicros: 1000,
         endMicros: 5000,
@@ -141,7 +143,14 @@ void main() {
     testWithoutContext('mergeEventsFromFile does nothing for non-existent file', () {
       final tracer = BuildTracer();
 
-      tracer.addCompleteEvent(name: 'test', cat: 'flutter', tid: 1, startMicros: 0, endMicros: 100);
+      tracer.addCompleteEvent(
+        name: 'test',
+        cat: 'flutter',
+        pid: 1,
+        tid: 1,
+        startMicros: 0,
+        endMicros: 100,
+      );
 
       // Should not throw.
       tracer.mergeEventsFromFile(fileSystem.file('does_not_exist.json'));
@@ -155,7 +164,14 @@ void main() {
 
     testWithoutContext('writeToFile creates parent directories', () {
       final tracer = BuildTracer();
-      tracer.addCompleteEvent(name: 'test', cat: 'flutter', tid: 1, startMicros: 0, endMicros: 100);
+      tracer.addCompleteEvent(
+        name: 'test',
+        cat: 'flutter',
+        pid: 1,
+        tid: 1,
+        startMicros: 0,
+        endMicros: 100,
+      );
 
       final outFile = fileSystem.file('/a/b/c/trace.json');
       tracer.writeToFile(outFile);
@@ -169,6 +185,7 @@ void main() {
       tracer.addCompleteEvent(
         name: 'flutter build apk',
         cat: 'flutter',
+        pid: 1,
         tid: 1,
         startMicros: 0,
         endMicros: 15000000,
@@ -176,6 +193,7 @@ void main() {
       tracer.addCompleteEvent(
         name: 'gradle assembleRelease',
         cat: 'gradle',
+        pid: 1,
         tid: 2,
         startMicros: 500000,
         endMicros: 12500000,
@@ -183,7 +201,8 @@ void main() {
       tracer.addCompleteEvent(
         name: 'KernelSnapshot',
         cat: 'assemble',
-        tid: 3,
+        pid: 2,
+        tid: 1,
         startMicros: 2000000,
         endMicros: 5000000,
         args: <String, Object?>{'skipped': false},

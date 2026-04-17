@@ -17,6 +17,11 @@ import 'platform.dart';
 const kNetworkProblemExitCode = 50;
 const kFlutterStorageBaseUrl = 'FLUTTER_STORAGE_BASE_URL';
 
+/// Perfetto row id for Flutter-tool HTTP artifact fetches. Local to
+/// the flutter tool's pid; picked to sit alongside the flutter-tool
+/// and assemble rows without overlapping either.
+const int _networkTid = 5;
+
 typedef HttpClientFactory = HttpClient Function();
 
 typedef UrlTunneller = Future<String> Function(String url);
@@ -101,7 +106,8 @@ class Net {
       tracer.addCompleteEvent(
         name: '${onlyHeaders ? 'HEAD' : 'GET'} ${url.host}',
         cat: 'network',
-        tid: 5,
+        pid: currentProcessId(),
+        tid: _networkTid,
         startMicros: networkStartMicros,
         endMicros: DateTime.now().microsecondsSinceEpoch,
         args: <String, Object?>{

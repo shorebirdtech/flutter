@@ -402,6 +402,13 @@ class CocoaPods {
       workingDirectory: _fileSystem.path.dirname(xcodeProject.podfile.path),
       environment: <String, String>{'COCOAPODS_DISABLE_STATS': 'true', 'LANG': 'en_US.UTF-8'},
     );
+    // Real pid of the `pod` process. We emit phase spans on this pid +
+    // tid=1, and name it via a `process_name` metadata event so Perfetto
+    // groups pod install work into its own row.
+    final int podPid = process.pid;
+    tracer
+      ..addProcessNameMetadata(pid: podPid, name: 'pod install')
+      ..addThreadNameMetadata(pid: podPid, tid: 1, name: 'pod install');
 
     final stdoutBuf = StringBuffer();
     final stderrBuf = StringBuffer();
@@ -418,6 +425,7 @@ class CocoaPods {
         tracer.addCompleteEvent(
           name: 'pod install: $previousPhase',
           cat: 'subprocess',
+          pid: podPid,
           tid: 1,
           startMicros: previousStart,
           endMicros: now,

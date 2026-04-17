@@ -57,6 +57,15 @@ import 'xcresult.dart';
 const kConcurrentRunFailureMessage1 = 'database is locked';
 const kConcurrentRunFailureMessage2 = 'there are two concurrent builds running';
 
+/// Perfetto row ids within the flutter_tool process, local to this file.
+const int _flutterToolTid = 1;
+const int _xcodeWaitTid = 2;
+
+/// Synthetic pid for Xcode subsection events parsed from xcresult. xcresult
+/// doesn't surface xcodebuild's pid, so events end up on this fixed id
+/// named via a `process_name` metadata event.
+const int _xcodeSubsectionPid = 0x78636f; // ASCII 'xco'
+
 /// User message when missing platform required to use Xcode.
 ///
 /// Starting with Xcode 15, the simulator is no longer downloaded with Xcode
@@ -357,13 +366,23 @@ Future<XcodeBuildResult> buildXcodeProject({
   final BuildTracer? tracer = buildInfo.shorebirdTraceFilePath != null ? BuildTracer() : null;
   // Expose to Net/subprocess layers so they can record spans themselves.
   BuildTracer.current = tracer;
+  final int flutterPid = currentProcessId();
+  if (tracer != null) {
+    tracer
+      ..addProcessNameMetadata(pid: flutterPid, name: 'flutter_tool')
+      ..addThreadNameMetadata(pid: flutterPid, tid: _flutterToolTid, name: 'flutter tool')
+      ..addThreadNameMetadata(pid: flutterPid, tid: _xcodeWaitTid, name: 'xcode (wait)')
+      ..addProcessNameMetadata(pid: _xcodeSubsectionPid, name: 'xcodebuild')
+      ..addThreadNameMetadata(pid: _xcodeSubsectionPid, tid: 1, name: 'xcode phases');
+  }
 
   final int podInstallStartMicros = DateTime.now().microsecondsSinceEpoch;
   await processPodsIfNeeded(project.ios, buildDirectoryPath, buildInfo.mode);
   tracer?.addCompleteEvent(
     name: 'pod install',
     cat: 'subprocess',
-    tid: 1,
+    pid: flutterPid,
+    tid: _flutterToolTid,
     startMicros: podInstallStartMicros,
     endMicros: DateTime.now().microsecondsSinceEpoch,
   );
@@ -571,7 +590,8 @@ Future<XcodeBuildResult> buildXcodeProject({
     tracer?.addCompleteEvent(
       name: 'pre-xcode setup',
       cat: 'flutter',
-      tid: 1,
+      pid: flutterPid,
+      tid: _flutterToolTid,
       startMicros: buildStartMicros,
       endMicros: xcodeStartMicros,
     );
@@ -606,7 +626,8 @@ Future<XcodeBuildResult> buildXcodeProject({
       tracer.addCompleteEvent(
         name: 'xcode ${xcodeBuildActionToString(buildAction)}',
         cat: 'xcode',
-        tid: 2,
+        pid: flutterPid,
+        tid: _xcodeWaitTid,
         startMicros: xcodeStartMicros,
         endMicros: xcodeEndMicros,
       );
@@ -629,14 +650,16 @@ Future<XcodeBuildResult> buildXcodeProject({
       tracer.addCompleteEvent(
         name: 'post-xcode processing',
         cat: 'flutter',
-        tid: 1,
+        pid: flutterPid,
+        tid: _flutterToolTid,
         startMicros: xcodeEndMicros,
         endMicros: buildEndMicros,
       );
       tracer.addCompleteEvent(
         name: 'flutter build ios',
         cat: 'flutter',
-        tid: 1,
+        pid: flutterPid,
+        tid: _flutterToolTid,
         startMicros: buildStartMicros,
         endMicros: buildEndMicros,
       );
@@ -1494,7 +1517,13 @@ Future<void> _emitXcodeSubsectionEvents({
     tracer.addCompleteEvent(
       name: title,
       cat: 'xcode_subsection',
-      tid: 4,
+      // Synthetic pid so subsections display on their own row in Perfetto,
+      // labelled "xcodebuild" via the process_name metadata emitted at
+      // tracer setup. xcresult doesn't surface xcodebuild's real pid, and
+      // compile sub-subsections are done by clang/swiftc/ld children we
+      // never saw — synthetic is honest.
+      pid: _xcodeSubsectionPid,
+      tid: 1,
       startMicros: startMicros,
       endMicros: endMicros,
     );
