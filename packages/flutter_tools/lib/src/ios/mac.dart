@@ -567,16 +567,15 @@ Future<XcodeBuildResult> buildXcodeProject({
       ]);
     }
 
-    final int preXcodeEndMicros = DateTime.now().microsecondsSinceEpoch;
+    final int xcodeStartMicros = DateTime.now().microsecondsSinceEpoch;
     tracer?.addCompleteEvent(
       name: 'pre-xcode setup',
       cat: 'flutter',
       tid: 1,
       startMicros: buildStartMicros,
-      endMicros: preXcodeEndMicros,
+      endMicros: xcodeStartMicros,
     );
 
-    final int xcodeStartMicros = DateTime.now().microsecondsSinceEpoch;
     final sw = Stopwatch()..start();
     initialBuildStatus = globals.logger.startProgress('Running Xcode build...');
 
@@ -626,19 +625,20 @@ Future<XcodeBuildResult> buildXcodeProject({
         final File assembleTraceFile = globals.fs.file(assembleTraceFilePath);
         tracer.mergeEventsFromFile(assembleTraceFile);
       }
+      final int buildEndMicros = DateTime.now().microsecondsSinceEpoch;
       tracer.addCompleteEvent(
         name: 'post-xcode processing',
         cat: 'flutter',
         tid: 1,
         startMicros: xcodeEndMicros,
-        endMicros: DateTime.now().microsecondsSinceEpoch,
+        endMicros: buildEndMicros,
       );
       tracer.addCompleteEvent(
         name: 'flutter build ios',
         cat: 'flutter',
         tid: 1,
         startMicros: buildStartMicros,
-        endMicros: DateTime.now().microsecondsSinceEpoch,
+        endMicros: buildEndMicros,
       );
       final File traceFile = globals.fs.file(buildInfo.shorebirdTraceFilePath);
       tracer.writeToFile(traceFile);
@@ -647,9 +647,7 @@ Future<XcodeBuildResult> buildXcodeProject({
         'View at https://ui.perfetto.dev',
       );
     }
-    if (tracer != null) {
-      BuildTracer.current = null;
-    }
+    BuildTracer.current = null;
 
     if (tempDir.existsSync()) {
       // Display additional warning and error message from xcresult bundle.

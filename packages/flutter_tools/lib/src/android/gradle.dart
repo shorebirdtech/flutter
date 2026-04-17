@@ -653,8 +653,9 @@ class AndroidGradleBuilder implements AndroidBuilder {
     );
 
     // Record Gradle span and merge assemble trace if tracing is enabled.
+    int? gradleEndMicros;
     if (tracer != null) {
-      final int gradleEndMicros = DateTime.now().microsecondsSinceEpoch;
+      gradleEndMicros = DateTime.now().microsecondsSinceEpoch;
       tracer.addCompleteEvent(
         name: 'gradle $assembleTask',
         cat: 'gradle',
@@ -675,20 +676,20 @@ class AndroidGradleBuilder implements AndroidBuilder {
     }
 
     if (exitCode != 0) {
+      BuildTracer.current = null;
       throwToolExit(
         'Gradle task $assembleTask failed with exit code $exitCode',
         exitCode: exitCode,
       );
     }
 
-    // Write the Shorebird build trace if tracing is enabled.
-    if (tracer != null && buildInfo.shorebirdTraceFilePath != null) {
+    if (tracer != null) {
       final int postGradleEndMicros = DateTime.now().microsecondsSinceEpoch;
       tracer.addCompleteEvent(
         name: 'post-gradle processing',
         cat: 'flutter',
         tid: 1,
-        startMicros: gradleStartMicros + sw.elapsedMicroseconds,
+        startMicros: gradleEndMicros!,
         endMicros: postGradleEndMicros,
       );
       tracer.addCompleteEvent(
