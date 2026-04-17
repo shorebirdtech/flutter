@@ -482,8 +482,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
 
     // Assembly work starts here.
     final int buildStartMicros = DateTime.now().microsecondsSinceEpoch;
-    final BuildTracer? tracer =
-        androidBuildInfo.buildInfo.shorebirdTraceFilePath != null
+    final BuildTracer? tracer = androidBuildInfo.buildInfo.shorebirdTraceFilePath != null
         ? BuildTracer()
         : null;
     // Make the tracer visible to other layers of the flutter tool (Net,

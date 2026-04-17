@@ -76,14 +76,16 @@ class BuildTracer {
     required int endMicros,
     Map<String, Object?>? args,
   }) {
-    _events.add(BuildTraceEvent(
-      name: name,
-      cat: cat,
-      tid: tid,
-      ts: startMicros,
-      dur: endMicros - startMicros,
-      args: args,
-    ));
+    _events.add(
+      BuildTraceEvent(
+        name: name,
+        cat: cat,
+        tid: tid,
+        ts: startMicros,
+        dur: endMicros - startMicros,
+        args: args,
+      ),
+    );
   }
 
   /// Reads a trace JSON file written by a subprocess and appends its events.

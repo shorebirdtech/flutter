@@ -354,9 +354,7 @@ Future<XcodeBuildResult> buildXcodeProject({
   // can be minutes on plugin-heavy apps — otherwise it's an invisible gap
   // between "flutter build ios" starting and the xcode archive span.
   final int buildStartMicros = DateTime.now().microsecondsSinceEpoch;
-  final BuildTracer? tracer = buildInfo.shorebirdTraceFilePath != null
-      ? BuildTracer()
-      : null;
+  final BuildTracer? tracer = buildInfo.shorebirdTraceFilePath != null ? BuildTracer() : null;
   // Expose to Net/subprocess layers so they can record spans themselves.
   BuildTracer.current = tracer;
 

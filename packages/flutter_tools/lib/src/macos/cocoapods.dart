@@ -400,10 +400,7 @@ class CocoaPods {
     final Process process = await _processManager.start(
       <String>['pod', 'install', '--verbose'],
       workingDirectory: _fileSystem.path.dirname(xcodeProject.podfile.path),
-      environment: <String, String>{
-        'COCOAPODS_DISABLE_STATS': 'true',
-        'LANG': 'en_US.UTF-8',
-      },
+      environment: <String, String>{'COCOAPODS_DISABLE_STATS': 'true', 'LANG': 'en_US.UTF-8'},
     );
 
     final stdoutBuf = StringBuffer();
@@ -430,20 +427,21 @@ class CocoaPods {
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .listen((String line) {
-      stdoutBuf
-        ..write(line)
-        ..write('\n');
-      // CocoaPods verbose-mode phase markers. Stable across recent versions.
-      if (line.contains('Analyzing dependencies')) {
-        transitionTo('analyzing');
-      } else if (line.contains('Downloading dependencies')) {
-        transitionTo('downloading');
-      } else if (line.contains('Generating Pods project')) {
-        transitionTo('generating');
-      } else if (line.contains('Integrating client project')) {
-        transitionTo('integrating');
-      }
-    }).asFuture<void>();
+          stdoutBuf
+            ..write(line)
+            ..write('\n');
+          // CocoaPods verbose-mode phase markers. Stable across recent versions.
+          if (line.contains('Analyzing dependencies')) {
+            transitionTo('analyzing');
+          } else if (line.contains('Downloading dependencies')) {
+            transitionTo('downloading');
+          } else if (line.contains('Generating Pods project')) {
+            transitionTo('generating');
+          } else if (line.contains('Integrating client project')) {
+            transitionTo('integrating');
+          }
+        })
+        .asFuture<void>();
 
     final Future<void> stderrDone = process.stderr
         .transform(utf8.decoder)
@@ -454,12 +452,7 @@ class CocoaPods {
     await Future.wait(<Future<void>>[stdoutDone, stderrDone]);
     transitionTo(null);
 
-    return ProcessResult(
-      process.pid,
-      exitCode,
-      stdoutBuf.toString(),
-      stderrBuf.toString(),
-    );
+    return ProcessResult(process.pid, exitCode, stdoutBuf.toString(), stderrBuf.toString());
   }
 
   void _diagnosePodInstallFailure(ProcessResult result, XcodeBasedProject xcodeProject) {

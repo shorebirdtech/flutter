@@ -727,9 +727,7 @@ class Context {
     // as an Xcode build phase script) we forward it to flutter assemble.
     if (environment['SHOREBIRD_TRACE_FILE'] != null &&
         environment['SHOREBIRD_TRACE_FILE']!.isNotEmpty) {
-      flutterArgs.add(
-        '--shorebird-trace-file=${environment['SHOREBIRD_TRACE_FILE']}',
-      );
+      flutterArgs.add('--shorebird-trace-file=${environment['SHOREBIRD_TRACE_FILE']}');
     }
 
     if (environment['CODE_SIZE_DIRECTORY'] != null &&

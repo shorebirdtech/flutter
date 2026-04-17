@@ -35,13 +35,7 @@ void main() {
     });
 
     testWithoutContext('toJson omits args when null', () {
-      final event = BuildTraceEvent(
-        name: 'test',
-        cat: 'flutter',
-        ts: 0,
-        dur: 100,
-        tid: 1,
-      );
+      final event = BuildTraceEvent(name: 'test', cat: 'flutter', ts: 0, dur: 100, tid: 1);
 
       final result = event.toJson();
 
@@ -111,17 +105,19 @@ void main() {
 
       // Write a trace file to merge.
       final sourceFile = fileSystem.file('source_trace.json');
-      sourceFile.writeAsStringSync(json.encode(<Map<String, Object?>>[
-        <String, Object?>{
-          'ph': 'X',
-          'name': 'KernelSnapshot',
-          'cat': 'assemble',
-          'ts': 2000,
-          'dur': 1000,
-          'pid': 1,
-          'tid': 3,
-        },
-      ]));
+      sourceFile.writeAsStringSync(
+        json.encode(<Map<String, Object?>>[
+          <String, Object?>{
+            'ph': 'X',
+            'name': 'KernelSnapshot',
+            'cat': 'assemble',
+            'ts': 2000,
+            'dur': 1000,
+            'pid': 1,
+            'tid': 3,
+          },
+        ]),
+      );
 
       tracer.addCompleteEvent(
         name: 'gradle build',
@@ -145,13 +141,7 @@ void main() {
     testWithoutContext('mergeEventsFromFile does nothing for non-existent file', () {
       final tracer = BuildTracer();
 
-      tracer.addCompleteEvent(
-        name: 'test',
-        cat: 'flutter',
-        tid: 1,
-        startMicros: 0,
-        endMicros: 100,
-      );
+      tracer.addCompleteEvent(name: 'test', cat: 'flutter', tid: 1, startMicros: 0, endMicros: 100);
 
       // Should not throw.
       tracer.mergeEventsFromFile(fileSystem.file('does_not_exist.json'));
@@ -165,13 +155,7 @@ void main() {
 
     testWithoutContext('writeToFile creates parent directories', () {
       final tracer = BuildTracer();
-      tracer.addCompleteEvent(
-        name: 'test',
-        cat: 'flutter',
-        tid: 1,
-        startMicros: 0,
-        endMicros: 100,
-      );
+      tracer.addCompleteEvent(name: 'test', cat: 'flutter', tid: 1, startMicros: 0, endMicros: 100);
 
       final outFile = fileSystem.file('/a/b/c/trace.json');
       tracer.writeToFile(outFile);
