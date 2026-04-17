@@ -12,6 +12,7 @@ import 'package:unified_analytics/unified_analytics.dart';
 import '../artifacts.dart';
 import '../base/file_system.dart';
 import '../base/fingerprint.dart';
+import '../base/net.dart';
 import '../base/io.dart';
 import '../base/logger.dart';
 import '../base/process.dart';
@@ -372,6 +373,7 @@ Future<XcodeBuildResult> buildXcodeProject({
       ..addProcessNameMetadata(pid: flutterPid, name: 'flutter_tool')
       ..addThreadNameMetadata(pid: flutterPid, tid: _flutterToolTid, name: 'flutter tool')
       ..addThreadNameMetadata(pid: flutterPid, tid: _xcodeWaitTid, name: 'xcode (wait)')
+      ..addThreadNameMetadata(pid: flutterPid, tid: networkTid, name: 'network')
       ..addProcessNameMetadata(pid: _xcodeSubsectionPid, name: 'xcodebuild')
       ..addThreadNameMetadata(pid: _xcodeSubsectionPid, tid: 1, name: 'xcode phases');
   }

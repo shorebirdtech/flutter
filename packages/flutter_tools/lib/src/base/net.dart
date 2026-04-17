@@ -20,7 +20,7 @@ const kFlutterStorageBaseUrl = 'FLUTTER_STORAGE_BASE_URL';
 /// Perfetto row id for Flutter-tool HTTP artifact fetches. Local to
 /// the flutter tool's pid; picked to sit alongside the flutter-tool
 /// and assemble rows without overlapping either.
-const int _networkTid = 5;
+const int networkTid = 5;
 
 typedef HttpClientFactory = HttpClient Function();
 
@@ -107,7 +107,7 @@ class Net {
         name: '${onlyHeaders ? 'HEAD' : 'GET'} ${url.host}',
         cat: 'network',
         pid: currentProcessId(),
-        tid: _networkTid,
+        tid: networkTid,
         startMicros: networkStartMicros,
         endMicros: DateTime.now().microsecondsSinceEpoch,
         args: <String, Object?>{

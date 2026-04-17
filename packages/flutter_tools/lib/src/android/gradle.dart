@@ -505,7 +505,8 @@ class AndroidGradleBuilder implements AndroidBuilder {
       tracer
         ..addProcessNameMetadata(pid: flutterPid, name: 'flutter_tool')
         ..addThreadNameMetadata(pid: flutterPid, tid: _flutterToolTid, name: 'flutter tool')
-        ..addThreadNameMetadata(pid: flutterPid, tid: _gradleWaitTid, name: 'gradle (wait)');
+        ..addThreadNameMetadata(pid: flutterPid, tid: _gradleWaitTid, name: 'gradle (wait)')
+        ..addThreadNameMetadata(pid: flutterPid, tid: networkTid, name: 'network');
     }
 
     final BuildInfo buildInfo = androidBuildInfo.buildInfo;
