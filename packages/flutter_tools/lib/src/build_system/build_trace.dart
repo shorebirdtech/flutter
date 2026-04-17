@@ -6,6 +6,13 @@ import '../base/file_system.dart';
 import '../convert.dart';
 
 /// A single event in a Chrome Trace Event Format trace.
+///
+/// Format doc: https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU
+///
+/// Shorebird has lookalike classes in `dart-sdk/pkg/aot_tools` and
+/// `shorebird_cli/lib/src/artifact_builder/shorebird_tracer.dart`; they
+/// all serialize to the same wire format so traces merge cleanly. Keep
+/// field names and ph/ts/dur/pid/tid shape in sync when editing.
 class BuildTraceEvent {
   BuildTraceEvent({
     required this.name,
@@ -17,6 +24,9 @@ class BuildTraceEvent {
     this.args,
   });
 
+  // `!` here is the flutter-preferred pattern for required JSON fields
+  // (lints `cast_nullable_to_non_nullable`): the trace format guarantees
+  // these, and the assertion fails loudly rather than silently coercing.
   factory BuildTraceEvent.fromJson(Map<String, Object?> json) {
     return BuildTraceEvent(
       name: json['name']! as String,

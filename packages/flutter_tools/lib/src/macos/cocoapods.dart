@@ -410,12 +410,16 @@ class CocoaPods {
 
     void transitionTo(String? newPhase) {
       final int now = DateTime.now().microsecondsSinceEpoch;
-      if (currentPhase != null && currentPhaseStartMicros != null) {
+      // Pull into locals so flow analysis promotes them to non-null; the
+      // closure-captured outer variables don't promote by themselves.
+      final previousPhase = currentPhase;
+      final previousStart = currentPhaseStartMicros;
+      if (previousPhase != null && previousStart != null) {
         tracer.addCompleteEvent(
-          name: 'pod install: $currentPhase',
+          name: 'pod install: $previousPhase',
           cat: 'subprocess',
           tid: 1,
-          startMicros: currentPhaseStartMicros!,
+          startMicros: previousStart,
           endMicros: now,
         );
       }

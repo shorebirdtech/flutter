@@ -725,9 +725,9 @@ class Context {
     // Shorebird-specific build-trace plumbing: mac.dart sets
     // SHOREBIRD_TRACE_FILE in the Xcode build environment; here (running
     // as an Xcode build phase script) we forward it to flutter assemble.
-    if (environment['SHOREBIRD_TRACE_FILE'] != null &&
-        environment['SHOREBIRD_TRACE_FILE']!.isNotEmpty) {
-      flutterArgs.add('--shorebird-trace-file=${environment['SHOREBIRD_TRACE_FILE']}');
+    final String? shorebirdTraceFile = environment['SHOREBIRD_TRACE_FILE'];
+    if (shorebirdTraceFile != null && shorebirdTraceFile.isNotEmpty) {
+      flutterArgs.add('--shorebird-trace-file=$shorebirdTraceFile');
     }
 
     if (environment['CODE_SIZE_DIRECTORY'] != null &&

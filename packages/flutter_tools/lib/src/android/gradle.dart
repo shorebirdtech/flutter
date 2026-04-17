@@ -652,10 +652,10 @@ class AndroidGradleBuilder implements AndroidBuilder {
       gradleExecutablePath: gradleExecutablePath,
     );
 
-    // Record Gradle span and merge assemble trace if tracing is enabled.
-    int? gradleEndMicros;
+    // Timestamp unconditionally so the later post-gradle span can use it
+    // without flow-analysis gymnastics across the error-exit.
+    final int gradleEndMicros = DateTime.now().microsecondsSinceEpoch;
     if (tracer != null) {
-      gradleEndMicros = DateTime.now().microsecondsSinceEpoch;
       tracer.addCompleteEvent(
         name: 'gradle $assembleTask',
         cat: 'gradle',
@@ -689,7 +689,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
         name: 'post-gradle processing',
         cat: 'flutter',
         tid: 1,
-        startMicros: gradleEndMicros!,
+        startMicros: gradleEndMicros,
         endMicros: postGradleEndMicros,
       );
       tracer.addCompleteEvent(
