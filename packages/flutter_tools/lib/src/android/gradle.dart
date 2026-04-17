@@ -24,7 +24,7 @@ import '../base/project_migrator.dart';
 import '../base/terminal.dart';
 import '../base/utils.dart';
 import '../build_info.dart';
-import '../build_system/build_trace.dart';
+import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import '../cache.dart';
 import '../convert.dart';
 import '../flutter_manifest.dart';

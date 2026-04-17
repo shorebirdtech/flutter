@@ -4,7 +4,7 @@
 
 import 'package:file/memory.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
-import 'package:flutter_tools/src/build_system/build_trace.dart';
+import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import 'package:flutter_tools/src/convert.dart';
 
 import '../../src/common.dart';

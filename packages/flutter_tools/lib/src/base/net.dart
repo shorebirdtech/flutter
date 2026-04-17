@@ -6,7 +6,7 @@ import 'dart:async';
 
 import 'package:meta/meta.dart';
 
-import '../build_system/build_trace.dart';
+import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import '../convert.dart';
 import 'common.dart';
 import 'file_system.dart';

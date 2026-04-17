@@ -11,7 +11,7 @@ import '../base/common.dart';
 import '../base/file_system.dart';
 import '../build_info.dart';
 import '../build_system/build_system.dart';
-import '../build_system/build_trace.dart';
+import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import '../build_system/depfile.dart';
 import '../build_system/targets/android.dart';
 import '../build_system/targets/assets.dart';

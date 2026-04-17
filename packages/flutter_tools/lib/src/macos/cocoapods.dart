@@ -19,7 +19,7 @@ import '../base/process.dart';
 import '../base/project_migrator.dart';
 import '../base/version.dart';
 import '../build_info.dart';
-import '../build_system/build_trace.dart';
+import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import '../cache.dart';
 import '../ios/xcodeproj.dart';
 import '../migrations/cocoapods_script_symlink.dart';

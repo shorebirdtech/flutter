@@ -20,7 +20,7 @@ import '../base/project_migrator.dart';
 import '../base/utils.dart';
 import '../base/version.dart';
 import '../build_info.dart';
-import '../build_system/build_trace.dart';
+import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import '../cache.dart';
 import '../darwin/darwin.dart';
 import '../device.dart';

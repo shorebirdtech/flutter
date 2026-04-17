@@ -58,6 +58,16 @@ dependencies:
   pubspec_parse: 1.5.0
 
   graphs: 2.3.2
+
+  # Shorebird-specific: shared build-trace library. Pinned to a specific
+  # commit of the shorebird monorepo. Roll this ref together with any
+  # change to the shared library. Subdir path points at the package
+  # within the monorepo.
+  shorebird_build_trace:
+    git:
+      url: https://github.com/shorebirdtech/shorebird.git
+      ref: 5005fd1ea99106c4723b0418cf2f76f92bb6f2ea
+      path: packages/shorebird_build_trace
   hooks_runner: 1.0.1
   hooks: 1.0.0
   code_assets: 1.0.0
