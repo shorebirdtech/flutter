@@ -610,7 +610,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
     }
 
     traceSession?.finish(
-      buildSpanName: isBuildingBundle ? 'flutter build appbundle' : 'flutter build apk',
+      buildTarget: isBuildingBundle ? 'appbundle' : 'apk',
       printStatus: _logger.printStatus,
     );
 

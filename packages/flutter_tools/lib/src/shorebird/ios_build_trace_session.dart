@@ -99,8 +99,8 @@ class IosBuildTraceSession {
       return;
     }
     _tracer.addCompleteEvent(
-      name: 'pod install',
-      cat: 'subprocess',
+      name: TraceSchema.podInstallSpanName,
+      cat: TraceSchema.catSubprocess,
       pid: _flutterPid,
       tid: _flutterToolTid,
       startMicros: startMicros,
@@ -129,7 +129,7 @@ class IosBuildTraceSession {
     _xcodeStartMicros = DateTime.now().microsecondsSinceEpoch;
     _tracer.addCompleteEvent(
       name: 'pre-xcode setup',
-      cat: 'flutter',
+      cat: TraceSchema.catFlutter,
       pid: _flutterPid,
       tid: _flutterToolTid,
       startMicros: _buildStartMicros,
@@ -151,8 +151,8 @@ class IosBuildTraceSession {
   }) async {
     _xcodeEndMicros = DateTime.now().microsecondsSinceEpoch;
     _tracer.addCompleteEvent(
-      name: 'xcode $buildActionName',
-      cat: 'xcode',
+      name: '${TraceSchema.xcodeSpanPrefix}$buildActionName',
+      cat: TraceSchema.catXcode,
       pid: _flutterPid,
       tid: _xcodeWaitTid,
       startMicros: _xcodeStartMicros ?? _buildStartMicros,
@@ -181,15 +181,15 @@ class IosBuildTraceSession {
     _tracer
       ..addCompleteEvent(
         name: 'post-xcode processing',
-        cat: 'flutter',
+        cat: TraceSchema.catFlutter,
         pid: _flutterPid,
         tid: _flutterToolTid,
         startMicros: _xcodeEndMicros ?? buildEndMicros,
         endMicros: buildEndMicros,
       )
       ..addCompleteEvent(
-        name: 'flutter build ios',
-        cat: 'flutter',
+        name: '${TraceSchema.flutterBuildSpanPrefix}ios',
+        cat: TraceSchema.catFlutter,
         pid: _flutterPid,
         tid: _flutterToolTid,
         startMicros: _buildStartMicros,
@@ -262,7 +262,7 @@ class IosBuildTraceSession {
       final int endMicros = ((startTime + duration) * 1000000).round();
       _tracer.addCompleteEvent(
         name: title,
-        cat: 'xcode_subsection',
+        cat: TraceSchema.catXcodeSubsection,
         // Synthetic pid so subsections display on their own row in
         // Perfetto, labelled 'xcodebuild' via the process_name
         // metadata emitted at tracer setup. xcresult doesn't surface

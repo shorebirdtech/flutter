@@ -407,9 +407,14 @@ class CocoaPods {
     // pod install work into its own row.
     final int podPid = process.pid;
     tracer
-      ..addProcessNameMetadata(pid: podPid, name: 'pod install')
-      ..addThreadNameMetadata(pid: podPid, tid: 1, name: 'pod install');
-    final phases = PhaseTracker(tracer: tracer, pid: podPid, tid: 1, namePrefix: 'pod install');
+      ..addProcessNameMetadata(pid: podPid, name: TraceSchema.podInstallSpanName)
+      ..addThreadNameMetadata(pid: podPid, tid: 1, name: TraceSchema.podInstallSpanName);
+    final phases = PhaseTracker(
+      tracer: tracer,
+      pid: podPid,
+      tid: 1,
+      namePrefix: TraceSchema.podInstallNamePrefix,
+    );
 
     final stdoutBuf = StringBuffer();
     final stderrBuf = StringBuffer();
@@ -423,13 +428,13 @@ class CocoaPods {
             ..write('\n');
           // CocoaPods verbose-mode phase markers. Stable across recent versions.
           if (line.contains('Analyzing dependencies')) {
-            phases.transitionTo('analyzing');
+            phases.transitionTo(TraceSchema.podPhaseAnalyzing);
           } else if (line.contains('Downloading dependencies')) {
-            phases.transitionTo('downloading');
+            phases.transitionTo(TraceSchema.podPhaseDownloading);
           } else if (line.contains('Generating Pods project')) {
-            phases.transitionTo('generating');
+            phases.transitionTo(TraceSchema.podPhaseGenerating);
           } else if (line.contains('Integrating client project')) {
-            phases.transitionTo('integrating');
+            phases.transitionTo(TraceSchema.podPhaseIntegrating);
           }
         })
         .asFuture<void>();

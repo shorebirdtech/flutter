@@ -120,7 +120,7 @@ class AndroidBuildTraceSession {
     final int preGradleEndMicros = DateTime.now().microsecondsSinceEpoch;
     _tracer.addCompleteEvent(
       name: 'pre-gradle setup',
-      cat: 'flutter',
+      cat: TraceSchema.catFlutter,
       pid: _flutterPid,
       tid: _flutterToolTid,
       startMicros: _buildStartMicros,
@@ -148,8 +148,8 @@ class AndroidBuildTraceSession {
   void onGradleFinished(String assembleTask) {
     _gradleEndMicros = DateTime.now().microsecondsSinceEpoch;
     _tracer.addCompleteEvent(
-      name: 'gradle $assembleTask',
-      cat: 'gradle',
+      name: '${TraceSchema.gradleSpanPrefix}$assembleTask',
+      cat: TraceSchema.catGradle,
       pid: _flutterPid,
       tid: _gradleWaitTid,
       startMicros: _gradleStartMicros ?? _buildStartMicros,
@@ -175,22 +175,25 @@ class AndroidBuildTraceSession {
   /// Writes the merged trace to disk and clears [BuildTracer.current].
   /// Records post-gradle + outer "flutter build" spans first.
   ///
+  /// [buildTarget] is the target suffix (e.g. `apk`, `appbundle`); the
+  /// outer span name is assembled as
+  /// `TraceSchema.flutterBuildSpanPrefix + buildTarget`.
   /// [printStatus] is called once with a user-facing "trace written"
   /// message so callers don't have to wire the logger through.
-  void finish({required String buildSpanName, required void Function(String) printStatus}) {
+  void finish({required String buildTarget, required void Function(String) printStatus}) {
     final int postGradleEndMicros = DateTime.now().microsecondsSinceEpoch;
     _tracer
       ..addCompleteEvent(
         name: 'post-gradle processing',
-        cat: 'flutter',
+        cat: TraceSchema.catFlutter,
         pid: _flutterPid,
         tid: _flutterToolTid,
         startMicros: _gradleEndMicros ?? postGradleEndMicros,
         endMicros: postGradleEndMicros,
       )
       ..addCompleteEvent(
-        name: buildSpanName,
-        cat: 'flutter',
+        name: '${TraceSchema.flutterBuildSpanPrefix}$buildTarget',
+        cat: TraceSchema.catFlutter,
         pid: _flutterPid,
         tid: _flutterToolTid,
         startMicros: _buildStartMicros,

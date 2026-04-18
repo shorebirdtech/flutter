@@ -470,7 +470,7 @@ void writeTraceData(Iterable<PerformanceMeasurement> measurements, File outFile)
     final int startMicros = measurement.startTimeMicroseconds;
     tracer.addCompleteEvent(
       name: measurement.analyticsName,
-      cat: 'assemble',
+      cat: TraceSchema.catAssemble,
       pid: pid,
       tid: 1,
       startMicros: startMicros,

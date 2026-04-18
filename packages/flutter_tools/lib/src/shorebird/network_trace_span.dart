@@ -38,7 +38,7 @@ class NetworkTraceSpan {
     }
     tracer.addCompleteEvent(
       name: '${_onlyHeaders ? 'HEAD' : 'GET'} ${_url.host}',
-      cat: 'network',
+      cat: TraceSchema.catNetwork,
       pid: currentProcessId(),
       tid: networkTid,
       startMicros: _startMicros,

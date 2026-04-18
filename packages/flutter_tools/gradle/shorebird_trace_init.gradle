@@ -73,6 +73,13 @@ gradle.addListener(new TaskExecutionListener() {
         // task's simple name (last colon segment) so plugin names like
         // `:package_info_plus:...` don't accidentally trigger the `packaging`
         // bucket.
+        //
+        // The kind strings below are a wire-format contract with
+        // shorebird_cli (which buckets its summary by these values).
+        // KEEP IN SYNC with `TraceSchema.gradleKind*` in the
+        // `shorebird_build_trace` package; adding a new kind means
+        // landing the matching constant there AND teaching shorebird_cli
+        // to bucket it, otherwise it silently falls into `other`.
         def path = task.path
         def lastColon = path.lastIndexOf(':')
         def simpleName = (lastColon >= 0 ? path.substring(lastColon + 1) : path).toLowerCase()
