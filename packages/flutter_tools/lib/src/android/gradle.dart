@@ -487,11 +487,8 @@ class AndroidGradleBuilder implements AndroidBuilder {
       _fileSystem,
       project.android.buildDirectory,
     );
-    Future<void> runWithTrace(Future<void> Function() body) =>
-        traceSession == null ? body() : traceSession.run(body);
 
-    await runWithTrace(() async {
-      final BuildInfo buildInfo = androidBuildInfo.buildInfo;
+    final BuildInfo buildInfo = androidBuildInfo.buildInfo;
     final String assembleTask = isBuildingBundle
         ? getBundleTaskFor(buildInfo)
         : getAssembleTaskFor(buildInfo);
@@ -605,6 +602,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
     traceSession?.onGradleFinished(assembleTask);
 
     if (exitCode != 0) {
+      traceSession?.abortOnGradleFailure();
       throwToolExit(
         'Gradle task $assembleTask failed with exit code $exitCode',
         exitCode: exitCode,
@@ -678,7 +676,6 @@ class AndroidGradleBuilder implements AndroidBuilder {
         await _performCodeSizeAnalysis('apk', apkFile, androidBuildInfo);
       }
     }
-    });
   }
 
   // Checks whether AGP has successfully stripped debug symbols from native libraries

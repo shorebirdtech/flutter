@@ -12,11 +12,16 @@ import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import '../base/file_system.dart';
 import 'network_trace_span.dart';
 
-/// Wraps the lifecycle of a Shorebird build trace across one iOS build.
-/// Returned by [maybeStart] only when `--shorebird-trace=<path>` was
-/// passed; the returned session's [run] method installs the tracer
-/// (via [BuildTracer.runAsync]) for the duration of its callback, so
-/// callers never touch the static.
+/// Wraps the lifecycle of a Shorebird build trace across one iOS
+/// build. Returned by [maybeStart] only when `--shorebird-trace=<path>`
+/// was passed; the constructor installs [BuildTracer.current] and
+/// [finish] / [abortOnFailure] clear it, so mac.dart itself never
+/// touches the static.
+///
+/// Manual start/stop (rather than a body-wrapping closure) because
+/// wrapping the ~300-line `buildXcodeProject` body would force a
+/// reindent that balloons our diff against upstream flutter and makes
+/// every subsequent merge of that method harder.
 class IosBuildTraceSession {
   IosBuildTraceSession._({
     required BuildTracer tracer,
@@ -29,36 +34,14 @@ class IosBuildTraceSession {
        _buildDirectoryPath = buildDirectoryPath,
        _flutterPid = currentProcessId(),
        _buildStartMicros = DateTime.now().microsecondsSinceEpoch {
+    BuildTracer.start(_tracer);
     _tracer
       ..addProcessNameMetadata(pid: _flutterPid, name: 'flutter_tool')
-      ..addThreadNameMetadata(
-        pid: _flutterPid,
-        tid: _flutterToolTid,
-        name: 'flutter tool',
-      )
-      ..addThreadNameMetadata(
-        pid: _flutterPid,
-        tid: _xcodeWaitTid,
-        name: 'xcode (wait)',
-      )
-      ..addThreadNameMetadata(
-        pid: _flutterPid,
-        tid: networkTid,
-        name: 'network',
-      )
+      ..addThreadNameMetadata(pid: _flutterPid, tid: _flutterToolTid, name: 'flutter tool')
+      ..addThreadNameMetadata(pid: _flutterPid, tid: _xcodeWaitTid, name: 'xcode (wait)')
+      ..addThreadNameMetadata(pid: _flutterPid, tid: networkTid, name: 'network')
       ..addProcessNameMetadata(pid: _xcodeSubsectionPid, name: 'xcodebuild')
-      ..addThreadNameMetadata(
-        pid: _xcodeSubsectionPid,
-        tid: 1,
-        name: 'xcode phases',
-      );
-  }
-
-  /// Runs [body] with this session's tracer installed as
-  /// [BuildTracer.current]. The zone scope guarantees [current] is
-  /// cleared when [body] returns or throws.
-  Future<T> run<T>(Future<T> Function() body) {
-    return BuildTracer.runAsync(_tracer, body);
+      ..addThreadNameMetadata(pid: _xcodeSubsectionPid, tid: 1, name: 'xcode phases');
   }
 
   /// Returns a session when a trace path is configured for this build,
@@ -185,8 +168,14 @@ class IosBuildTraceSession {
     }
   }
 
-  /// Writes the merged trace to disk. Records the post-xcode + outer
-  /// `flutter build ios` spans first.
+  /// Clears [BuildTracer.current] without writing the trace. Use on
+  /// error paths where [finish] won't run.
+  void abortOnFailure() {
+    BuildTracer.stop();
+  }
+
+  /// Writes the merged trace to disk and clears [BuildTracer.current].
+  /// Records the post-xcode + outer `flutter build ios` spans first.
   void finish({required void Function(String) printStatus}) {
     final int buildEndMicros = DateTime.now().microsecondsSinceEpoch;
     _tracer
@@ -211,6 +200,7 @@ class IosBuildTraceSession {
       'Shorebird build trace written to $_tracePath. '
       'View at https://ui.perfetto.dev',
     );
+    BuildTracer.stop();
   }
 
   /// Ask xcresulttool for the structured build log of the archive

@@ -14,17 +14,14 @@ import 'network_trace_span.dart';
 
 /// Wraps the lifecycle of a Shorebird build trace across one
 /// `buildGradleApp` call. Returned by [maybeStart] only when
-/// `--shorebird-trace=<path>` was passed; the returned session's [run]
-/// method installs the tracer (via [BuildTracer.runAsync]) for the
-/// duration of its callback, so callers never touch the static.
+/// `--shorebird-trace=<path>` was passed; the constructor installs
+/// [BuildTracer.current] and [finish] / [abortOnGradleFailure]
+/// clear it, so gradle.dart itself never touches the static.
 ///
-/// Usage from gradle.dart:
-///
-/// ```dart
-/// final session = AndroidBuildTraceSession.maybeStart(androidBuildInfo, fs);
-/// await session?.run(() => _buildGradleAppImpl(session, ...)) ??
-///     _buildGradleAppImpl(null, ...);
-/// ```
+/// Manual start/stop (rather than a body-wrapping closure) because
+/// wrapping the ~200-line `buildGradleApp` body would force a reindent
+/// that balloons our diff against upstream flutter and makes every
+/// subsequent merge of that method harder.
 class AndroidBuildTraceSession {
   AndroidBuildTraceSession._({
     required BuildTracer tracer,
@@ -37,30 +34,12 @@ class AndroidBuildTraceSession {
        _buildDirectory = buildDirectory,
        _flutterPid = currentProcessId(),
        _buildStartMicros = DateTime.now().microsecondsSinceEpoch {
+    BuildTracer.start(_tracer);
     _tracer
       ..addProcessNameMetadata(pid: _flutterPid, name: 'flutter_tool')
-      ..addThreadNameMetadata(
-        pid: _flutterPid,
-        tid: _flutterToolTid,
-        name: 'flutter tool',
-      )
-      ..addThreadNameMetadata(
-        pid: _flutterPid,
-        tid: _gradleWaitTid,
-        name: 'gradle (wait)',
-      )
-      ..addThreadNameMetadata(
-        pid: _flutterPid,
-        tid: networkTid,
-        name: 'network',
-      );
-  }
-
-  /// Runs [body] with this session's tracer installed as
-  /// [BuildTracer.current]. The zone scope guarantees [current] is
-  /// cleared when [body] returns or throws.
-  Future<T> run<T>(Future<T> Function() body) {
-    return BuildTracer.runAsync(_tracer, body);
+      ..addThreadNameMetadata(pid: _flutterPid, tid: _flutterToolTid, name: 'flutter tool')
+      ..addThreadNameMetadata(pid: _flutterPid, tid: _gradleWaitTid, name: 'gradle (wait)')
+      ..addThreadNameMetadata(pid: _flutterPid, tid: networkTid, name: 'network');
   }
 
   /// Returns a session when a trace path is configured for this build,
@@ -186,15 +165,19 @@ class AndroidBuildTraceSession {
     }
   }
 
-  /// Writes the merged trace to disk. Records post-gradle + outer
-  /// "flutter build" spans first.
+  /// Call right before `throwToolExit` when Gradle returned non-zero —
+  /// clears [BuildTracer.current] so the caught ToolExit doesn't leak
+  /// tracer state into any later code that reads [BuildTracer.current].
+  void abortOnGradleFailure() {
+    BuildTracer.stop();
+  }
+
+  /// Writes the merged trace to disk and clears [BuildTracer.current].
+  /// Records post-gradle + outer "flutter build" spans first.
   ///
   /// [printStatus] is called once with a user-facing "trace written"
   /// message so callers don't have to wire the logger through.
-  void finish({
-    required String buildSpanName,
-    required void Function(String) printStatus,
-  }) {
+  void finish({required String buildSpanName, required void Function(String) printStatus}) {
     final int postGradleEndMicros = DateTime.now().microsecondsSinceEpoch;
     _tracer
       ..addCompleteEvent(
@@ -218,5 +201,6 @@ class AndroidBuildTraceSession {
       'Shorebird build trace written to $_tracePath. '
       'View at https://ui.perfetto.dev',
     );
+    BuildTracer.stop();
   }
 }

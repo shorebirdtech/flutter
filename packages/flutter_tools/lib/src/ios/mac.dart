@@ -357,10 +357,7 @@ Future<XcodeBuildResult> buildXcodeProject({
     fileSystem: globals.fs,
     buildDirectoryPath: globals.fs.path.join(getBuildDirectory(), 'ios'),
   );
-  Future<XcodeBuildResult> runWithTrace(Future<XcodeBuildResult> Function() body) =>
-      traceSession == null ? body() : traceSession.run(body);
 
-  return runWithTrace(() async {
   traceSession?.onBeforePodInstall();
   await processPodsIfNeeded(project.ios, buildDirectoryPath, buildInfo.mode);
   traceSession?.onAfterPodInstall();
@@ -683,7 +680,6 @@ Future<XcodeBuildResult> buildXcodeProject({
       xcResult: xcResult,
     );
   }
-  });
 }
 
 /// Check if the Flutter framework's public headers have changed since last built.
