@@ -4,6 +4,7 @@
 
 import 'package:args/args.dart';
 import 'package:meta/meta.dart';
+import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import 'package:unified_analytics/unified_analytics.dart';
 
 import '../artifacts.dart';
@@ -11,7 +12,6 @@ import '../base/common.dart';
 import '../base/file_system.dart';
 import '../build_info.dart';
 import '../build_system/build_system.dart';
-import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import '../build_system/depfile.dart';
 import '../build_system/targets/android.dart';
 import '../build_system/targets/assets.dart';
@@ -454,44 +454,33 @@ void writePerformanceData(Iterable<PerformanceMeasurement> measurements, File ou
 }
 
 /// Output build trace data in Chrome Trace Event Format in [outFile].
+/// `flutter assemble` is re-entered as its own process by Gradle /
+/// xcode_backend, so its events get their own Perfetto row named
+/// `flutter assemble`. Spans for each [PerformanceMeasurement] are
+/// emitted using its wall-clock [PerformanceMeasurement.startTimeMicroseconds]
+/// (not the stopwatch duration alone) so the timeline aligns with the
+/// parent flutter tool's trace when merged.
 @visibleForTesting
 void writeTraceData(Iterable<PerformanceMeasurement> measurements, File outFile) {
-  // Real pid of this (re-entrant) flutter tool invocation. `flutter
-  // assemble` is spawned by Gradle / xcode_backend as its own process,
-  // so its spans deserve their own Perfetto row named accordingly.
   final int pid = currentProcessId();
-  final events = <Map<String, Object?>>[
-    <String, Object?>{
-      'name': 'process_name',
-      'ph': 'M',
-      'pid': pid,
-      'args': <String, Object?>{'name': 'flutter assemble'},
-    },
-    <String, Object?>{
-      'name': 'thread_name',
-      'ph': 'M',
-      'pid': pid,
-      'tid': 1,
-      'args': <String, Object?>{'name': 'flutter assemble'},
-    },
-    for (final PerformanceMeasurement measurement in measurements)
-      <String, Object?>{
-        'ph': 'X',
-        'name': measurement.analyticsName,
-        'cat': 'assemble',
-        'ts': measurement.startTimeMicroseconds,
-        'dur': measurement.elapsedMilliseconds * 1000,
-        'pid': pid,
-        'tid': 1,
-        'args': <String, Object?>{
-          'target': measurement.target,
-          'skipped': measurement.skipped,
-          'succeeded': measurement.succeeded,
-        },
+  final tracer = BuildTracer()
+    ..addProcessNameMetadata(pid: pid, name: 'flutter assemble')
+    ..addThreadNameMetadata(pid: pid, tid: 1, name: 'flutter assemble');
+  for (final measurement in measurements) {
+    final int startMicros = measurement.startTimeMicroseconds;
+    tracer.addCompleteEvent(
+      name: measurement.analyticsName,
+      cat: 'assemble',
+      pid: pid,
+      tid: 1,
+      startMicros: startMicros,
+      endMicros: startMicros + measurement.elapsedMilliseconds * 1000,
+      args: <String, Object?>{
+        'target': measurement.target,
+        'skipped': measurement.skipped,
+        'succeeded': measurement.succeeded,
       },
-  ];
-  if (!outFile.parent.existsSync()) {
-    outFile.parent.createSync(recursive: true);
+    );
   }
-  outFile.writeAsStringSync(json.encode(events));
+  tracer.writeToFile(outFile);
 }

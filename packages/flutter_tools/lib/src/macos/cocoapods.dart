@@ -6,6 +6,7 @@ import 'dart:convert';
 
 import 'package:file/file.dart';
 import 'package:process/process.dart';
+import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import 'package:unified_analytics/unified_analytics.dart';
 
 import '../base/common.dart';
@@ -19,7 +20,6 @@ import '../base/process.dart';
 import '../base/project_migrator.dart';
 import '../base/version.dart';
 import '../build_info.dart';
-import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import '../cache.dart';
 import '../ios/xcodeproj.dart';
 import '../migrations/cocoapods_script_symlink.dart';
@@ -402,38 +402,17 @@ class CocoaPods {
       workingDirectory: _fileSystem.path.dirname(xcodeProject.podfile.path),
       environment: <String, String>{'COCOAPODS_DISABLE_STATS': 'true', 'LANG': 'en_US.UTF-8'},
     );
-    // Real pid of the `pod` process. We emit phase spans on this pid +
-    // tid=1, and name it via a `process_name` metadata event so Perfetto
-    // groups pod install work into its own row.
+    // Real pid of the `pod` process. Phase spans land on this pid +
+    // tid=1, with a `process_name` metadata event so Perfetto groups
+    // pod install work into its own row.
     final int podPid = process.pid;
     tracer
       ..addProcessNameMetadata(pid: podPid, name: 'pod install')
       ..addThreadNameMetadata(pid: podPid, tid: 1, name: 'pod install');
+    final phases = PhaseTracker(tracer: tracer, pid: podPid, tid: 1, namePrefix: 'pod install');
 
     final stdoutBuf = StringBuffer();
     final stderrBuf = StringBuffer();
-    String? currentPhase;
-    int? currentPhaseStartMicros;
-
-    void transitionTo(String? newPhase) {
-      final int now = DateTime.now().microsecondsSinceEpoch;
-      // Pull into locals so flow analysis promotes them to non-null; the
-      // closure-captured outer variables don't promote by themselves.
-      final previousPhase = currentPhase;
-      final previousStart = currentPhaseStartMicros;
-      if (previousPhase != null && previousStart != null) {
-        tracer.addCompleteEvent(
-          name: 'pod install: $previousPhase',
-          cat: 'subprocess',
-          pid: podPid,
-          tid: 1,
-          startMicros: previousStart,
-          endMicros: now,
-        );
-      }
-      currentPhase = newPhase;
-      currentPhaseStartMicros = newPhase == null ? null : now;
-    }
 
     final Future<void> stdoutDone = process.stdout
         .transform(utf8.decoder)
@@ -444,13 +423,13 @@ class CocoaPods {
             ..write('\n');
           // CocoaPods verbose-mode phase markers. Stable across recent versions.
           if (line.contains('Analyzing dependencies')) {
-            transitionTo('analyzing');
+            phases.transitionTo('analyzing');
           } else if (line.contains('Downloading dependencies')) {
-            transitionTo('downloading');
+            phases.transitionTo('downloading');
           } else if (line.contains('Generating Pods project')) {
-            transitionTo('generating');
+            phases.transitionTo('generating');
           } else if (line.contains('Integrating client project')) {
-            transitionTo('integrating');
+            phases.transitionTo('integrating');
           }
         })
         .asFuture<void>();
@@ -462,7 +441,7 @@ class CocoaPods {
 
     final int exitCode = await process.exitCode;
     await Future.wait(<Future<void>>[stdoutDone, stderrDone]);
-    transitionTo(null);
+    phases.end();
 
     return ProcessResult(process.pid, exitCode, stdoutBuf.toString(), stderrBuf.toString());
   }
