@@ -24,12 +24,12 @@ import '../base/project_migrator.dart';
 import '../base/terminal.dart';
 import '../base/utils.dart';
 import '../build_info.dart';
-import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import '../cache.dart';
 import '../convert.dart';
 import '../flutter_manifest.dart';
 import '../globals.dart' as globals;
 import '../project.dart';
+import '../shorebird/android_build_trace_session.dart';
 import 'android_builder.dart';
 import 'android_studio.dart';
 import 'gradle_errors.dart';
@@ -63,12 +63,6 @@ report any issues.
 Otherwise, file an issue at https://github.com/flutter/flutter/issues.''';
 
 typedef _OutputParser = void Function(String line);
-
-/// Perfetto row ids within the flutter_tool process, local to this file.
-/// Since they're only ever used within a single pid, they don't have to
-/// agree with any other producer's tids.
-const int _flutterToolTid = 1;
-const int _gradleWaitTid = 2;
 
 String _getOutputAppLinkSettingsTaskFor(String buildVariant) {
   return _taskForBuildVariant('output', buildVariant, 'AppLinkSettings');
@@ -488,26 +482,16 @@ class AndroidGradleBuilder implements AndroidBuilder {
       return;
     }
 
-    // Assembly work starts here.
-    final int buildStartMicros = DateTime.now().microsecondsSinceEpoch;
-    final BuildTracer? tracer = androidBuildInfo.buildInfo.shorebirdTraceFilePath != null
-        ? BuildTracer()
-        : null;
-    // Make the tracer visible to other layers of the flutter tool (Net,
-    // subprocess wrappers) so they can record spans without plumbing a
-    // parameter through. Cleared in the finally-equivalent below, after
-    // the trace is written.
-    BuildTracer.current = tracer;
-    final int flutterPid = currentProcessId();
-    if (tracer != null) {
-      tracer
-        ..addProcessNameMetadata(pid: flutterPid, name: 'flutter_tool')
-        ..addThreadNameMetadata(pid: flutterPid, tid: _flutterToolTid, name: 'flutter tool')
-        ..addThreadNameMetadata(pid: flutterPid, tid: _gradleWaitTid, name: 'gradle (wait)')
-        ..addThreadNameMetadata(pid: flutterPid, tid: networkTid, name: 'network');
-    }
+    final AndroidBuildTraceSession? traceSession = AndroidBuildTraceSession.maybeStart(
+      androidBuildInfo,
+      _fileSystem,
+      project.android.buildDirectory,
+    );
+    Future<void> runWithTrace(Future<void> Function() body) =>
+        traceSession == null ? body() : traceSession.run(body);
 
-    final BuildInfo buildInfo = androidBuildInfo.buildInfo;
+    await runWithTrace(() async {
+      final BuildInfo buildInfo = androidBuildInfo.buildInfo;
     final String assembleTask = isBuildingBundle
         ? getBundleTaskFor(buildInfo)
         : getAssembleTaskFor(buildInfo);
@@ -583,53 +567,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
       }
     }
     options.addAll(androidBuildInfo.buildInfo.toGradleConfig());
-    // Pass trace file path as a Gradle property for flutter assemble.
-    // We use an intermediate file that gradle.dart will merge into the final trace.
-    // NOTE: This path is passed as a project-level Gradle property, so it's
-    // shared across all variants. This is safe because `flutter build apk`
-    // only runs a single variant's FlutterTask per invocation. If we ever
-    // support tracing builds that run multiple variants simultaneously (e.g.
-    // multiple flavors in one Gradle invocation), this path would need to
-    // include the variant name to avoid collisions.
-    final String? assembleTraceFilePath;
-    final String? gradleTaskTraceFilePath;
-    if (buildInfo.shorebirdTraceFilePath != null) {
-      // Embed the assemble task name (carries variant + build type, e.g.
-      // `assembleFooRelease` or `bundleRelease`) in the intermediate
-      // paths so a single Gradle invocation running multiple variants in
-      // parallel — something Gradle supports in principle — can't have
-      // per-variant FlutterTask instances stomp on each other's trace.
-      assembleTraceFilePath = _fileSystem.path.join(
-        project.android.buildDirectory.path,
-        'intermediates',
-        'shorebird',
-        'shorebird_assemble_trace_$assembleTask.json',
-      );
-      options.add('-Pshorebird-trace-file=$assembleTraceFilePath');
-
-      // Load the Shorebird gradle trace init script so every Gradle task
-      // emits a Chrome Trace Event Format entry we can merge into the
-      // main trace — gives per-plugin / per-task visibility that the
-      // single "gradle assembleRelease" span can't provide on its own.
-      gradleTaskTraceFilePath = _fileSystem.path.join(
-        project.android.buildDirectory.path,
-        'intermediates',
-        'shorebird',
-        'shorebird_gradle_task_trace_$assembleTask.json',
-      );
-      final String gradleTraceInitScript = _fileSystem.path.join(
-        Cache.flutterRoot!,
-        'packages',
-        'flutter_tools',
-        'gradle',
-        'shorebird_trace_init.gradle',
-      );
-      options.add('-I=$gradleTraceInitScript');
-      options.add('-Pshorebird.gradle-trace-file=$gradleTaskTraceFilePath');
-    } else {
-      assembleTraceFilePath = null;
-      gradleTaskTraceFilePath = null;
-    }
+    options.addAll(traceSession?.extraGradleOptions(assembleTask) ?? const <String>[]);
     if (buildInfo.fileSystemRoots.isNotEmpty) {
       options.add('-Pfilesystem-roots=${buildInfo.fileSystemRoots.join('|')}');
     }
@@ -639,36 +577,14 @@ class AndroidGradleBuilder implements AndroidBuilder {
     if (androidBuildInfo.splitPerAbi) {
       options.add('-Psplit-per-abi=true');
     }
-    final int preGradleEndMicros = DateTime.now().microsecondsSinceEpoch;
-    tracer?.addCompleteEvent(
-      name: 'pre-gradle setup',
-      cat: 'flutter',
-      pid: flutterPid,
-      tid: _flutterToolTid,
-      startMicros: buildStartMicros,
-      endMicros: preGradleEndMicros,
-    );
-
     late Stopwatch sw;
-    late int gradleStartMicros;
     final int exitCode = await _runGradleTask(
       assembleTask,
       preRunTask: () {
-        gradleStartMicros = DateTime.now().microsecondsSinceEpoch;
+        traceSession?.onGradleAboutToStart();
         sw = Stopwatch()..start();
       },
-      // Emit the flow start with id = Gradle's real pid as soon as the
-      // JVM is spawned. The init script pulls the same pid from
-      // `ProcessHandle.current().pid()` when it emits the matching flow
-      // end, so both sides agree on the id with no plumbing.
-      onStart: (process) {
-        tracer?.addFlowStart(
-          id: process.pid,
-          pid: flutterPid,
-          tid: _gradleWaitTid,
-          atMicros: DateTime.now().microsecondsSinceEpoch,
-        );
-      },
+      onStart: (process) => traceSession?.onGradleSpawn(process),
       postRunTask: () {
         final Duration elapsedDuration = sw.elapsed;
         _analytics.send(
@@ -686,64 +602,19 @@ class AndroidGradleBuilder implements AndroidBuilder {
       gradleExecutablePath: gradleExecutablePath,
     );
 
-    // Timestamp unconditionally so the later post-gradle span can use it
-    // without flow-analysis gymnastics across the error-exit.
-    final int gradleEndMicros = DateTime.now().microsecondsSinceEpoch;
-    if (tracer != null) {
-      tracer.addCompleteEvent(
-        name: 'gradle $assembleTask',
-        cat: 'gradle',
-        pid: flutterPid,
-        tid: _gradleWaitTid,
-        startMicros: gradleStartMicros,
-        endMicros: gradleEndMicros,
-      );
-      // Merge the assemble trace file that flutter assemble wrote.
-      if (assembleTraceFilePath != null) {
-        final File assembleTraceFile = _fileSystem.file(assembleTraceFilePath);
-        tracer.mergeEventsFromFile(assembleTraceFile);
-      }
-      // Merge the per-task events the init script wrote for this Gradle run.
-      if (gradleTaskTraceFilePath != null) {
-        final File gradleTaskTraceFile = _fileSystem.file(gradleTaskTraceFilePath);
-        tracer.mergeEventsFromFile(gradleTaskTraceFile);
-      }
-    }
+    traceSession?.onGradleFinished(assembleTask);
 
     if (exitCode != 0) {
-      BuildTracer.current = null;
       throwToolExit(
         'Gradle task $assembleTask failed with exit code $exitCode',
         exitCode: exitCode,
       );
     }
 
-    if (tracer != null) {
-      final int postGradleEndMicros = DateTime.now().microsecondsSinceEpoch;
-      tracer.addCompleteEvent(
-        name: 'post-gradle processing',
-        cat: 'flutter',
-        pid: flutterPid,
-        tid: _flutterToolTid,
-        startMicros: gradleEndMicros,
-        endMicros: postGradleEndMicros,
-      );
-      tracer.addCompleteEvent(
-        name: isBuildingBundle ? 'flutter build appbundle' : 'flutter build apk',
-        cat: 'flutter',
-        pid: flutterPid,
-        tid: _flutterToolTid,
-        startMicros: buildStartMicros,
-        endMicros: postGradleEndMicros,
-      );
-      final File traceFile = _fileSystem.file(buildInfo.shorebirdTraceFilePath);
-      tracer.writeToFile(traceFile);
-      _logger.printStatus(
-        'Shorebird build trace written to ${buildInfo.shorebirdTraceFilePath}. '
-        'View at https://ui.perfetto.dev',
-      );
-    }
-    BuildTracer.current = null;
+    traceSession?.finish(
+      buildSpanName: isBuildingBundle ? 'flutter build appbundle' : 'flutter build apk',
+      printStatus: _logger.printStatus,
+    );
 
     if (isBuildingBundle) {
       final File bundleFile = findBundleFile(project, buildInfo, _logger, _analytics);
@@ -807,6 +678,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
         await _performCodeSizeAnalysis('apk', apkFile, androidBuildInfo);
       }
     }
+    });
   }
 
   // Checks whether AGP has successfully stripped debug symbols from native libraries

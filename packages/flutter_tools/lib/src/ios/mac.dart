@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:meta/meta.dart';
 import 'package:process/process.dart';
@@ -14,13 +13,11 @@ import '../base/file_system.dart';
 import '../base/fingerprint.dart';
 import '../base/io.dart';
 import '../base/logger.dart';
-import '../base/net.dart';
 import '../base/process.dart';
 import '../base/project_migrator.dart';
 import '../base/utils.dart';
 import '../base/version.dart';
 import '../build_info.dart';
-import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import '../cache.dart';
 import '../darwin/darwin.dart';
 import '../device.dart';
@@ -40,6 +37,7 @@ import '../migrations/xcode_script_build_phase_migration.dart';
 import '../migrations/xcode_thin_binary_build_phase_input_paths_migration.dart';
 import '../plugins.dart';
 import '../project.dart';
+import '../shorebird/ios_build_trace_session.dart';
 import 'application_package.dart';
 import 'code_signing.dart';
 import 'migrations/host_app_info_plist_migration.dart';
@@ -57,15 +55,6 @@ import 'xcresult.dart';
 
 const kConcurrentRunFailureMessage1 = 'database is locked';
 const kConcurrentRunFailureMessage2 = 'there are two concurrent builds running';
-
-/// Perfetto row ids within the flutter_tool process, local to this file.
-const int _flutterToolTid = 1;
-const int _xcodeWaitTid = 2;
-
-/// Synthetic pid for Xcode subsection events parsed from xcresult. xcresult
-/// doesn't surface xcodebuild's pid, so events end up on this fixed id
-/// named via a `process_name` metadata event.
-const int _xcodeSubsectionPid = 0x78636f; // ASCII 'xco'
 
 /// User message when missing platform required to use Xcode.
 ///
@@ -360,55 +349,26 @@ Future<XcodeBuildResult> buildXcodeProject({
       );
     }
   }
-  // Create the Shorebird tracer early enough to capture pod install, which
-  // can be minutes on plugin-heavy apps — otherwise it's an invisible gap
-  // between "flutter build ios" starting and the xcode archive span.
-  final int buildStartMicros = DateTime.now().microsecondsSinceEpoch;
-  final BuildTracer? tracer = buildInfo.shorebirdTraceFilePath != null ? BuildTracer() : null;
-  // Expose to Net/subprocess layers so they can record spans themselves.
-  BuildTracer.current = tracer;
-  final int flutterPid = currentProcessId();
-  if (tracer != null) {
-    tracer
-      ..addProcessNameMetadata(pid: flutterPid, name: 'flutter_tool')
-      ..addThreadNameMetadata(pid: flutterPid, tid: _flutterToolTid, name: 'flutter tool')
-      ..addThreadNameMetadata(pid: flutterPid, tid: _xcodeWaitTid, name: 'xcode (wait)')
-      ..addThreadNameMetadata(pid: flutterPid, tid: networkTid, name: 'network')
-      ..addProcessNameMetadata(pid: _xcodeSubsectionPid, name: 'xcodebuild')
-      ..addThreadNameMetadata(pid: _xcodeSubsectionPid, tid: 1, name: 'xcode phases');
-  }
-
-  final int podInstallStartMicros = DateTime.now().microsecondsSinceEpoch;
-  await processPodsIfNeeded(project.ios, buildDirectoryPath, buildInfo.mode);
-  tracer?.addCompleteEvent(
-    name: 'pod install',
-    cat: 'subprocess',
-    pid: flutterPid,
-    tid: _flutterToolTid,
-    startMicros: podInstallStartMicros,
-    endMicros: DateTime.now().microsecondsSinceEpoch,
+  // Created early enough to capture pod install, which can be minutes
+  // on plugin-heavy apps — otherwise it's an invisible gap between
+  // "flutter build ios" starting and the xcode archive span.
+  final IosBuildTraceSession? traceSession = IosBuildTraceSession.maybeStart(
+    shorebirdTraceFilePath: buildInfo.shorebirdTraceFilePath,
+    fileSystem: globals.fs,
+    buildDirectoryPath: globals.fs.path.join(getBuildDirectory(), 'ios'),
   );
+  Future<XcodeBuildResult> runWithTrace(Future<XcodeBuildResult> Function() body) =>
+      traceSession == null ? body() : traceSession.run(body);
+
+  return runWithTrace(() async {
+  traceSession?.onBeforePodInstall();
+  await processPodsIfNeeded(project.ios, buildDirectoryPath, buildInfo.mode);
+  traceSession?.onAfterPodInstall();
   if (configOnly) {
     return XcodeBuildResult(success: true);
   }
 
-  // Pass the Shorebird trace file path as an intermediate location for
-  // flutter assemble. mac.dart merges this into the final trace file.
-  // The env var is read by xcode_backend.dart when Xcode invokes the
-  // build phase script; naming it SHOREBIRD_TRACE_FILE avoids squatting
-  // on an Xcode-reserved prefix.
-  final String? assembleTraceFilePath;
-  if (buildInfo.shorebirdTraceFilePath != null) {
-    assembleTraceFilePath = globals.fs.path.join(
-      globals.fs.currentDirectory.path,
-      getBuildDirectory(),
-      'ios',
-      'shorebird_assemble_trace.json',
-    );
-    buildCommands.add('SHOREBIRD_TRACE_FILE=$assembleTraceFilePath');
-  } else {
-    assembleTraceFilePath = null;
-  }
+  buildCommands.addAll(traceSession?.extraBuildCommands() ?? const <String>[]);
 
   if (globals.logger.isVerbose) {
     // An environment variable to be passed to xcode_backend.sh determining
@@ -588,15 +548,7 @@ Future<XcodeBuildResult> buildXcodeProject({
       ]);
     }
 
-    final int xcodeStartMicros = DateTime.now().microsecondsSinceEpoch;
-    tracer?.addCompleteEvent(
-      name: 'pre-xcode setup',
-      cat: 'flutter',
-      pid: flutterPid,
-      tid: _flutterToolTid,
-      startMicros: buildStartMicros,
-      endMicros: xcodeStartMicros,
-    );
+    traceSession?.onXcodeAboutToStart();
 
     final sw = Stopwatch()..start();
     initialBuildStatus = globals.logger.startProgress('Running Xcode build...');
@@ -622,57 +574,12 @@ Future<XcodeBuildResult> buildXcodeProject({
       ),
     );
 
-    // Record Xcode span and merge assemble trace if tracing is enabled.
-    if (tracer != null) {
-      final int xcodeEndMicros = DateTime.now().microsecondsSinceEpoch;
-      tracer.addCompleteEvent(
-        name: 'xcode ${xcodeBuildActionToString(buildAction)}',
-        cat: 'xcode',
-        pid: flutterPid,
-        tid: _xcodeWaitTid,
-        startMicros: xcodeStartMicros,
-        endMicros: xcodeEndMicros,
-      );
-      // Break the monolithic "xcode archive" span into per-subsection
-      // events by asking xcresulttool for the structured build log. Each
-      // top-level subsection ("Build target X", "Archive target Y",
-      // "Compile Swift module Z", ...) has a real wall-clock startTime
-      // and duration, so events land on an accurate timeline inside the
-      // xcode outer span.
-      await _emitXcodeSubsectionEvents(
-        tracer: tracer,
-        resultBundleDirectory: resultBundleDirectory,
-      );
-      // Merge the assemble trace file that flutter assemble wrote.
-      if (assembleTraceFilePath != null) {
-        final File assembleTraceFile = globals.fs.file(assembleTraceFilePath);
-        tracer.mergeEventsFromFile(assembleTraceFile);
-      }
-      final int buildEndMicros = DateTime.now().microsecondsSinceEpoch;
-      tracer.addCompleteEvent(
-        name: 'post-xcode processing',
-        cat: 'flutter',
-        pid: flutterPid,
-        tid: _flutterToolTid,
-        startMicros: xcodeEndMicros,
-        endMicros: buildEndMicros,
-      );
-      tracer.addCompleteEvent(
-        name: 'flutter build ios',
-        cat: 'flutter',
-        pid: flutterPid,
-        tid: _flutterToolTid,
-        startMicros: buildStartMicros,
-        endMicros: buildEndMicros,
-      );
-      final File traceFile = globals.fs.file(buildInfo.shorebirdTraceFilePath);
-      tracer.writeToFile(traceFile);
-      globals.printStatus(
-        'Shorebird build trace written to ${buildInfo.shorebirdTraceFilePath}. '
-        'View at https://ui.perfetto.dev',
-      );
-    }
-    BuildTracer.current = null;
+    await traceSession?.onXcodeFinished(
+      buildActionName: xcodeBuildActionToString(buildAction),
+      resultBundleDirectory: resultBundleDirectory,
+      runXcresultTool: (List<String> args) => globals.processManager.run(args),
+    );
+    traceSession?.finish(printStatus: globals.printStatus);
 
     if (tempDir.existsSync()) {
       // Display additional warning and error message from xcresult bundle.
@@ -776,6 +683,7 @@ Future<XcodeBuildResult> buildXcodeProject({
       xcResult: xcResult,
     );
   }
+  });
 }
 
 /// Check if the Flutter framework's public headers have changed since last built.
@@ -1459,75 +1367,3 @@ class _XCResultIssueHandlingResult {
 
 const _kResultBundlePath = 'temporary_xcresult_bundle';
 const _kResultBundleVersion = '3';
-
-/// Ask xcresulttool for the structured build log of the archive action
-/// and emit one Chrome Trace Event per top-level subsection (each Xcode
-/// "target" build). Best-effort: silently returns if the bundle can't be
-/// parsed (xcresulttool output format drifts across Xcode versions).
-Future<void> _emitXcodeSubsectionEvents({
-  required BuildTracer tracer,
-  required Directory resultBundleDirectory,
-}) async {
-  if (!resultBundleDirectory.existsSync()) {
-    return;
-  }
-  final ProcessResult result;
-  try {
-    result = await globals.processManager.run(<String>[
-      'xcrun',
-      'xcresulttool',
-      'get',
-      'log',
-      '--type',
-      'build',
-      '--path',
-      resultBundleDirectory.path,
-    ]);
-  } on Exception {
-    return;
-  }
-  if (result.exitCode != 0) {
-    return;
-  }
-
-  final Object? decoded;
-  try {
-    decoded = json.decode(result.stdout as String);
-  } on FormatException {
-    return;
-  }
-  if (decoded is! Map<String, Object?>) {
-    return;
-  }
-
-  final Object? subsections = decoded['subsections'];
-  if (subsections is! List) {
-    return;
-  }
-  for (final Object? sub in subsections) {
-    if (sub is! Map<String, Object?>) {
-      continue;
-    }
-    final String title = (sub['title'] as String?) ?? '';
-    final double? startTime = (sub['startTime'] as num?)?.toDouble();
-    final double? duration = (sub['duration'] as num?)?.toDouble();
-    if (startTime == null || duration == null || duration <= 0) {
-      continue;
-    }
-    final int startMicros = (startTime * 1000000).round();
-    final int endMicros = ((startTime + duration) * 1000000).round();
-    tracer.addCompleteEvent(
-      name: title,
-      cat: 'xcode_subsection',
-      // Synthetic pid so subsections display on their own row in Perfetto,
-      // labelled "xcodebuild" via the process_name metadata emitted at
-      // tracer setup. xcresult doesn't surface xcodebuild's real pid, and
-      // compile sub-subsections are done by clang/swiftc/ld children we
-      // never saw — synthetic is honest.
-      pid: _xcodeSubsectionPid,
-      tid: 1,
-      startMicros: startMicros,
-      endMicros: endMicros,
-    );
-  }
-}
