@@ -1621,36 +1621,39 @@ void main() {
     expect(processManager, hasNoRemainingExpectations);
   });
 
-  testUsingContext('determine picks stable branch over rc branch from shorebird flutter_release', () {
-    processManager.addCommands(<FakeCommand>[
-      const FakeCommand(
-        command: <String>['git', 'tag', '--points-at', 'HEAD'],
-        // No tag at HEAD.
-      ),
-      const FakeCommand(
-        command: <String>[
-          'git',
-          'for-each-ref',
-          '--contains',
-          'HEAD',
-          '--format',
-          '%(refname:short)',
-          'refs/remotes/origin/flutter_release/*',
-        ],
-        // Both stable and rc branches contain this commit.
-        stdout: 'origin/flutter_release/3.41.4\norigin/flutter_release/3.41.4-rc2',
-      ),
-    ]);
-    final platform = FakePlatform();
+  testUsingContext(
+    'determine picks stable branch over rc branch from shorebird flutter_release',
+    () {
+      processManager.addCommands(<FakeCommand>[
+        const FakeCommand(
+          command: <String>['git', 'tag', '--points-at', 'HEAD'],
+          // No tag at HEAD.
+        ),
+        const FakeCommand(
+          command: <String>[
+            'git',
+            'for-each-ref',
+            '--contains',
+            'HEAD',
+            '--format',
+            '%(refname:short)',
+            'refs/remotes/origin/flutter_release/*',
+          ],
+          // Both stable and rc branches contain this commit.
+          stdout: 'origin/flutter_release/3.41.4\norigin/flutter_release/3.41.4-rc2',
+        ),
+      ]);
+      final platform = FakePlatform();
 
-    final GitTagVersion gitTagVersion = GitTagVersion.determine(
-      platform,
-      git: git,
-      workingDirectory: '.',
-    );
-    expect(gitTagVersion.frameworkVersionFor('abcd1234'), '3.41.4');
-    expect(processManager, hasNoRemainingExpectations);
-  });
+      final GitTagVersion gitTagVersion = GitTagVersion.determine(
+        platform,
+        git: git,
+        workingDirectory: '.',
+      );
+      expect(gitTagVersion.frameworkVersionFor('abcd1234'), '3.41.4');
+      expect(processManager, hasNoRemainingExpectations);
+    },
+  );
 
   group('$FlutterEngineStampFromFile', () {
     late FileSystem fs;
