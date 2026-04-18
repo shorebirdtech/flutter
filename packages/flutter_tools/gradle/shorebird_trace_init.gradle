@@ -76,10 +76,11 @@ gradle.addListener(new TaskExecutionListener() {
         //
         // The kind strings below are a wire-format contract with
         // shorebird_cli (which buckets its summary by these values).
-        // KEEP IN SYNC with `TraceSchema.gradleKind*` in the
+        // KEEP IN SYNC with the `GradleTaskKind` enum in the
         // `shorebird_build_trace` package; adding a new kind means
-        // landing the matching constant there AND teaching shorebird_cli
-        // to bucket it, otherwise it silently falls into `other`.
+        // landing the matching enum value there AND teaching
+        // shorebird_cli to bucket it, otherwise it silently falls into
+        // `other`.
         def path = task.path
         def lastColon = path.lastIndexOf(':')
         def simpleName = (lastColon >= 0 ? path.substring(lastColon + 1) : path).toLowerCase()

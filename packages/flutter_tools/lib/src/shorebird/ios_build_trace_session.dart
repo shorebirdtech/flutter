@@ -99,8 +99,8 @@ class IosBuildTraceSession {
       return;
     }
     _tracer.addCompleteEvent(
-      name: TraceSchema.podInstallSpanName,
-      cat: TraceSchema.catSubprocess,
+      name: TraceNames.podInstallSpanName,
+      cat: TraceCategory.subprocess.wireName,
       pid: _flutterPid,
       tid: _flutterToolTid,
       startMicros: startMicros,
@@ -129,7 +129,7 @@ class IosBuildTraceSession {
     _xcodeStartMicros = DateTime.now().microsecondsSinceEpoch;
     _tracer.addCompleteEvent(
       name: 'pre-xcode setup',
-      cat: TraceSchema.catFlutter,
+      cat: TraceCategory.flutter.wireName,
       pid: _flutterPid,
       tid: _flutterToolTid,
       startMicros: _buildStartMicros,
@@ -151,8 +151,8 @@ class IosBuildTraceSession {
   }) async {
     _xcodeEndMicros = DateTime.now().microsecondsSinceEpoch;
     _tracer.addCompleteEvent(
-      name: '${TraceSchema.xcodeSpanPrefix}$buildActionName',
-      cat: TraceSchema.catXcode,
+      name: '${TraceNames.xcodeSpanPrefix}$buildActionName',
+      cat: TraceCategory.xcode.wireName,
       pid: _flutterPid,
       tid: _xcodeWaitTid,
       startMicros: _xcodeStartMicros ?? _buildStartMicros,
@@ -181,15 +181,15 @@ class IosBuildTraceSession {
     _tracer
       ..addCompleteEvent(
         name: 'post-xcode processing',
-        cat: TraceSchema.catFlutter,
+        cat: TraceCategory.flutter.wireName,
         pid: _flutterPid,
         tid: _flutterToolTid,
         startMicros: _xcodeEndMicros ?? buildEndMicros,
         endMicros: buildEndMicros,
       )
       ..addCompleteEvent(
-        name: '${TraceSchema.flutterBuildSpanPrefix}ios',
-        cat: TraceSchema.catFlutter,
+        name: '${TraceNames.flutterBuildSpanPrefix}ios',
+        cat: TraceCategory.flutter.wireName,
         pid: _flutterPid,
         tid: _flutterToolTid,
         startMicros: _buildStartMicros,
@@ -262,7 +262,7 @@ class IosBuildTraceSession {
       final int endMicros = ((startTime + duration) * 1000000).round();
       _tracer.addCompleteEvent(
         name: title,
-        cat: TraceSchema.catXcodeSubsection,
+        cat: TraceCategory.xcodeSubsection.wireName,
         // Synthetic pid so subsections display on their own row in
         // Perfetto, labelled 'xcodebuild' via the process_name
         // metadata emitted at tracer setup. xcresult doesn't surface

@@ -66,7 +66,7 @@ dependencies:
   shorebird_build_trace:
     git:
       url: https://github.com/shorebirdtech/shorebird.git
-      ref: d2099fe7af3ce0ea66f86396220984c50ce655dd
+      ref: 27f5971e8d5d860a4476ec4d39ff696251c74b51
       path: packages/shorebird_build_trace
   hooks_runner: 1.0.1
   hooks: 1.0.0

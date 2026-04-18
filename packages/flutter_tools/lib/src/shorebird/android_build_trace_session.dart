@@ -120,7 +120,7 @@ class AndroidBuildTraceSession {
     final int preGradleEndMicros = DateTime.now().microsecondsSinceEpoch;
     _tracer.addCompleteEvent(
       name: 'pre-gradle setup',
-      cat: TraceSchema.catFlutter,
+      cat: TraceCategory.flutter.wireName,
       pid: _flutterPid,
       tid: _flutterToolTid,
       startMicros: _buildStartMicros,
@@ -148,8 +148,8 @@ class AndroidBuildTraceSession {
   void onGradleFinished(String assembleTask) {
     _gradleEndMicros = DateTime.now().microsecondsSinceEpoch;
     _tracer.addCompleteEvent(
-      name: '${TraceSchema.gradleSpanPrefix}$assembleTask',
-      cat: TraceSchema.catGradle,
+      name: '${TraceNames.gradleSpanPrefix}$assembleTask',
+      cat: TraceCategory.gradle.wireName,
       pid: _flutterPid,
       tid: _gradleWaitTid,
       startMicros: _gradleStartMicros ?? _buildStartMicros,
@@ -177,7 +177,7 @@ class AndroidBuildTraceSession {
   ///
   /// [buildTarget] is the target suffix (e.g. `apk`, `appbundle`); the
   /// outer span name is assembled as
-  /// `TraceSchema.flutterBuildSpanPrefix + buildTarget`.
+  /// `TraceNames.flutterBuildSpanPrefix + buildTarget`.
   /// [printStatus] is called once with a user-facing "trace written"
   /// message so callers don't have to wire the logger through.
   void finish({required String buildTarget, required void Function(String) printStatus}) {
@@ -185,15 +185,15 @@ class AndroidBuildTraceSession {
     _tracer
       ..addCompleteEvent(
         name: 'post-gradle processing',
-        cat: TraceSchema.catFlutter,
+        cat: TraceCategory.flutter.wireName,
         pid: _flutterPid,
         tid: _flutterToolTid,
         startMicros: _gradleEndMicros ?? postGradleEndMicros,
         endMicros: postGradleEndMicros,
       )
       ..addCompleteEvent(
-        name: '${TraceSchema.flutterBuildSpanPrefix}$buildTarget',
-        cat: TraceSchema.catFlutter,
+        name: '${TraceNames.flutterBuildSpanPrefix}$buildTarget',
+        cat: TraceCategory.flutter.wireName,
         pid: _flutterPid,
         tid: _flutterToolTid,
         startMicros: _buildStartMicros,
