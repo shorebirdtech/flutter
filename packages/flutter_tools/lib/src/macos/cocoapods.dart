@@ -426,16 +426,8 @@ class CocoaPods {
           stdoutBuf
             ..write(line)
             ..write('\n');
-          // CocoaPods verbose-mode phase markers. Stable across recent versions.
-          if (line.contains('Analyzing dependencies')) {
-            phases.transitionTo(PodInstallPhase.analyzing.wireName);
-          } else if (line.contains('Downloading dependencies')) {
-            phases.transitionTo(PodInstallPhase.downloading.wireName);
-          } else if (line.contains('Generating Pods project')) {
-            phases.transitionTo(PodInstallPhase.generating.wireName);
-          } else if (line.contains('Integrating client project')) {
-            phases.transitionTo(PodInstallPhase.integrating.wireName);
-          }
+          final PodInstallPhase? phase = _podPhaseForLogLine(line);
+          if (phase != null) phases.transitionTo(phase.wireName);
         })
         .asFuture<void>();
 
@@ -656,4 +648,28 @@ class CocoaPods {
       }
     }
   }
+}
+
+/// CocoaPods verbose-mode log markers, in the order they print during a
+/// normal `pod install`. A match means "from now on, the process is in
+/// this phase" — the `PhaseTracker` closes the prior phase and opens a
+/// new one.
+///
+/// These substrings have been stable across recent CocoaPods releases;
+/// if CocoaPods renames one, the worst case is we miss a phase in the
+/// trace — pod install still succeeds.
+const _podPhaseMarkers = <String, PodInstallPhase>{
+  'Analyzing dependencies': PodInstallPhase.analyzing,
+  'Downloading dependencies': PodInstallPhase.downloading,
+  'Generating Pods project': PodInstallPhase.generating,
+  'Integrating client project': PodInstallPhase.integrating,
+};
+
+/// Returns the phase a `pod install --verbose` log [line] transitions
+/// into, or null if the line doesn't contain any of the known markers.
+PodInstallPhase? _podPhaseForLogLine(String line) {
+  for (final MapEntry<String, PodInstallPhase> entry in _podPhaseMarkers.entries) {
+    if (line.contains(entry.key)) return entry.value;
+  }
+  return null;
 }
