@@ -1162,8 +1162,7 @@ STDERR STUFF
           FakeProcessManager.list(<FakeCommand>[setUpFakeXcodeBuildHandler('Release')]),
       Platform: () => macosPlatformWithShorebirdPublicKey,
       FeatureFlags: () => TestFeatureFlags(isMacOSEnabled: true),
-      OperatingSystemUtils: () =>
-          FakeOperatingSystemUtils(hostPlatform: HostPlatform.darwin_x64),
+      OperatingSystemUtils: () => FakeOperatingSystemUtils(hostPlatform: HostPlatform.darwin_x64),
     },
     // SHOREBIRD_PUBLIC_KEY → shorebird.yaml injection happens inside the
     // assets build target, which TestBuildSystem.all stubs out entirely.
