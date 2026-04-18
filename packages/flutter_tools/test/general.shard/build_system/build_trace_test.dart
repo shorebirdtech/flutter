@@ -15,8 +15,8 @@ void main() {
       final event = BuildTraceEvent(
         name: 'test_target',
         cat: 'assemble',
-        ts: 1000000,
-        dur: 500000,
+        start: DateTime.fromMicrosecondsSinceEpoch(1000000),
+        duration: const Duration(microseconds: 500000),
         pid: 1,
         tid: 3,
         args: <String, Object?>{'key': 'value'},
@@ -35,7 +35,14 @@ void main() {
     });
 
     testWithoutContext('toJson omits args when null', () {
-      final event = BuildTraceEvent(name: 'test', cat: 'flutter', ts: 0, dur: 100, pid: 1, tid: 1);
+      final event = BuildTraceEvent(
+        name: 'test',
+        cat: 'flutter',
+        start: DateTime.fromMicrosecondsSinceEpoch(0),
+        duration: const Duration(microseconds: 100),
+        pid: 1,
+        tid: 1,
+      );
 
       final result = event.toJson();
 
@@ -81,8 +88,8 @@ void main() {
         cat: 'gradle',
         pid: 1,
         tid: 2,
-        startMicros: 1000,
-        endMicros: 5000,
+        start: DateTime.fromMicrosecondsSinceEpoch(1000),
+        end: DateTime.fromMicrosecondsSinceEpoch(5000),
       );
 
       final outFile = fileSystem.file('trace.json');
@@ -125,8 +132,8 @@ void main() {
         cat: 'gradle',
         pid: 1,
         tid: 2,
-        startMicros: 1000,
-        endMicros: 5000,
+        start: DateTime.fromMicrosecondsSinceEpoch(1000),
+        end: DateTime.fromMicrosecondsSinceEpoch(5000),
       );
 
       tracer.mergeEventsFromFile(sourceFile);
@@ -148,8 +155,8 @@ void main() {
         cat: 'flutter',
         pid: 1,
         tid: 1,
-        startMicros: 0,
-        endMicros: 100,
+        start: DateTime.fromMicrosecondsSinceEpoch(0),
+        end: DateTime.fromMicrosecondsSinceEpoch(100),
       );
 
       // Should not throw.
@@ -169,8 +176,8 @@ void main() {
         cat: 'flutter',
         pid: 1,
         tid: 1,
-        startMicros: 0,
-        endMicros: 100,
+        start: DateTime.fromMicrosecondsSinceEpoch(0),
+        end: DateTime.fromMicrosecondsSinceEpoch(100),
       );
 
       final outFile = fileSystem.file('/a/b/c/trace.json');
@@ -187,24 +194,24 @@ void main() {
         cat: 'flutter',
         pid: 1,
         tid: 1,
-        startMicros: 0,
-        endMicros: 15000000,
+        start: DateTime.fromMicrosecondsSinceEpoch(0),
+        end: DateTime.fromMicrosecondsSinceEpoch(15000000),
       );
       tracer.addCompleteEvent(
         name: 'gradle assembleRelease',
         cat: 'gradle',
         pid: 1,
         tid: 2,
-        startMicros: 500000,
-        endMicros: 12500000,
+        start: DateTime.fromMicrosecondsSinceEpoch(500000),
+        end: DateTime.fromMicrosecondsSinceEpoch(12500000),
       );
       tracer.addCompleteEvent(
         name: 'KernelSnapshot',
         cat: 'assemble',
         pid: 2,
         tid: 1,
-        startMicros: 2000000,
-        endMicros: 5000000,
+        start: DateTime.fromMicrosecondsSinceEpoch(2000000),
+        end: DateTime.fromMicrosecondsSinceEpoch(5000000),
         args: <String, Object?>{'skipped': false},
       );
 

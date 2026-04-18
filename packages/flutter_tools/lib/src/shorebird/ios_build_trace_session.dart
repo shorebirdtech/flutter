@@ -33,7 +33,7 @@ class IosBuildTraceSession {
        _tracePath = tracePath,
        _buildDirectoryPath = buildDirectoryPath,
        _flutterPid = currentProcessId(),
-       _buildStartMicros = DateTime.now().microsecondsSinceEpoch {
+       _buildStart = DateTime.now() {
     BuildTracer.start(_tracer);
     _tracer
       ..addProcessNameMetadata(pid: _flutterPid, name: 'flutter_tool')
@@ -69,7 +69,7 @@ class IosBuildTraceSession {
   final String _tracePath;
   final String _buildDirectoryPath;
   final int _flutterPid;
-  final int _buildStartMicros;
+  final DateTime _buildStart;
 
   static const int _flutterToolTid = 1;
   static const int _xcodeWaitTid = 2;
@@ -79,23 +79,23 @@ class IosBuildTraceSession {
   /// this fixed id named via a `process_name` metadata event.
   static const int _xcodeSubsectionPid = 0x78636f; // ASCII 'xco'
 
-  int? _podInstallStartMicros;
-  int? _xcodeStartMicros;
-  int? _xcodeEndMicros;
+  DateTime? _podInstallStart;
+  DateTime? _xcodeStart;
+  DateTime? _xcodeEnd;
   String? _assembleTraceFilePath;
 
   /// Call immediately before `processPodsIfNeeded` so the resulting
   /// span covers its full wall-clock.
   void onBeforePodInstall() {
-    _podInstallStartMicros = DateTime.now().microsecondsSinceEpoch;
+    _podInstallStart = DateTime.now();
   }
 
   /// Call immediately after `processPodsIfNeeded` returns. Records the
   /// `pod install` complete event using the start timestamp captured
   /// by [onBeforePodInstall].
   void onAfterPodInstall() {
-    final int? startMicros = _podInstallStartMicros;
-    if (startMicros == null) {
+    final DateTime? start = _podInstallStart;
+    if (start == null) {
       return;
     }
     _tracer.addCompleteEvent(
@@ -103,8 +103,8 @@ class IosBuildTraceSession {
       cat: TraceCategory.subprocess.wireName,
       pid: _flutterPid,
       tid: _flutterToolTid,
-      startMicros: startMicros,
-      endMicros: DateTime.now().microsecondsSinceEpoch,
+      start: start,
+      end: DateTime.now(),
     );
   }
 
@@ -126,14 +126,15 @@ class IosBuildTraceSession {
   /// Call right before `_runBuildWithRetries` so the outer build span
   /// can compute the pre-xcode setup interval.
   void onXcodeAboutToStart() {
-    _xcodeStartMicros = DateTime.now().microsecondsSinceEpoch;
+    final xcodeStart = DateTime.now();
+    _xcodeStart = xcodeStart;
     _tracer.addCompleteEvent(
       name: 'pre-xcode setup',
       cat: TraceCategory.flutter.wireName,
       pid: _flutterPid,
       tid: _flutterToolTid,
-      startMicros: _buildStartMicros,
-      endMicros: _xcodeStartMicros!,
+      start: _buildStart,
+      end: xcodeStart,
     );
   }
 
@@ -149,14 +150,15 @@ class IosBuildTraceSession {
     required Directory resultBundleDirectory,
     required Future<ProcessResult> Function(List<String>) runXcresultTool,
   }) async {
-    _xcodeEndMicros = DateTime.now().microsecondsSinceEpoch;
+    final xcodeEnd = DateTime.now();
+    _xcodeEnd = xcodeEnd;
     _tracer.addCompleteEvent(
       name: '${TraceNames.xcodeSpanPrefix}$buildActionName',
       cat: TraceCategory.xcode.wireName,
       pid: _flutterPid,
       tid: _xcodeWaitTid,
-      startMicros: _xcodeStartMicros ?? _buildStartMicros,
-      endMicros: _xcodeEndMicros!,
+      start: _xcodeStart ?? _buildStart,
+      end: xcodeEnd,
     );
     await _emitXcodeSubsectionEvents(
       resultBundleDirectory: resultBundleDirectory,
@@ -177,23 +179,23 @@ class IosBuildTraceSession {
   /// Writes the merged trace to disk and clears [BuildTracer.current].
   /// Records the post-xcode + outer `flutter build ios` spans first.
   void finish({required void Function(String) printStatus}) {
-    final int buildEndMicros = DateTime.now().microsecondsSinceEpoch;
+    final buildEnd = DateTime.now();
     _tracer
       ..addCompleteEvent(
         name: 'post-xcode processing',
         cat: TraceCategory.flutter.wireName,
         pid: _flutterPid,
         tid: _flutterToolTid,
-        startMicros: _xcodeEndMicros ?? buildEndMicros,
-        endMicros: buildEndMicros,
+        start: _xcodeEnd ?? buildEnd,
+        end: buildEnd,
       )
       ..addCompleteEvent(
         name: '${TraceNames.flutterBuildSpanPrefix}ios',
         cat: TraceCategory.flutter.wireName,
         pid: _flutterPid,
         tid: _flutterToolTid,
-        startMicros: _buildStartMicros,
-        endMicros: buildEndMicros,
+        start: _buildStart,
+        end: buildEnd,
       )
       ..writeToFile(_fs.file(_tracePath));
     printStatus(
@@ -258,8 +260,8 @@ class IosBuildTraceSession {
       if (startTime == null || duration == null || duration <= 0) {
         continue;
       }
-      final int startMicros = (startTime * 1000000).round();
-      final int endMicros = ((startTime + duration) * 1000000).round();
+      final start = DateTime.fromMicrosecondsSinceEpoch((startTime * 1000000).round());
+      final end = DateTime.fromMicrosecondsSinceEpoch(((startTime + duration) * 1000000).round());
       _tracer.addCompleteEvent(
         name: title,
         cat: TraceCategory.xcodeSubsection.wireName,
@@ -271,8 +273,8 @@ class IosBuildTraceSession {
         // honest.
         pid: _xcodeSubsectionPid,
         tid: 1,
-        startMicros: startMicros,
-        endMicros: endMicros,
+        start: start,
+        end: end,
       );
     }
   }

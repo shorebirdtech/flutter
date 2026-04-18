@@ -21,11 +21,11 @@ class NetworkTraceSpan {
   NetworkTraceSpan.start({required Uri url, required bool onlyHeaders})
     : _url = url,
       _onlyHeaders = onlyHeaders,
-      _startMicros = DateTime.now().microsecondsSinceEpoch;
+      _start = DateTime.now();
 
   final Uri _url;
   final bool _onlyHeaders;
-  final int _startMicros;
+  final DateTime _start;
 
   /// Emits the span. Safe to call whether or not a tracer is active.
   /// [statusCode] is recorded on normal completion; [errorKind] on
@@ -41,8 +41,8 @@ class NetworkTraceSpan {
       cat: TraceCategory.network.wireName,
       pid: currentProcessId(),
       tid: networkTid,
-      startMicros: _startMicros,
-      endMicros: DateTime.now().microsecondsSinceEpoch,
+      start: _start,
+      end: DateTime.now(),
       args: <String, Object?>{
         'method': _onlyHeaders ? 'HEAD' : 'GET',
         'host': _url.host,

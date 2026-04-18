@@ -33,7 +33,7 @@ class AndroidBuildTraceSession {
        _tracePath = tracePath,
        _buildDirectory = buildDirectory,
        _flutterPid = currentProcessId(),
-       _buildStartMicros = DateTime.now().microsecondsSinceEpoch {
+       _buildStart = DateTime.now() {
     BuildTracer.start(_tracer);
     _tracer
       ..addProcessNameMetadata(pid: _flutterPid, name: 'flutter_tool')
@@ -66,15 +66,15 @@ class AndroidBuildTraceSession {
   final String _tracePath;
   final Directory _buildDirectory;
   final int _flutterPid;
-  final int _buildStartMicros;
+  final DateTime _buildStart;
 
   static const int _flutterToolTid = 1;
   static const int _gradleWaitTid = 2;
 
   String? _assembleTraceFilePath;
   String? _gradleTaskTraceFilePath;
-  int? _gradleStartMicros;
-  int? _gradleEndMicros;
+  DateTime? _gradleStart;
+  DateTime? _gradleEnd;
 
   /// Returns the `-P`/`-I=` flags to thread trace plumbing into Gradle.
   /// Safe to splat into the options list unconditionally.
@@ -117,16 +117,16 @@ class AndroidBuildTraceSession {
   /// wrapper is about to run so [finish] can compute the outer build
   /// span.
   void onGradleAboutToStart() {
-    final int preGradleEndMicros = DateTime.now().microsecondsSinceEpoch;
+    final preGradleEnd = DateTime.now();
     _tracer.addCompleteEvent(
       name: 'pre-gradle setup',
       cat: TraceCategory.flutter.wireName,
       pid: _flutterPid,
       tid: _flutterToolTid,
-      startMicros: _buildStartMicros,
-      endMicros: preGradleEndMicros,
+      start: _buildStart,
+      end: preGradleEnd,
     );
-    _gradleStartMicros = DateTime.now().microsecondsSinceEpoch;
+    _gradleStart = DateTime.now();
   }
 
   /// Hook for `_runGradleTask`'s `onStart` — emits a flow-start tied to
@@ -138,7 +138,7 @@ class AndroidBuildTraceSession {
       id: process.pid,
       pid: _flutterPid,
       tid: _gradleWaitTid,
-      atMicros: DateTime.now().microsecondsSinceEpoch,
+      at: DateTime.now(),
     );
   }
 
@@ -146,14 +146,15 @@ class AndroidBuildTraceSession {
   /// Records the outer `gradle <task>` span and merges the intermediate
   /// trace files into the main tracer.
   void onGradleFinished(String assembleTask) {
-    _gradleEndMicros = DateTime.now().microsecondsSinceEpoch;
+    final gradleEnd = DateTime.now();
+    _gradleEnd = gradleEnd;
     _tracer.addCompleteEvent(
       name: '${TraceNames.gradleSpanPrefix}$assembleTask',
       cat: TraceCategory.gradle.wireName,
       pid: _flutterPid,
       tid: _gradleWaitTid,
-      startMicros: _gradleStartMicros ?? _buildStartMicros,
-      endMicros: _gradleEndMicros!,
+      start: _gradleStart ?? _buildStart,
+      end: gradleEnd,
     );
     final String? assembleTraceFilePath = _assembleTraceFilePath;
     if (assembleTraceFilePath != null) {
@@ -181,23 +182,23 @@ class AndroidBuildTraceSession {
   /// [printStatus] is called once with a user-facing "trace written"
   /// message so callers don't have to wire the logger through.
   void finish({required String buildTarget, required void Function(String) printStatus}) {
-    final int postGradleEndMicros = DateTime.now().microsecondsSinceEpoch;
+    final postGradleEnd = DateTime.now();
     _tracer
       ..addCompleteEvent(
         name: 'post-gradle processing',
         cat: TraceCategory.flutter.wireName,
         pid: _flutterPid,
         tid: _flutterToolTid,
-        startMicros: _gradleEndMicros ?? postGradleEndMicros,
-        endMicros: postGradleEndMicros,
+        start: _gradleEnd ?? postGradleEnd,
+        end: postGradleEnd,
       )
       ..addCompleteEvent(
         name: '${TraceNames.flutterBuildSpanPrefix}$buildTarget',
         cat: TraceCategory.flutter.wireName,
         pid: _flutterPid,
         tid: _flutterToolTid,
-        startMicros: _buildStartMicros,
-        endMicros: postGradleEndMicros,
+        start: _buildStart,
+        end: postGradleEnd,
       )
       ..writeToFile(_fs.file(_tracePath));
     printStatus(

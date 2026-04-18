@@ -458,8 +458,8 @@ void writePerformanceData(Iterable<PerformanceMeasurement> measurements, File ou
 /// xcode_backend, so its events get their own Perfetto row named
 /// `flutter assemble`. Spans for each [PerformanceMeasurement] are
 /// emitted using its wall-clock [PerformanceMeasurement.startTimeMicroseconds]
-/// (not the stopwatch duration alone) so the timeline aligns with the
-/// parent flutter tool's trace when merged.
+/// (converted to a DateTime; not the stopwatch duration alone) so the
+/// timeline aligns with the parent flutter tool's trace when merged.
 @visibleForTesting
 void writeTraceData(Iterable<PerformanceMeasurement> measurements, File outFile) {
   final int pid = currentProcessId();
@@ -467,14 +467,14 @@ void writeTraceData(Iterable<PerformanceMeasurement> measurements, File outFile)
     ..addProcessNameMetadata(pid: pid, name: 'flutter assemble')
     ..addThreadNameMetadata(pid: pid, tid: 1, name: 'flutter assemble');
   for (final measurement in measurements) {
-    final int startMicros = measurement.startTimeMicroseconds;
+    final start = DateTime.fromMicrosecondsSinceEpoch(measurement.startTimeMicroseconds);
     tracer.addCompleteEvent(
       name: measurement.analyticsName,
       cat: TraceCategory.assemble.wireName,
       pid: pid,
       tid: 1,
-      startMicros: startMicros,
-      endMicros: startMicros + measurement.elapsedMilliseconds * 1000,
+      start: start,
+      end: start.add(Duration(milliseconds: measurement.elapsedMilliseconds)),
       args: <String, Object?>{
         'target': measurement.target,
         'skipped': measurement.skipped,
