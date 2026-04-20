@@ -321,8 +321,7 @@ if (host_os == "mac" &&
       rebase_path(
           "${root_out_dir}/artifacts_x64/analyze_snapshot_${target_cpu}"),
       "--out",
-      rebase_path(
-          "${root_out_dir}/universal/analyze_snapshot_${target_cpu}"),
+      rebase_path("${root_out_dir}/universal/analyze_snapshot_${target_cpu}"),
     ]
     deps = [
       ":create_macos_analyze_snapshot_arm64_${target_cpu}",

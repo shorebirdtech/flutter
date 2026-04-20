@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:io' as io;
+import 'dart:io' show Platform;
 
 import 'package:process/process.dart';
 
@@ -31,7 +31,9 @@ class GenSnapshot {
     required Artifacts artifacts,
     required ProcessManager processManager,
     required Logger logger,
+    required FileSystem fileSystem,
   }) : _artifacts = artifacts,
+       _fileSystem = fileSystem,
        _processUtils = ProcessUtils(logger: logger, processManager: processManager);
 
   final Artifacts _artifacts;
@@ -55,6 +57,30 @@ class GenSnapshot {
     'Warning: This VM has been configured to obfuscate symbol information which violates the Dart standard.',
     '         See dartbug.com/30524 for more information.',
   };
+
+  /// Returns the path to analyze_snapshot if it exists alongside gen_snapshot.
+  String? getAnalyzeSnapshotPath(SnapshotType snapshotType, DarwinArch? darwinArch) {
+    Artifact genSnapshotArtifact;
+    if (snapshotType.platform == TargetPlatform.ios ||
+        snapshotType.platform == TargetPlatform.darwin) {
+      genSnapshotArtifact = darwinArch == DarwinArch.arm64
+          ? Artifact.genSnapshotArm64
+          : Artifact.genSnapshotX64;
+    } else {
+      genSnapshotArtifact = Artifact.genSnapshot;
+    }
+    final genSnapshotPath = getSnapshotterPath(snapshotType, genSnapshotArtifact);
+    // analyze_snapshot is typically in the same directory as gen_snapshot,
+    // named 'analyze_snapshot' or 'analyze_snapshot_arm64'.
+    final dir = _fileSystem.path.dirname(genSnapshotPath);
+    for (final name in ['analyze_snapshot_arm64', 'analyze_snapshot']) {
+      final path = _fileSystem.path.join(dir, name);
+      if (_fileSystem.file(path).existsSync()) return path;
+    }
+    return null;
+  }
+
+  final FileSystem _fileSystem;
 
   Future<int> run({
     required SnapshotType snapshotType,
@@ -89,6 +115,7 @@ class GenSnapshot {
 
 class AOTSnapshotter {
   AOTSnapshotter({
+    this.reportTimings = false,
     required Logger logger,
     required FileSystem fileSystem,
     required Xcode xcode,
@@ -97,32 +124,24 @@ class AOTSnapshotter {
   }) : _logger = logger,
        _fileSystem = fileSystem,
        _xcode = xcode,
-       _processManager = processManager,
+       _processUtils = ProcessUtils(logger: logger, processManager: processManager),
        _genSnapshot = GenSnapshot(
          artifacts: artifacts,
          processManager: processManager,
          logger: logger,
+         fileSystem: fileSystem,
        );
 
   final Logger _logger;
   final FileSystem _fileSystem;
   final Xcode _xcode;
-  final ProcessManager _processManager;
+  final ProcessUtils _processUtils;
   final GenSnapshot _genSnapshot;
 
-  /// The default cascade byte threshold for the DD table cascade limiter.
-  static const int _ddMaxBytesDefault = 10000;
-
-  /// The cascade byte threshold for the DD table cascade limiter.
-  /// Functions whose transitive caller tree exceeds this many compiled code
-  /// bytes are routed through the indirect dispatch table.
-  ///
-  /// Overridable via the SHOREBIRD_DD_MAX_BYTES environment variable. An
-  /// environment variable is used (rather than a command-line flag) so that
-  /// older Flutter builds without DD table support silently ignore it.
-  static int get _ddMaxBytes =>
-      int.tryParse(io.Platform.environment['SHOREBIRD_DD_MAX_BYTES'] ?? '') ??
-      _ddMaxBytesDefault;
+  /// If true then AOTSnapshotter would report timings for individual building
+  /// steps (Dart front-end parsing and snapshot generation) in a stable
+  /// machine readable form.
+  final bool reportTimings;
 
   /// Builds an architecture-specific ahead-of-time compiled snapshot of the specified script.
   Future<int> build({
@@ -248,44 +267,83 @@ class AOTSnapshotter {
 
     final snapshotType = SnapshotType(platform, buildMode);
 
-    // Dynamic Dispatch (DD) table: for arm64 Apple platforms with the linker
-    // enabled, we do a 2-pass build. Pass 1 produces a temp ELF for
-    // analyze_snapshot to compute the DD table and slot mapping. Pass 2
-    // produces the final assembly snapshot with indirect calls wired up.
-    final bool usesDDTable = usesLinker && darwinArch == DarwinArch.arm64;
-    io.stderr.writeln('DD TABLE: usesLinker=$usesLinker, darwinArch=$darwinArch, usesDDTable=$usesDDTable');
-    String? ddSlotMappingPath;
+    // DD 2-pass build: if SHOREBIRD_DD_MAX_BYTES is set, build an ELF
+    // for analysis, compute the DD table, then rebuild with DD.
+    final ddMaxBytesStr = const String.fromEnvironment('SHOREBIRD_DD_MAX_BYTES',
+        defaultValue: '').isEmpty
+        ? Platform.environment['SHOREBIRD_DD_MAX_BYTES']
+        : null;
+    final ddMaxBytes = int.tryParse(ddMaxBytesStr ?? '') ?? 0;
 
-    if (usesDDTable) {
-      final ddResult = await _computeDDTable(
+    if (ddMaxBytes > 0 && usesLinker) {
+      _logger.printTrace('DD 2-pass build: dd_max_bytes=$ddMaxBytes');
+
+      // Pass 1: Build ELF for analysis + DD identity file.
+      final elfForAnalysis = _fileSystem.path.join(outputDir.parent.path, 'App_dd_analysis.so');
+      final ddIdentityPath = _fileSystem.path.join(outputDir.parent.path, 'App.dd_identity.link');
+      final ddTablePath = _fileSystem.path.join(outputDir.parent.path, 'App.dd.link');
+      final ddCallerLinksPath = _fileSystem.path.join(outputDir.parent.path, 'App.dd_callers.link');
+      final ddSlotMappingPath = _fileSystem.path.join(outputDir.parent.path, 'App.dd_slots.link');
+
+      // Build elfArgs from genSnapshotArgs, replacing assembly with ELF
+      // and adding DD identity export. mainPath must remain at the end.
+      final elfArgs = <String>[
+        ...genSnapshotArgs.where((a) =>
+            a != mainPath &&
+            !a.startsWith('--snapshot_kind=') &&
+            !a.startsWith('--assembly=') &&
+            !a.startsWith('--elf=')),
+        '--snapshot_kind=app-aot-elf',
+        '--elf=$elfForAnalysis',
+        '--print_dd_function_identity_to=$ddIdentityPath',
+        mainPath,
+      ];
+      final int pass1Exit = await _genSnapshot.run(
         snapshotType: snapshotType,
-        darwinArch: darwinArch!,
-        mainPath: mainPath,
-        outputDir: outputDir,
-        genSnapshotArgs: genSnapshotArgs,
+        additionalArgs: elfArgs,
+        darwinArch: darwinArch,
       );
-      if (ddResult != 0) {
-        return ddResult;
+      if (pass1Exit != 0) {
+        _logger.printError('DD pass 1 (ELF for analysis) failed with exit code $pass1Exit');
+        return pass1Exit;
       }
-      final slotMappingFile = _fileSystem.file(
-        _fileSystem.path.join(outputDir.parent.path, 'App.dd_slots.link'),
-      );
-      if (slotMappingFile.existsSync()) {
-        ddSlotMappingPath = slotMappingFile.path;
-      }
-    }
 
-    // Insert DD slot mapping arg before mainPath (the last arg).
-    final finalGenSnapshotArgs = <String>[
-      ...genSnapshotArgs.take(genSnapshotArgs.length - 1),
-      if (ddSlotMappingPath != null)
-        '--dd_slot_mapping=$ddSlotMappingPath',
-      genSnapshotArgs.last, // mainPath
-    ];
+      // Run analyze_snapshot to compute DD table + caller links.
+      final analyzeSnapshotPath = _genSnapshot.getAnalyzeSnapshotPath(snapshotType, darwinArch);
+      if (analyzeSnapshotPath != null) {
+        await _processUtils.stream(<String>[
+          analyzeSnapshotPath,
+          '--compute_dd_table=$ddTablePath',
+          '--dd_caller_links=$ddCallerLinksPath',
+          '--dd_max_bytes=$ddMaxBytes',
+          elfForAnalysis,
+        ]);
+
+        // Compute DD slot mapping.
+        await _processUtils.stream(<String>[
+          analyzeSnapshotPath,
+          '--compute_dd_slot_mapping=$ddSlotMappingPath',
+          '--dd_table_data=$ddTablePath',
+          '--dd_caller_links=$ddCallerLinksPath',
+          '--dd_function_identity=$ddIdentityPath',
+          elfForAnalysis,
+        ]);
+
+        // Add DD slot mapping to gen_snapshot args (before mainPath, which is last).
+        if (_fileSystem.file(ddSlotMappingPath).existsSync()) {
+          final mainPathIndex = genSnapshotArgs.indexOf(mainPath);
+          genSnapshotArgs.insert(mainPathIndex, '--dd_slot_mapping=$ddSlotMappingPath');
+          _logger.printTrace('DD 2-pass build: added --dd_slot_mapping');
+        }
+      }
+
+      // Clean up temporary ELF.
+      _fileSystem.file(elfForAnalysis).deleteSync();
+    }
 
     final int genSnapshotExitCode = await _genSnapshot.run(
       snapshotType: snapshotType,
-      additionalArgs: finalGenSnapshotArgs,
+      additionalArgs: genSnapshotArgs,
       darwinArch: darwinArch,
     );
     if (genSnapshotExitCode != 0) {
@@ -308,203 +366,6 @@ class AOTSnapshotter {
       );
     } else {
       return 0;
-    }
-  }
-
-  /// Computes the Dynamic Dispatch (DD) table for the release snapshot.
-  ///
-  /// Runs gen_snapshot in ELF mode to produce a temporary snapshot, then uses
-  /// analyze_snapshot to compute the DD table manifest, caller links, and slot
-  /// mapping. The DD files are written next to the other link files in
-  /// [outputDir]'s parent.
-  ///
-  /// Returns 0 on success, non-zero on failure.
-  Future<int> _computeDDTable({
-    required SnapshotType snapshotType,
-    required DarwinArch darwinArch,
-    required String mainPath,
-    required Directory outputDir,
-    required List<String> genSnapshotArgs,
-  }) async {
-    _logger.printTrace('Computing DD table for release snapshot...');
-
-    // Derive analyze_snapshot path from gen_snapshot path.
-    // Check for it early so we can skip the entire DD computation (including
-    // the gen_snapshot ELF pass) when using a standard Flutter SDK that doesn't
-    // ship analyze_snapshot.
-    final genSnapshotArtifact = darwinArch == DarwinArch.arm64
-        ? Artifact.genSnapshotArm64
-        : Artifact.genSnapshotX64;
-    final genSnapshotPath = _genSnapshot.getSnapshotterPath(snapshotType, genSnapshotArtifact);
-    final analyzeSnapshotPath = _fileSystem.path.join(
-      _fileSystem.path.dirname(genSnapshotPath),
-      _fileSystem.path.basename(genSnapshotPath).replaceFirst('gen_snapshot', 'analyze_snapshot'),
-    );
-
-    if (!_fileSystem.file(analyzeSnapshotPath).existsSync()) {
-      _logger.printTrace('analyze_snapshot not found at $analyzeSnapshotPath, skipping DD table.');
-      return 0;
-    }
-
-    // Backwards compatibility: older gen_snapshot binaries (any Shorebird
-    // engine predating the DD table work) don't know the
-    // `--print_dd_function_identity_to` flag and will hard-error
-    // "Unrecognized flags: print_dd_function_identity_to" on the ELF pass
-    // below. Probe for flag support once here and skip the entire DD
-    // pipeline if the flag isn't present. Leaves the build to proceed as
-    // a normal (non-DD) Shorebird release.
-    final bool genSnapshotSupportsDD = await _genSnapshotSupportsDD(
-      genSnapshotPath: genSnapshotPath,
-    );
-    if (!genSnapshotSupportsDD) {
-      _logger.printTrace(
-          'gen_snapshot at $genSnapshotPath does not support '
-          '--print_dd_function_identity_to, skipping DD table. This is '
-          'expected when running against a pre-DD-table engine.');
-      return 0;
-    }
-
-    final String linkDir = outputDir.parent.path;
-    final String tempElfPath = _fileSystem.path.join(outputDir.path, '_dd_analysis.elf');
-    final String ddTablePath = _fileSystem.path.join(linkDir, 'App.dd.link');
-    final String ddCallerLinksPath = _fileSystem.path.join(linkDir, 'App.dd_callers.link');
-    final String ddSlotMappingPath = _fileSystem.path.join(linkDir, 'App.dd_slots.link');
-    final String ddIdentityPath = _fileSystem.path.join(linkDir, 'App.dd_identity.link');
-
-    // Build a temporary ELF snapshot (no DD) for analyze_snapshot.
-    // Strip out assembly/link-dump args — we only need a bare ELF.
-    // Export DD function identity (InstructionsTable index → kernel_offset)
-    // so the slot mapping can use kernel_offset-based function matching.
-    final elfArgs = <String>[
-      '--deterministic',
-      '--snapshot_kind=app-aot-elf',
-      '--elf=$tempElfPath',
-      '--print_dd_function_identity_to=$ddIdentityPath',
-      mainPath,
-    ];
-    final int elfExitCode = await _genSnapshot.run(
-      snapshotType: snapshotType,
-      additionalArgs: elfArgs,
-      darwinArch: darwinArch,
-    );
-    if (elfExitCode != 0) {
-      _logger.printError('DD analysis: gen_snapshot (ELF pass) failed with exit code $elfExitCode');
-      return elfExitCode;
-    }
-
-    // Step 1: Compute DD table + caller links.
-    final int computeTableResult = await _runProcess(analyzeSnapshotPath, <String>[
-      '--compute_dd_table=$ddTablePath',
-      '--dd_caller_links=$ddCallerLinksPath',
-      '--dd_max_bytes=$_ddMaxBytes',
-      tempElfPath,
-    ]);
-    if (computeTableResult != 0) {
-      _logger.printError('DD analysis: compute_dd_table failed with exit code $computeTableResult');
-      _cleanupFile(tempElfPath);
-      _cleanupFile(ddIdentityPath);
-      return computeTableResult;
-    }
-
-    // Step 2: Compute DD slot mapping using identity file for
-    // kernel_offset-based function matching.
-    final int computeMappingResult = await _runProcess(analyzeSnapshotPath, <String>[
-      '--compute_dd_slot_mapping=$ddSlotMappingPath',
-      '--dd_table_data=$ddTablePath',
-      '--dd_caller_links=$ddCallerLinksPath',
-      '--dd_function_identity=$ddIdentityPath',
-      tempElfPath,
-    ]);
-    if (computeMappingResult != 0) {
-      _logger.printError('DD analysis: compute_dd_slot_mapping failed with exit code $computeMappingResult');
-      _cleanupFile(tempElfPath);
-      _cleanupFile(ddIdentityPath);
-      return computeMappingResult;
-    }
-
-    _logger.printTrace('DD table computed successfully.');
-    _cleanupFile(tempElfPath);
-    _cleanupFile(ddIdentityPath);
-    return 0;
-  }
-
-  /// Runs a process and returns the exit code.
-  Future<int> _runProcess(String executable, List<String> args) async {
-    _logger.printTrace('Running: $executable ${args.join(' ')}');
-    final io.ProcessResult result = await _processManager.run(
-      <String>[executable, ...args],
-    );
-    if (result.exitCode != 0) {
-      _logger.printTrace('stdout: ${result.stdout}');
-      _logger.printTrace('stderr: ${result.stderr}');
-    }
-    return result.exitCode;
-  }
-
-  // Cached result of the DD flag probe. Keyed by absolute gen_snapshot path
-  // so a single process can cover multiple arches (arm64 / x64) cleanly.
-  static final Map<String, bool> _genSnapshotDDSupportCache = <String, bool>{};
-
-  /// Returns true if the gen_snapshot binary at [genSnapshotPath] recognizes
-  /// the `--print_dd_function_identity_to` flag (and by extension the rest of
-  /// the DD-table flag family: `--dd_slot_mapping`, the DD identity file
-  /// write path, etc.).
-  ///
-  /// Probe strategy: invoke gen_snapshot with the DD flag plus a bogus
-  /// kernel input. Two possible failure modes:
-  ///
-  ///   * The flag is recognized → gen_snapshot parses flags, then fails
-  ///     trying to load the invalid kernel: "Can't load Kernel binary:
-  ///     File size is too small to be a valid kernel file."
-  ///
-  ///   * The flag is not recognized → the VM refuses to initialize at all:
-  ///     "Setting VM flags failed: Unrecognized flags:
-  ///     print_dd_function_identity_to"
-  ///
-  /// We check stderr for the "Unrecognized flags" token. If present, the
-  /// flag is not supported and the DD pipeline must be skipped to avoid
-  /// hard-erroring the entire release build. We deliberately do NOT use
-  /// `--help` or `--print_flags` because neither prints per-flag info
-  /// without a kernel input (gen_snapshot exits early on
-  /// "At least one input is required").
-  ///
-  /// Result is cached per gen_snapshot path so multi-arch builds don't pay
-  /// the probe cost more than once per unique binary.
-  Future<bool> _genSnapshotSupportsDD({
-    required String genSnapshotPath,
-  }) async {
-    final bool? cached = _genSnapshotDDSupportCache[genSnapshotPath];
-    if (cached != null) {
-      return cached;
-    }
-    final io.ProcessResult result = await _processManager.run(
-      <String>[
-        genSnapshotPath,
-        '--print_dd_function_identity_to=/dev/null',
-        '--snapshot_kind=app-aot-elf',
-        '--elf=/dev/null',
-        '/dev/null',
-      ],
-    );
-    // gen_snapshot always exits non-zero here because the kernel load
-    // fails. The question is WHY it exited non-zero: if stderr contains
-    // "Unrecognized flags: print_dd_function_identity_to" the DD flag
-    // isn't supported by this binary; otherwise it parsed the flag OK
-    // and only failed later on the bogus kernel.
-    final String stderr = result.stderr.toString();
-    final bool unrecognized =
-        stderr.contains('Unrecognized flags: print_dd_function_identity_to') ||
-        stderr.contains('Unrecognized flag: print_dd_function_identity_to');
-    final bool supported = !unrecognized;
-    _genSnapshotDDSupportCache[genSnapshotPath] = supported;
-    return supported;
-  }
-
-  /// Deletes a file if it exists.
-  void _cleanupFile(String path) {
-    final file = _fileSystem.file(path);
-    if (file.existsSync()) {
-      file.deleteSync();
     }
   }
 
