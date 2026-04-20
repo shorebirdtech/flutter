@@ -131,6 +131,10 @@ abstract final class FlutterOptions {
   static const kDartDefineFromFileOption = 'dart-define-from-file';
   static const kWebDefinesOption = 'web-define';
   static const kPerformanceMeasurementFile = 'performance-measurement-file';
+  // Shorebird-specific build-trace option. Prefixed so the flag name and
+  // generated env vars / Gradle properties don't squat on identifiers
+  // upstream Flutter might want later.
+  static const kShorebirdTrace = 'shorebird-trace';
   static const kDeviceUser = 'device-user';
   static const kDeviceTimeout = 'device-timeout';
   static const kDeviceConnection = 'device-connection';
@@ -1064,6 +1068,19 @@ abstract class FlutterCommand extends Command<void> {
     );
   }
 
+  void usesShorebirdTraceOption({bool hide = false}) {
+    argParser.addOption(
+      FlutterOptions.kShorebirdTrace,
+      help:
+          'Output a Chrome Trace Event Format JSON file for build '
+          'profiling. The resulting file can be viewed at '
+          'https://ui.perfetto.dev. Shorebird-specific; named to avoid '
+          'colliding with any future upstream trace option.',
+      hide: hide,
+      valueHelp: 'path/to/shorebird-trace.json',
+    );
+  }
+
   void addAndroidSpecificBuildOptions({bool hide = false}) {
     argParser.addFlag(
       FlutterOptions.kAndroidGradleDaemon,
@@ -1466,6 +1483,11 @@ abstract class FlutterCommand extends Command<void> {
         ? stringArg(FlutterOptions.kPerformanceMeasurementFile)
         : null;
 
+    final String? shorebirdTraceFilePath =
+        argParser.options.containsKey(FlutterOptions.kShorebirdTrace)
+        ? stringArg(FlutterOptions.kShorebirdTrace)
+        : null;
+
     final Map<String, Object?> defineConfigJsonMap = extractDartDefineConfigJsonMap();
     final List<String> dartDefines = extractDartDefines(defineConfigJsonMap: defineConfigJsonMap);
 
@@ -1517,6 +1539,7 @@ abstract class FlutterCommand extends Command<void> {
       dartDefines: dartDefines,
       dartExperiments: experiments,
       performanceMeasurementFile: performanceMeasurementFile,
+      shorebirdTraceFilePath: shorebirdTraceFilePath,
       packageConfigPath: packagesPath ?? packageConfigFile.path,
       codeSizeDirectory: codeSizeDirectory,
       androidGradleDaemon: androidGradleDaemon,
