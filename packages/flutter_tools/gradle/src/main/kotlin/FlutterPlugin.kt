@@ -608,6 +608,8 @@ class FlutterPlugin : Plugin<Project> {
             val dartDefinesValue: String? = project.findProperty("dart-defines")?.toString()
             val performanceMeasurementFileValue: String? =
                 project.findProperty("performance-measurement-file")?.toString()
+            val shorebirdTraceFileValue: String? =
+                project.findProperty("shorebird-trace-file")?.toString()
             val codeSizeDirectoryValue: String? =
                 project.findProperty("code-size-directory")?.toString()
             val deferredComponentsValue: Boolean =
@@ -705,6 +707,7 @@ class FlutterPlugin : Plugin<Project> {
                     dartObfuscation = dartObfuscationValue
                     dartDefines = dartDefinesValue
                     performanceMeasurementFile = performanceMeasurementFileValue
+                    shorebirdTraceFile = shorebirdTraceFileValue
                     codeSizeDirectory = codeSizeDirectoryValue
                     deferredComponents = deferredComponentsValue
                     validateDeferredComponents = validateDeferredComponentsValue
