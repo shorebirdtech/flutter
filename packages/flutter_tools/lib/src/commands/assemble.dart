@@ -4,6 +4,7 @@
 
 import 'package:args/args.dart';
 import 'package:meta/meta.dart';
+import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import 'package:unified_analytics/unified_analytics.dart';
 
 import '../artifacts.dart';
@@ -115,6 +116,13 @@ class AssembleCommand extends FlutterCommand {
     argParser.addOption(
       'performance-measurement-file',
       help: 'Output individual target performance to a JSON file.',
+    );
+    argParser.addOption(
+      'shorebird-trace-file',
+      help:
+          'Output a Shorebird build trace in Chrome Trace Event Format '
+          'JSON. Shorebird-specific; used by the build-trace plumbing in '
+          'gradle.dart / mac.dart to collect flutter-assemble timings.',
     );
     argParser.addMultiOption(
       'input',
@@ -398,6 +406,10 @@ class AssembleCommand extends FlutterCommand {
       final File outFile = globals.fs.file(argumentResults['performance-measurement-file']);
       writePerformanceData(result.performance.values, outFile);
     }
+    if (argumentResults.wasParsed('shorebird-trace-file')) {
+      final File outFile = globals.fs.file(argumentResults['shorebird-trace-file']);
+      writeTraceData(result.performance.values, outFile);
+    }
     if (argumentResults.wasParsed('depfile')) {
       final File depfileFile = globals.fs.file(stringArg('depfile'));
       final depfile = Depfile(result.inputFiles, result.outputFiles);
@@ -443,4 +455,36 @@ void writePerformanceData(Iterable<PerformanceMeasurement> measurements, File ou
     outFile.parent.createSync(recursive: true);
   }
   outFile.writeAsStringSync(json.encode(jsonData));
+}
+
+/// Output build trace data in Chrome Trace Event Format in [outFile].
+/// `flutter assemble` is re-entered as its own process by Gradle /
+/// xcode_backend, so its events get their own Perfetto row named
+/// `flutter assemble`. Spans for each [PerformanceMeasurement] are
+/// emitted using its wall-clock [PerformanceMeasurement.startTimeMicroseconds]
+/// (converted to a DateTime; not the stopwatch duration alone) so the
+/// timeline aligns with the parent flutter tool's trace when merged.
+@visibleForTesting
+void writeTraceData(Iterable<PerformanceMeasurement> measurements, File outFile) {
+  final int pid = currentProcessId();
+  final tracer = BuildTracer()
+    ..addProcessNameMetadata(pid: pid, name: 'flutter assemble')
+    ..addThreadNameMetadata(pid: pid, tid: 1, name: 'flutter assemble');
+  for (final measurement in measurements) {
+    final start = DateTime.fromMicrosecondsSinceEpoch(measurement.startTimeMicroseconds);
+    tracer.addCompleteEvent(
+      name: measurement.analyticsName,
+      cat: TraceCategory.assemble.wireName,
+      pid: pid,
+      tid: 1,
+      start: start,
+      end: start.add(Duration(milliseconds: measurement.elapsedMilliseconds)),
+      args: <String, Object?>{
+        'target': measurement.target,
+        'skipped': measurement.skipped,
+        'succeeded': measurement.succeeded,
+      },
+    );
+  }
+  tracer.writeToFile(outFile);
 }
