@@ -36,6 +36,7 @@ import '../migrations/xcode_script_build_phase_migration.dart';
 import '../migrations/xcode_thin_binary_build_phase_input_paths_migration.dart';
 import '../plugins.dart';
 import '../project.dart';
+import '../shorebird/ios_build_trace_session.dart';
 import 'application_package.dart';
 import 'code_signing.dart';
 import 'migrations/host_app_info_plist_migration.dart';
@@ -349,10 +350,23 @@ Future<XcodeBuildResult> buildXcodeProject({
       );
     }
   }
+  // Created early enough to capture pod install, which can be minutes
+  // on plugin-heavy apps — otherwise it's an invisible gap between
+  // "flutter build ios" starting and the xcode archive span.
+  final IosBuildTraceSession? traceSession = IosBuildTraceSession.maybeStart(
+    shorebirdTraceFilePath: buildInfo.shorebirdTraceFilePath,
+    fileSystem: globals.fs,
+    buildDirectoryPath: globals.fs.path.join(getBuildDirectory(), 'ios'),
+  );
+
+  traceSession?.onBeforePodInstall();
   await processPodsIfNeeded(project.ios, buildDirectoryPath, buildInfo.mode);
+  traceSession?.onAfterPodInstall();
   if (configOnly) {
     return XcodeBuildResult(success: true);
   }
+
+  buildCommands.addAll(traceSession?.extraBuildCommands() ?? const <String>[]);
 
   if (globals.logger.isVerbose) {
     // An environment variable to be passed to xcode_backend.sh determining
@@ -532,6 +546,8 @@ Future<XcodeBuildResult> buildXcodeProject({
       ]);
     }
 
+    traceSession?.onXcodeAboutToStart();
+
     final sw = Stopwatch()..start();
     initialBuildStatus = globals.logger.startProgress('Running Xcode build...');
 
@@ -555,6 +571,13 @@ Future<XcodeBuildResult> buildXcodeProject({
         elapsedMilliseconds: elapsedDuration.inMilliseconds,
       ),
     );
+
+    await traceSession?.onXcodeFinished(
+      buildActionName: xcodeBuildActionToString(buildAction),
+      resultBundleDirectory: resultBundleDirectory,
+      runXcresultTool: (List<String> args) => globals.processManager.run(args),
+    );
+    traceSession?.finish(printStatus: globals.printStatus);
 
     if (tempDir.existsSync()) {
       // Display additional warning and error message from xcresult bundle.

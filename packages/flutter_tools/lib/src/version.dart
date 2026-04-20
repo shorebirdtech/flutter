@@ -1072,11 +1072,11 @@ class GitTagVersion {
         .stdout
         .trim();
     final stableVersionPattern = RegExp(r'^\d+\.\d+\.\d+$');
-    final String? shorebirdFlutterVersion = LineSplitter.split(
-      shorebirdFlutterReleases,
-    ).map((e) => e.replaceFirst('origin/flutter_release/', '')).where(
-      (e) => stableVersionPattern.hasMatch(e),
-    ).toList().firstOrNull;
+    final String? shorebirdFlutterVersion = LineSplitter.split(shorebirdFlutterReleases)
+        .map((e) => e.replaceFirst('origin/flutter_release/', ''))
+        .where((e) => stableVersionPattern.hasMatch(e))
+        .toList()
+        .firstOrNull;
     if (shorebirdFlutterVersion != null) {
       return parse(shorebirdFlutterVersion);
     }
