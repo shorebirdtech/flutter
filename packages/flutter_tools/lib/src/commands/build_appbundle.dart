@@ -38,6 +38,7 @@ class BuildAppBundleCommand extends BuildSubCommand {
       DartCompileOptionsBundle(),
       AndroidBuildOptionsBundle(),
     ]);
+    usesShorebirdTraceOption(hide: !verboseHelp);
     argParser.addDescriptors(const <OptionDescriptor<Object?>>[
       _targetPlatform,
       _deferredComponents,

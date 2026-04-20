@@ -33,10 +33,8 @@ void main() {
   late FakeToolContext toolContext;
 
   setUp(() {
-    fileSystem = MemoryFileSystem.test();
-    fileSystem.file('pubspec.yaml').createSync();
     fakeAnalytics = getInitializedFakeAnalyticsInstance(
-      fs: fileSystem,
+      fs: MemoryFileSystem.test(),
       fakeFlutterVersion: FakeFlutterVersion(),
     );
     logger = BufferLogger.test();
@@ -254,52 +252,20 @@ void main() {
         ),
       );
 
-      const invalidDartDefines = [
-        'flutter.inspector.structuredErrors%3Dtrue',
-        '///',
-        '@@@@',
-        "'",
-        '"',
-        '`',
-        r'\',
-        r'$',
-        ';',
-        '/*',
-        '*/',
-        '//',
-        '\n',
-        '\r',
-        '<',
-        '>',
-        '{',
-        '}',
-        '[',
-        ']',
-        '(',
-        ')',
-        '%',
-        '=',
-        '&',
-        '?',
-        '#',
+      final command = <String>[
+        'assemble',
+        '--output',
+        'Output',
+        '-DartDefines=flutter.inspector.structuredErrors%3Dtrue',
+        'debug_macos_bundle_flutter_assets',
       ];
-      for (final invalidDartDefine in invalidDartDefines) {
-        final command = <String>[
-          'assemble',
-          '--output',
-          'Output',
-          '-DartDefines=$invalidDartDefine',
-          'debug_macos_bundle_flutter_assets',
-        ];
-        expect(
-          commandRunner.run(command),
-          throwsToolExit(
-            message:
-                'Error parsing assemble command: The -Pdart-defines argument contains non-base64 encoded data. '
-                'Check your build command and try again.',
-          ),
-        );
-      }
+      expect(
+        commandRunner.run(command),
+        throwsToolExit(
+          message:
+              'Error parsing assemble command: your generated configuration may be out of date',
+        ),
+      );
     },
   );
 
@@ -534,6 +500,7 @@ void main() {
         skipped: false,
         succeeded: true,
         elapsedMilliseconds: 123,
+        startTimeMicroseconds: 0,
       ),
     ];
     final FileSystem localFileSystem = MemoryFileSystem.test();

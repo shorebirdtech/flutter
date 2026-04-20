@@ -72,6 +72,16 @@ dependencies:
   hooks_runner: 1.6.4
   hooks: 2.2.0
   code_assets: 2.1.0
+
+  # Shorebird-specific: shared build-trace library. Pinned to a specific
+  # commit of the shorebird monorepo. Roll this ref together with any
+  # change to the shared library. Subdir path points at the package
+  # within the monorepo.
+  shorebird_build_trace:
+    git:
+      url: https://github.com/shorebirdtech/shorebird.git
+      ref: cff436f66534e14618cddcaf93f0d0e9862c937a
+      path: packages/shorebird_build_trace
   data_assets: 0.20.0
   record_use: 1.1.1
 

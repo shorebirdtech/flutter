@@ -34,6 +34,7 @@ import '../convert.dart';
 import '../flutter_manifest.dart';
 import '../globals.dart' as globals;
 import '../project.dart';
+import '../shorebird/android_build_trace_session.dart';
 import 'android_builder.dart';
 import 'android_sdk.dart';
 import 'android_studio.dart';
@@ -299,6 +300,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
     VoidCallback? postRunTask,
     int? maxRetries,
     _OutputParser? outputParser,
+    void Function(Process process)? onStart,
   }) async {
     final bool usesAndroidX = isAppUsingAndroidX(project.android.hostAppGradleRoot);
     final String? agpVersion = gradle.getAgpVersion(
@@ -365,6 +367,7 @@ class AndroidGradleBuilder implements AndroidBuilder {
         allowReentrantFlutter: true,
         environment: _java?.gradleEnvironment,
         mapFunction: consumeLog,
+        onStart: onStart,
       );
     } on ProcessException catch (exception) {
       consumeLog(exception.toString());
@@ -554,7 +557,12 @@ To fix this, you can either:
       return;
     }
 
-    // Assembly work starts here.
+    final AndroidBuildTraceSession? traceSession = AndroidBuildTraceSession.maybeStart(
+      androidBuildInfo,
+      _fileSystem,
+      project.android.buildDirectory,
+    );
+
     final BuildInfo buildInfo = androidBuildInfo.buildInfo;
     final String assembleTask = isBuildingBundle
         ? getBundleTaskFor(buildInfo)
@@ -639,6 +647,7 @@ To fix this, you can either:
       }
     }
     options.addAll(androidBuildInfo.buildInfo.toGradleConfig());
+    options.addAll(traceSession?.extraGradleOptions(assembleTask) ?? const <String>[]);
     if (buildInfo.fileSystemRoots.isNotEmpty) {
       options.add('-Pfilesystem-roots=${buildInfo.fileSystemRoots.join('|')}');
     }
@@ -654,8 +663,10 @@ To fix this, you can either:
     final int exitCode = await _runGradleTask(
       assembleTask,
       preRunTask: () {
+        traceSession?.onGradleAboutToStart();
         sw = Stopwatch()..start();
       },
+      onStart: (process) => traceSession?.onGradleSpawn(process),
       postRunTask: () {
         final Duration elapsedDuration = sw.elapsed;
         _analytics.send(
@@ -673,13 +684,23 @@ To fix this, you can either:
       gradleExecutablePath: gradleExecutablePath,
     );
 
+    traceSession?.onGradleFinished(assembleTask);
+
     if (exitCode != 0) {
+      // Abort the trace before the compatibility check, which exits the tool on
+      // an incompatible pair and would otherwise strand the session.
+      traceSession?.abortOnGradleFailure();
       await _checkJavaAndGradleCompatibility(project, androidBuildInfo.buildInfo);
       throwToolExit(
         'Gradle task $assembleTask failed with exit code $exitCode',
         exitCode: exitCode,
       );
     }
+
+    traceSession?.finish(
+      buildTarget: isBuildingBundle ? 'appbundle' : 'apk',
+      printStatus: _logger.printStatus,
+    );
 
     if (isBuildingBundle) {
       final File bundleFile = findBundleFile(project, buildInfo, _logger, _analytics);

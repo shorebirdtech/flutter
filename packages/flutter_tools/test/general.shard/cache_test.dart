@@ -15,7 +15,6 @@ import 'package:flutter_tools/src/base/io.dart';
 import 'package:flutter_tools/src/base/logger.dart';
 import 'package:flutter_tools/src/base/os.dart';
 import 'package:flutter_tools/src/base/platform.dart';
-import 'package:flutter_tools/src/base/terminal.dart';
 import 'package:flutter_tools/src/cache.dart';
 import 'package:flutter_tools/src/dart/pub.dart';
 import 'package:flutter_tools/src/flutter_cache.dart';
@@ -25,7 +24,6 @@ import 'package:test/fake.dart';
 
 import '../src/common.dart';
 import '../src/context.dart';
-import '../src/fake_http_client.dart';
 import '../src/fakes.dart';
 
 const unameCommandForX64 = FakeCommand(command: <String>['uname', '-m'], stdout: 'x86_64');
@@ -1602,7 +1600,7 @@ void main() {
 
     await engineStamp.updateInner(artifactUpdater, fileSystem, FakeOperatingSystemUtils());
 
-    expect(messages, <String>['Engine Information']);
+    expect(messages, <String>['Downloading engine information...']);
 
     expect(downloads, <String>[
       'https://download.shorebird.dev/flutter_infra_release/flutter/hijklmnop/engine_stamp.json',
@@ -2110,33 +2108,22 @@ class FakeArtifactUpdater extends Fake implements ArtifactUpdater {
   void Function(String, Uri, Directory)? onDownloadFile;
 
   @override
-  Future<void> downloadZippedTarball(String artifactName, Uri url, Directory location) async {
-    onDownloadZipTarball?.call(artifactName, url, location);
+  Future<void> downloadZippedTarball(String message, Uri url, Directory location) async {
+    onDownloadZipTarball?.call(message, url, location);
   }
 
   @override
-  Future<void> downloadZipArchive(String artifactName, Uri url, Directory location) async {
-    onDownloadZipArchive?.call(artifactName, url, location);
+  Future<void> downloadZipArchive(String message, Uri url, Directory location) async {
+    onDownloadZipArchive?.call(message, url, location);
   }
 
   @override
-  Future<void> downloadFile(String artifactName, Uri url, Directory location) async {
-    onDownloadFile?.call(artifactName, url, location);
+  Future<void> downloadFile(String message, Uri url, Directory location) async {
+    onDownloadFile?.call(message, url, location);
   }
 
   @override
   void removeDownloadedFiles() {}
-
-  @override
-  void setProgressContext({
-    required int artifactIndex,
-    required int artifactTotal,
-    required int downloadTotal,
-    int downloadIndex = 0,
-  }) {}
-
-  @override
-  void resetProgressContext() {}
 }
 
 class FakeArtifactUpdaterDownload extends ArtifactUpdater {

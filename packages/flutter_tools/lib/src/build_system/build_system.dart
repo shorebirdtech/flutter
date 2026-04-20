@@ -920,6 +920,7 @@ class _BuildInstance {
 
   Future<bool> _invokeInternal(Node node) async {
     final PoolResource resource = await resourcePool.request();
+    final int startTimeMicroseconds = DateTime.now().microsecondsSinceEpoch;
     final stopwatch = Stopwatch()..start();
     var succeeded = true;
     var skipped = false;
@@ -1017,6 +1018,7 @@ class _BuildInstance {
         skipped: skipped,
         succeeded: succeeded,
         analyticsName: node.target.analyticsName,
+        startTimeMicroseconds: startTimeMicroseconds,
       );
     }
     return succeeded;
@@ -1046,6 +1048,7 @@ class PerformanceMeasurement {
     required this.skipped,
     required this.succeeded,
     required this.analyticsName,
+    required this.startTimeMicroseconds,
   });
 
   final int elapsedMilliseconds;
@@ -1053,6 +1056,9 @@ class PerformanceMeasurement {
   final bool skipped;
   final bool succeeded;
   final String analyticsName;
+
+  /// Wall-clock start time in microseconds since epoch.
+  final int startTimeMicroseconds;
 }
 
 /// Check if there are any dependency cycles in the target.
