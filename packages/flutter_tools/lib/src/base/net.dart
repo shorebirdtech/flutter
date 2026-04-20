@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:meta/meta.dart';
 
 import '../convert.dart';
+import '../shorebird/network_trace_span.dart';
 import 'common.dart';
 import 'file_system.dart';
 import 'io.dart';
@@ -87,6 +88,8 @@ class Net {
   Future<bool> _attempt(Uri url, {IOSink? destSink, bool onlyHeaders = false}) async {
     assert(onlyHeaders || destSink != null);
     _logger.printTrace('Downloading: $url');
+    final traceSpan = NetworkTraceSpan.start(url: url, onlyHeaders: onlyHeaders);
+
     final HttpClient httpClient = _httpClientFactory();
     HttpClientRequest request;
     HttpClientResponse? response;
@@ -98,6 +101,7 @@ class Net {
       }
       response = await request.close();
     } on ArgumentError catch (error) {
+      traceSpan.record(errorKind: 'ArgumentError');
       final String? overrideUrl = _platform.environment[kFlutterStorageBaseUrl];
       if (overrideUrl != null && url.toString().contains(overrideUrl)) {
         _logger.printError(error.toString());
@@ -112,6 +116,7 @@ class Net {
       _logger.printError(error.toString());
       rethrow;
     } on HandshakeException catch (error) {
+      traceSpan.record(errorKind: 'HandshakeException');
       _logger.printTrace(error.toString());
       throwToolExit(
         'Could not authenticate download server. You may be experiencing a man-in-the-middle attack,\n'
@@ -120,29 +125,35 @@ class Net {
         exitCode: kNetworkProblemExitCode,
       );
     } on SocketException catch (error) {
+      traceSpan.record(errorKind: 'SocketException');
       _logger.printTrace('Download error: $error');
       return false;
     } on HttpException catch (error) {
+      traceSpan.record(errorKind: 'HttpException');
       _logger.printTrace('Download error: $error');
       return false;
     }
 
+    final int statusCode = response.statusCode;
+
     // If we're making a HEAD request, we're only checking to see if the URL is
     // valid.
     if (onlyHeaders) {
-      return response.statusCode == HttpStatus.ok;
+      traceSpan.record(statusCode: statusCode);
+      return statusCode == HttpStatus.ok;
     }
-    if (response.statusCode != HttpStatus.ok) {
-      if (response.statusCode > 0 && response.statusCode < 500) {
+    if (statusCode != HttpStatus.ok) {
+      traceSpan.record(statusCode: statusCode);
+      if (statusCode > 0 && statusCode < 500) {
         throwToolExit(
           'Download failed.\n'
           'URL: $url\n'
-          'Error: ${response.statusCode} ${response.reasonPhrase}',
+          'Error: $statusCode ${response.reasonPhrase}',
           exitCode: kNetworkProblemExitCode,
         );
       }
       // 5xx errors are server errors and we can try again
-      _logger.printTrace('Download error: ${response.statusCode} ${response.reasonPhrase}');
+      _logger.printTrace('Download error: $statusCode ${response.reasonPhrase}');
       return false;
     }
     _logger.printTrace('Received response from server, collecting bytes...');
@@ -156,6 +167,9 @@ class Net {
     } finally {
       await destSink?.flush();
       await destSink?.close();
+      // Record after the body has been fully drained so `dur` reflects
+      // end-to-end download time, not just time-to-first-byte.
+      traceSpan.record(statusCode: statusCode);
     }
   }
 }
