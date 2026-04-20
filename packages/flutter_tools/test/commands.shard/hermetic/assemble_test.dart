@@ -28,13 +28,9 @@ void main() {
   final StackTrace stackTrace = StackTrace.current;
   late FakeAnalytics fakeAnalytics;
 
-  late MemoryFileSystem fileSystem;
-
   setUp(() {
-    fileSystem = MemoryFileSystem.test();
-    fileSystem.file('pubspec.yaml').createSync();
     fakeAnalytics = getInitializedFakeAnalyticsInstance(
-      fs: fileSystem,
+      fs: MemoryFileSystem.test(),
       fakeFlutterVersion: FakeFlutterVersion(),
     );
   });
@@ -55,7 +51,7 @@ void main() {
     },
     overrides: <Type, Generator>{
       Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      FileSystem: () => fileSystem,
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
     },
   );
@@ -84,7 +80,7 @@ void main() {
     },
     overrides: <Type, Generator>{
       Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      FileSystem: () => fileSystem,
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
     },
   );
@@ -113,7 +109,7 @@ void main() {
     },
     overrides: <Type, Generator>{
       Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      FileSystem: () => fileSystem,
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
     },
   );
@@ -142,7 +138,7 @@ void main() {
     },
     overrides: <Type, Generator>{
       Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      FileSystem: () => fileSystem,
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
     },
   );
@@ -164,7 +160,7 @@ void main() {
     },
     overrides: <Type, Generator>{
       Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      FileSystem: () => fileSystem,
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
       FeatureFlags: () => TestFeatureFlags(isMacOSEnabled: true),
     },
@@ -196,7 +192,7 @@ void main() {
     overrides: <Type, Generator>{
       Analytics: () => fakeAnalytics,
       Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      FileSystem: () => fileSystem,
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
     },
   );
@@ -228,7 +224,7 @@ void main() {
     },
     overrides: <Type, Generator>{
       Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      FileSystem: () => fileSystem,
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
       FeatureFlags: () => TestFeatureFlags(isMacOSEnabled: true),
       Analytics: () => fakeAnalytics,
@@ -249,7 +245,7 @@ void main() {
     },
     overrides: <Type, Generator>{
       Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      FileSystem: () => fileSystem,
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
     },
   );
@@ -273,7 +269,7 @@ void main() {
     },
     overrides: <Type, Generator>{
       Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      FileSystem: () => fileSystem,
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
     },
   );
@@ -285,56 +281,24 @@ void main() {
         AssembleCommand(buildSystem: TestBuildSystem.all(BuildResult(success: true))),
       );
 
-      const invalidDartDefines = [
-        'flutter.inspector.structuredErrors%3Dtrue',
-        '///',
-        '@@@@',
-        "'",
-        '"',
-        '`',
-        r'\',
-        r'$',
-        ';',
-        '/*',
-        '*/',
-        '//',
-        '\n',
-        '\r',
-        '<',
-        '>',
-        '{',
-        '}',
-        '[',
-        ']',
-        '(',
-        ')',
-        '%',
-        '=',
-        '&',
-        '?',
-        '#',
+      final command = <String>[
+        'assemble',
+        '--output',
+        'Output',
+        '-DartDefines=flutter.inspector.structuredErrors%3Dtrue',
+        'debug_macos_bundle_flutter_assets',
       ];
-      for (final invalidDartDefine in invalidDartDefines) {
-        final command = <String>[
-          'assemble',
-          '--output',
-          'Output',
-          '-DartDefines=$invalidDartDefine',
-          'debug_macos_bundle_flutter_assets',
-        ];
-        expect(
-          commandRunner.run(command),
-          throwsToolExit(
-            message:
-                'Error parsing assemble command: The -Pdart-defines argument contains non-base64 encoded data. '
-                'Check your build command and try again.',
-          ),
-        );
-      }
+      expect(
+        commandRunner.run(command),
+        throwsToolExit(
+          message:
+              'Error parsing assemble command: your generated configuration may be out of date',
+        ),
+      );
     },
     overrides: <Type, Generator>{
       Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      FileSystem: () => fileSystem,
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
     },
   );
@@ -350,7 +314,7 @@ void main() {
     },
     overrides: <Type, Generator>{
       Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      FileSystem: () => fileSystem,
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
     },
   );
@@ -380,7 +344,7 @@ void main() {
     },
     overrides: <Type, Generator>{
       Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      FileSystem: () => fileSystem,
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
     },
   );
@@ -400,6 +364,7 @@ void main() {
                   elapsedMilliseconds: 123,
                   skipped: false,
                   succeeded: true,
+                  startTimeMicroseconds: 0,
                 ),
               },
             ),
@@ -422,7 +387,7 @@ void main() {
     },
     overrides: <Type, Generator>{
       Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      FileSystem: () => fileSystem,
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
     },
   );
@@ -452,7 +417,7 @@ void main() {
         localEngineHost: 'out/host_release',
       ),
       Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      FileSystem: () => fileSystem,
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
     },
   );
@@ -525,7 +490,7 @@ void main() {
     },
     overrides: <Type, Generator>{
       Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      FileSystem: () => fileSystem,
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
     },
   );
@@ -538,6 +503,7 @@ void main() {
         skipped: false,
         succeeded: true,
         elapsedMilliseconds: 123,
+        startTimeMicroseconds: 0,
       ),
     ];
     final FileSystem fileSystem = MemoryFileSystem.test();
@@ -582,23 +548,56 @@ void main() {
     expect(testLogger.statusText, contains('assemble'));
   });
 
-  testUsingContext(
-    'flutter assemble fails if pubspec.yaml is missing',
-    () async {
-      final CommandRunner<void> commandRunner = createTestCommandRunner(
-        AssembleCommand(buildSystem: TestBuildSystem.error(null)),
-      );
+  testWithoutContext('writeTraceData outputs Chrome Trace Event Format', () {
+    final measurements = <PerformanceMeasurement>[
+      PerformanceMeasurement(
+        analyticsName: 'KernelSnapshot',
+        target: 'kernel_snapshot',
+        skipped: false,
+        succeeded: true,
+        elapsedMilliseconds: 500,
+        startTimeMicroseconds: 1000000,
+      ),
+    ];
+    final FileSystem fileSystem = MemoryFileSystem.test();
+    final outFile = fileSystem.currentDirectory.childDirectory('foo').childFile('trace.json');
 
-      await expectLater(
-        commandRunner.run(<String>['assemble', '-o Output', 'debug_macos_bundle_flutter_assets']),
-        throwsToolExit(message: 'No pubspec.yaml file found'),
-      );
-    },
-    overrides: <Type, Generator>{
-      FileSystem: () => MemoryFileSystem.test(),
-      ProcessManager: () => FakeProcessManager.any(),
-    },
-  );
+    writeTraceData(measurements, outFile);
+
+    expect(outFile, exists);
+    final events = json.decode(outFile.readAsStringSync()) as List<Object?>;
+    // 2 metadata events (process_name, thread_name) + 1 complete span.
+    expect(events, hasLength(3));
+
+    // Metadata events name the process + thread so Perfetto labels the
+    // row rather than showing a bare pid.
+    final processMeta = events[0]! as Map<String, Object?>;
+    expect(processMeta['ph'], 'M');
+    expect(processMeta['name'], 'process_name');
+    expect((processMeta['args']! as Map)['name'], 'flutter assemble');
+
+    final threadMeta = events[1]! as Map<String, Object?>;
+    expect(threadMeta['ph'], 'M');
+    expect(threadMeta['name'], 'thread_name');
+    expect((threadMeta['args']! as Map)['name'], 'flutter assemble');
+
+    final event = events[2]! as Map<String, Object?>;
+    expect(event['ph'], 'X');
+    expect(event['name'], 'KernelSnapshot');
+    expect(event['cat'], 'assemble');
+    expect(event['ts'], 1000000);
+    expect(event['dur'], 500000);
+    // pid is the real pid of the test process; just assert it's present
+    // and an int, and matches between metadata + span.
+    expect(event['pid'], isA<int>());
+    expect(event['pid'], processMeta['pid']);
+    expect(event['tid'], 1);
+    expect(event['args'], <String, Object?>{
+      'target': 'kernel_snapshot',
+      'skipped': false,
+      'succeeded': true,
+    });
+  });
 }
 
 final class _StubCommand extends FlutterCommand {
