@@ -243,6 +243,7 @@ abstract class ProcessUtils {
     RegExp? stdoutErrorMatcher,
     StringConverter? mapFunction,
     Map<String, String>? environment,
+    void Function(Process process)? onStart,
   });
 
   bool exitsHappySync(List<String> cli, {Map<String, String>? environment});
@@ -560,6 +561,7 @@ class _DefaultProcessUtils implements ProcessUtils {
     RegExp? stdoutErrorMatcher,
     StringConverter? mapFunction,
     Map<String, String>? environment,
+    void Function(Process process)? onStart,
   }) async {
     final Process process = await start(
       cmd,
@@ -567,6 +569,7 @@ class _DefaultProcessUtils implements ProcessUtils {
       allowReentrantFlutter: allowReentrantFlutter,
       environment: environment,
     );
+    onStart?.call(process);
     final StreamSubscription<String> stdoutSubscription = process.stdout
         .transform(utf8AllowMalformedLineDecoder)
         .where((String line) => filter == null || filter.hasMatch(line))

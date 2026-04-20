@@ -914,6 +914,7 @@ abstract class _BuildIOSSubCommand extends BuildSubCommand {
       DartCompileOptionsBundle(),
       AppleBuildOptionsBundle(),
     ]);
+    usesShorebirdTraceOption(hide: !verboseHelp);
     argParser.addDescriptor(_codesign);
   }
 

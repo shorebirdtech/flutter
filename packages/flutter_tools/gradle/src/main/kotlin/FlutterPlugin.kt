@@ -624,6 +624,7 @@ class FlutterPlugin : Plugin<Project> {
             dartObfuscation = compileOptions.dartObfuscation
             dartDefines = compileOptions.dartDefines
             performanceMeasurementFile = compileOptions.performanceMeasurementFile
+            shorebirdTraceFile = project.findProperty("shorebird-trace-file")?.toString()
             codeSizeDirectory = compileOptions.codeSizeDirectory
             deferredComponents = compileOptions.deferredComponents
             validateDeferredComponents = compileOptions.validateDeferredComponents

@@ -33,6 +33,7 @@ class BuildApkCommand extends BuildSubCommand {
       DartCompileOptionsBundle(),
       AndroidBuildOptionsBundle(),
     ]);
+    usesShorebirdTraceOption(hide: !verboseHelp);
     argParser.addDescriptors(const <OptionDescriptor<Object?>>[
       _splitPerAbi,
       _configOnly,
