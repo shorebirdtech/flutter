@@ -8,14 +8,22 @@ import 'package:yaml_edit/yaml_edit.dart';
 import '../base/file_system.dart';
 import '../globals.dart' as globals;
 
-void updateShorebirdYaml(String? flavor, String shorebirdYamlPath, {required Map<String, String> environment}) {
+void updateShorebirdYaml(
+  String? flavor,
+  String shorebirdYamlPath, {
+  required Map<String, String> environment,
+}) {
   final File shorebirdYaml = globals.fs.file(shorebirdYamlPath);
   if (!shorebirdYaml.existsSync()) {
     throw Exception('shorebird.yaml not found at $shorebirdYamlPath');
   }
   final YamlDocument input = loadYamlDocument(shorebirdYaml.readAsStringSync());
   final YamlMap yamlMap = input.contents as YamlMap;
-  final Map<String, dynamic> compiled = compileShorebirdYaml(yamlMap, flavor: flavor, environment: environment);
+  final Map<String, dynamic> compiled = compileShorebirdYaml(
+    yamlMap,
+    flavor: flavor,
+    environment: environment,
+  );
   // Currently we write out over the same yaml file, we should fix this to
   // write to a new .json file instead and avoid naming confusion between the
   // input and compiled files.
@@ -44,16 +52,19 @@ String appIdForFlavor(YamlMap yamlMap, {required String? flavor}) {
   return flavorAppId;
 }
 
-Map<String, dynamic> compileShorebirdYaml(YamlMap yamlMap, {required String? flavor, required Map<String, String> environment}) {
+Map<String, dynamic> compileShorebirdYaml(
+  YamlMap yamlMap, {
+  required String? flavor,
+  required Map<String, String> environment,
+}) {
   final String appId = appIdForFlavor(yamlMap, flavor: flavor);
-  final Map<String, dynamic> compiled = <String, dynamic>{
-    'app_id': appId,
-  };
+  final Map<String, dynamic> compiled = <String, dynamic>{'app_id': appId};
   void copyIfSet(String key) {
     if (yamlMap[key] != null) {
       compiled[key] = yamlMap[key];
     }
   }
+
   copyIfSet('base_url');
   copyIfSet('auto_update');
   copyIfSet('patch_verification');

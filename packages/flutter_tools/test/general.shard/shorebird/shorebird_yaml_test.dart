@@ -20,8 +20,11 @@ auto_update: false
 ''';
       final YamlDocument input = loadYamlDocument(yamlContents);
       final YamlMap yamlMap = input.contents as YamlMap;
-      final Map<String, dynamic> compiled =
-          compileShorebirdYaml(yamlMap, flavor: null, environment: <String, String>{});
+      final Map<String, dynamic> compiled = compileShorebirdYaml(
+        yamlMap,
+        flavor: null,
+        environment: <String, String>{},
+      );
       expect(compiled, <String, dynamic>{
         'app_id': '6160a7d8-cc18-4928-1233-05b51c0bb02c',
         'auto_update': false,
@@ -56,16 +59,22 @@ patch_verification: strict
 ''';
       final YamlDocument input = loadYamlDocument(yamlContents);
       final YamlMap yamlMap = input.contents as YamlMap;
-      final Map<String, dynamic> compiled1 =
-          compileShorebirdYaml(yamlMap, flavor: null, environment: <String, String>{});
+      final Map<String, dynamic> compiled1 = compileShorebirdYaml(
+        yamlMap,
+        flavor: null,
+        environment: <String, String>{},
+      );
       expect(compiled1, <String, dynamic>{
         'app_id': '1-a',
         'auto_update': false,
         'base_url': 'https://example.com',
         'patch_verification': 'strict',
       });
-      final Map<String, dynamic> compiled2 =
-          compileShorebirdYaml(yamlMap, flavor: 'foo', environment: <String, String>{'SHOREBIRD_PUBLIC_KEY': '4-a'});
+      final Map<String, dynamic> compiled2 = compileShorebirdYaml(
+        yamlMap,
+        flavor: 'foo',
+        environment: <String, String>{'SHOREBIRD_PUBLIC_KEY': '4-a'},
+      );
       expect(compiled2, <String, dynamic>{
         'app_id': '2-a',
         'auto_update': false,
@@ -83,7 +92,7 @@ flavors:
   bar: 3-a
 base_url: https://example.com
 ''';
-    // Make a temporary file to test editing in place.
+      // Make a temporary file to test editing in place.
       final Directory tempDir = Directory.systemTemp.createTempSync('shorebird_yaml_test.');
       final File tempFile = File('${tempDir.path}/shorebird.yaml');
       tempFile.writeAsStringSync(yamlContents);

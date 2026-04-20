@@ -148,8 +148,7 @@ class AOTSnapshotter {
       // Shorebird uses --deterministic to improve snapshot stability and increase linking.
       '--deterministic',
       // Only save LinkInfo if we're using the linker.
-      if (usesLinker)
-        ...dumpLinkInfoArgs,
+      if (usesLinker) ...dumpLinkInfoArgs,
     ];
 
     final bool targetingApplePlatform =
