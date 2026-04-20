@@ -907,6 +907,7 @@ abstract class _BuildIOSSubCommand extends BuildSubCommand {
     usesExtraDartFlagOptions(verboseHelp: verboseHelp);
     addEnableExperimentation(hide: !verboseHelp);
     addBuildPerformanceFile(hide: !verboseHelp);
+    usesShorebirdTraceOption(hide: !verboseHelp);
     usesAnalyzeSizeFlag();
     argParser.addFlag(
       'codesign',

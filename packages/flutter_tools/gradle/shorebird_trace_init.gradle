@@ -1,0 +1,159 @@
+// Emits Chrome Trace Event Format events for every Gradle task so the
+// Shorebird build trace (`flutter build ... --shorebird-trace`) can show
+// per-task timings alongside flutter tool + flutter assemble spans.
+//
+// This file is Shorebird-specific — it exists in the Shorebird fork of
+// Flutter and has no equivalent upstream. Activated by passing
+// `-I=<this>` together with `-Pshorebird.gradle-trace-file=<path>`.
+// Output file is consumed by Flutter's gradle.dart and merged into the
+// main trace.
+//
+// Events land on tid=4 (flutter tool = 1, native build outer = 2, flutter
+// assemble = 3) so Perfetto shows a clean per-tier layout.
+
+import groovy.json.JsonOutput
+import org.gradle.api.Task
+import org.gradle.api.execution.TaskExecutionListener
+import org.gradle.api.tasks.TaskState
+
+def traceFilePath = gradle.startParameter.projectProperties['shorebird.gradle-trace-file']
+if (!traceFilePath) {
+    traceFilePath = System.getProperty('shorebird.gradle-trace-file')
+}
+if (!traceFilePath) {
+    return
+}
+
+// Flow id shared with flutter_tool so Perfetto draws an arrow from the
+// parent "gradle <task>" span into our first per-task event. Missing
+// when flutter_tool is older than the flow-id plumbing; that's fine,
+// the init script just skips the flow-end event in that case.
+def gradleFlowIdRaw = gradle.startParameter.projectProperties['shorebird.gradle-trace-flow-id']
+def gradleFlowId = gradleFlowIdRaw ? gradleFlowIdRaw.toLong() : null
+
+// Real pid of this Gradle JVM — Gradle tasks belong to this process, so
+// emitting spans on it matches the process topology. Named via a
+// `process_name` metadata event below so Perfetto labels the row
+// "gradle" rather than showing a bare number.
+def gradlePid = ProcessHandle.current().pid()
+def gradleTid = 1
+
+def events = Collections.synchronizedList([
+    [
+        name: 'process_name',
+        ph: 'M',
+        pid: gradlePid,
+        args: [name: 'gradle'],
+    ],
+    [
+        name: 'thread_name',
+        ph: 'M',
+        pid: gradlePid,
+        tid: gradleTid,
+        args: [name: 'gradle tasks'],
+    ],
+])
+def firstTaskFlowEmitted = new java.util.concurrent.atomic.AtomicBoolean(false)
+def startTimesMicros = Collections.synchronizedMap([:])
+
+gradle.addListener(new TaskExecutionListener() {
+    @Override
+    void beforeExecute(Task task) {
+        startTimesMicros[task.path] = System.currentTimeMillis() * 1000L
+    }
+
+    @Override
+    void afterExecute(Task task, TaskState state) {
+        def start = startTimesMicros.remove(task.path)
+        if (start == null) return
+        def end = System.currentTimeMillis() * 1000L
+        def dur = Math.max(0L, end - start)
+        // Classify the task path into a small set of "kinds" so downstream
+        // summarizers can bucket without retaining names. Match against the
+        // task's simple name (last colon segment) so plugin names like
+        // `:package_info_plus:...` don't accidentally trigger the `packaging`
+        // bucket.
+        //
+        // The kind strings below are a wire-format contract with
+        // shorebird_cli (which buckets its summary by these values).
+        // KEEP IN SYNC with the `GradleTaskKind` enum in the
+        // `shorebird_build_trace` package; adding a new kind means
+        // landing the matching enum value there AND teaching
+        // shorebird_cli to bucket it, otherwise it silently falls into
+        // `other`.
+        def path = task.path
+        def lastColon = path.lastIndexOf(':')
+        def simpleName = (lastColon >= 0 ? path.substring(lastColon + 1) : path).toLowerCase()
+
+        // Order matters: the first regex that matches wins. `kotlin_compile`
+        // must precede `java_compile` (both match `compile*`). `java_compile`
+        // must precede the `scaffold` bucket's `prepare*` because AGP's
+        // javaPreCompileRelease is scaffolding-shaped but semantically javac.
+        // `flutter_gradle_plugin` must precede `packaging` so tasks like
+        // `packageFlutterBuild` don't fall through to the `package*` bucket.
+        def kindRules = [
+            [~/^compile.*kotlin.*/,                                   'kotlin_compile'],
+            [~/(^compile.*(java|jni).*|.*precompile.*)/,              'java_compile'],
+            [~/.*aidl.*/,                                             'aidl'],
+            [~/(^minify.*|.*r8.*)/,                                   'r8_minify'],
+            [~/.*dex.*/,                                              'dex'],
+            [~/^lint.*/,                                              'lint'],
+            [~/(.*jnilibs.*|.*nativelibs.*|.*link.*native.*)/,        'native_link'],
+            [~/.*(processresources|mergeresources|mergemanifest|rfile|parserelease|mergerelease|generaterelease).*/, 'resources'],
+            [~/(^compileflutter.*|.*flutterbuild.*|^flutter.*)/,      'flutter_gradle_plugin'],
+            [~/^package.*/,                                           'packaging'],
+            [~/.*bundle.*/,                                           'bundle'],
+            [~/.*transform.*/,                                        'transform'],
+            // Catch-all for Gradle's per-plugin / per-variant scaffolding
+            // (metadata files, proguard rule export, pre-/post-compile
+            // bookkeeping). Individually small but the long tail adds up on
+            // plugin-heavy apps.
+            [~/(.*aarmetadata.*|.*proguard.*|.*validate.*|^check.*|^prepare.*|^generate.*|^copy.*)/, 'gradle_scaffold'],
+        ]
+        def kind = kindRules.find { simpleName ==~ it[0] }?.getAt(1) ?: 'other'
+
+        // The task "owner" is the first colon-separated segment. For
+        // subproject tasks this is typically the plugin name (e.g.
+        // `:camera_android`). Kept for local debug — the privacy-safe
+        // summary that Shorebird writes aggregates this out.
+        def owner = path.startsWith(':') ? path.substring(1).split(':')[0] : ''
+
+        // Emit the flow-end event on the first task, connecting back to
+        // flutter_tool's "gradle <task>" span. Atomic so we emit at most
+        // one across concurrent task callbacks.
+        if (gradleFlowId != null && firstTaskFlowEmitted.compareAndSet(false, true)) {
+            events.add([
+                ph: 'f',
+                name: 'spawn',
+                cat: 'flow',
+                id: gradleFlowId,
+                ts: start,
+                pid: gradlePid,
+                tid: gradleTid,
+                bp: 'e',
+            ])
+        }
+        events.add([
+            name: path,
+            cat: 'gradle_task',
+            ph: 'X',
+            ts: start,
+            dur: dur,
+            pid: gradlePid,
+            tid: gradleTid,
+            args: [
+                kind: kind,
+                owner: owner,
+                skipped: state.skipped,
+                upToDate: state.upToDate,
+                fromCache: state.skipMessage == 'FROM-CACHE',
+            ],
+        ])
+    }
+})
+
+gradle.buildFinished {
+    def f = new File(traceFilePath)
+    f.parentFile?.mkdirs()
+    f.text = JsonOutput.toJson(events)
+}

@@ -44,6 +44,7 @@ class BuildInfo {
     List<String>? dartExperiments,
     required this.treeShakeIcons,
     this.performanceMeasurementFile,
+    this.shorebirdTraceFilePath,
     required this.packageConfigPath,
     this.codeSizeDirectory,
     this.androidGradleDaemon = true,
@@ -178,6 +179,12 @@ class BuildInfo {
   /// This is not considered a build input and will not force assemble to
   /// rerun tasks.
   final String? performanceMeasurementFile;
+
+  /// Path to the Shorebird build-trace output file. When non-null, the
+  /// Shorebird-specific build-trace plumbing emits a Chrome Trace Event
+  /// Format JSON file here. Named `shorebird` to keep the fork's
+  /// surface area visibly distinct from upstream Flutter.
+  final String? shorebirdTraceFilePath;
 
   /// If provided, an output directory where one or more v8-style heap snapshots
   /// will be written for code size profiling.
