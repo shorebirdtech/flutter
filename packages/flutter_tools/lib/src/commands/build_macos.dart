@@ -18,6 +18,7 @@ class BuildMacosCommand extends BuildSubCommand {
     : super(verboseHelp: verboseHelp) {
     addCommonDesktopBuildOptions(verboseHelp: verboseHelp);
     usesFlavorOption();
+    usesShorebirdTraceOption(hide: !verboseHelp);
     argParser.addFlag(
       'config-only',
       help:
