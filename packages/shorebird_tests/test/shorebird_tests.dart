@@ -23,10 +23,16 @@ File get _flutterBinaryFile => File(
       ),
     );
 
+/// Whether to print line-by-line subprocess output.
+///
+/// Set the `VERBOSE` environment variable to enable streaming output,
+/// which is useful for debugging timeouts in CI.
+final bool _verbose = Platform.environment.containsKey('VERBOSE');
+
 /// Runs a flutter command using the correct binary ([_flutterBinaryFile]) with the given arguments.
 ///
-/// Streams stdout and stderr to the test output in real time so that
-/// CI logs show progress even if the process hangs or times out.
+/// Streams stdout and stderr to the test output in real time when [_verbose]
+/// is true, so CI logs show progress even if the process hangs or times out.
 Future<ProcessResult> _runFlutterCommand(
   List<String> arguments, {
   required Directory workingDirectory,
@@ -51,19 +57,22 @@ Future<ProcessResult> _runFlutterCommand(
 
   process.stdout.transform(utf8.decoder).listen((String data) {
     stdoutBuffer.write(data);
-    // Print each line with a prefix so it's easy to identify in CI logs.
-    for (final String line in data.split('\n')) {
-      if (line.isNotEmpty) {
-        print('  [$command] $line');
+    if (_verbose) {
+      for (final String line in data.split('\n')) {
+        if (line.isNotEmpty) {
+          print('  [$command] $line');
+        }
       }
     }
   });
 
   process.stderr.transform(utf8.decoder).listen((String data) {
     stderrBuffer.write(data);
-    for (final String line in data.split('\n')) {
-      if (line.isNotEmpty) {
-        print('  [$command] (stderr) $line');
+    if (_verbose) {
+      for (final String line in data.split('\n')) {
+        if (line.isNotEmpty) {
+          print('  [$command] (stderr) $line');
+        }
       }
     }
   });
@@ -72,6 +81,10 @@ Future<ProcessResult> _runFlutterCommand(
   stopwatch.stop();
   print('[$command] completed in ${stopwatch.elapsed} '
       '(exit code $exitCode)');
+  if (exitCode != 0 && !_verbose) {
+    print('[$command] stdout:\n$stdoutBuffer');
+    print('[$command] stderr:\n$stderrBuffer');
+  }
 
   return ProcessResult(
     process.pid,
