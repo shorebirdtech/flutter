@@ -138,3 +138,6 @@ jobs:
         # Quick sanity check that Android builds work on macOS too
         run: dart test test/android_test.dart --name "can build an apk"
         working-directory: packages/shorebird_tests
+        env:
+          # Enables streaming subprocess output for debugging timeouts.
+          VERBOSE: "1"
