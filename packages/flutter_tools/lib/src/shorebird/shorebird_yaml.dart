@@ -72,5 +72,9 @@ Map<String, dynamic> compileShorebirdYaml(
   if (shorebirdPublicKeyEnvVar != null) {
     compiled['patch_public_key'] = shorebirdPublicKeyEnvVar;
   }
+  final String? moduleVersion = environment['SHOREBIRD_MODULE_VERSION'];
+  if (moduleVersion != null) {
+    compiled['module_version'] = moduleVersion;
+  }
   return compiled;
 }
