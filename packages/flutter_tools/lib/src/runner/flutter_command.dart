@@ -1163,6 +1163,7 @@ abstract class FlutterCommand extends Command<void> {
     usesDartDefineOption();
     usesExtraDartFlagOptions(verboseHelp: verboseHelp);
     usesPubOption();
+    usesShorebirdTraceOption(hide: !verboseHelp);
     usesTargetOption();
     usesTrackWidgetCreation(verboseHelp: verboseHelp);
     usesBuildNumberOption();
