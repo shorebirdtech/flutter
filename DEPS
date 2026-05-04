@@ -19,7 +19,7 @@ vars = {
   "dart_sdk_revision": "b65ce89c8057d6880e00693a7b0ecd7b9e5f61ca",
   "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
   "updater_git": "https://github.com/shorebirdtech/updater.git",
-  "updater_rev": "8691c8f60e69f8eb1f35361f4a22e8c9a7fdf93c",
+  "updater_rev": "34509fca3c65388ebc84cfaea8f38733ce41f41a",
 
   # Do not download the Emscripten SDK by default.
   # This prevents us from downloading the Emscripten toolchain for builds
@@ -230,10 +230,10 @@ deps = {
   Var('chromium_git') + '/chromium/tools/depot_tools.git' + '@' + '580b4ff3f5cd0dcaa2eacda28cefe0f45320e8f7',
 
   'engine/src/flutter/third_party/rapidjson':
-   Var('flutter_git') + '/third_party/rapidjson' + '@' + '47253cab97e9cfe99dbd6b90836fc11589d7d802',
+   Var('flutter_git') + '/third_party/rapidjson' + '@' + 'ef3564c5c8824989393b87df25355baf35ff544b',
 
   'engine/src/flutter/third_party/harfbuzz':
-   Var('flutter_git') + '/third_party/harfbuzz' + '@' + '49844c32a7a3f6be371355a1213c952a3f4a44e7',
+   Var('flutter_git') + '/third_party/harfbuzz' + '@' + 'ea6a172f84f2cbcfed803b5ae71064c7afb6b5c2',
 
   'engine/src/flutter/third_party/libcxx':
    Var('llvm_git') + '/llvm-project/libcxx' + '@' + 'bd557f6f764d1e40b62528a13b124ce740624f8f',
@@ -245,7 +245,7 @@ deps = {
    Var('llvm_git') + '/llvm-project/libc' + '@' + '5af39a19a1ad51ce93972cdab206dcd3ff9b6afa',
 
   'engine/src/flutter/third_party/glfw':
-   Var('flutter_git') + '/third_party/glfw' + '@' + '9352d8fe93cd443be18157abe81f16500549aec0',
+   Var('flutter_git') + '/third_party/glfw' + '@' + 'dd8a678a66f1967372e5a5e3deac41ebf65ee127',
 
   'engine/src/flutter/third_party/shaderc':
    Var('flutter_git') + '/third_party/shaderc' + '@' + '70b1130380fcbf1d1e9719ee78ba7202a5161424',
@@ -302,7 +302,7 @@ deps = {
    Var('chromium_git') + '/external/github.com/google/benchmark' + '@' + '431abd149fd76a072f821913c0340137cc755f36',
 
   'engine/src/flutter/third_party/googletest':
-   Var('chromium_git') + '/external/github.com/google/googletest' + '@' + 'e9907112b47255d50b4d343e7e2160bce8dc85d1',
+   Var('chromium_git') + '/external/github.com/google/googletest' + '@' + '7f036c5563af7d0329f20e8bb42effb04629f0c0',
 
   'engine/src/flutter/third_party/re2':
    Var('chromium_git') + '/external/github.com/google/re2' + '@' + 'c84a140c93352cdabbfb547c531be34515b12228',
@@ -331,7 +331,7 @@ deps = {
    {'dep_type': 'cipd', 'packages': [{'package': 'dart/third_party/flutter/devtools', 'version': 'git_revision:85f945ac99379d64d4df6f67d9b011e4cc418e7e'}]},
 
   'engine/src/flutter/third_party/dart/third_party/perfetto/src':
-   Var('chromium_git') + '/external/github.com/google/perfetto' + '@' + Var('dart_perfetto_rev'),
+   Var('android_git') + '/platform/external/perfetto' + '@' + Var('dart_perfetto_rev'),
 
   'engine/src/flutter/third_party/dart/third_party/pkg/core':
    Var('dart_git') + '/core.git' + '@' + Var('dart_core_rev'),
@@ -527,7 +527,7 @@ deps = {
    Var('skia_git') + '/external/github.com/google/wuffs-mirror-release-c.git' + '@' + '600cd96cf47788ee3a74b40a6028b035c9fd6a61',
 
   'engine/src/flutter/third_party/zlib':
-   Var('chromium_git') + '/chromium/src/third_party/zlib.git' + '@' + '7eda07b1e067ef3fd7eea0419c88b5af45c9a776',
+   Var('chromium_git') + '/chromium/src/third_party/zlib.git' + '@' + '7d77fb7fd66d8a5640618ad32c71fdeb7d3e02df',
 
   'engine/src/flutter/third_party/cpu_features/src':
    Var('chromium_git') + '/external/github.com/google/cpu_features.git' + '@' + '936b9ab5515dead115606559502e3864958f7f6e',
@@ -588,7 +588,7 @@ deps = {
   Var('dart_git') + '/external/github.com/google/vector_math.dart.git' + '@' + '0a5fd95449083d404df9768bc1b321b88a7d2eef', # 2.1.0
 
   'engine/src/flutter/third_party/imgui':
-  Var('flutter_git') + '/third_party/imgui.git' + '@' + '2a1b69f05748ad909f03acf4533447cac1331611',
+  Var('flutter_git') + '/third_party/imgui.git' + '@' + '3ea0fad204e994d669f79ed29dcaf61cd5cb571d',
 
   'engine/src/flutter/third_party/json':
   Var('flutter_git') + '/third_party/json.git' + '@' + '17d9eacd248f58b73f4d1be518ef649fe2295642',
