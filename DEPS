@@ -20,7 +20,7 @@ vars = {
   "dart_sdk_revision": "b65ce89c8057d6880e00693a7b0ecd7b9e5f61ca",
   "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
   "updater_git": "https://github.com/shorebirdtech/updater.git",
-  "updater_rev": "8691c8f60e69f8eb1f35361f4a22e8c9a7fdf93c",
+  "updater_rev": "34509fca3c65388ebc84cfaea8f38733ce41f41a",
 
   # WARNING: DO NOT EDIT canvaskit_cipd_instance MANUALLY
   # See `lib/web_ui/README.md` for how to roll CanvasKit to a new version.
@@ -48,7 +48,7 @@ vars = {
   # updates to Clang Tidy will not turn the tree red.
   #
   # See https://github.com/flutter/flutter/wiki/Engine-pre‐submits-and-post‐submits#post-submit
-  'clang_version': 'git_revision:80743bd43fd5b38fedc503308e7a652e23d3ec93',
+  'clang_version': 'git_revision:8c7a2ce01a77c96028fe2c8566f65c45ad9408d3',
 
   'reclient_version': 're_client_version:0.185.0.db415f21-gomaip',
 
@@ -240,10 +240,10 @@ deps = {
   Var('chromium_git') + '/chromium/tools/depot_tools.git' + '@' + '580b4ff3f5cd0dcaa2eacda28cefe0f45320e8f7',
 
   'engine/src/flutter/third_party/rapidjson':
-   Var('flutter_git') + '/third_party/rapidjson' + '@' + '47253cab97e9cfe99dbd6b90836fc11589d7d802',
+   Var('flutter_git') + '/third_party/rapidjson' + '@' + 'ef3564c5c8824989393b87df25355baf35ff544b',
 
   'engine/src/flutter/third_party/harfbuzz':
-   Var('flutter_git') + '/third_party/harfbuzz' + '@' + '49844c32a7a3f6be371355a1213c952a3f4a44e7',
+   Var('flutter_git') + '/third_party/harfbuzz' + '@' + 'ea6a172f84f2cbcfed803b5ae71064c7afb6b5c2',
 
   'engine/src/flutter/third_party/libcxx':
    Var('llvm_git') + '/llvm-project/libcxx' + '@' + 'bd557f6f764d1e40b62528a13b124ce740624f8f',
@@ -255,10 +255,10 @@ deps = {
    Var('llvm_git') + '/llvm-project/libc' + '@' + '5af39a19a1ad51ce93972cdab206dcd3ff9b6afa',
 
   'engine/src/flutter/third_party/glfw':
-   Var('flutter_git') + '/third_party/glfw' + '@' + '9352d8fe93cd443be18157abe81f16500549aec0',
+   Var('flutter_git') + '/third_party/glfw' + '@' + 'dd8a678a66f1967372e5a5e3deac41ebf65ee127',
 
   'engine/src/flutter/third_party/shaderc':
-   Var('chromium_git') + '/external/github.com/google/shaderc' + '@' + 'd15277d6bc180f6a0b8b601f0cab2bbcaac9b4d5',
+   Var('chromium_git') + '/external/github.com/google/shaderc' + '@' + '37e25539ce199ecaf19fb7f7d27818716d36686d',
 
   'engine/src/flutter/third_party/vulkan-deps':
    Var('chromium_git') + '/vulkan-deps' + '@' + 'a9e2ca3b57aba86a22a2df1b84bf12f8cc98806e',
@@ -276,7 +276,7 @@ deps = {
    Var('chromium_git') + '/external/github.com/google/benchmark' + '@' + '431abd149fd76a072f821913c0340137cc755f36',
 
   'engine/src/flutter/third_party/googletest':
-   Var('chromium_git') + '/external/github.com/google/googletest' + '@' + 'e9907112b47255d50b4d343e7e2160bce8dc85d1',
+   Var('chromium_git') + '/external/github.com/google/googletest' + '@' + '7f036c5563af7d0329f20e8bb42effb04629f0c0',
 
   'engine/src/flutter/third_party/re2':
    Var('chromium_git') + '/external/github.com/google/re2' + '@' + 'c84a140c93352cdabbfb547c531be34515b12228',
@@ -305,7 +305,7 @@ deps = {
    {'dep_type': 'cipd', 'packages': [{'package': 'dart/third_party/flutter/devtools', 'version': 'git_revision:12d595649f189f1896722623f72599077f476848'}]},
 
   'engine/src/flutter/third_party/dart/third_party/perfetto/src':
-   Var('chromium_git') + '/external/github.com/google/perfetto' + '@' + Var('dart_perfetto_rev'),
+   Var('android_git') + '/platform/external/perfetto' + '@' + Var('dart_perfetto_rev'),
 
   'engine/src/flutter/third_party/dart/third_party/pkg/core':
    Var('dart_git') + '/core.git' + '@' + Var('dart_core_rev'),
@@ -477,7 +477,7 @@ deps = {
    Var('chromium_git') + '/external/github.com/libexpat/libexpat.git' + '@' + '8e49998f003d693213b538ef765814c7d21abada',
 
   'engine/src/flutter/third_party/freetype2':
-   Var('flutter_git') + '/third_party/freetype2' + '@' + 'be4bcb57914154fc1b9e2900bf8e4b516057e2b8',
+   Var('flutter_git') + '/third_party/freetype2' + '@' + 'bfc3453fdc85d87b45c896f68bf2e49ebdaeef0a',
 
   'engine/src/flutter/third_party/skia':
    Var('skia_git') + '/skia.git' + '@' +  Var('skia_revision'),
@@ -492,7 +492,7 @@ deps = {
    Var('flutter_git') + '/third_party/libjpeg-turbo' + '@' + '0fb821f3b2e570b2783a94ccd9a2fb1f4916ae9f',
 
   'engine/src/flutter/third_party/libpng':
-   Var('flutter_git') + '/third_party/libpng' + '@' + 'b6004397d2ab98f0250376d9b357337b7f422d13',
+   Var('flutter_git') + '/third_party/libpng' + '@' + 'f139fd5d80944f5453b079672e50f32ca98ef076',
 
   'engine/src/flutter/third_party/libwebp':
    Var('chromium_git') + '/webm/libwebp.git' + '@' + 'ca332209cb5567c9b249c86788cb2dbf8847e760', # 1.3.2
@@ -501,7 +501,7 @@ deps = {
    Var('skia_git') + '/external/github.com/google/wuffs-mirror-release-c.git' + '@' + '600cd96cf47788ee3a74b40a6028b035c9fd6a61',
 
   'engine/src/flutter/third_party/zlib':
-   Var('chromium_git') + '/chromium/src/third_party/zlib.git' + '@' + '7eda07b1e067ef3fd7eea0419c88b5af45c9a776',
+   Var('chromium_git') + '/chromium/src/third_party/zlib.git' + '@' + '7d77fb7fd66d8a5640618ad32c71fdeb7d3e02df',
 
   'engine/src/flutter/third_party/cpu_features/src':
    Var('chromium_git') + '/external/github.com/google/cpu_features.git' + '@' + '936b9ab5515dead115606559502e3864958f7f6e',
@@ -522,7 +522,7 @@ deps = {
   Var('swiftshader_git') + '/SwiftShader.git' + '@' + '794b0cfce1d828d187637e6d932bae484fbe0976',
 
   'engine/src/flutter/third_party/angle':
-  Var('flutter_git') + '/third_party/angle' + '@' + '84027aca9b71c9ba335bd000dad1107b8810a511',
+  Var('flutter_git') + '/third_party/angle' + '@' + '6950c6c99fa1a2d653922871ede6679d74840289',
 
   'engine/src/flutter/third_party/vulkan_memory_allocator':
   Var('chromium_git') + '/external/github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator' + '@' + 'c788c52156f3ef7bc7ab769cb03c110a53ac8fcb',
@@ -562,7 +562,7 @@ deps = {
   Var('dart_git') + '/external/github.com/google/vector_math.dart.git' + '@' + '0a5fd95449083d404df9768bc1b321b88a7d2eef', # 2.1.0
 
   'engine/src/flutter/third_party/imgui':
-  Var('flutter_git') + '/third_party/imgui.git' + '@' + '2a1b69f05748ad909f03acf4533447cac1331611',
+  Var('flutter_git') + '/third_party/imgui.git' + '@' + '3ea0fad204e994d669f79ed29dcaf61cd5cb571d',
 
   'engine/src/flutter/third_party/json':
   Var('flutter_git') + '/third_party/json.git' + '@' + '17d9eacd248f58b73f4d1be518ef649fe2295642',
@@ -772,7 +772,7 @@ deps = {
     'packages': [
       {
         'package': 'flutter_internal/rbe/reclient_cfgs',
-        'version': '0vARzGeIZgIhW7zVfWuqIPQ_HXMLDccjAstykWZKjaEC',
+        'version': 'LNMZdvF2Y86Dq05IWthtVJ_PswIFSRiywIHrkfHhelUC',
       }
     ],
     'condition': 'use_rbe',
