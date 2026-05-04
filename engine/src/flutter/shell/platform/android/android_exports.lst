@@ -12,13 +12,9 @@
     InternalFlutterGpu*;
     kInternalFlutterGpu*;
     shorebird_init;
-    shorebird_active_path;
-    shorebird_active_patch_number;
     shorebird_free_string;
     shorebird_free_update_result;
     shorebird_check_for_downloadable_update;
-    shorebird_check_for_update;
-    shorebird_update;
     shorebird_update_with_result;
     shorebird_next_boot_patch_number;
     shorebird_current_boot_patch_number;
