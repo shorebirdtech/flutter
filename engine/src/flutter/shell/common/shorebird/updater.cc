@@ -7,7 +7,7 @@
 #include "flutter/fml/logging.h"
 
 #if SHOREBIRD_PLATFORM_SUPPORTED
-#include "third_party/updater/library/include/updater.h"
+#include "third_party/updater/library/include/updater_engine.h"
 #endif
 
 namespace flutter {
