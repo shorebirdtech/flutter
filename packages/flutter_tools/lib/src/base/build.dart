@@ -60,24 +60,24 @@ class GenSnapshot {
 
   /// Returns the path to analyze_snapshot if it exists alongside gen_snapshot.
   String? getAnalyzeSnapshotPath(SnapshotType snapshotType, DarwinArch? darwinArch) {
-    Artifact genSnapshotArtifact;
+    final Artifact genSnapshotArtifact;
+    final String analyzeName;
     if (snapshotType.platform == TargetPlatform.ios ||
         snapshotType.platform == TargetPlatform.darwin) {
-      genSnapshotArtifact = darwinArch == DarwinArch.arm64
-          ? Artifact.genSnapshotArm64
-          : Artifact.genSnapshotX64;
+      if (darwinArch == DarwinArch.arm64) {
+        genSnapshotArtifact = Artifact.genSnapshotArm64;
+        analyzeName = 'analyze_snapshot_arm64';
+      } else {
+        genSnapshotArtifact = Artifact.genSnapshotX64;
+        analyzeName = 'analyze_snapshot_x64';
+      }
     } else {
       genSnapshotArtifact = Artifact.genSnapshot;
+      analyzeName = 'analyze_snapshot';
     }
-    final genSnapshotPath = getSnapshotterPath(snapshotType, genSnapshotArtifact);
-    // analyze_snapshot is typically in the same directory as gen_snapshot,
-    // named 'analyze_snapshot' or 'analyze_snapshot_arm64'.
-    final dir = _fileSystem.path.dirname(genSnapshotPath);
-    for (final name in ['analyze_snapshot_arm64', 'analyze_snapshot']) {
-      final path = _fileSystem.path.join(dir, name);
-      if (_fileSystem.file(path).existsSync()) return path;
-    }
-    return null;
+    final String genSnapshotPath = getSnapshotterPath(snapshotType, genSnapshotArtifact);
+    final String path = _fileSystem.path.join(_fileSystem.path.dirname(genSnapshotPath), analyzeName);
+    return _fileSystem.file(path).existsSync() ? path : null;
   }
 
   final FileSystem _fileSystem;
@@ -115,7 +115,6 @@ class GenSnapshot {
 
 class AOTSnapshotter {
   AOTSnapshotter({
-    this.reportTimings = false,
     required Logger logger,
     required FileSystem fileSystem,
     required Xcode xcode,
@@ -137,11 +136,6 @@ class AOTSnapshotter {
   final Xcode _xcode;
   final ProcessUtils _processUtils;
   final GenSnapshot _genSnapshot;
-
-  /// If true then AOTSnapshotter would report timings for individual building
-  /// steps (Dart front-end parsing and snapshot generation) in a stable
-  /// machine readable form.
-  final bool reportTimings;
 
   /// Builds an architecture-specific ahead-of-time compiled snapshot of the specified script.
   Future<int> build({
@@ -267,78 +261,19 @@ class AOTSnapshotter {
 
     final snapshotType = SnapshotType(platform, buildMode);
 
-    // DD 2-pass build: if SHOREBIRD_DD_MAX_BYTES is set, build an ELF
-    // for analysis, compute the DD table, then rebuild with DD.
-    final ddMaxBytesStr = const String.fromEnvironment('SHOREBIRD_DD_MAX_BYTES',
-        defaultValue: '').isEmpty
-        ? Platform.environment['SHOREBIRD_DD_MAX_BYTES']
-        : null;
-    final ddMaxBytes = int.tryParse(ddMaxBytesStr ?? '') ?? 0;
-
+    final int ddMaxBytes = _readDdMaxBytes();
     if (ddMaxBytes > 0 && usesLinker) {
-      _logger.printTrace('DD 2-pass build: dd_max_bytes=$ddMaxBytes');
-
-      // Pass 1: Build ELF for analysis + DD identity file.
-      final elfForAnalysis = _fileSystem.path.join(outputDir.parent.path, 'App_dd_analysis.so');
-      final ddIdentityPath = _fileSystem.path.join(outputDir.parent.path, 'App.dd_identity.link');
-      final ddTablePath = _fileSystem.path.join(outputDir.parent.path, 'App.dd.link');
-      final ddCallerLinksPath = _fileSystem.path.join(outputDir.parent.path, 'App.dd_callers.link');
-      final ddSlotMappingPath = _fileSystem.path.join(outputDir.parent.path, 'App.dd_slots.link');
-
-      // Build elfArgs from genSnapshotArgs, replacing assembly with ELF
-      // and adding DD identity export. mainPath must remain at the end.
-      final elfArgs = <String>[
-        ...genSnapshotArgs.where((a) =>
-            a != mainPath &&
-            !a.startsWith('--snapshot_kind=') &&
-            !a.startsWith('--assembly=') &&
-            !a.startsWith('--elf=')),
-        '--snapshot_kind=app-aot-elf',
-        '--elf=$elfForAnalysis',
-        '--print_dd_function_identity_to=$ddIdentityPath',
-        mainPath,
-      ];
-      final int pass1Exit = await _genSnapshot.run(
+      final int pass1Exit = await _runDdAnalysisPass(
         snapshotType: snapshotType,
-        additionalArgs: elfArgs,
         darwinArch: darwinArch,
+        outputDir: outputDir,
+        baseGenSnapshotArgs: genSnapshotArgs,
+        mainPath: mainPath,
+        ddMaxBytes: ddMaxBytes,
       );
       if (pass1Exit != 0) {
-        _logger.printError('DD pass 1 (ELF for analysis) failed with exit code $pass1Exit');
         return pass1Exit;
       }
-
-      // Run analyze_snapshot to compute DD table + caller links.
-      final analyzeSnapshotPath = _genSnapshot.getAnalyzeSnapshotPath(snapshotType, darwinArch);
-      if (analyzeSnapshotPath != null) {
-        await _processUtils.stream(<String>[
-          analyzeSnapshotPath,
-          '--compute_dd_table=$ddTablePath',
-          '--dd_caller_links=$ddCallerLinksPath',
-          '--dd_max_bytes=$ddMaxBytes',
-          elfForAnalysis,
-        ]);
-
-        // Compute DD slot mapping.
-        await _processUtils.stream(<String>[
-          analyzeSnapshotPath,
-          '--compute_dd_slot_mapping=$ddSlotMappingPath',
-          '--dd_table_data=$ddTablePath',
-          '--dd_caller_links=$ddCallerLinksPath',
-          '--dd_function_identity=$ddIdentityPath',
-          elfForAnalysis,
-        ]);
-
-        // Add DD slot mapping to gen_snapshot args (before mainPath, which is last).
-        if (_fileSystem.file(ddSlotMappingPath).existsSync()) {
-          final mainPathIndex = genSnapshotArgs.indexOf(mainPath);
-          genSnapshotArgs.insert(mainPathIndex, '--dd_slot_mapping=$ddSlotMappingPath');
-          _logger.printTrace('DD 2-pass build: added --dd_slot_mapping');
-        }
-      }
-
-      // Clean up temporary ELF.
-      _fileSystem.file(elfForAnalysis).deleteSync();
     }
 
     final int genSnapshotExitCode = await _genSnapshot.run(
@@ -367,6 +302,91 @@ class AOTSnapshotter {
     } else {
       return 0;
     }
+  }
+
+  /// Reads the SHOREBIRD_DD_MAX_BYTES env var (preferring `dart-define` over
+  /// the process environment). Returns 0 if unset, malformed, or non-positive,
+  /// which signals "no DD pass."
+  int _readDdMaxBytes() {
+    const fromDefine = String.fromEnvironment('SHOREBIRD_DD_MAX_BYTES');
+    final String? raw = fromDefine.isNotEmpty ? fromDefine : Platform.environment['SHOREBIRD_DD_MAX_BYTES'];
+    return int.tryParse(raw ?? '') ?? 0;
+  }
+
+  /// Runs the DD analysis pass: gen_snapshot → ELF + DD identity, then
+  /// analyze_snapshot to compute the DD table, caller links, and slot mapping.
+  /// On success, mutates [baseGenSnapshotArgs] to add `--dd_slot_mapping=...`
+  /// before [mainPath] so the subsequent gen_snapshot run picks it up.
+  /// Returns the gen_snapshot pass-1 exit code (0 on success).
+  Future<int> _runDdAnalysisPass({
+    required SnapshotType snapshotType,
+    required DarwinArch? darwinArch,
+    required Directory outputDir,
+    required List<String> baseGenSnapshotArgs,
+    required String mainPath,
+    required int ddMaxBytes,
+  }) async {
+    _logger.printTrace('DD 2-pass build: dd_max_bytes=$ddMaxBytes');
+
+    String linkPath(String name) => _fileSystem.path.join(outputDir.parent.path, name);
+    final String elfForAnalysis = linkPath('App_dd_analysis.so');
+    final String ddIdentityPath = linkPath('App.dd_identity.link');
+    final String ddTablePath = linkPath('App.dd.link');
+    final String ddCallerLinksPath = linkPath('App.dd_callers.link');
+    final String ddSlotMappingPath = linkPath('App.dd_slots.link');
+
+    // Pass 1: build ELF for analysis + DD identity. Strip the existing snapshot
+    // kind/output args from the base set; mainPath must remain at the end.
+    final elfArgs = <String>[
+      ...baseGenSnapshotArgs.where((String a) =>
+          a != mainPath &&
+          !a.startsWith('--snapshot_kind=') &&
+          !a.startsWith('--assembly=') &&
+          !a.startsWith('--elf=')),
+      '--snapshot_kind=app-aot-elf',
+      '--elf=$elfForAnalysis',
+      '--print_dd_function_identity_to=$ddIdentityPath',
+      mainPath,
+    ];
+    final int pass1Exit = await _genSnapshot.run(
+      snapshotType: snapshotType,
+      additionalArgs: elfArgs,
+      darwinArch: darwinArch,
+    );
+    if (pass1Exit != 0) {
+      _logger.printError('DD pass 1 (ELF for analysis) failed with exit code $pass1Exit');
+      return pass1Exit;
+    }
+
+    final String? analyzeSnapshotPath = _genSnapshot.getAnalyzeSnapshotPath(snapshotType, darwinArch);
+    if (analyzeSnapshotPath != null) {
+      await _processUtils.stream(<String>[
+        analyzeSnapshotPath,
+        '--compute_dd_table=$ddTablePath',
+        '--dd_caller_links=$ddCallerLinksPath',
+        '--dd_max_bytes=$ddMaxBytes',
+        elfForAnalysis,
+      ]);
+      await _processUtils.stream(<String>[
+        analyzeSnapshotPath,
+        '--compute_dd_slot_mapping=$ddSlotMappingPath',
+        '--dd_table_data=$ddTablePath',
+        '--dd_caller_links=$ddCallerLinksPath',
+        '--dd_function_identity=$ddIdentityPath',
+        elfForAnalysis,
+      ]);
+
+      if (_fileSystem.file(ddSlotMappingPath).existsSync()) {
+        baseGenSnapshotArgs.insert(
+          baseGenSnapshotArgs.indexOf(mainPath),
+          '--dd_slot_mapping=$ddSlotMappingPath',
+        );
+        _logger.printTrace('DD 2-pass build: added --dd_slot_mapping');
+      }
+    }
+
+    _fileSystem.file(elfForAnalysis).deleteSync();
+    return 0;
   }
 
   /// Builds an iOS or macOS framework at [outputPath]/App.framework from the assembly
