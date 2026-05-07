@@ -86,7 +86,8 @@ if (shorebird_updater_supported) {
       "$shorebird_updater_dir/Cargo.lock",
       "$shorebird_updater_dir/library/Cargo.toml",
       "$shorebird_updater_dir/library/build.rs",
-      "$shorebird_updater_dir/library/cbindgen.toml",
+      "$shorebird_updater_dir/library/cbindgen_dart.toml",
+      "$shorebird_updater_dir/library/cbindgen_engine.toml",
       "$shorebird_updater_dir/library/.cargo/config.toml",
     ]
     inputs += shorebird_updater_rs_sources
