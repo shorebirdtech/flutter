@@ -58,7 +58,16 @@ class GenSnapshot {
     '         See dartbug.com/30524 for more information.',
   };
 
-  /// Returns the path to analyze_snapshot if it exists alongside gen_snapshot.
+  /// Returns the path to an analyze_snapshot binary that matches gen_snapshot's
+  /// SDK version, or null if no matching binary can be found.
+  ///
+  /// gen_snapshot and analyze_snapshot share a snapshot-format hash baked into
+  /// each binary; if the hashes disagree, analyze_snapshot rejects gen_snapshot's
+  /// output with "Wrong full snapshot version" at parse time. Pre-existing binary
+  /// layouts (e.g. an older `universal/analyze_snapshot_<arch>` left behind from
+  /// a previous BUILD.gn revision) can shadow the freshly built one. Resolve by
+  /// probing every candidate location and returning only the one whose
+  /// `--sdk_version` matches gen_snapshot's `--version` output.
   String? getAnalyzeSnapshotPath(SnapshotType snapshotType, DarwinArch? darwinArch) {
     final Artifact genSnapshotArtifact;
     final String analyzeName;
@@ -76,19 +85,44 @@ class GenSnapshot {
       analyzeName = 'analyze_snapshot';
     }
     final String genSnapshotPath = getSnapshotterPath(snapshotType, genSnapshotArtifact);
+    final String? genVersion = _probeSdkVersion(genSnapshotPath, '--version');
     final String dir = _fileSystem.path.dirname(genSnapshotPath);
     // Cached SDK layout puts analyze_snapshot alongside gen_snapshot. Local
     // engine layout resolves gen_snapshot via .../universal/gen_snapshot_arm64
-    // while analyze_snapshot lives one level up at the build-dir root.
+    // while analyze_snapshot lives one level up at the build-dir root. Probe
+    // both. If we successfully read gen_snapshot's version, accept only a
+    // candidate whose --sdk_version matches; otherwise fall back to the first
+    // existing candidate (better than failing closed when the version probe
+    // itself misbehaves).
     for (final candidate in <String>[
       _fileSystem.path.join(dir, analyzeName),
       _fileSystem.path.join(dir, '..', analyzeName),
     ]) {
-      if (_fileSystem.file(candidate).existsSync()) {
+      if (!_fileSystem.file(candidate).existsSync()) {
+        continue;
+      }
+      if (genVersion == null) {
+        return candidate;
+      }
+      final String? candidateVersion = _probeSdkVersion(candidate, '--sdk_version');
+      if (candidateVersion == genVersion) {
         return candidate;
       }
     }
     return null;
+  }
+
+  /// Runs [binary] with [versionFlag] and returns the trimmed stderr output,
+  /// or null if the binary couldn't be invoked or printed nothing.
+  /// gen_snapshot and analyze_snapshot both write their version line to stderr.
+  String? _probeSdkVersion(String binary, String versionFlag) {
+    try {
+      final RunResult result = _processUtils.runSync(<String>[binary, versionFlag]);
+      final String stderr = result.stderr.trim();
+      return stderr.isEmpty ? null : stderr;
+    } on Exception {
+      return null;
+    }
   }
 
   final FileSystem _fileSystem;
@@ -370,31 +404,66 @@ class AOTSnapshotter {
     }
 
     final String? analyzeSnapshotPath = _genSnapshot.getAnalyzeSnapshotPath(snapshotType, darwinArch);
-    if (analyzeSnapshotPath != null) {
-      await _processUtils.stream(<String>[
-        analyzeSnapshotPath,
-        '--compute_dd_table=$ddTablePath',
-        '--dd_caller_links=$ddCallerLinksPath',
-        '--dd_max_bytes=$ddMaxBytes',
-        elfForAnalysis,
-      ]);
-      await _processUtils.stream(<String>[
-        analyzeSnapshotPath,
-        '--compute_dd_slot_mapping=$ddSlotMappingPath',
-        '--dd_table_data=$ddTablePath',
-        '--dd_caller_links=$ddCallerLinksPath',
-        '--dd_function_identity=$ddIdentityPath',
-        elfForAnalysis,
-      ]);
-
-      if (_fileSystem.file(ddSlotMappingPath).existsSync()) {
-        baseGenSnapshotArgs.insert(
-          baseGenSnapshotArgs.indexOf(mainPath),
-          '--dd_slot_mapping=$ddSlotMappingPath',
-        );
-        _logger.printTrace('DD 2-pass build: added --dd_slot_mapping');
-      }
+    if (analyzeSnapshotPath == null) {
+      _logger.printError(
+        'DD pass: could not find an analyze_snapshot binary whose --sdk_version '
+        'matches gen_snapshot. The release will ship without DD activation; '
+        'patches against it will fall back to on-the-fly DD computation and '
+        'produce a structurally divergent snapshot (devastating link percentage). '
+        'Aborting the build instead.',
+      );
+      _fileSystem.file(elfForAnalysis).deleteSync();
+      return 1;
     }
+
+    final int ddTableExit = await _processUtils.stream(<String>[
+      analyzeSnapshotPath,
+      '--compute_dd_table=$ddTablePath',
+      '--dd_caller_links=$ddCallerLinksPath',
+      '--dd_max_bytes=$ddMaxBytes',
+      elfForAnalysis,
+    ]);
+    if (ddTableExit != 0) {
+      _logger.printError(
+        'DD pass: analyze_snapshot --compute_dd_table failed with exit code '
+        '$ddTableExit. App.dd.link will not be produced and the release would '
+        'ship without DD activation.',
+      );
+      _fileSystem.file(elfForAnalysis).deleteSync();
+      return ddTableExit;
+    }
+
+    final int ddSlotMappingExit = await _processUtils.stream(<String>[
+      analyzeSnapshotPath,
+      '--compute_dd_slot_mapping=$ddSlotMappingPath',
+      '--dd_table_data=$ddTablePath',
+      '--dd_caller_links=$ddCallerLinksPath',
+      '--dd_function_identity=$ddIdentityPath',
+      elfForAnalysis,
+    ]);
+    if (ddSlotMappingExit != 0) {
+      _logger.printError(
+        'DD pass: analyze_snapshot --compute_dd_slot_mapping failed with exit '
+        'code $ddSlotMappingExit. The DD slot mapping will not be available and '
+        'gen_snapshot pass 2 would emit a no-DD snapshot.',
+      );
+      _fileSystem.file(elfForAnalysis).deleteSync();
+      return ddSlotMappingExit;
+    }
+
+    if (!_fileSystem.file(ddSlotMappingPath).existsSync()) {
+      _logger.printError(
+        'DD pass: analyze_snapshot --compute_dd_slot_mapping reported success '
+        'but $ddSlotMappingPath was not produced.',
+      );
+      _fileSystem.file(elfForAnalysis).deleteSync();
+      return 1;
+    }
+    baseGenSnapshotArgs.insert(
+      baseGenSnapshotArgs.indexOf(mainPath),
+      '--dd_slot_mapping=$ddSlotMappingPath',
+    );
+    _logger.printTrace('DD 2-pass build: added --dd_slot_mapping');
 
     _fileSystem.file(elfForAnalysis).deleteSync();
     return 0;
