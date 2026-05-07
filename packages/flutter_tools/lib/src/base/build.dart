@@ -76,8 +76,19 @@ class GenSnapshot {
       analyzeName = 'analyze_snapshot';
     }
     final String genSnapshotPath = getSnapshotterPath(snapshotType, genSnapshotArtifact);
-    final String path = _fileSystem.path.join(_fileSystem.path.dirname(genSnapshotPath), analyzeName);
-    return _fileSystem.file(path).existsSync() ? path : null;
+    final String dir = _fileSystem.path.dirname(genSnapshotPath);
+    // Cached SDK layout puts analyze_snapshot alongside gen_snapshot. Local
+    // engine layout resolves gen_snapshot via .../universal/gen_snapshot_arm64
+    // while analyze_snapshot lives one level up at the build-dir root.
+    for (final candidate in <String>[
+      _fileSystem.path.join(dir, analyzeName),
+      _fileSystem.path.join(dir, '..', analyzeName),
+    ]) {
+      if (_fileSystem.file(candidate).existsSync()) {
+        return candidate;
+      }
+    }
+    return null;
   }
 
   final FileSystem _fileSystem;
