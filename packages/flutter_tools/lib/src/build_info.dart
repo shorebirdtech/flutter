@@ -382,6 +382,7 @@ class BuildInfo {
       kFileSystemScheme: ?fileSystemScheme,
       kBuildName: ?buildName,
       kBuildNumber: ?buildNumber,
+      kFlavor: ?flavor,
       if (useLocalCanvasKit) kUseLocalCanvasKitFlag: useLocalCanvasKit.toString(),
     };
   }
