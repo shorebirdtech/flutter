@@ -338,6 +338,11 @@ class BuildInfo {
       kFileSystemScheme: ?fileSystemScheme,
       kBuildName: ?buildName,
       kBuildNumber: ?buildNumber,
+      // TODO(eseidel): Remove when flutter/flutter#186221 lands. Without
+      // this line --flavor doesn't reach CopyAssets for
+      // `flutter build ios-framework`, which silently breaks both
+      // flavor-conditional assets and shorebird.yaml flavor compilation.
+      kFlavor: ?flavor,
       if (useLocalCanvasKit) kUseLocalCanvasKitFlag: useLocalCanvasKit.toString(),
     };
   }

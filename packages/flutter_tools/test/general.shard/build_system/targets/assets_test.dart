@@ -224,6 +224,67 @@ flutter:
     },
   );
 
+  group('CopyAssets compiles shorebird.yaml using the environment flavor', () {
+    const shorebirdYamlContents = '''
+app_id: base-app-id
+flavors:
+  internal: internal-app-id
+  stable: stable-app-id
+''';
+
+    void writeProjectWithShorebirdYaml() {
+      fileSystem.file('pubspec.yaml')
+        ..createSync()
+        ..writeAsStringSync('''
+name: example
+flutter:
+  assets:
+    - shorebird.yaml
+''');
+      fileSystem.file('shorebird.yaml')
+        ..createSync()
+        ..writeAsStringSync(shorebirdYamlContents);
+      writePackageConfigFiles(directory: globals.fs.currentDirectory, mainLibName: 'example');
+    }
+
+    testUsingContext(
+      'falls back to top-level app_id when no flavor is set',
+      () async {
+        writeProjectWithShorebirdYaml();
+
+        await const CopyAssets().build(environment);
+
+        final File compiled = fileSystem.file(
+          '${environment.buildDir.path}/flutter_assets/shorebird.yaml',
+        );
+        expect(compiled.readAsStringSync(), 'app_id: base-app-id');
+      },
+      overrides: <Type, Generator>{
+        FileSystem: () => fileSystem,
+        ProcessManager: () => FakeProcessManager.any(),
+      },
+    );
+
+    testUsingContext(
+      'uses the flavor app_id when flavor is set',
+      () async {
+        environment.defines[kFlavor] = 'internal';
+        writeProjectWithShorebirdYaml();
+
+        await const CopyAssets().build(environment);
+
+        final File compiled = fileSystem.file(
+          '${environment.buildDir.path}/flutter_assets/shorebird.yaml',
+        );
+        expect(compiled.readAsStringSync(), 'app_id: internal-app-id');
+      },
+      overrides: <Type, Generator>{
+        FileSystem: () => fileSystem,
+        ProcessManager: () => FakeProcessManager.any(),
+      },
+    );
+  });
+
   testUsingContext(
     'transforms assets declared with transformers',
     () async {
