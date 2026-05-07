@@ -768,6 +768,75 @@ void main() {
   );
 
   testUsingContext(
+    'ReleaseIosApplicationBundle compiles shorebird.yaml using the flavor app_id',
+    () async {
+      environment.defines[kBuildMode] = 'release';
+      environment.defines[kXcodeAction] = 'install';
+      environment.defines[kFlavor] = 'internal';
+
+      fileSystem.file('pubspec.yaml')
+        ..createSync()
+        ..writeAsStringSync('''
+name: example
+flutter:
+  assets:
+    - shorebird.yaml
+''');
+
+      fileSystem.file('shorebird.yaml')
+        ..createSync()
+        ..writeAsStringSync('''
+app_id: base-app-id
+flavors:
+  internal: internal-app-id
+  stable: stable-app-id
+''');
+
+      writePackageConfigFiles(directory: fileSystem.currentDirectory, mainLibName: 'example');
+
+      fileSystem
+          .file(fileSystem.path.join('ios', 'Flutter', 'AppFrameworkInfo.plist'))
+          .createSync(recursive: true);
+      environment.buildDir
+          .childDirectory('App.framework')
+          .childFile('App')
+          .createSync(recursive: true);
+      environment.buildDir.childFile('native_assets.json').createSync();
+
+      final Directory frameworkDirectory = environment.outputDir.childDirectory('App.framework');
+      final File frameworkDirectoryBinary = frameworkDirectory.childFile('App');
+      final File infoPlist = frameworkDirectory.childFile('Info.plist');
+      processManager.addCommands(<FakeCommand>[
+        createPlutilFakeCommand(infoPlist),
+        FakeCommand(
+          command: <String>[
+            'xattr',
+            '-r',
+            '-d',
+            'com.apple.FinderInfo',
+            frameworkDirectoryBinary.path,
+          ],
+        ),
+        FakeCommand(
+          command: <String>['codesign', '--force', '--sign', '-', frameworkDirectoryBinary.path],
+        ),
+      ]);
+
+      await const ReleaseIosApplicationBundle().build(environment);
+
+      final File compiledYaml = frameworkDirectory
+          .childDirectory('flutter_assets')
+          .childFile('shorebird.yaml');
+      expect(compiledYaml.readAsStringSync(), 'app_id: internal-app-id');
+    },
+    overrides: <Type, Generator>{
+      FileSystem: () => fileSystem,
+      ProcessManager: () => processManager,
+      Platform: () => macPlatform,
+    },
+  );
+
+  testUsingContext(
     'AotAssemblyRelease throws exception if asked to build for simulator',
     () async {
       final FileSystem fileSystem = MemoryFileSystem.test();
