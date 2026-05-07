@@ -1,6 +1,5 @@
 EXPORTS
   shorebird_check_for_downloadable_update = shorebird_check_for_downloadable_update
-  shorebird_check_for_update = shorebird_check_for_update
   shorebird_current_boot_patch_number = shorebird_current_boot_patch_number
   shorebird_free_string = shorebird_free_string
   shorebird_free_update_result = shorebird_free_update_result
@@ -13,5 +12,4 @@ EXPORTS
   shorebird_report_launch_success = shorebird_report_launch_success
   shorebird_should_auto_update = shorebird_should_auto_update
   shorebird_start_update_thread = shorebird_start_update_thread
-  shorebird_update = shorebird_update
   shorebird_update_with_result = shorebird_update_with_result
