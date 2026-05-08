@@ -72,14 +72,15 @@ Future<void> downloadFromStaging({
 
   print('[GCS] Downloading from $stagingRoot');
 
-  // List files in the staging location
-  final ProcessResult lsResult = await runChecked(
+  // List files in the staging location. We capture stdout because we need
+  // to parse the file list; everything else uses runChecked to stream.
+  final String lsOutput = await runCapturingStdout(
     'gsutil',
     <String>['ls', stagingRoot],
     description: 'gsutil ls $stagingRoot',
   );
 
-  final List<String> files = (lsResult.stdout as String)
+  final List<String> files = lsOutput
       .split('\n')
       .where((String f) => f.endsWith('.tar.gz'))
       .toList();
