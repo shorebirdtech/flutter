@@ -91,6 +91,10 @@
         "gn_args": ["--no-prebuilt-dart-sdk"],
         "ninja_targets": ["flutter/build/archives:artifacts"],
         "out_dir": "host_debug"
+      },
+      {
+        "type": "shell",
+        "command": "mkdir -p out/host_release/aot_tools && out/host_release/dart-sdk/bin/dart pub get --offline --directory=flutter/third_party/dart/pkg/aot_tools && out/host_release/dart-sdk/bin/dart compile kernel flutter/third_party/dart/pkg/aot_tools/bin/aot_tools.dart -o out/host_release/aot_tools/aot-tools.dill"
       }
     ],
     "artifacts": [
