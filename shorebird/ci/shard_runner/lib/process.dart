@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 /// Resolves an executable name for Windows, appending .cmd if needed.
@@ -28,10 +30,13 @@ String _resolveExecutable(String executable) {
   return executable;
 }
 
-/// Runs a process and throws if it exits with a non-zero code.
+/// Runs a process, streaming stdout/stderr to the parent's stdio so the
+/// caller (and CI logs) see output live. Throws if the process exits
+/// non-zero.
 ///
-/// Returns the [ProcessResult] for callers that need stdout/stderr.
-Future<ProcessResult> runChecked(
+/// Use this for everything except the rare case where you need to parse
+/// the child's stdout — for that, see [runCapturingStdout].
+Future<void> runChecked(
   String executable,
   List<String> arguments, {
   String? workingDirectory,
@@ -40,27 +45,59 @@ Future<ProcessResult> runChecked(
 }) async {
   final String resolvedExecutable = _resolveExecutable(executable);
 
-  final ProcessResult result = await Process.run(
+  final Process process = await Process.start(
+    resolvedExecutable,
+    arguments,
+    workingDirectory: workingDirectory,
+    environment: environment,
+    mode: ProcessStartMode.inheritStdio,
+  );
+
+  final int exitCode = await process.exitCode;
+  if (exitCode != 0) {
+    final String desc = description ?? '$executable ${arguments.join(' ')}';
+    throw Exception('$desc failed (exit $exitCode)');
+  }
+}
+
+/// Runs a process, capturing stdout into the returned string while still
+/// streaming stderr to the parent's stderr. Throws if the process exits
+/// non-zero.
+///
+/// Use this when you need to parse the child's stdout (e.g. `gsutil ls`).
+/// For everything else use [runChecked] so output reaches the CI log live.
+Future<String> runCapturingStdout(
+  String executable,
+  List<String> arguments, {
+  String? workingDirectory,
+  Map<String, String>? environment,
+  String? description,
+}) async {
+  final String resolvedExecutable = _resolveExecutable(executable);
+
+  final Process process = await Process.start(
     resolvedExecutable,
     arguments,
     workingDirectory: workingDirectory,
     environment: environment,
   );
 
-  if (result.exitCode != 0) {
-    final String desc = description ?? '$executable ${arguments.join(' ')}';
-    final String stderr = (result.stderr as String).trim();
-    final String stdout = (result.stdout as String).trim();
-    final StringBuffer message =
-        StringBuffer('$desc failed (exit ${result.exitCode})');
-    if (stdout.isNotEmpty) {
-      message.write('\nSTDOUT: $stdout');
-    }
-    if (stderr.isNotEmpty) {
-      message.write('\nSTDERR: $stderr');
-    }
-    throw Exception(message.toString());
-  }
+  final Future<String> stdoutFuture =
+      process.stdout.transform(utf8.decoder).join();
+  final Future<void> stderrFuture =
+      process.stderr.transform(utf8.decoder).forEach(stderr.write);
 
-  return result;
+  final List<Object?> results = await Future.wait<Object?>(<Future<Object?>>[
+    stdoutFuture,
+    stderrFuture,
+    process.exitCode,
+  ]);
+  final String capturedStdout = results[0] as String;
+  final int exitCode = results[2] as int;
+
+  if (exitCode != 0) {
+    final String desc = description ?? '$executable ${arguments.join(' ')}';
+    throw Exception('$desc failed (exit $exitCode)');
+  }
+  return capturedStdout;
 }
