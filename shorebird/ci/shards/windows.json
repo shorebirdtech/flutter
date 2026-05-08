@@ -9,7 +9,7 @@
       }
     ],
     "artifacts": [
-      {"src": "zip_archives/android-arm64-release/windows-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/windows-x64.zip"}
+      {"src": "android_release_arm64/zip_archives/android-arm64-release/windows-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/windows-x64.zip"}
     ]
   },
   "android-arm32": {
@@ -22,7 +22,7 @@
       }
     ],
     "artifacts": [
-      {"src": "zip_archives/android-arm-release/windows-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/windows-x64.zip"}
+      {"src": "android_release/zip_archives/android-arm-release/windows-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/windows-x64.zip"}
     ]
   },
   "android-x64": {
@@ -35,7 +35,7 @@
       }
     ],
     "artifacts": [
-      {"src": "zip_archives/android-x64-release/windows-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/windows-x64.zip"}
+      {"src": "android_release_x64/zip_archives/android-x64-release/windows-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/windows-x64.zip"}
     ]
   },
   "host": {
