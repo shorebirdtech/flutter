@@ -157,12 +157,16 @@
         "gn_args": ["--runtime-mode=release", "--mac", "--mac-cpu=x64"],
         "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts"],
         "out_dir": "mac_release"
+      },
+      {
+        "type": "shell",
+        "command": "flutter/bin/et stamp && cp out/engine_stamp.json out/mac_release/engine_stamp.json"
       }
     ],
     "compose_input": "macos-framework",
     "artifacts": [
       {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-darwin-x64.zip", "zip": true, "content_hash": true},
-      {"src": "engine_stamp.json", "dst": "flutter_infra_release/flutter/$engine/engine_stamp.json"}
+      {"src": "mac_release/engine_stamp.json", "dst": "flutter_infra_release/flutter/$engine/engine_stamp.json"}
     ]
   }
 }
