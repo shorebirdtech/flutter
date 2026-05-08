@@ -80,10 +80,8 @@ Future<void> downloadFromStaging({
     description: 'gsutil ls $stagingRoot',
   );
 
-  final List<String> files = lsOutput
-      .split('\n')
-      .where((String f) => f.endsWith('.tar.gz'))
-      .toList();
+  final List<String> files =
+      lsOutput.split('\n').where((String f) => f.endsWith('.tar.gz')).toList();
 
   for (final String file in files) {
     final String fileName = p.basename(file);
