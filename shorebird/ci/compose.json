@@ -22,7 +22,7 @@
       "--x64-out-dir": "mac_release"
     },
     "artifacts": [
-      {"src": "FlutterMacOS.framework.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64-release/FlutterMacOS.framework.zip"},
+      {"src": "FlutterMacOS.framework.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64-release/framework.zip"},
       {"src": "FlutterMacOS.framework.dSYM.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64/FlutterMacOS.framework.dSYM.zip"}
     ]
   },
