@@ -94,7 +94,7 @@
       },
       {
         "type": "shell",
-        "command": "mkdir -p out/host_release/aot_tools && out/host_release/dart-sdk/bin/dart pub get --offline --directory=flutter/third_party/dart/pkg/aot_tools && out/host_release/dart-sdk/bin/dart compile kernel flutter/third_party/dart/pkg/aot_tools/bin/aot_tools.dart -o out/host_release/aot_tools/aot-tools.dill"
+        "command": "mkdir -p out/host_release/aot_tools && out/host_release/dart-sdk/bin/dart pub get --directory=flutter/third_party/dart/pkg/aot_tools && out/host_release/dart-sdk/bin/dart compile kernel flutter/third_party/dart/pkg/aot_tools/bin/aot_tools.dart -o out/host_release/aot_tools/aot-tools.dill"
       }
     ],
     "artifacts": [
