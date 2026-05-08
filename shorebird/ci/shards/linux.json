@@ -13,12 +13,12 @@
       }
     ],
     "artifacts": [
-      {"src": "zip_archives/android-arm64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/artifacts.zip"},
-      {"src": "zip_archives/android-arm64-release/linux-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/linux-x64.zip"},
-      {"src": "zip_archives/android-arm64-release/symbols.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/symbols.zip"},
-      {"src": "arm64_v8a_release.pom", "dst": "download.flutter.io/io/flutter/arm64_v8a_release/1.0.0-$engine/arm64_v8a_release-1.0.0-$engine.pom"},
-      {"src": "arm64_v8a_release.jar", "dst": "download.flutter.io/io/flutter/arm64_v8a_release/1.0.0-$engine/arm64_v8a_release-1.0.0-$engine.jar"},
-      {"src": "arm64_v8a_release.maven-metadata.xml", "dst": "download.flutter.io/io/flutter/arm64_v8a_release/1.0.0-$engine/arm64_v8a_release-1.0.0-$engine.maven-metadata.xml"}
+      {"src": "android_release_arm64/zip_archives/android-arm64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/artifacts.zip"},
+      {"src": "android_release_arm64/zip_archives/android-arm64-release/linux-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/linux-x64.zip"},
+      {"src": "android_release_arm64/zip_archives/android-arm64-release/symbols.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/symbols.zip"},
+      {"src": "android_release_arm64/arm64_v8a_release.pom", "dst": "download.flutter.io/io/flutter/arm64_v8a_release/1.0.0-$engine/arm64_v8a_release-1.0.0-$engine.pom"},
+      {"src": "android_release_arm64/arm64_v8a_release.jar", "dst": "download.flutter.io/io/flutter/arm64_v8a_release/1.0.0-$engine/arm64_v8a_release-1.0.0-$engine.jar"},
+      {"src": "android_release_arm64/arm64_v8a_release.maven-metadata.xml", "dst": "download.flutter.io/io/flutter/arm64_v8a_release/1.0.0-$engine/arm64_v8a_release-1.0.0-$engine.maven-metadata.xml"}
     ]
   },
   "android-arm32": {
@@ -35,15 +35,15 @@
       }
     ],
     "artifacts": [
-      {"src": "zip_archives/android-arm-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/artifacts.zip"},
-      {"src": "zip_archives/android-arm-release/linux-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/linux-x64.zip"},
-      {"src": "zip_archives/android-arm-release/symbols.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/symbols.zip"},
-      {"src": "armeabi_v7a_release.pom", "dst": "download.flutter.io/io/flutter/armeabi_v7a_release/1.0.0-$engine/armeabi_v7a_release-1.0.0-$engine.pom"},
-      {"src": "armeabi_v7a_release.jar", "dst": "download.flutter.io/io/flutter/armeabi_v7a_release/1.0.0-$engine/armeabi_v7a_release-1.0.0-$engine.jar"},
-      {"src": "armeabi_v7a_release.maven-metadata.xml", "dst": "download.flutter.io/io/flutter/armeabi_v7a_release/1.0.0-$engine/armeabi_v7a_release-1.0.0-$engine.maven-metadata.xml"},
-      {"src": "flutter_embedding_release.pom", "dst": "download.flutter.io/io/flutter/flutter_embedding_release/1.0.0-$engine/flutter_embedding_release-1.0.0-$engine.pom"},
-      {"src": "flutter_embedding_release.jar", "dst": "download.flutter.io/io/flutter/flutter_embedding_release/1.0.0-$engine/flutter_embedding_release-1.0.0-$engine.jar"},
-      {"src": "flutter_embedding_release.maven-metadata.xml", "dst": "download.flutter.io/io/flutter/flutter_embedding_release/1.0.0-$engine/flutter_embedding_release-1.0.0-$engine.maven-metadata.xml"}
+      {"src": "android_release/zip_archives/android-arm-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/artifacts.zip"},
+      {"src": "android_release/zip_archives/android-arm-release/linux-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/linux-x64.zip"},
+      {"src": "android_release/zip_archives/android-arm-release/symbols.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/symbols.zip"},
+      {"src": "android_release/armeabi_v7a_release.pom", "dst": "download.flutter.io/io/flutter/armeabi_v7a_release/1.0.0-$engine/armeabi_v7a_release-1.0.0-$engine.pom"},
+      {"src": "android_release/armeabi_v7a_release.jar", "dst": "download.flutter.io/io/flutter/armeabi_v7a_release/1.0.0-$engine/armeabi_v7a_release-1.0.0-$engine.jar"},
+      {"src": "android_release/armeabi_v7a_release.maven-metadata.xml", "dst": "download.flutter.io/io/flutter/armeabi_v7a_release/1.0.0-$engine/armeabi_v7a_release-1.0.0-$engine.maven-metadata.xml"},
+      {"src": "android_release/flutter_embedding_release.pom", "dst": "download.flutter.io/io/flutter/flutter_embedding_release/1.0.0-$engine/flutter_embedding_release-1.0.0-$engine.pom"},
+      {"src": "android_release/flutter_embedding_release.jar", "dst": "download.flutter.io/io/flutter/flutter_embedding_release/1.0.0-$engine/flutter_embedding_release-1.0.0-$engine.jar"},
+      {"src": "android_release/flutter_embedding_release.maven-metadata.xml", "dst": "download.flutter.io/io/flutter/flutter_embedding_release/1.0.0-$engine/flutter_embedding_release-1.0.0-$engine.maven-metadata.xml"}
     ]
   },
   "android-x64": {
@@ -60,12 +60,12 @@
       }
     ],
     "artifacts": [
-      {"src": "zip_archives/android-x64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/artifacts.zip"},
-      {"src": "zip_archives/android-x64-release/linux-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/linux-x64.zip"},
-      {"src": "zip_archives/android-x64-release/symbols.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/symbols.zip"},
-      {"src": "x86_64_release.pom", "dst": "download.flutter.io/io/flutter/x86_64_release/1.0.0-$engine/x86_64_release-1.0.0-$engine.pom"},
-      {"src": "x86_64_release.jar", "dst": "download.flutter.io/io/flutter/x86_64_release/1.0.0-$engine/x86_64_release-1.0.0-$engine.jar"},
-      {"src": "x86_64_release.maven-metadata.xml", "dst": "download.flutter.io/io/flutter/x86_64_release/1.0.0-$engine/x86_64_release-1.0.0-$engine.maven-metadata.xml"}
+      {"src": "android_release_x64/zip_archives/android-x64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/artifacts.zip"},
+      {"src": "android_release_x64/zip_archives/android-x64-release/linux-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/linux-x64.zip"},
+      {"src": "android_release_x64/zip_archives/android-x64-release/symbols.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/symbols.zip"},
+      {"src": "android_release_x64/x86_64_release.pom", "dst": "download.flutter.io/io/flutter/x86_64_release/1.0.0-$engine/x86_64_release-1.0.0-$engine.pom"},
+      {"src": "android_release_x64/x86_64_release.jar", "dst": "download.flutter.io/io/flutter/x86_64_release/1.0.0-$engine/x86_64_release-1.0.0-$engine.jar"},
+      {"src": "android_release_x64/x86_64_release.maven-metadata.xml", "dst": "download.flutter.io/io/flutter/x86_64_release/1.0.0-$engine/x86_64_release-1.0.0-$engine.maven-metadata.xml"}
     ]
   },
   "host": {
