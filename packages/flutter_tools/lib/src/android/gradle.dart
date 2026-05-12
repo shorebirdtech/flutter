@@ -738,10 +738,26 @@ class AndroidGradleBuilder implements AndroidBuilder {
     }
 
     if (!(result.stdout.contains('libapp.so.sym') || result.stdout.contains('libapp.so.dbg'))) {
-      _logger.printTrace(
-        'libapp.so.sym or libapp.so.dbg not present when checking final appbundle for debug symbols.',
+      // Shorebird-specific: demote upstream's fatal check to a warning.
+      //
+      // Upstream Flutter PR #181275 (3.44) inverted libapp.so strip
+      // responsibility — Flutter stopped stripping it, AGP is expected to,
+      // and this check fails the build if `.sym/.dbg` is absent. Shorebird
+      // flows that either keep libapp.so unstripped (legacy fixtures with
+      // `keepDebugSymbols.add("**/libapp.so")`) or pre-strip via
+      // `--extra-gen-snapshot-options=--strip` (obfuscated builds) both
+      // produce AABs without `libapp.so.sym`. Returning `true` here lets the
+      // build succeed; the trade-off is that Play Console won't get Dart
+      // crash symbols for these AABs. New apps should remove the legacy
+      // `keepDebugSymbols` line to re-enable AGP-side stripping.
+      _logger.printWarning(
+        'libapp.so.sym or libapp.so.dbg not present when checking final '
+        'appbundle for debug symbols. Play Console will not receive Dart '
+        'crash symbols for this build. To enable, remove '
+        '`packaging.jniLibs.keepDebugSymbols.add("**/libapp.so")` from '
+        'android/app/build.gradle.kts.',
       );
-      return false;
+      return true;
     }
 
     return true;
