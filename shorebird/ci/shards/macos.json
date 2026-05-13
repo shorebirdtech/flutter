@@ -48,21 +48,6 @@
     ],
     "compose_input": "ios-framework"
   },
-  "ios-release-ext": {
-    "steps": [
-      {
-        "type": "rust",
-        "targets": ["aarch64-apple-ios"]
-      },
-      {
-        "type": "gn_ninja",
-        "gn_args": ["--ios", "--runtime-mode=release", "--darwin-extension-safe", "--xcode-symlinks", "--gn-arg=shorebird_runtime=true"],
-        "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
-        "out_dir": "ios_release_extension_safe"
-      }
-    ],
-    "compose_input": "ios-framework"
-  },
   "ios-sim-x64": {
     "steps": [
       {
@@ -78,21 +63,6 @@
     ],
     "compose_input": "ios-framework"
   },
-  "ios-sim-x64-ext": {
-    "steps": [
-      {
-        "type": "rust",
-        "targets": ["x86_64-apple-ios"]
-      },
-      {
-        "type": "gn_ninja",
-        "gn_args": ["--ios", "--runtime-mode=debug", "--darwin-extension-safe", "--simulator"],
-        "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
-        "out_dir": "ios_debug_sim_extension_safe"
-      }
-    ],
-    "compose_input": "ios-framework"
-  },
   "ios-sim-arm64": {
     "steps": [
       {
@@ -100,17 +70,6 @@
         "gn_args": ["--ios", "--runtime-mode=debug", "--simulator", "--simulator-cpu=arm64"],
         "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
         "out_dir": "ios_debug_sim_arm64"
-      }
-    ],
-    "compose_input": "ios-framework"
-  },
-  "ios-sim-arm64-ext": {
-    "steps": [
-      {
-        "type": "gn_ninja",
-        "gn_args": ["--ios", "--runtime-mode=debug", "--darwin-extension-safe", "--simulator", "--simulator-cpu=arm64"],
-        "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
-        "out_dir": "ios_debug_sim_arm64_extension_safe"
       }
     ],
     "compose_input": "ios-framework"
