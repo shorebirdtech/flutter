@@ -354,7 +354,9 @@ class AOTSnapshotter {
   /// which signals "no DD pass."
   int _readDdMaxBytes() {
     const fromDefine = String.fromEnvironment('SHOREBIRD_DD_MAX_BYTES');
-    final String? raw = fromDefine.isNotEmpty ? fromDefine : Platform.environment['SHOREBIRD_DD_MAX_BYTES'];
+    final String? raw = fromDefine.isNotEmpty
+        ? fromDefine
+        : Platform.environment['SHOREBIRD_DD_MAX_BYTES'];
     return int.tryParse(raw ?? '') ?? 0;
   }
 
@@ -384,11 +386,13 @@ class AOTSnapshotter {
     // Pass 1: build ELF for analysis + DD identity. Strip the existing snapshot
     // kind/output args from the base set; mainPath must remain at the end.
     final elfArgs = <String>[
-      ...baseGenSnapshotArgs.where((String a) =>
-          a != mainPath &&
-          !a.startsWith('--snapshot_kind=') &&
-          !a.startsWith('--assembly=') &&
-          !a.startsWith('--elf=')),
+      ...baseGenSnapshotArgs.where(
+        (String a) =>
+            a != mainPath &&
+            !a.startsWith('--snapshot_kind=') &&
+            !a.startsWith('--assembly=') &&
+            !a.startsWith('--elf='),
+      ),
       '--snapshot_kind=app-aot-elf',
       '--elf=$elfForAnalysis',
       '--print_dd_function_identity_to=$ddIdentityPath',
@@ -404,7 +408,10 @@ class AOTSnapshotter {
       return pass1Exit;
     }
 
-    final String? analyzeSnapshotPath = _genSnapshot.getAnalyzeSnapshotPath(snapshotType, darwinArch);
+    final String? analyzeSnapshotPath = _genSnapshot.getAnalyzeSnapshotPath(
+      snapshotType,
+      darwinArch,
+    );
     if (analyzeSnapshotPath == null) {
       _logger.printError(
         'DD pass: could not find an analyze_snapshot binary whose --sdk_version '
@@ -469,9 +476,7 @@ class AOTSnapshotter {
       // and gets carried into the patch debug bundle.
       '--print_dd_resolution_to=$ddResolutionPath',
     ]);
-    _logger.printTrace(
-      'DD 2-pass build: added --dd_slot_mapping and --print_dd_resolution_to',
-    );
+    _logger.printTrace('DD 2-pass build: added --dd_slot_mapping and --print_dd_resolution_to');
 
     _fileSystem.file(elfForAnalysis).deleteSync();
     return 0;
