@@ -545,5 +545,7 @@ abstract final class LinkSupplement {
     maybeCopy('App.dd_callers.link');
     maybeCopy('App.dd_identity.link');
     maybeCopy('App.dd_slots.link');
+    // Per-slot DD resolution outcome diagnostic (TSV).
+    maybeCopy('App.dd_resolution.tsv');
   }
 }

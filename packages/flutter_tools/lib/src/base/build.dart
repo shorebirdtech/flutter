@@ -379,6 +379,7 @@ class AOTSnapshotter {
     final String ddTablePath = linkPath('App.dd.link');
     final String ddCallerLinksPath = linkPath('App.dd_callers.link');
     final String ddSlotMappingPath = linkPath('App.dd_slots.link');
+    final String ddResolutionPath = linkPath('App.dd_resolution.tsv');
 
     // Pass 1: build ELF for analysis + DD identity. Strip the existing snapshot
     // kind/output args from the base set; mainPath must remain at the end.
@@ -459,11 +460,18 @@ class AOTSnapshotter {
       _fileSystem.file(elfForAnalysis).deleteSync();
       return 1;
     }
-    baseGenSnapshotArgs.insert(
-      baseGenSnapshotArgs.indexOf(mainPath),
+    final int mainPathIndex = baseGenSnapshotArgs.indexOf(mainPath);
+    baseGenSnapshotArgs.insertAll(mainPathIndex, <String>[
       '--dd_slot_mapping=$ddSlotMappingPath',
+      // Per-slot resolution outcome dump (TSV: slot, outcome, rewritten,
+      // name). Diagnostic for analyzing which slots got dropped during
+      // the resolver's run; ends up alongside the other supplement files
+      // and gets carried into the patch debug bundle.
+      '--print_dd_resolution_to=$ddResolutionPath',
+    ]);
+    _logger.printTrace(
+      'DD 2-pass build: added --dd_slot_mapping and --print_dd_resolution_to',
     );
-    _logger.printTrace('DD 2-pass build: added --dd_slot_mapping');
 
     _fileSystem.file(elfForAnalysis).deleteSync();
     return 0;
