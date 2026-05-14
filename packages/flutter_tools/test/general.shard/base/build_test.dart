@@ -63,6 +63,7 @@ void main() {
         artifacts: artifacts,
         logger: logger,
         processManager: processManager,
+        fileSystem: MemoryFileSystem.test(),
       );
     });
 
