@@ -23,6 +23,7 @@
 #include "flutter/shell/common/switches.h"
 #include "fml/logging.h"
 #include "shell/platform/embedder/embedder.h"
+#include "third_party/dart/runtime/include/dart_native_api.h"
 #include "third_party/dart/runtime/include/dart_tools_api.h"
 
 // Namespaced to avoid Google style warnings.
@@ -64,6 +65,32 @@ void SetBaseSnapshot(Settings& settings) {
   // the mappings alive.
   vm_snapshot = DartSnapshot::VMSnapshotFromSettings(settings);
   isolate_snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
+
+  // Diagnostic for investigating in-the-wild patch-apply failures where the
+  // on-device synthesized base byte stream is shorter than the host CLI's
+  // `aot_tools dump_blobs` extraction. Logging here (not in `createForSnapshots`)
+  // means we get sizes for EVERY app boot — including the passing add-to-app
+  // variant — for side-by-side comparison.
+  const uint8_t* vm_data_ptr = vm_snapshot->GetDataMapping();
+  const uint8_t* iso_data_ptr = isolate_snapshot->GetDataMapping();
+  const uint8_t* vm_insns_ptr = vm_snapshot->GetInstructionsMapping();
+  const uint8_t* iso_insns_ptr = isolate_snapshot->GetInstructionsMapping();
+  intptr_t vm_data_size =
+      vm_data_ptr ? Dart_SnapshotDataSize(vm_data_ptr) : -1;
+  intptr_t iso_data_size =
+      iso_data_ptr ? Dart_SnapshotDataSize(iso_data_ptr) : -1;
+  intptr_t vm_insns_size =
+      vm_insns_ptr ? Dart_SnapshotInstrSize(vm_insns_ptr) : -1;
+  intptr_t iso_insns_size =
+      iso_insns_ptr ? Dart_SnapshotInstrSize(iso_insns_ptr) : -1;
+  FML_LOG(INFO) << "[shorebird] SetBaseSnapshot mappings: "
+                << "vm_data_size=" << vm_data_size
+                << " iso_data_size=" << iso_data_size
+                << " vm_insns_size=" << vm_insns_size
+                << " iso_insns_size=" << iso_insns_size << " total="
+                << (vm_data_size + iso_data_size + vm_insns_size +
+                    iso_insns_size);
+
   Shorebird_SetBaseSnapshots(isolate_snapshot->GetDataMapping(),
                              isolate_snapshot->GetInstructionsMapping(),
                              vm_snapshot->GetDataMapping(),
