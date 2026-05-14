@@ -521,11 +521,13 @@ abstract final class LinkSupplement {
     }
 
     void maybeCopy(String name) {
-      final File file = environment.fileSystem.file(
-        environment.fileSystem.path.join(inputBuildDir, name),
-      );
+      final path = environment.fileSystem.path.join(inputBuildDir, name);
+      final File file = environment.fileSystem.file(path);
       if (file.existsSync()) {
         file.copySync(environment.fileSystem.path.join(shorebirdDir.path, name));
+        environment.logger.printTrace('LinkSupplement: copied $name');
+      } else {
+        environment.logger.printTrace('LinkSupplement: missing $name at $path');
       }
     }
 
@@ -537,5 +539,13 @@ abstract final class LinkSupplement {
     maybeCopy('App.dispatch_table.json');
     maybeCopy('App.ft.link');
     maybeCopy('App.field_table.json');
+    // DD table files for cascade limiter (produced by 2-pass release build
+    // when SHOREBIRD_DD_MAX_BYTES is set).
+    maybeCopy('App.dd.link');
+    maybeCopy('App.dd_callers.link');
+    maybeCopy('App.dd_identity.link');
+    maybeCopy('App.dd_slots.link');
+    // Per-slot DD resolution outcome diagnostic (TSV).
+    maybeCopy('App.dd_resolution.tsv');
   }
 }

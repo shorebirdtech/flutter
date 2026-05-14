@@ -889,7 +889,14 @@ flavors:
           .createSync(recursive: true);
 
       final build = environment.buildDir.path;
+      // Both archs go through the same code path now (the DD-pass is gated on
+      // SHOREBIRD_DD_MAX_BYTES which isn't set in this test), so neither
+      // architecture has an extra async hop. With concurrent Future.wait, the
+      // archs reach gen_snapshot in iteration order: arm64 first
+      // (`kDarwinArchs = 'arm64 x86_64'`), x86_64 second. They then
+      // interleave at each subsequent await point in the same order.
       processManager.addCommands(<FakeCommand>[
+        // arm64 gen_snapshot runs first (iteration order).
         FakeCommand(
           command: <String>[
             'Artifact.genSnapshotArm64.TargetPlatform.darwin.release',
@@ -900,6 +907,7 @@ flavors:
             environment.buildDir.childFile('app.dill').path,
           ],
         ),
+        // x86_64 gen_snapshot runs next.
         FakeCommand(
           command: <String>[
             'Artifact.genSnapshotX64.TargetPlatform.darwin.release',
@@ -910,6 +918,7 @@ flavors:
             environment.buildDir.childFile('app.dill').path,
           ],
         ),
+        // From here on the two builds interleave: arm64 then x86_64 at each step.
         FakeCommand(
           command: <String>[
             'xcrun',
