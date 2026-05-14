@@ -86,11 +86,31 @@ std::unique_ptr<SnapshotsDataHandle> SnapshotsDataHandle::createForSnapshots(
     const DartSnapshot& isolate_snapshot) {
   // This needs to match the order in which the blobs are written out in
   // analyze_snapshot --dump_blobs
+  auto vm_data = DataMapping(vm_snapshot);
+  auto iso_data = DataMapping(isolate_snapshot);
+  auto vm_insns = InstructionsMapping(vm_snapshot);
+  auto iso_insns = InstructionsMapping(isolate_snapshot);
+
+  // Diagnostic for investigating in-the-wild patch-apply failures where the
+  // on-device synthesized "base file" disagrees with what the host's
+  // `aot_tools dump_blobs` produced. If `Dart_SnapshotDataSize` /
+  // `Dart_SnapshotInstrSize` reports a shorter span on the device than the
+  // host extraction did, the bipatch state machine reads past EOF and the
+  // patch is rejected. Logging each blob's size separately tells the next
+  // investigator exactly which of the 4 mappings is wrong.
+  FML_LOG(INFO) << "[shorebird] SnapshotsDataHandle blob sizes: vm_data="
+                << vm_data->GetSize() << "b iso_data=" << iso_data->GetSize()
+                << "b vm_instructions=" << vm_insns->GetSize()
+                << "b iso_instructions=" << iso_insns->GetSize() << "b total="
+                << (vm_data->GetSize() + iso_data->GetSize() +
+                    vm_insns->GetSize() + iso_insns->GetSize())
+                << "b";
+
   std::vector<std::unique_ptr<fml::Mapping>> blobs;
-  blobs.push_back(DataMapping(vm_snapshot));
-  blobs.push_back(DataMapping(isolate_snapshot));
-  blobs.push_back(InstructionsMapping(vm_snapshot));
-  blobs.push_back(InstructionsMapping(isolate_snapshot));
+  blobs.push_back(std::move(vm_data));
+  blobs.push_back(std::move(iso_data));
+  blobs.push_back(std::move(vm_insns));
+  blobs.push_back(std::move(iso_insns));
   return std::make_unique<SnapshotsDataHandle>(std::move(blobs));
 }
 
