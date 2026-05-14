@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:io' show Platform;
+
 import 'package:process/process.dart';
 
 import '../artifacts.dart';
@@ -29,7 +31,9 @@ class GenSnapshot {
     required this._artifacts,
     required ProcessManager processManager,
     required Logger logger,
-  }) : _processUtils = ProcessUtils(logger: logger, processManager: processManager);
+    required FileSystem fileSystem,
+  }) : _fileSystem = fileSystem,
+       _processUtils = ProcessUtils(logger: logger, processManager: processManager);
 
   final Artifacts _artifacts;
   final ProcessUtils _processUtils;
@@ -52,6 +56,75 @@ class GenSnapshot {
     'Warning: This VM has been configured to obfuscate symbol information which violates the Dart standard.',
     '         See dartbug.com/30524 for more information.',
   };
+
+  /// Returns the path to an analyze_snapshot binary that matches gen_snapshot's
+  /// SDK version, or null if no matching binary can be found.
+  ///
+  /// gen_snapshot and analyze_snapshot share a snapshot-format hash baked into
+  /// each binary; if the hashes disagree, analyze_snapshot rejects gen_snapshot's
+  /// output with "Wrong full snapshot version" at parse time. Pre-existing binary
+  /// layouts (e.g. an older `universal/analyze_snapshot_<arch>` left behind from
+  /// a previous BUILD.gn revision) can shadow the freshly built one. Resolve by
+  /// probing every candidate location and returning only the one whose
+  /// `--sdk_version` matches gen_snapshot's `--version` output.
+  String? getAnalyzeSnapshotPath(SnapshotType snapshotType, CpuArch? cpuArch) {
+    final Artifact genSnapshotArtifact;
+    final String analyzeName;
+    if (snapshotType.platform == TargetPlatform.ios ||
+        snapshotType.platform == TargetPlatform.darwin) {
+      if (cpuArch == CpuArch.arm64) {
+        genSnapshotArtifact = Artifact.genSnapshotArm64;
+        analyzeName = 'analyze_snapshot_arm64';
+      } else {
+        genSnapshotArtifact = Artifact.genSnapshotX64;
+        analyzeName = 'analyze_snapshot_x64';
+      }
+    } else {
+      genSnapshotArtifact = Artifact.genSnapshot;
+      analyzeName = 'analyze_snapshot';
+    }
+    final String genSnapshotPath = getSnapshotterPath(snapshotType, genSnapshotArtifact);
+    final String? genVersion = _probeSdkVersion(genSnapshotPath, '--version');
+    final String dir = _fileSystem.path.dirname(genSnapshotPath);
+    // Cached SDK layout puts analyze_snapshot alongside gen_snapshot. Local
+    // engine layout resolves gen_snapshot via .../universal/gen_snapshot_arm64
+    // while analyze_snapshot lives one level up at the build-dir root. Probe
+    // both. If we successfully read gen_snapshot's version, accept only a
+    // candidate whose --sdk_version matches; otherwise fall back to the first
+    // existing candidate (better than failing closed when the version probe
+    // itself misbehaves).
+    for (final candidate in <String>[
+      _fileSystem.path.join(dir, analyzeName),
+      _fileSystem.path.join(dir, '..', analyzeName),
+    ]) {
+      if (!_fileSystem.file(candidate).existsSync()) {
+        continue;
+      }
+      if (genVersion == null) {
+        return candidate;
+      }
+      final String? candidateVersion = _probeSdkVersion(candidate, '--sdk_version');
+      if (candidateVersion == genVersion) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  /// Runs [binary] with [versionFlag] and returns the trimmed stderr output,
+  /// or null if the binary couldn't be invoked or printed nothing.
+  /// gen_snapshot and analyze_snapshot both write their version line to stderr.
+  String? _probeSdkVersion(String binary, String versionFlag) {
+    try {
+      final RunResult result = _processUtils.runSync(<String>[binary, versionFlag]);
+      final String stderr = result.stderr.trim();
+      return stderr.isEmpty ? null : stderr;
+    } on Exception {
+      return null;
+    }
+  }
+
+  final FileSystem _fileSystem;
 
   Future<int> run({
     required SnapshotType snapshotType,
@@ -95,15 +168,18 @@ class AOTSnapshotter {
     required ProcessManager processManager,
     this._xcode,
   }) : _logger = logger,
+       _processUtils = ProcessUtils(logger: logger, processManager: processManager),
        _genSnapshot = GenSnapshot(
          artifacts: artifacts,
          processManager: processManager,
          logger: logger,
+         fileSystem: fileSystem,
        );
 
   final Logger _logger;
   final FileSystem _fileSystem;
   final Xcode? _xcode;
+  final ProcessUtils _processUtils;
   final GenSnapshot _genSnapshot;
 
   /// Builds an architecture-specific ahead-of-time compiled snapshot of the specified script.
@@ -160,7 +236,6 @@ class AOTSnapshotter {
 
     final targetingAndroidPlatform = platform.os == .android;
     _logger.printTrace('targetingAndroidPlatform = $targetingAndroidPlatform');
-
     // We strip snapshot by default, but allow to suppress this behavior
     // by supplying --no-strip in extraGenSnapshotOptions.
     var shouldStrip = true;
@@ -217,9 +292,6 @@ class AOTSnapshotter {
       if (stripAfterBuild) {
         _logger.printTrace('Will strip AOT snapshot manually after build and dSYM generation.');
       }
-    } else if (targetingAndroidPlatform) {
-      stripAfterBuild = false;
-      // When building for Android, we let AGP handle stripping of debug symbols.
     } else {
       stripAfterBuild = false;
       if (shouldStrip) {
@@ -256,6 +328,22 @@ class AOTSnapshotter {
     genSnapshotArgs.add(mainPath);
 
     final snapshotType = SnapshotType(platform, buildMode);
+
+    final int ddMaxBytes = _readDdMaxBytes();
+    if (ddMaxBytes > 0 && usesLinker) {
+      final int pass1Exit = await _runDdAnalysisPass(
+        snapshotType: snapshotType,
+        cpuArch: cpuArch,
+        outputDir: outputDir,
+        baseGenSnapshotArgs: genSnapshotArgs,
+        mainPath: mainPath,
+        ddMaxBytes: ddMaxBytes,
+      );
+      if (pass1Exit != 0) {
+        return pass1Exit;
+      }
+    }
+
     final int genSnapshotExitCode = await _genSnapshot.run(
       snapshotType: snapshotType,
       additionalArgs: genSnapshotArgs,
@@ -266,6 +354,8 @@ class AOTSnapshotter {
       return genSnapshotExitCode;
     }
 
+    // On iOS and macOS, we use Xcode to compile the snapshot into a dynamic library that the
+    // end-developer can link into their app.
     if (targetingApplePlatform) {
       if (extractAppleDebugSymbols) {
         final Xcode? xcode = _xcode;
@@ -302,6 +392,19 @@ class AOTSnapshotter {
       } else {
         assert(!stripAfterBuild);
       }
+
+      if (stripAfterBuild) {
+        // See https://www.unix.com/man-page/osx/1/strip/ for arguments
+        final RunResult stripResult = await _xcode.strip(<String>['-x', appLib, '-o', appLib]);
+        if (stripResult.exitCode != 0) {
+          _logger.printError(
+            'Failed to strip debugging symbols from the generated AOT snapshot - strip terminated with exit code ${stripResult.exitCode}',
+          );
+          return stripResult.exitCode;
+        }
+      }
+    } else {
+      assert(!stripAfterBuild);
     }
 
     return 0;
@@ -319,7 +422,6 @@ class AOTSnapshotter {
       TargetPlatform.darwin,
       TargetPlatform.linux_x64,
       TargetPlatform.linux_arm64,
-      TargetPlatform.linux_riscv64,
       TargetPlatform.windows_x64,
       TargetPlatform.windows_arm64,
     ].contains(platform);
