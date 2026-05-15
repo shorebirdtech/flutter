@@ -66,11 +66,10 @@ void SetBaseSnapshot(Settings& settings) {
   vm_snapshot = DartSnapshot::VMSnapshotFromSettings(settings);
   isolate_snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
 
-  // Diagnostic for investigating in-the-wild patch-apply failures where the
-  // on-device synthesized base byte stream is shorter than the host CLI's
-  // `aot_tools dump_blobs` extraction. Logging here (not in `createForSnapshots`)
-  // means we get sizes for EVERY app boot — including the passing add-to-app
-  // variant — for side-by-side comparison.
+  // Per-mapping observability for the base snapshot. Logged at every app boot
+  // so customer syslogs include the exact sizes the on-device base reader
+  // exposes — directly comparable to the host's `aot_tools dump_blobs`
+  // extraction the patch was generated against.
   const uint8_t* vm_data_ptr = vm_snapshot->GetDataMapping();
   const uint8_t* iso_data_ptr = isolate_snapshot->GetDataMapping();
   const uint8_t* vm_insns_ptr = vm_snapshot->GetInstructionsMapping();
