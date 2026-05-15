@@ -38,7 +38,7 @@
       {"src": "android_release_x64/zip_archives/android-x64-release/windows-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/windows-x64.zip"}
     ]
   },
-  "host": {
+  "host-release": {
     "steps": [
       {
         "type": "rust",
@@ -49,6 +49,18 @@
         "gn_args": ["--runtime-mode=release", "--no-prebuilt-dart-sdk"],
         "ninja_targets": ["dart_sdk", "flutter/build/archives:windows_flutter", "gen_snapshot", "windows", "flutter/build/archives:artifacts"],
         "out_dir": "host_release"
+      }
+    ],
+    "artifacts": [
+      {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-windows-x64.zip", "zip": true, "content_hash": true},
+      {"src": "host_release/zip_archives/windows-x64-release/windows-x64-flutter.zip", "dst": "flutter_infra_release/flutter/$engine/windows-x64-release/windows-x64-flutter.zip"}
+    ]
+  },
+  "host-debug": {
+    "steps": [
+      {
+        "type": "rust",
+        "targets": ["x86_64-pc-windows-msvc"]
       },
       {
         "type": "gn_ninja",
@@ -58,8 +70,6 @@
       }
     ],
     "artifacts": [
-      {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-windows-x64.zip", "zip": true, "content_hash": true},
-      {"src": "host_release/zip_archives/windows-x64-release/windows-x64-flutter.zip", "dst": "flutter_infra_release/flutter/$engine/windows-x64-release/windows-x64-flutter.zip"},
       {"src": "host_debug/zip_archives/windows-x64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/windows-x64/artifacts.zip"}
     ]
   }
