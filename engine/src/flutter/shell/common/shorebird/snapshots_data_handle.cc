@@ -91,13 +91,10 @@ std::unique_ptr<SnapshotsDataHandle> SnapshotsDataHandle::createForSnapshots(
   auto vm_insns = InstructionsMapping(vm_snapshot);
   auto iso_insns = InstructionsMapping(isolate_snapshot);
 
-  // Diagnostic for investigating in-the-wild patch-apply failures where the
-  // on-device synthesized "base file" disagrees with what the host's
-  // `aot_tools dump_blobs` produced. If `Dart_SnapshotDataSize` /
-  // `Dart_SnapshotInstrSize` reports a shorter span on the device than the
-  // host extraction did, the bipatch state machine reads past EOF and the
-  // patch is rejected. Logging each blob's size separately tells the next
-  // investigator exactly which of the 4 mappings is wrong.
+  // Per-blob observability for the base byte stream the updater is about to
+  // patch against. Logged at every patch-apply attempt so customer syslogs
+  // include the exact sizes the bipatch state machine sees — directly
+  // comparable to the host's `aot_tools dump_blobs` extraction.
   FML_LOG(INFO) << "[shorebird] SnapshotsDataHandle blob sizes: vm_data="
                 << vm_data->GetSize() << "b iso_data=" << iso_data->GetSize()
                 << "b vm_instructions=" << vm_insns->GetSize()
@@ -158,7 +155,9 @@ int64_t SnapshotsDataHandle::Seek(int64_t offset, int32_t whence) {
       FML_CHECK(false) << "Unrecognized whence value in Seek: " << whence;
   }
   current_index_ = IndexForAbsoluteOffset(offset, start_index);
-  return current_index_.offset;
+  // Per POSIX/Rust io::Seek contract, return the new absolute position from
+  // the start of the stream, not the offset within the current blob.
+  return static_cast<int64_t>(AbsoluteOffsetForIndex(current_index_));
 }
 
 }  // namespace flutter
