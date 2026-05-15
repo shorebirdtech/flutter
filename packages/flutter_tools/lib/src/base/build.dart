@@ -306,7 +306,11 @@ class AOTSnapshotter {
 
     final snapshotType = SnapshotType(platform, buildMode);
 
+    final timings = _BuildTimings();
+    final totalSw = Stopwatch()..start();
+
     final int ddMaxBytes = _readDdMaxBytes();
+    timings.add('dd_max_bytes', ddMaxBytes);
     if (ddMaxBytes > 0 && usesLinker) {
       final int pass1Exit = await _runDdAnalysisPass(
         snapshotType: snapshotType,
@@ -315,17 +319,20 @@ class AOTSnapshotter {
         baseGenSnapshotArgs: genSnapshotArgs,
         mainPath: mainPath,
         ddMaxBytes: ddMaxBytes,
+        timings: timings,
       );
       if (pass1Exit != 0) {
         return pass1Exit;
       }
     }
 
+    final pass2Sw = Stopwatch()..start();
     final int genSnapshotExitCode = await _genSnapshot.run(
       snapshotType: snapshotType,
       additionalArgs: genSnapshotArgs,
       darwinArch: darwinArch,
     );
+    timings.add('gen_snapshot_pass2_ms', pass2Sw.elapsedMilliseconds);
     if (genSnapshotExitCode != 0) {
       _logger.printError('Dart snapshot generator failed with exit code $genSnapshotExitCode');
       return genSnapshotExitCode;
@@ -334,7 +341,8 @@ class AOTSnapshotter {
     // On iOS and macOS, we use Xcode to compile the snapshot into a dynamic library that the
     // end-developer can link into their app.
     if (targetingApplePlatform) {
-      return _buildFramework(
+      final frameworkSw = Stopwatch()..start();
+      final int frameworkExit = await _buildFramework(
         appleArch: darwinArch!,
         isIOS: platform == TargetPlatform.ios,
         sdkRoot: sdkRoot,
@@ -344,7 +352,13 @@ class AOTSnapshotter {
         stripAfterBuild: stripAfterBuild,
         extractAppleDebugSymbols: extractAppleDebugSymbols,
       );
+      timings.add('build_framework_ms', frameworkSw.elapsedMilliseconds);
+      timings.add('aot_build_total_ms', totalSw.elapsedMilliseconds);
+      timings.write(_fileSystem, outputDir.parent);
+      return frameworkExit;
     } else {
+      timings.add('aot_build_total_ms', totalSw.elapsedMilliseconds);
+      timings.write(_fileSystem, outputDir.parent);
       return 0;
     }
   }
@@ -372,6 +386,7 @@ class AOTSnapshotter {
     required List<String> baseGenSnapshotArgs,
     required String mainPath,
     required int ddMaxBytes,
+    required _BuildTimings timings,
   }) async {
     _logger.printTrace('DD 2-pass build: dd_max_bytes=$ddMaxBytes');
 
@@ -398,11 +413,13 @@ class AOTSnapshotter {
       '--print_dd_function_identity_to=$ddIdentityPath',
       mainPath,
     ];
+    final pass1Sw = Stopwatch()..start();
     final int pass1Exit = await _genSnapshot.run(
       snapshotType: snapshotType,
       additionalArgs: elfArgs,
       darwinArch: darwinArch,
     );
+    timings.add('dd_pass1_gen_snapshot_elf_ms', pass1Sw.elapsedMilliseconds);
     if (pass1Exit != 0) {
       _logger.printError('DD pass 1 (ELF for analysis) failed with exit code $pass1Exit');
       return pass1Exit;
@@ -424,6 +441,7 @@ class AOTSnapshotter {
       return 1;
     }
 
+    final ddTableSw = Stopwatch()..start();
     final int ddTableExit = await _processUtils.stream(<String>[
       analyzeSnapshotPath,
       '--compute_dd_table=$ddTablePath',
@@ -431,6 +449,7 @@ class AOTSnapshotter {
       '--dd_max_bytes=$ddMaxBytes',
       elfForAnalysis,
     ]);
+    timings.add('dd_compute_table_ms', ddTableSw.elapsedMilliseconds);
     if (ddTableExit != 0) {
       _logger.printError(
         'DD pass: analyze_snapshot --compute_dd_table failed with exit code '
@@ -441,6 +460,7 @@ class AOTSnapshotter {
       return ddTableExit;
     }
 
+    final ddSlotSw = Stopwatch()..start();
     final int ddSlotMappingExit = await _processUtils.stream(<String>[
       analyzeSnapshotPath,
       '--compute_dd_slot_mapping=$ddSlotMappingPath',
@@ -449,6 +469,7 @@ class AOTSnapshotter {
       '--dd_function_identity=$ddIdentityPath',
       elfForAnalysis,
     ]);
+    timings.add('dd_compute_slot_mapping_ms', ddSlotSw.elapsedMilliseconds);
     if (ddSlotMappingExit != 0) {
       _logger.printError(
         'DD pass: analyze_snapshot --compute_dd_slot_mapping failed with exit '
@@ -601,5 +622,26 @@ class AOTSnapshotter {
       TargetPlatform.windows_x64,
       TargetPlatform.windows_arm64,
     ].contains(platform);
+  }
+}
+
+/// Collects per-phase wall-clock timings for the AOT release build and
+/// dumps them to `App.dd_pass_timings.txt` next to the snapshot output.
+/// Format is one `key\tvalue` line per entry, in insertion order.
+class _BuildTimings {
+  final List<MapEntry<String, int>> _entries = <MapEntry<String, int>>[];
+
+  void add(String key, int value) {
+    _entries.add(MapEntry<String, int>(key, value));
+  }
+
+  void write(FileSystem fs, Directory linkDir) {
+    final buffer = StringBuffer();
+    for (final MapEntry<String, int> entry in _entries) {
+      buffer.writeln('${entry.key}\t${entry.value}');
+    }
+    fs.file(fs.path.join(linkDir.path, 'App.dd_pass_timings.txt'))
+      ..createSync(recursive: true)
+      ..writeAsStringSync(buffer.toString());
   }
 }
