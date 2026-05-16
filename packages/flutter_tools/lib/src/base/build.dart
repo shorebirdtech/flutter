@@ -326,6 +326,15 @@ class AOTSnapshotter {
       }
     }
 
+    // Optional: when SHOREBIRD_PROFILE_GEN_SNAPSHOT is set, ask gen_snapshot
+    // to print its built-in per-phase precompiler timings to stderr. The
+    // output ends up in the shorebird release log alongside everything else.
+    if (Platform.environment['SHOREBIRD_PROFILE_GEN_SNAPSHOT'] == '1') {
+      genSnapshotArgs.insert(
+        genSnapshotArgs.indexOf(mainPath),
+        '--print_precompiler_timings',
+      );
+    }
     final pass2Sw = Stopwatch()..start();
     final int genSnapshotExitCode = await _genSnapshot.run(
       snapshotType: snapshotType,
