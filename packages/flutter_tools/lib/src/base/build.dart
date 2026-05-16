@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, Process, ProcessStartMode, systemEncoding;
 
 import 'package:process/process.dart';
 
@@ -326,21 +326,35 @@ class AOTSnapshotter {
       }
     }
 
-    // Optional: when SHOREBIRD_PROFILE_GEN_SNAPSHOT is set, ask gen_snapshot
-    // to print its built-in per-phase precompiler timings to stderr. The
-    // output ends up in the shorebird release log alongside everything else.
-    if (Platform.environment['SHOREBIRD_PROFILE_GEN_SNAPSHOT'] == '1') {
+    // Optional profiling mode: when SHOREBIRD_PROFILE_GEN_SNAPSHOT=1, inject
+    // --print_precompiler_timings into pass 2 AND capture gen_snapshot's
+    // stderr directly to a file. Necessary because xcodebuild's run-script
+    // pipe filters most subprocess stderr lines, so the timings output
+    // never makes it back to the shorebird log.
+    final bool profileGenSnapshot =
+        Platform.environment['SHOREBIRD_PROFILE_GEN_SNAPSHOT'] == '1';
+    if (profileGenSnapshot) {
       genSnapshotArgs.insert(
         genSnapshotArgs.indexOf(mainPath),
         '--print_precompiler_timings',
       );
     }
     final pass2Sw = Stopwatch()..start();
-    final int genSnapshotExitCode = await _genSnapshot.run(
-      snapshotType: snapshotType,
-      additionalArgs: genSnapshotArgs,
-      darwinArch: darwinArch,
-    );
+    final int genSnapshotExitCode = profileGenSnapshot
+        ? await _runGenSnapshotWithStderrCapture(
+            snapshotType: snapshotType,
+            additionalArgs: genSnapshotArgs,
+            darwinArch: darwinArch,
+            stderrOutputPath: _fileSystem.path.join(
+              outputDir.parent.path,
+              'App.gen_snapshot_pass2.stderr.log',
+            ),
+          )
+        : await _genSnapshot.run(
+            snapshotType: snapshotType,
+            additionalArgs: genSnapshotArgs,
+            darwinArch: darwinArch,
+          );
     timings.add('gen_snapshot_pass2_ms', pass2Sw.elapsedMilliseconds);
     if (genSnapshotExitCode != 0) {
       _logger.printError('Dart snapshot generator failed with exit code $genSnapshotExitCode');
@@ -381,6 +395,50 @@ class AOTSnapshotter {
         ? fromDefine
         : Platform.environment['SHOREBIRD_DD_MAX_BYTES'];
     return int.tryParse(raw ?? '') ?? 0;
+  }
+
+  /// Variant of [GenSnapshot.run] that captures gen_snapshot's full stderr
+  /// to a file in addition to forwarding it to the logger. Used only by
+  /// the SHOREBIRD_PROFILE_GEN_SNAPSHOT codepath so we can read the
+  /// `--print_precompiler_timings` output even when xcodebuild's run-script
+  /// pipe filters most subprocess stderr lines.
+  Future<int> _runGenSnapshotWithStderrCapture({
+    required SnapshotType snapshotType,
+    required DarwinArch? darwinArch,
+    required List<String> additionalArgs,
+    required String stderrOutputPath,
+  }) async {
+    final Artifact genSnapshotArtifact;
+    if (snapshotType.platform == TargetPlatform.ios ||
+        snapshotType.platform == TargetPlatform.darwin) {
+      genSnapshotArtifact = darwinArch == DarwinArch.arm64
+          ? Artifact.genSnapshotArm64
+          : Artifact.genSnapshotX64;
+    } else {
+      genSnapshotArtifact = Artifact.genSnapshot;
+    }
+    final String snapshotterPath = _genSnapshot.getSnapshotterPath(
+      snapshotType,
+      genSnapshotArtifact,
+    );
+    final process = await Process.start(
+      snapshotterPath,
+      additionalArgs,
+      mode: ProcessStartMode.normal,
+    );
+    final Future<String> stderrText = process.stderr
+        .transform(systemEncoding.decoder)
+        .join();
+    final Future<String> stdoutText = process.stdout
+        .transform(systemEncoding.decoder)
+        .join();
+    final int exitCode = await process.exitCode;
+    final String capturedStderr = await stderrText;
+    await stdoutText;
+    _fileSystem.file(stderrOutputPath)
+      ..createSync(recursive: true)
+      ..writeAsStringSync(capturedStderr);
+    return exitCode;
   }
 
   /// Runs the DD analysis pass: gen_snapshot → ELF + DD identity, then
