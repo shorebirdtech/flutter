@@ -799,6 +799,16 @@ class AndroidGradleBuilder implements AndroidBuilder {
     final String aarTask = getAarTaskFor(buildInfo);
     final Status status = _logger.startProgress("Running Gradle task '$aarTask'...");
 
+    // When a caller runs `flutter build aar` multiple modes in one
+    // invocation (debug + profile + release), each iteration's trace
+    // overwrites the previous one. Shorebird's release flow only
+    // builds release mode, so this isn't a concern in practice.
+    final AndroidBuildTraceSession? traceSession = AndroidBuildTraceSession.maybeStart(
+      androidBuildInfo,
+      _fileSystem,
+      project.android.buildDirectory,
+    );
+
     final String flutterRoot = _fileSystem.path.absolute(Cache.flutterRoot!);
     final String initScript = _fileSystem.path.join(
       flutterRoot,
@@ -872,8 +882,10 @@ class AndroidGradleBuilder implements AndroidBuilder {
       command.add('-Ptarget-platform=$targetPlatforms');
     }
 
+    command.addAll(traceSession?.extraGradleOptions(aarTask) ?? const <String>[]);
     command.add(aarTask);
 
+    traceSession?.onGradleAboutToStart();
     final sw = Stopwatch()..start();
     RunResult result;
     try {
@@ -895,7 +907,10 @@ class AndroidGradleBuilder implements AndroidBuilder {
       ),
     );
 
+    traceSession?.onGradleFinished(aarTask);
+
     if (result.exitCode != 0) {
+      traceSession?.abortOnGradleFailure();
       _logger.printStatus(result.stdout, wrap: false);
       _logger.printError(result.stderr, wrap: false);
       throwToolExit(
@@ -905,10 +920,12 @@ class AndroidGradleBuilder implements AndroidBuilder {
     }
     final Directory repoDirectory = getRepoDirectory(outputDirectory);
     if (!repoDirectory.existsSync()) {
+      traceSession?.abortOnGradleFailure();
       _logger.printStatus(result.stdout, wrap: false);
       _logger.printError(result.stderr, wrap: false);
       throwToolExit('Gradle task $aarTask failed to produce $repoDirectory.', exitCode: exitCode);
     }
+    traceSession?.finish(buildTarget: 'aar', printStatus: _logger.printStatus);
     _logger.printStatus(
       '${_logger.terminal.successMark} '
       'Built ${_fileSystem.path.relative(repoDirectory.path)}',
