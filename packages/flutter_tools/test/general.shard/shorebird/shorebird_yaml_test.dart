@@ -83,6 +83,29 @@ patch_verification: strict
         'patch_public_key': '4-a',
       });
     });
+    test('module_version from environment', () {
+      const String yamlContents = '''
+app_id: 1-a
+''';
+      final YamlDocument input = loadYamlDocument(yamlContents);
+      final YamlMap yamlMap = input.contents as YamlMap;
+
+      // Without env var, module_version is absent.
+      final Map<String, dynamic> withoutEnv = compileShorebirdYaml(
+        yamlMap,
+        flavor: null,
+        environment: <String, String>{},
+      );
+      expect(withoutEnv.containsKey('module_version'), isFalse);
+
+      // With env var, module_version is included.
+      final Map<String, dynamic> withEnv = compileShorebirdYaml(
+        yamlMap,
+        flavor: null,
+        environment: <String, String>{'SHOREBIRD_MODULE_VERSION': 'abc1234'},
+      );
+      expect(withEnv['module_version'], 'abc1234');
+    });
     test('edit in place', () {
       const String yamlContents = '''
 app_id: 1-a
