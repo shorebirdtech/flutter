@@ -307,7 +307,24 @@ class AOTSnapshotter {
     final snapshotType = SnapshotType(platform, buildMode);
 
     final int ddMaxBytes = _readDdMaxBytes();
-    if (ddMaxBytes > 0 && usesLinker) {
+    // DD pass requires:
+    //   1. an analyze_snapshot binary whose --sdk_version matches gen_snapshot's
+    //      --version, and
+    //   2. a single non-racing ELF output path per build invocation.
+    //
+    // macOS builds fail both. (1) The shipped `analyze_snapshot` is a single
+    // host-arch binary; when targeting x64 from an arm64 host, gen_snapshot_x64
+    // reports `macos_simx64` while analyze_snapshot reports `macos_arm64` and
+    // the version-equality check rejects it. (2) Flutter spawns
+    // gen_snapshot_arm64 and gen_snapshot_x64 in parallel and both DD passes
+    // race on the same `App_dd_analysis.so` path under
+    // `.dart_tool/flutter_build/<hash>/`.
+    //
+    // Skip DD on macOS until that work is done. Patches built without DD
+    // activation will compute DD on the fly when applied, which is the
+    // pre-1.6.99 behavior — slightly worse link percentage but functional.
+    final bool ddPassSupported = platform != TargetPlatform.darwin;
+    if (ddMaxBytes > 0 && usesLinker && ddPassSupported) {
       final int pass1Exit = await _runDdAnalysisPass(
         snapshotType: snapshotType,
         darwinArch: darwinArch,
