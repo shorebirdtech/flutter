@@ -15,7 +15,7 @@ vars = {
   'flutter_git': 'https://flutter.googlesource.com',
   'skia_git': 'https://skia.googlesource.com',
   'llvm_git': 'https://llvm.googlesource.com',
-  "dart_sdk_revision": "c968e1daf89e957815b22a24fe9a99feb322798b",
+  "dart_sdk_revision": "cadcba181f9d4e41d70f17d3599cdb7c07bf93b5",
   "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
   "updater_git": "https://github.com/shorebirdtech/updater.git",
   "updater_rev": "fe3733374c222bf7d8ff1913f5ab213421a7d94f",
