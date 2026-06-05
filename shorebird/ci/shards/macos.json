@@ -82,7 +82,7 @@
       },
       {
         "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=release", "--mac-cpu=arm64"],
+        "gn_args": ["--runtime-mode=release", "--mac-cpu=arm64", "--no-prebuilt-dart-sdk"],
         "ninja_targets": ["dart_sdk"],
         "out_dir": "host_release_arm64"
       },
