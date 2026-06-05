@@ -282,7 +282,9 @@ flavors:
 ''');
 
     final result = await _runFlutterCommand(
-      ['pub', 'run', 'flutter_flavorizr'],
+      // -f/--force skips flutter_flavorizr's interactive "proceed? (Y/n)"
+      // prompt, which throws "No terminal attached to stdout" under CI.
+      ['pub', 'run', 'flutter_flavorizr', '-f'],
       workingDirectory: this,
     );
     if (result.exitCode != 0) {
