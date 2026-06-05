@@ -19,7 +19,7 @@ vars = {
   # clone (gen_snapshot etc.) and to key the macos-arm64 prebuilt object in
   # GCS, so source and prebuilt stay the same revision. A published prebuilt
   # must exist for this sha (see the macos-arm64 dart-sdk gcs dep below).
-  "dart_sdk_revision": "3bc26d9ebe7cadc4becd7313cad8cb005f98f6e6",
+  "dart_sdk_revision": "0e6acdc83e3e35edc029cc5ba92b1f7a8713e6d1",
   "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
   "updater_git": "https://github.com/shorebirdtech/updater.git",
   "updater_rev": "a591b7f6b961430034defe379a8190c41b1c5dbf",
@@ -422,9 +422,9 @@ deps = {
     'objects': [
       {
         'object_name': Var('dart_sdk_revision') + '/dart-sdk-darwin-arm64.tar.gz',
-        'sha256sum': '5968b313316b9edc8d6b003e9fb663e024568d00cea5efe0214191020412ffbf',
-        'size_bytes': 205230386,
-        'generation': 1780425558083300,
+        'sha256sum': 'afc019372949b74cbc970ccbe83288adfeb009a3b1bbbc1af320f450b8556a12',
+        'size_bytes': 205231868,
+        'generation': 1780626598067383,
       }
     ],
     'dep_type': 'gcs',
