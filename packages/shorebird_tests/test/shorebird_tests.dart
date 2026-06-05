@@ -240,9 +240,12 @@ extension ShorebirdProjectDirectoryOnDirectory on Directory {
 
   Future<void> addProjectFlavors() async {
     await addPubDependency(
-      // TODO(felangel): revert to using published version once 3.29.0 support is released.
-      // https://github.com/AngeloAvv/flutter_flavorizr/pull/291
-      'dev:flutter_flavorizr:{"git":{"url":"https://github.com/wjlee611/flutter_flavorizr.git","ref":"chore/temp-migrate-3-29","path":"."}}',
+      // Published flutter_flavorizr. We previously pinned a fork for Flutter
+      // 3.29 support (AngeloAvv/flutter_flavorizr#291, never merged); the
+      // published package has since moved well past that and generates
+      // AGP-8-compatible flavor config (resValues build feature), which the
+      // 3.29-era fork did not.
+      'dev:flutter_flavorizr:^2.5.0',
     );
 
     await File(
