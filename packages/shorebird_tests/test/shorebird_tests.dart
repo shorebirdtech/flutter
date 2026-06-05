@@ -240,9 +240,18 @@ extension ShorebirdProjectDirectoryOnDirectory on Directory {
 
   Future<void> addProjectFlavors() async {
     await addPubDependency(
-      // TODO(felangel): revert to using published version once 3.29.0 support is released.
-      // https://github.com/AngeloAvv/flutter_flavorizr/pull/291
-      'dev:flutter_flavorizr:{"git":{"url":"https://github.com/wjlee611/flutter_flavorizr.git","ref":"chore/temp-migrate-3-29","path":"."}}',
+      // Published flutter_flavorizr. We previously pinned a fork for Flutter
+      // 3.29 support (AngeloAvv/flutter_flavorizr#291, never merged); the
+      // published package has since adopted 3.29/AGP-8 support (>=2.3.0), so
+      // the fork is obsolete.
+      //
+      // Pinned to 2.4.2 (not the latest 2.5.x): 2.5.0 replaced the Ruby
+      // xcodeproj gem with dart_xcodeproj, and its generated .pbxproj breaks
+      // `flutter build ipa --no-codesign --flavor` (the unsigned flavor
+      // archive demands a Development Team). 2.4.2 is the last Ruby-xcodeproj
+      // release and matches the generation path the old fork used, while
+      // still carrying the AGP-8 resValues fix the fork lacked.
+      'dev:flutter_flavorizr:2.4.2',
     );
 
     await File(
@@ -279,13 +288,30 @@ flavors:
 ''');
 
     final result = await _runFlutterCommand(
-      ['pub', 'run', 'flutter_flavorizr'],
+      // -f/--force skips flutter_flavorizr's interactive "proceed? (Y/n)"
+      // prompt, which throws "No terminal attached to stdout" under CI.
+      ['pub', 'run', 'flutter_flavorizr', '-f'],
       workingDirectory: this,
     );
     if (result.exitCode != 0) {
       throw Exception(
           'Failed to run `flutter pub run flutter_flavorizr`: ${result.stderr}');
     }
+
+    // flutter_flavorizr 2.4.2 emits per-flavor `resValue` entries in
+    // build.gradle. AGP 8 (Flutter 3.44+) gates resValues behind an opt-in
+    // build feature, so the flavored `flutter build apk` fails with "contains
+    // custom resource values, but the feature is disabled" unless we enable
+    // it. (Published flavorizr only enables this on 2.5.x, which we can't use:
+    // 2.5.0's dart_xcodeproj rewrite breaks `flutter build ipa --no-codesign
+    // --flavor`. So we stay on the last Ruby-xcodeproj release and toggle the
+    // build feature ourselves.)
+    final gradleProperties =
+        File(path.join(this.path, 'android', 'gradle.properties'));
+    await gradleProperties.writeAsString(
+      '\nandroid.defaults.buildfeatures.resvalues=true\n',
+      mode: FileMode.append,
+    );
   }
 
   void addShorebirdFlavors() {
