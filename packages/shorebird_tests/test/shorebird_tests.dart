@@ -297,6 +297,21 @@ flavors:
       throw Exception(
           'Failed to run `flutter pub run flutter_flavorizr`: ${result.stderr}');
     }
+
+    // flutter_flavorizr 2.4.2 emits per-flavor `resValue` entries in
+    // build.gradle. AGP 8 (Flutter 3.44+) gates resValues behind an opt-in
+    // build feature, so the flavored `flutter build apk` fails with "contains
+    // custom resource values, but the feature is disabled" unless we enable
+    // it. (Published flavorizr only enables this on 2.5.x, which we can't use:
+    // 2.5.0's dart_xcodeproj rewrite breaks `flutter build ipa --no-codesign
+    // --flavor`. So we stay on the last Ruby-xcodeproj release and toggle the
+    // build feature ourselves.)
+    final gradleProperties =
+        File(path.join(this.path, 'android', 'gradle.properties'));
+    await gradleProperties.writeAsString(
+      '\nandroid.defaults.buildfeatures.resvalues=true\n',
+      mode: FileMode.append,
+    );
   }
 
   void addShorebirdFlavors() {
