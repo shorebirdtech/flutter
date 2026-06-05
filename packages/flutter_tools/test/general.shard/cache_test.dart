@@ -1600,7 +1600,7 @@ void main() {
 
     await engineStamp.updateInner(artifactUpdater, fileSystem, FakeOperatingSystemUtils());
 
-    expect(messages, <String>['Downloading engine information...']);
+    expect(messages, <String>['Engine Information']);
 
     expect(downloads, <String>[
       'https://download.shorebird.dev/flutter_infra_release/flutter/hijklmnop/engine_stamp.json',
