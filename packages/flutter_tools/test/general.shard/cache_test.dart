@@ -881,7 +881,7 @@ void main() {
 
       await webSdk.updateInner(artifactUpdater, fileSystem, FakeOperatingSystemUtils());
 
-      expect(messages, <String>['Downloading Web SDK...']);
+      expect(messages, <String>['Web SDK']);
 
       expect(downloads, <String>[
         'https://download.shorebird.dev/flutter_infra_release/flutter/hijklmnop/flutter-web-sdk.zip',
@@ -1002,7 +1002,7 @@ void main() {
 
     await engineStamp.updateInner(artifactUpdater, fileSystem, FakeOperatingSystemUtils());
 
-    expect(messages, <String>['Downloading engine information...']);
+    expect(messages, <String>['Engine Information']);
 
     expect(downloads, <String>[
       'https://download.shorebird.dev/flutter_infra_release/flutter/hijklmnop/engine_stamp.json',
@@ -1317,6 +1317,12 @@ class FakeSecondaryCachedArtifact extends Fake implements CachedArtifact {
 
   @override
   DevelopmentArtifact get developmentArtifact => DevelopmentArtifact.universal;
+
+  @override
+  String get displayName => 'fake';
+
+  @override
+  int get downloadCount => 1;
 }
 
 class FakeIosUsbArtifacts extends Fake implements IosUsbArtifacts {
