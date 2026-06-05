@@ -888,7 +888,7 @@ flavors:
           .childFile('x86_64/App.framework.dSYM/Contents/Resources/DWARF/App')
           .createSync(recursive: true);
 
-      final build = environment.buildDir.path;
+      final String build = environment.buildDir.path;
       // Both archs go through the same code path now (the DD-pass is gated on
       // SHOREBIRD_DD_MAX_BYTES which isn't set in this test), so neither
       // architecture has an extra async hop. With concurrent Future.wait, the
@@ -1072,7 +1072,11 @@ class FakeXcodeProjectInterpreter extends Fake implements XcodeProjectInterprete
   List<String> schemes;
 
   @override
-  Future<XcodeProjectInfo?> getInfo(String projectPath, {String? projectFilename}) async {
+  Future<XcodeProjectInfo?> getInfo(
+    String projectPath, {
+    required Directory buildDirectory,
+    String? projectFilename,
+  }) async {
     return XcodeProjectInfo(<String>[], <String>[], schemes, BufferLogger.test());
   }
 }
