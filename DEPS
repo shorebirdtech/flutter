@@ -400,14 +400,27 @@ deps = {
     'dep_type': 'cipd',
     'condition': 'host_os == "mac" and download_dart_sdk'
   },
+  # Consume Shorebird's own published Dart SDK (built from
+  # shorebirdtech/dart-sdk) from GCS instead of Google's CIPD prebuilt, so
+  # the engine builds against our Dart fork and skips rebuilding it from
+  # source (see shards/macos.json: mac-arm64 drops --no-prebuilt-dart-sdk).
+  # The object is keyed by Var('dart_sdk_revision') so it tracks the same
+  # fork revision as the source clone above; sha256sum/size_bytes pin the
+  # specific artifact's content and must be updated whenever that revision
+  # bumps. tar.gz (not zip) so gclient's extraction preserves the executable
+  # bit on bin/dart etc. The bot reads this private bucket via a keyless-WIF
+  # reader SA (shorebirdtech/_build_engine sync.yaml).
   'engine/src/flutter/prebuilts/macos-arm64/dart-sdk': {
-    'packages': [
+    'bucket': 'shorebird-dart-sdk-prebuilt',
+    'objects': [
       {
-        'package': 'flutter/dart-sdk/mac-arm64',
-        'version': 'git_revision:'+Var('dart_revision')
+        'object_name': Var('dart_sdk_revision') + '/dart-sdk-darwin-arm64.tar.gz',
+        'sha256sum': '5968b313316b9edc8d6b003e9fb663e024568d00cea5efe0214191020412ffbf',
+        'size_bytes': 205230386,
+        'generation': 1780425558083300,
       }
     ],
-    'dep_type': 'cipd',
+    'dep_type': 'gcs',
     'condition': 'host_os == "mac" and download_dart_sdk'
   },
   'engine/src/flutter/prebuilts/windows-x64/dart-sdk': {
