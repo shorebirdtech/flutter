@@ -26,7 +26,6 @@ import '../../../src/fakes.dart';
 
 const kBoundaryKey = '4d2d9609-c662-4571-afde-31410f96caa6';
 const kElfAot = '--snapshot_kind=app-aot-elf';
-const kMachoDylibAot = '--snapshot_kind=app-aot-macho-dylib';
 
 /// Generate Shorebird link info arguments for iOS/macOS AOT builds.
 /// The [buildPath] should be the build directory path (outputDir.parent.path).
@@ -695,6 +694,7 @@ void main() {
           '--deterministic',
           kElfAot,
           '--elf=$build/app.so',
+          '--strip',
           '--no-sim-use-hardfp',
           '--no-use-integer-division',
           '$build/app.dill',
@@ -725,6 +725,7 @@ void main() {
           '--trace-precompiler-to=code_size_1/trace.android-arm.json',
           kElfAot,
           '--elf=$build/app.so',
+          '--strip',
           '--no-sim-use-hardfp',
           '--no-use-integer-division',
           '$build/app.dill',
@@ -819,13 +820,50 @@ void main() {
             ...linkInfoArgsFor(build),
             '--write-v8-snapshot-profile-to=code_size_1/snapshot.arm64.json',
             '--trace-precompiler-to=code_size_1/trace.arm64.json',
-            kMachoDylibAot,
-            '--macho=$build/arm64/App.framework/App',
-            '--macho-object=$build/arm64/app.o',
-            '--macho-min-os-version=15.0',
-            '--macho-rpath=@executable_path/Frameworks,@loader_path/Frameworks',
-            '--macho-install-name=@rpath/App.framework/App',
+            '--snapshot_kind=app-aot-assembly',
+            '--assembly=$build/arm64/snapshot_assembly.S',
             '$build/app.dill',
+          ],
+        ),
+        FakeCommand(
+          command: <String>[
+            'xcrun',
+            'cc',
+            '-arch',
+            'arm64',
+            '-miphoneos-version-min=13.0',
+            '-isysroot',
+            'path/to/iPhoneOS.sdk',
+            '-c',
+            '$build/arm64/snapshot_assembly.S',
+            '-o',
+            '$build/arm64/snapshot_assembly.o',
+          ],
+        ),
+        FakeCommand(
+          command: <String>[
+            'xcrun',
+            'clang',
+            '-arch',
+            'arm64',
+            '-miphoneos-version-min=13.0',
+            '-isysroot',
+            'path/to/iPhoneOS.sdk',
+            '-dynamiclib',
+            '-Xlinker',
+            '-rpath',
+            '-Xlinker',
+            '@executable_path/Frameworks',
+            '-Xlinker',
+            '-rpath',
+            '-Xlinker',
+            '@loader_path/Frameworks',
+            '-fapplication-extension',
+            '-install_name',
+            '@rpath/App.framework/App',
+            '-o',
+            '$build/arm64/App.framework/App',
+            '$build/arm64/snapshot_assembly.o',
           ],
         ),
         FakeCommand(
@@ -888,6 +926,7 @@ void main() {
           'baz=2',
           kElfAot,
           '--elf=$build/app.so',
+          '--strip',
           '--no-sim-use-hardfp',
           '--no-use-integer-division',
           '$build/app.dill',
