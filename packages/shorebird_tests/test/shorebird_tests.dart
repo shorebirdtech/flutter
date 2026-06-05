@@ -242,10 +242,16 @@ extension ShorebirdProjectDirectoryOnDirectory on Directory {
     await addPubDependency(
       // Published flutter_flavorizr. We previously pinned a fork for Flutter
       // 3.29 support (AngeloAvv/flutter_flavorizr#291, never merged); the
-      // published package has since moved well past that and generates
-      // AGP-8-compatible flavor config (resValues build feature), which the
-      // 3.29-era fork did not.
-      'dev:flutter_flavorizr:^2.5.0',
+      // published package has since adopted 3.29/AGP-8 support (>=2.3.0), so
+      // the fork is obsolete.
+      //
+      // Pinned to 2.4.2 (not the latest 2.5.x): 2.5.0 replaced the Ruby
+      // xcodeproj gem with dart_xcodeproj, and its generated .pbxproj breaks
+      // `flutter build ipa --no-codesign --flavor` (the unsigned flavor
+      // archive demands a Development Team). 2.4.2 is the last Ruby-xcodeproj
+      // release and matches the generation path the old fork used, while
+      // still carrying the AGP-8 resValues fix the fork lacked.
+      'dev:flutter_flavorizr:2.4.2',
     );
 
     await File(
