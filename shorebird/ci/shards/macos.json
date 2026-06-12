@@ -82,8 +82,8 @@
       },
       {
         "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=release", "--mac-cpu=arm64", "--no-prebuilt-dart-sdk"],
-        "ninja_targets": ["dart_sdk"],
+        "gn_args": ["--runtime-mode=release", "--mac-cpu=arm64"],
+        "ninja_targets": ["dart_sdk", "flutter/tools/font_subset"],
         "out_dir": "host_release_arm64"
       },
       {
@@ -96,7 +96,8 @@
     "compose_input": "macos-framework",
     "artifacts": [
       {"src": "host_release_arm64/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-darwin-arm64.zip", "zip": true, "content_hash": true},
-      {"src": "mac_release_arm64/zip_archives/darwin-arm64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64-release/artifacts.zip"}
+      {"src": "mac_release_arm64/zip_archives/darwin-arm64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64-release/artifacts.zip"},
+      {"src": "host_release_arm64/zip_archives/darwin-arm64/font-subset.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64/font-subset.zip"}
     ]
   },
   "mac-x64": {

@@ -60,6 +60,11 @@ artifact_overrides:
   - flutter_infra_release/flutter/$engine/darwin-x64-release/framework.zip
   - flutter_infra_release/flutter/$engine/darwin-x64-release/gen_snapshot.zip
 
+  # Host const_finder (font-subset.zip). Fork-built so const_finder.dart.snapshot
+  # is stamped with our Dart SDK hash and loads under the strict shipped VM.
+  # The flutter tool resolves this from darwin-x64 even on arm64 hosts.
+  - flutter_infra_release/flutter/$engine/darwin-x64/font-subset.zip
+
   # Windows release artifacts
   - flutter_infra_release/flutter/$engine/windows-x64/artifacts.zip
   - flutter_infra_release/flutter/$engine/windows-x64-release/windows-x64-flutter.zip
