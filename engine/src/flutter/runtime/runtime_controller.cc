@@ -123,6 +123,24 @@ std::unique_ptr<RuntimeController> RuntimeController::Clone() const {
   );
 }
 
+// Shorebird: |Clone|, except the new controller launches isolates from
+// |isolate_snapshot| instead of this controller's snapshot. Used by the
+// production hot restart to relaunch the root isolate from a newly
+// installed patch; see shell/common/shorebird/hot_restart.h.
+std::unique_ptr<RuntimeController> RuntimeController::CloneWithSnapshot(
+    fml::RefPtr<const DartSnapshot> isolate_snapshot) const {
+  return std::make_unique<RuntimeController>(client_,                      //
+                                             vm_,                          //
+                                             std::move(isolate_snapshot),  //
+                                             idle_notification_callback_,  //
+                                             platform_data_,               //
+                                             isolate_create_callback_,     //
+                                             isolate_shutdown_callback_,   //
+                                             persistent_isolate_data_,     //
+                                             context_                      //
+  );
+}
+
 bool RuntimeController::FlushRuntimeStateToIsolate() {
   FML_DCHECK(!has_flushed_runtime_state_)
       << "FlushRuntimeStateToIsolate is called more than once somehow.";

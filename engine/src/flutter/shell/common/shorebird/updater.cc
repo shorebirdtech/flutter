@@ -20,6 +20,9 @@ std::atomic<bool> Updater::launch_started_{false};
 std::atomic<bool> Updater::launch_completed_{false};
 std::atomic<bool> Updater::initialized_{false};
 std::atomic<bool> Updater::update_thread_started_{false};
+std::mutex Updater::restart_hosts_mutex_;
+std::map<uintptr_t, std::function<bool()>> Updater::restart_hosts_;
+std::atomic<bool> Updater::hot_restart_supported_{false};
 
 Updater& Updater::Instance() {
   std::lock_guard<std::mutex> lock(instance_mutex_);
@@ -44,13 +47,13 @@ void Updater::ResetInstanceForTesting() {
 }
 
 void Updater::ResetLaunchStateForTesting() {
-  launch_started_.store(false);
-  launch_completed_.store(false);
+  BeginNewLaunchCycle();
   initialized_.store(false);
   update_thread_started_.store(false);
 }
 
 bool Updater::Init(const AppConfig& config) {
+  app_config_ = config;
   bool result = DoInit(config);
   // Latch rather than assign: add-to-app calls Init once per engine, and a
   // later failure must not forget that the process already configured.
@@ -58,6 +61,54 @@ bool Updater::Init(const AppConfig& config) {
     initialized_.store(true);
   }
   return result;
+}
+
+// A hot restart re-runs the launch lifecycle, so only the per-cycle guards
+// clear. The process stays configured and its update thread stays running,
+// so `initialized_` and `update_thread_started_` deliberately survive.
+void Updater::BeginNewLaunchCycle() {
+  launch_started_.store(false);
+  launch_completed_.store(false);
+}
+
+void Updater::RegisterRestartHost(uintptr_t host_id,
+                                  std::function<bool()> request_restart) {
+  std::lock_guard<std::mutex> lock(restart_hosts_mutex_);
+  restart_hosts_[host_id] = std::move(request_restart);
+}
+
+void Updater::UnregisterRestartHost(uintptr_t host_id) {
+  // Blocks while RequestRestart is invoking this host's callback, so a
+  // callback never runs against a destroyed host. Host callbacks must only
+  // schedule work (never restart synchronously), both to keep this window
+  // short and because the request arrives on an arbitrary thread.
+  std::lock_guard<std::mutex> lock(restart_hosts_mutex_);
+  restart_hosts_.erase(host_id);
+}
+
+bool Updater::RequestRestart() {
+  std::lock_guard<std::mutex> lock(restart_hosts_mutex_);
+  if (restart_hosts_.empty()) {
+    FML_LOG(WARNING) << "Shorebird restart requested, but no engine capable "
+                        "of hot restart is running.";
+    return false;
+  }
+  if (restart_hosts_.size() > 1) {
+    FML_LOG(WARNING)
+        << "Shorebird restart requested, but multiple Flutter engines are "
+           "running in this process. Hot restart is not supported with "
+           "multiple engines; the patch will boot on the next app launch.";
+    return false;
+  }
+  return restart_hosts_.begin()->second();
+}
+
+void Updater::SetHotRestartSupported(bool supported) {
+  hot_restart_supported_.store(supported);
+}
+
+bool Updater::HotRestartSupported() {
+  return hot_restart_supported_.load();
 }
 
 void Updater::ReportLaunchStart() {
@@ -132,6 +183,14 @@ void Updater::ReportLaunchFailure() {
 #if SHOREBIRD_PLATFORM_SUPPORTED
 // RealUpdater implementation - wraps the Rust C API
 
+namespace {
+// Registered with the Rust updater; invoked (on an arbitrary thread) when
+// Dart calls shorebird_restart_app.
+bool RestartHandlerTrampoline() {
+  return Updater::RequestRestart();
+}
+}  // namespace
+
 bool RealUpdater::DoInit(const AppConfig& config) {
   // Convert paths to C strings
   std::vector<const char*> c_paths;
@@ -154,7 +213,15 @@ bool RealUpdater::DoInit(const AppConfig& config) {
   rust_callbacks.seek = config.file_callbacks.seek;
   rust_callbacks.close = config.file_callbacks.close;
 
-  return shorebird_init(&params, rust_callbacks, config.yaml_config.c_str());
+  bool result =
+      shorebird_init(&params, rust_callbacks, config.yaml_config.c_str());
+  if (result) {
+    // Let package:shorebird_code_push request hot restarts via
+    // shorebird_restart_app. Whether a restart can actually be serviced is
+    // decided per-request by RequestRestart (a single registered host).
+    shorebird_set_restart_handler(&RestartHandlerTrampoline);
+  }
+  return result;
 }
 
 void RealUpdater::ValidateNextBootPatch() {

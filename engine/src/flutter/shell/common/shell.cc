@@ -617,6 +617,10 @@ Shell::Shell(DartVMRef vm,
 }
 
 Shell::~Shell() {
+  // Shorebird: stop servicing hot restart requests. Blocks until any
+  // in-flight request against this shell has finished scheduling.
+  ShorebirdUnregisterRestartHost();
+
 #if !SLIMPELLER
   PersistentCache::GetCacheForProcess()->RemoveWorkerTaskRunner(
       task_runners_.GetIOTaskRunner());
@@ -916,6 +920,10 @@ bool Shell::Setup(std::unique_ptr<PlatformView> platform_view,
   }
 
   is_set_up_ = true;
+
+  // Shorebird: allow package:shorebird_code_push to hot restart this shell
+  // in production. No-op unless eligible; see hot_restart.cc.
+  ShorebirdRegisterRestartHost();
 
 #if !SLIMPELLER
   PersistentCache::GetCacheForProcess()->AddWorkerTaskRunner(
