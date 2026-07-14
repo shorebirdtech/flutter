@@ -74,8 +74,7 @@ void SetBaseSnapshot(Settings& settings) {
   const uint8_t* iso_data_ptr = isolate_snapshot->GetDataMapping();
   const uint8_t* vm_insns_ptr = vm_snapshot->GetInstructionsMapping();
   const uint8_t* iso_insns_ptr = isolate_snapshot->GetInstructionsMapping();
-  intptr_t vm_data_size =
-      vm_data_ptr ? Dart_SnapshotDataSize(vm_data_ptr) : -1;
+  intptr_t vm_data_size = vm_data_ptr ? Dart_SnapshotDataSize(vm_data_ptr) : -1;
   intptr_t iso_data_size =
       iso_data_ptr ? Dart_SnapshotDataSize(iso_data_ptr) : -1;
   intptr_t vm_insns_size =
@@ -250,6 +249,15 @@ void ConfigureShorebird(std::string code_cache_path,
   config.yaml_config = shorebird_yaml;
 
   bool init_result = shorebird::Updater::Instance().Init(config);
+
+  // On the mobile path, snapshots resolve through
+  // Settings::application_library_paths, which hot restart can re-resolve to
+  // pick up a newly installed patch. Desktop embedders (the other
+  // ConfigureShorebird overload) wire AOT data through the embedder API,
+  // which a restart would not refresh, so they don't enable this.
+  if (init_result) {
+    shorebird::Updater::SetHotRestartSupported(true);
+  }
 
   // We do not support synchronous updates on launch, it's a terrible UX.
   // Users can implement custom check-for-updates using

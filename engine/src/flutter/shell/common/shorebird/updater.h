@@ -7,6 +7,8 @@
 
 #include <atomic>
 #include <cstdint>
+#include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -81,10 +83,17 @@ class Updater {
   virtual ~Updater() = default;
 
   /// Initialize the updater with configuration.
+  /// Retains a copy of `config` (see `GetAppConfig`) and calls the
+  /// implementation's `DoInit`.
   /// @param config Configuration containing release version, paths, and
   /// callbacks
   /// @return true if initialization succeeded
-  virtual bool Init(const AppConfig& config) = 0;
+  bool Init(const AppConfig& config);
+
+  /// The configuration passed to the last successful `Init` call. Hot
+  /// restart uses `original_libapp_paths` to fall back to the base release
+  /// when the running patch has been rolled back.
+  const AppConfig& GetAppConfig() const { return app_config_; }
 
   /// Validate the next boot patch. If invalid, falls back to last good state.
   virtual void ValidateNextBootPatch() = 0;
@@ -93,12 +102,44 @@ class Updater {
   /// @return Path to patch, or empty string if no patch available
   virtual std::string NextBootPatchPath() = 0;
 
-  // Boot lifecycle methods — guarded to run at most once per process.
+  // Boot lifecycle methods — guarded to run at most once per launch cycle.
   // Callers may call these freely; subsequent calls after the first are
-  // silently ignored.
+  // silently ignored. A process normally has exactly one launch cycle; hot
+  // restart begins another via `BeginNewLaunchCycle`.
   void ReportLaunchStart();
   void ReportLaunchSuccess();
   void ReportLaunchFailure();
+
+  /// Re-arms the launch lifecycle guards so a hot restart can report a new
+  /// launch cycle (start, then success/failure) to the Rust updater —
+  /// exactly like a fresh process boot. Only the hot restart host may call
+  /// this, immediately before re-resolving the isolate snapshot.
+  static void BeginNewLaunchCycle();
+
+  // Hot restart hosts.
+  //
+  // A host is a Shell that can tear down and relaunch its Dart isolate from
+  // the current next-boot patch. Hosts register at Shell setup and
+  // unregister at Shell destruction. `RequestRestart` is invoked (on an
+  // arbitrary thread) when Dart calls `shorebird_restart_app`; the host's
+  // callback must schedule the restart asynchronously and return whether it
+  // was scheduled. Restarting is only supported with exactly one live host:
+  // with multiple engines in one process (add-to-app, FlutterEngineGroup)
+  // there is no safe way to restart them all against a shared updater
+  // state, so the request is rejected.
+  static void RegisterRestartHost(uintptr_t host_id,
+                                  std::function<bool()> request_restart);
+  static void UnregisterRestartHost(uintptr_t host_id);
+  static bool RequestRestart();
+
+  /// Marks hot restart as supported for this process. Set by the mobile
+  /// (Android/iOS) ConfigureShorebird path, where snapshot re-resolution via
+  /// `Settings::application_library_paths` picks up a newly installed patch.
+  /// Desktop embedders resolve AOT data through the embedder API instead; a
+  /// restart there would silently relaunch the old snapshot, so they do not
+  /// set this.
+  static void SetHotRestartSupported(bool supported);
+  static bool HotRestartSupported();
 
   // Update checking
   virtual bool ShouldAutoUpdate() = 0;
@@ -111,7 +152,7 @@ class Updater {
   static void SetInstanceForTesting(std::unique_ptr<Updater> instance);
   static void ResetInstanceForTesting();
 
-  /// Resets the once-per-process launch guards so tests can verify
+  /// Resets the once-per-launch-cycle guards so tests can verify
   /// start/success/failure calls on fresh Updater instances.
   static void ResetLaunchStateForTesting();
 
@@ -119,17 +160,25 @@ class Updater {
   Updater() = default;
 
   // Subclass hooks — called by the public guarded methods above.
+  virtual bool DoInit(const AppConfig& config) = 0;
   virtual void DoReportLaunchStart() = 0;
   virtual void DoReportLaunchSuccess() = 0;
   virtual void DoReportLaunchFailure() = 0;
 
  private:
+  AppConfig app_config_;
+
   static std::unique_ptr<Updater> instance_;
   static std::mutex instance_mutex_;
 
-  // Once-per-process guards for launch lifecycle.
+  // Once-per-launch-cycle guards. See `BeginNewLaunchCycle`.
   static std::atomic<bool> launch_started_;
   static std::atomic<bool> launch_completed_;
+
+  // Hot restart host registry.
+  static std::mutex restart_hosts_mutex_;
+  static std::map<uintptr_t, std::function<bool()>> restart_hosts_;
+  static std::atomic<bool> hot_restart_supported_;
 };
 
 /// No-op implementation for unsupported platforms.
@@ -139,7 +188,7 @@ class NoOpUpdater : public Updater {
   NoOpUpdater() = default;
   ~NoOpUpdater() override = default;
 
-  bool Init(const AppConfig& config) override { return true; }
+  bool DoInit(const AppConfig& config) override { return true; }
   void ValidateNextBootPatch() override {}
   std::string NextBootPatchPath() override { return ""; }
   void DoReportLaunchStart() override {}
@@ -157,7 +206,7 @@ class RealUpdater : public Updater {
   RealUpdater() = default;
   ~RealUpdater() override = default;
 
-  bool Init(const AppConfig& config) override;
+  bool DoInit(const AppConfig& config) override;
   void ValidateNextBootPatch() override;
   std::string NextBootPatchPath() override;
   void DoReportLaunchStart() override;
@@ -175,7 +224,7 @@ class MockUpdater : public Updater {
   MockUpdater() = default;
   ~MockUpdater() override = default;
 
-  bool Init(const AppConfig& config) override;
+  bool DoInit(const AppConfig& config) override;
   void ValidateNextBootPatch() override;
   std::string NextBootPatchPath() override;
   void DoReportLaunchStart() override;

@@ -185,6 +185,18 @@ class RuntimeController : public PlatformConfigurationClient,
   std::unique_ptr<RuntimeController> Clone() const;
 
   //----------------------------------------------------------------------------
+  /// @brief      Shorebird: like |Clone|, but the cloned controller launches
+  ///             isolates from |isolate_snapshot| instead of this
+  ///             controller's snapshot. Used by the production hot restart
+  ///             to relaunch the root isolate from a newly installed patch.
+  ///
+  /// @return     A clone of the existing runtime controller with the given
+  ///             isolate snapshot.
+  ///
+  std::unique_ptr<RuntimeController> CloneWithSnapshot(
+      fml::RefPtr<const DartSnapshot> isolate_snapshot) const;
+
+  //----------------------------------------------------------------------------
   /// @brief      Notify the isolate that a new view is available.
   ///
   ///             A view must be added before other methods can refer to it,

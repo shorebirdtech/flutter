@@ -214,6 +214,24 @@ bool Engine::Restart(RunConfiguration configuration) {
   return Run(std::move(configuration)) == Engine::RunStatus::Success;
 }
 
+// Shorebird: |Restart|, but the relaunched isolate boots from
+// |isolate_snapshot| (a newly installed patch) instead of the snapshot this
+// engine booted with.
+bool Engine::RestartWithSnapshot(
+    RunConfiguration configuration,
+    fml::RefPtr<const DartSnapshot> isolate_snapshot) {
+  TRACE_EVENT0("flutter", "Engine::RestartWithSnapshot");
+  if (!configuration.IsValid()) {
+    FML_LOG(ERROR) << "Engine run configuration was invalid.";
+    return false;
+  }
+  delegate_.OnPreEngineRestart();
+  runtime_controller_ =
+      runtime_controller_->CloneWithSnapshot(std::move(isolate_snapshot));
+  UpdateAssetManager(nullptr);
+  return Run(std::move(configuration)) == Engine::RunStatus::Success;
+}
+
 Engine::RunStatus Engine::Run(RunConfiguration configuration) {
   if (!configuration.IsValid()) {
     FML_LOG(ERROR) << "Engine run configuration was invalid.";
@@ -222,8 +240,11 @@ Engine::RunStatus Engine::Run(RunConfiguration configuration) {
 
   last_entry_point_ = configuration.GetEntrypoint();
   last_entry_point_library_ = configuration.GetEntrypointLibrary();
-#if (FLUTTER_RUNTIME_MODE == FLUTTER_RUNTIME_MODE_DEBUG)
-  // This is only used to support restart.
+// This is only used to support restart. Shorebird: also retained in release
+// on supported platforms, where the production hot restart relaunches the
+// isolate with the same entrypoint arguments.
+#if (FLUTTER_RUNTIME_MODE == FLUTTER_RUNTIME_MODE_DEBUG) || \
+    SHOREBIRD_PLATFORM_SUPPORTED
   last_entry_point_args_ = configuration.GetEntrypointArgs();
 #endif
 
