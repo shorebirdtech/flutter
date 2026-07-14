@@ -445,6 +445,13 @@ class Shell final : public PlatformView::Delegate,
   static std::pair<DartVMRef, fml::RefPtr<const DartSnapshot>>
   InferVmInitDataFromSettings(Settings& settings);
 
+  // Shorebird: hot restart host registration. Declared here because the
+  // implementations need this shell's settings, VM, and engine; defined in
+  // shell/common/shorebird/hot_restart.cc to keep the logic out of this
+  // file.
+  void ShorebirdRegisterRestartHost();
+  void ShorebirdUnregisterRestartHost();
+
  private:
   using ServiceProtocolHandler =
       std::function<bool(const ServiceProtocol::Handler::ServiceProtocolMap&,
