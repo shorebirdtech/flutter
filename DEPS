@@ -421,7 +421,14 @@ deps = {
       }
     ],
     'dep_type': 'gcs',
-    'condition': 'host_os == "mac" and download_dart_sdk'
+    # Dry-run 3.47.0-rc0: mac-arm64 builds Dart from source
+    # (--no-prebuilt-dart-sdk in shards/macos.json), so this prebuilt is never
+    # consumed. Disabled because it was never published for the offsets-regen
+    # tip (046fbc2), which 404s gclient sync. Real release: either publish it
+    # via publish-darwin-arm64 + update sha256sum/size_bytes/generation, or drop
+    # this hook (it is vestigial post the #155 partial revert). See
+    # notes/3.47.0-rc0/deferred-followups.md.
+    'condition': 'False'
   },
   'engine/src/flutter/prebuilts/windows-x64/dart-sdk': {
     'packages': [
