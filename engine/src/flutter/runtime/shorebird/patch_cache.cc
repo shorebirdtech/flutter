@@ -40,17 +40,15 @@ std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
                                                  elf_mapping->GetSize());
 
   const char* error = nullptr;
-  // The VM Snapshot is identical for all binaries produced by a given version
-  // of Dart. Our linker checks this and will fail to link if ever the VM
-  // snapshot changes. We ignore the VM data/instrs here.
-  const uint8_t* ignored_vm_data = nullptr;
-  const uint8_t* ignored_vm_instrs = nullptr;
+  // One data blob and one text blob. The VM isolate folded into the isolate
+  // group, so the VM and isolate symbols now name the same buffers and
+  // Dart_LoadELF resolves a single pair.
   const uint8_t* isolate_data = nullptr;
   const uint8_t* isolate_instrs = nullptr;
 
-  Dart_LoadedElf* elf = Dart_LoadELF(
-      path.c_str(), elf_file_offset, &error, &ignored_vm_data,
-      &ignored_vm_instrs, &isolate_data, &isolate_instrs, dart::bin::kReadOnly);
+  Dart_LoadedElf* elf =
+      Dart_LoadELF(path.c_str(), elf_file_offset, &error, &isolate_data,
+                   &isolate_instrs, dart::bin::kReadOnly);
 
   if (elf == nullptr) {
     FML_LOG(ERROR) << "Failed to load patch at " << path << " error: " << error;
