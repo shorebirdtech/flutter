@@ -267,9 +267,11 @@ void ConfigureShorebird(std::string code_cache_path,
     FML_LOG(INFO) << "Shorebird updater: active path: " << active_path;
 
 #if SHOREBIRD_USE_INTERPRETER
-    // On iOS we add the patch to the front of the list instead of clearing
-    // the list, to allow dart_snapshot.cc to still find the base snapshot
-    // for the vm isolate.
+    // Front-insert rather than clear. A linked patch carries only the code it
+    // rewrote, and everything it linked against still executes out of the base
+    // image, so the base has to stay resolvable for the life of the process.
+    // SearchMapping takes the first path that resolves a symbol, so the patch
+    // still wins the lookup without evicting the base.
     settings.application_library_paths.insert(
         settings.application_library_paths.begin(), active_path);
 #else
@@ -300,9 +302,10 @@ void ConfigureShorebird(std::string code_cache_path,
 
 void* FileCallbacksImpl::Open() {
 #if SHOREBIRD_USE_INTERPRETER
-  return SnapshotsDataHandle::createForSnapshots(*vm_snapshot,
-                                                 *isolate_snapshot)
-      .release();
+  // vm_snapshot, not isolate_snapshot: both resolve the same symbol now, but
+  // only the VM path is patch-blind, and this stream must be the unpatched
+  // base.
+  return SnapshotsDataHandle::createForSnapshots(*vm_snapshot).release();
 #else
   // SnapshotsDataHandle exists on all platforms (for testing) but is only used
   // on iOS. iOS patches are generated from just the Dart parts of the snapshot,
