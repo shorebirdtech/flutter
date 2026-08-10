@@ -17,7 +17,7 @@ vars = {
   'llvm_git': 'https://llvm.googlesource.com',
   'dart_ai_rev': '9c96bfe5f091c9451eff5b59c9bffeb2e806b875',
   'skia_revision': '8df24be66531469e576a806749a0202ae26b8d08',
-  "dart_sdk_revision": "046fbc29efd0bd56a7749e1e48a0793fe41780d8",
+  "dart_sdk_revision": "1c05054e0833f9fc163e81e294a7ef1562e9f930",
   "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
   "updater_git": "https://github.com/shorebirdtech/updater.git",
   "updater_rev": "1f85c4ab1ee5b540269b9859c75e1bffbb9050c7",
@@ -415,20 +415,13 @@ deps = {
     'objects': [
       {
         'object_name': Var('dart_sdk_revision') + '/dart-sdk-darwin-arm64.tar.gz',
-        'sha256sum': '5968b313316b9edc8d6b003e9fb663e024568d00cea5efe0214191020412ffbf',
-        'size_bytes': 205230386,
-        'generation': 1780425558083300,
+        'sha256sum': 'd47ac7c3fbec53d2d64a167bea6086a1d635f332995da2c93baa31c2ede069c3',
+        'size_bytes': 215163753,
+        'generation': 1786384359711456,
       }
     ],
     'dep_type': 'gcs',
-    # Dry-run 3.47.0-rc0: mac-arm64 builds Dart from source
-    # (--no-prebuilt-dart-sdk in shards/macos.json), so this prebuilt is never
-    # consumed. Disabled because it was never published for the offsets-regen
-    # tip (046fbc2), which 404s gclient sync. Real release: either publish it
-    # via publish-darwin-arm64 + update sha256sum/size_bytes/generation, or drop
-    # this hook (it is vestigial post the #155 partial revert). See
-    # notes/3.47.0-rc0/deferred-followups.md.
-    'condition': 'False'
+    'condition': 'host_os == "mac" and download_dart_sdk'
   },
   'engine/src/flutter/prebuilts/windows-x64/dart-sdk': {
     'packages': [
