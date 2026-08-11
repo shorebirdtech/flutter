@@ -18,36 +18,19 @@ TEST(PatchCache, InstanceReturnsSameInstance) {
   EXPECT_EQ(&instance1, &instance2);
 }
 
+// Every case below keeps a non-patch path at the front. A .vmcode front path
+// commits to loading the file, and a load failure is fatal by design, so the
+// load itself is only exercised end to end.
+
 TEST(TryLoadFromPatch, ReturnsNullptrForEmptyPaths) {
   std::vector<std::string> empty_paths;
-  auto result = TryLoadFromPatch(empty_paths, "kDartIsolateSnapshotData");
+  auto result = TryLoadFromPatch(empty_paths, PatchSymbol::kIsolateData);
   EXPECT_EQ(result, nullptr);
 }
 
 TEST(TryLoadFromPatch, ReturnsNullptrForNonVmcodePath) {
   std::vector<std::string> paths = {"/path/to/some/file.so"};
-  auto result = TryLoadFromPatch(paths, "kDartIsolateSnapshotData");
-  EXPECT_EQ(result, nullptr);
-}
-
-TEST(TryLoadFromPatch, ReturnsNullptrForVmSymbol) {
-  // Even with a .vmcode path, VM symbols should return nullptr
-  // (we can't actually load the file, but we can verify the symbol check)
-  std::vector<std::string> paths = {"/path/to/patch.vmcode"};
-
-  // VM data symbol should return nullptr (patches don't contain VM snapshots)
-  auto result_vm_data = TryLoadFromPatch(paths, "kDartVmSnapshotData");
-  EXPECT_EQ(result_vm_data, nullptr);
-
-  // VM instructions symbol should return nullptr
-  auto result_vm_instrs =
-      TryLoadFromPatch(paths, "kDartVmSnapshotInstructions");
-  EXPECT_EQ(result_vm_instrs, nullptr);
-}
-
-TEST(TryLoadFromPatch, ReturnsNullptrForUnknownSymbol) {
-  std::vector<std::string> paths = {"/path/to/patch.vmcode"};
-  auto result = TryLoadFromPatch(paths, "kSomeUnknownSymbol");
+  auto result = TryLoadFromPatch(paths, PatchSymbol::kIsolateData);
   EXPECT_EQ(result, nullptr);
 }
 
@@ -55,7 +38,7 @@ TEST(TryLoadFromPatch, ChecksOnlyFirstPath) {
   // Only the first path should be checked for .vmcode extension
   std::vector<std::string> paths = {"/path/to/regular.so",
                                     "/path/to/patch.vmcode"};
-  auto result = TryLoadFromPatch(paths, "kDartIsolateSnapshotData");
+  auto result = TryLoadFromPatch(paths, PatchSymbol::kIsolateInstructions);
   // Should return nullptr because first path is not .vmcode
   EXPECT_EQ(result, nullptr);
 }

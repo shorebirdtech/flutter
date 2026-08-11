@@ -160,7 +160,7 @@ static std::shared_ptr<const fml::Mapping> ResolveIsolateData(
 #if SHOREBIRD_USE_INTERPRETER
   // Try loading from a Shorebird patch first.
   if (auto mapping = TryLoadFromPatch(settings.application_library_paths,
-                                      DartSnapshot::kIsolateDataSymbol)) {
+                                      PatchSymbol::kIsolateData)) {
     return mapping;
   }
 #endif  // SHOREBIRD_USE_INTERPRETER
@@ -185,9 +185,8 @@ static std::shared_ptr<const fml::Mapping> ResolveIsolateInstructions(
 #else  // DART_SNAPSHOT_STATIC_LINK
 #if SHOREBIRD_USE_INTERPRETER
   // Try loading from a Shorebird patch first.
-  if (auto mapping =
-          TryLoadFromPatch(settings.application_library_paths,
-                           DartSnapshot::kIsolateInstructionsSymbol)) {
+  if (auto mapping = TryLoadFromPatch(settings.application_library_paths,
+                                      PatchSymbol::kIsolateInstructions)) {
     return mapping;
   }
 #endif  // SHOREBIRD_USE_INTERPRETER
