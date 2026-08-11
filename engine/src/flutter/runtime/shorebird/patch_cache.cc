@@ -9,6 +9,7 @@
 #include "flutter/fml/logging.h"
 #include "flutter/fml/mapping.h"
 #include "flutter/runtime/shorebird/patch_mapping.h"
+#include "flutter/shell/common/shorebird/updater.h"
 #include "third_party/dart/runtime/include/dart_api.h"
 
 namespace flutter {
@@ -125,12 +126,16 @@ std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
   // Load the patch using the cache.
   auto cache_entry = PatchCache::Instance().GetOrLoad(patch_path);
   if (!cache_entry) {
-    // Boot the base image rather than aborting, and say so, because the
-    // updater's own bookkeeping will still report this patch as running.
-    // PatchCacheEntry::Create has already logged why the load failed.
+    // Boot the base image rather than aborting. PatchCacheEntry::Create has
+    // already logged why the load failed.
     FML_LOG(ERROR) << "Shorebird: patch load failed, running base code from "
                       "the app image instead of "
                    << patch_path;
+    // ReportLaunchStart already promoted this patch to current_boot, so
+    // without a failure report it stays "running" in the updater's books
+    // while base code executes, and the next launch retries the same patch.
+    // Guarded once per process, so the second symbol lookup is a no-op.
+    shorebird::Updater::Instance().ReportLaunchFailure();
     return nullptr;
   }
 
