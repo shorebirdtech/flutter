@@ -194,10 +194,10 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
     FML_LOG(INFO) << "Shorebird updater: no active patch.";
   }
 
-  // Note: shorebird_report_launch_start() is now called from TryLoadFromPatch()
-  // in runtime/shorebird/patch_cache.cc, right before the patched snapshot is
-  // actually loaded. This fixes issues with FlutterEngineGroup and other cases
-  // where ConfigureShorebird() is called but no Shell is created.
+  // Launch reporting does not happen here. ResolveIsolateData in
+  // runtime/dart_snapshot.cc reports the start, so a FlutterEngineGroup or
+  // add-to-app host that calls ConfigureShorebird() without ever creating a
+  // Shell does not record a boot that never happened.
   if (!init_result) {
     return false;
   }
@@ -282,10 +282,10 @@ void ConfigureShorebird(std::string code_cache_path,
     FML_LOG(INFO) << "Shorebird updater: no active patch.";
   }
 
-  // Note: shorebird_report_launch_start() is now called from TryLoadFromPatch()
-  // in runtime/shorebird/patch_cache.cc, right before the patched snapshot is
-  // actually loaded. This fixes issues with FlutterEngineGroup and other cases
-  // where ConfigureShorebird() is called but no Shell is created.
+  // Launch reporting does not happen here. ResolveIsolateData in
+  // runtime/dart_snapshot.cc reports the start, so a FlutterEngineGroup or
+  // add-to-app host that calls ConfigureShorebird() without ever creating a
+  // Shell does not record a boot that never happened.
 
   if (!init_result) {
     return;
