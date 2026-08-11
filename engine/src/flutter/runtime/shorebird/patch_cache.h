@@ -81,23 +81,28 @@ class PatchCache {
   FML_DISALLOW_COPY_AND_ASSIGN(PatchCache);
 };
 
+/// Which half of the isolate snapshot pair a caller wants out of a patch.
+///
+/// A patch carries only the isolate pair, never the VM pair. Callers name the
+/// half they want instead of passing the snapshot symbol, because the VM and
+/// isolate symbols share the same names and a name cannot say which pair it
+/// belongs to.
+enum class PatchSymbol {
+  kIsolateData,
+  kIsolateInstructions,
+};
+
 /// Checks if the first path in native_library_paths is a Shorebird patch
-/// (.vmcode file) and if so, attempts to load the requested symbol from
-/// the patch.
+/// (.vmcode file) and if so, loads the requested snapshot from the patch.
 ///
 /// @param native_library_paths The list of library paths to check. The first
 ///        path is checked for the .vmcode extension.
-/// @param symbol_name The symbol to load (kIsolateDataSymbol or
-///        kIsolateInstructionsSymbol).
-/// @return A mapping for the requested symbol if this is a patch and the
-///         symbol is available in the patch, nullptr otherwise.
-///
-/// Note: Patches only contain isolate data/instructions, not VM
-/// data/instructions. For VM symbols, this will always return nullptr,
-/// allowing the caller to fall back to loading from the base app.
+/// @param symbol Which half of the isolate snapshot pair to load.
+/// @return A mapping for the requested snapshot if this is a patch, nullptr
+///         otherwise, which leaves the caller to fall back to the base app.
 std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
     const std::vector<std::string>& native_library_paths,
-    const char* symbol_name);
+    PatchSymbol symbol);
 
 }  // namespace flutter
 
