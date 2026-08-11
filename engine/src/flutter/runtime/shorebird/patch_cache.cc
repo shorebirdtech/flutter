@@ -13,17 +13,6 @@
 
 namespace flutter {
 
-namespace {
-
-// These symbol names match the constants in dart_snapshot.cc.
-// We duplicate them here rather than extracting them into a header.
-// They are actually defined down in Dart and will never change.
-constexpr const char* kIsolateDataSymbol = "kDartIsolateSnapshotData";
-constexpr const char* kIsolateInstructionsSymbol =
-    "kDartIsolateSnapshotInstructions";
-
-}  // namespace
-
 // PatchCacheEntry implementation
 
 std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
@@ -121,7 +110,7 @@ void PatchCache::PruneExpired() {
 
 std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
     const std::vector<std::string>& native_library_paths,
-    const char* symbol_name) {
+    PatchSymbol symbol) {
   if (native_library_paths.empty()) {
     return nullptr;
   }
@@ -133,31 +122,24 @@ std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
     return nullptr;
   }
 
-  // Patches only contain isolate data/instructions, not VM data/instructions.
-  // Return nullptr for VM symbols to allow fallback to the base app.
-  std::string symbol(symbol_name);
-  if (symbol != kIsolateDataSymbol && symbol != kIsolateInstructionsSymbol) {
-    return nullptr;
-  }
-
   // Load the patch using the cache.
   auto cache_entry = PatchCache::Instance().GetOrLoad(patch_path);
   if (!cache_entry) {
-    FML_LOG(FATAL) << "Failed to load symbol from patch at " << patch_path;
+    // Boot the base image rather than aborting, and say so, because the
+    // updater's own bookkeeping will still report this patch as running.
+    // PatchCacheEntry::Create has already logged why the load failed.
+    FML_LOG(ERROR) << "Shorebird: patch load failed, running base code from "
+                      "the app image instead of "
+                   << patch_path;
     return nullptr;
   }
 
-  FML_LOG(INFO) << "Loading symbol from patch: " << symbol_name;
-
-  // ReportLaunchStart is now called from ResolveIsolateData in
-  // dart_snapshot.cc, which runs before TryLoadFromPatch on all platforms.
-
-  if (symbol == kIsolateDataSymbol) {
+  if (symbol == PatchSymbol::kIsolateData) {
+    FML_LOG(INFO) << "Loading isolate data from patch";
     return PatchMapping::CreateIsolateData(cache_entry);
-  } else {
-    FML_CHECK(symbol == kIsolateInstructionsSymbol);
-    return PatchMapping::CreateIsolateInstructions(cache_entry);
   }
+  FML_LOG(INFO) << "Loading isolate instructions from patch";
+  return PatchMapping::CreateIsolateInstructions(cache_entry);
 }
 
 }  // namespace flutter
