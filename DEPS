@@ -17,14 +17,10 @@ vars = {
   'llvm_git': 'https://llvm.googlesource.com',
   'dart_ai_rev': '9c96bfe5f091c9451eff5b59c9bffeb2e806b875',
   'skia_revision': '8df24be66531469e576a806749a0202ae26b8d08',
-  "dart_sdk_revision": "1c05054e0833f9fc163e81e294a7ef1562e9f930",
+  "dart_sdk_revision": "7a2e23fcbdb8f3aff1a7a45388d551fef4d96e82",
   "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
   "updater_git": "https://github.com/shorebirdtech/updater.git",
   "updater_rev": "1f85c4ab1ee5b540269b9859c75e1bffbb9050c7",
-
-  # WARNING: DO NOT EDIT canvaskit_cipd_instance MANUALLY
-  # See `lib/web_ui/README.md` for how to roll CanvasKit to a new version.
-  'canvaskit_cipd_instance': '61aeJQ9laGfEFF_Vlc_u0MCkqB6xb2hAYHRBxKH-Uw4C',
 
   # Do not download the Emscripten SDK by default.
   # This prevents us from downloading the Emscripten toolchain for builds
@@ -415,9 +411,9 @@ deps = {
     'objects': [
       {
         'object_name': Var('dart_sdk_revision') + '/dart-sdk-darwin-arm64.tar.gz',
-        'sha256sum': 'd47ac7c3fbec53d2d64a167bea6086a1d635f332995da2c93baa31c2ede069c3',
-        'size_bytes': 215163753,
-        'generation': 1786384359711456,
+        'sha256sum': 'bd742409ee43d7b6a52a98e638971940f1758739419f33db8e2b93bc66111519',
+        'size_bytes': 215172456,
+        'generation': 1786648280112953,
       }
     ],
     'dep_type': 'gcs',
