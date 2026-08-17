@@ -173,5 +173,71 @@ TEST(SnapshotsDataHandle, SeekFromEnd) {
   EXPECT_EQ(buffer[1], 'l');
 }
 
+// Builds a snapshot whose data and instructions mappings are distinguishable,
+// so a stream that repeats or reorders a region shows up in the bytes.
+static fml::RefPtr<DartSnapshot> MakeSnapshot(
+    const std::string& data,
+    const std::string& instructions) {
+  return fml::MakeRefCounted<DartSnapshot>(
+      std::make_shared<const fml::NonOwnedMapping>(
+          reinterpret_cast<const uint8_t*>(data.data()), data.size()),
+      std::make_shared<const fml::NonOwnedMapping>(
+          reinterpret_cast<const uint8_t*>(instructions.data()),
+          instructions.size()));
+}
+
+// Guards blob count and order, which the Read/Seek tests above never touch
+// because they build handles through the public constructor.
+//
+// kVMDataSymbol and kIsolateDataSymbol now resolve to the same buffer, so a
+// createForSnapshots taking two snapshots appended every byte twice and
+// silently misaligned this stream against the host's dump_blobs extraction.
+// Neither end validates the length, so only the bytes catch it.
+TEST(SnapshotsDataHandle, CreateForSnapshotsEmitsDataThenInstructionsOnce) {
+  const std::string data = "DATA";
+  const std::string instructions = "INSTRUCTIONS";
+  auto snapshot = MakeSnapshot(data, instructions);
+
+  auto handle = SnapshotsDataHandle::createForSnapshots(*snapshot);
+
+  EXPECT_EQ(handle->FullSize(), data.size() + instructions.size());
+
+  std::vector<uint8_t> buffer(handle->FullSize(), 0);
+  EXPECT_EQ(handle->Read(buffer.data(), buffer.size()), buffer.size());
+  EXPECT_EQ(std::string(buffer.begin(), buffer.end()), data + instructions);
+}
+
+// Order must match HandleDumpBlobs, which writes the data region then the text
+// region. Asserted separately from the concatenation so a pure ordering
+// regression names itself.
+TEST(SnapshotsDataHandle, CreateForSnapshotsPutsDataBeforeInstructions) {
+  const std::string data = "AAAA";
+  const std::string instructions = "BB";
+  auto snapshot = MakeSnapshot(data, instructions);
+
+  auto handle = SnapshotsDataHandle::createForSnapshots(*snapshot);
+
+  uint8_t first[4] = {0, 0, 0, 0};
+  EXPECT_EQ(handle->Read(first, 4), 4u);
+  EXPECT_EQ(std::string(first, first + 4), data);
+
+  uint8_t rest[2] = {0, 0};
+  EXPECT_EQ(handle->Read(rest, 2), 2u);
+  EXPECT_EQ(std::string(rest, rest + 2), instructions);
+}
+
+// An empty region must not change the byte stream. The zero-length assumption
+// this entry started from was wrong, so pin the behavior rather than the
+// reasoning that produced it.
+TEST(SnapshotsDataHandle, CreateForSnapshotsKeepsEmptyInstructionsRegion) {
+  const std::string data = "DATA";
+  const std::string instructions;
+  auto snapshot = MakeSnapshot(data, instructions);
+
+  auto handle = SnapshotsDataHandle::createForSnapshots(*snapshot);
+
+  EXPECT_EQ(handle->FullSize(), data.size());
+}
+
 }  // namespace testing
 }  // namespace flutter
