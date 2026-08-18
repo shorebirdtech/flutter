@@ -2003,6 +2003,20 @@ void main() {
             command: <String>[
               'git',
               'for-each-ref',
+              '--contains',
+              'REVISION_A',
+              '--format',
+              '%(refname:short)',
+              'refs/remotes/origin/flutter_release/*',
+            ],
+            environment: <String, String>{'PATH': '/usr/bin'},
+          ),
+        );
+        processManager.addCommand(
+          const FakeCommand(
+            command: <String>[
+              'git',
+              'for-each-ref',
               '--sort=-v:refname',
               '--count=1',
               '--format=%(refname:short)',

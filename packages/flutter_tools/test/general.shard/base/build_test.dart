@@ -17,7 +17,7 @@ const kWhichSysctlCommand = FakeCommand(command: <String>['which', 'sysctl']);
 const kARMCheckCommand = FakeCommand(command: <String>['sysctl', 'hw.optional.arm64'], exitCode: 1);
 
 const kDefaultClang = <String>[
-  '-miphoneos-version-min=13.0',
+  '-miphoneos-version-min=15.0',
   '-isysroot',
   'path/to/sdk',
   '-dynamiclib',
@@ -239,7 +239,7 @@ void main() {
             'cc',
             '-arch',
             'arm64',
-            '-miphoneos-version-min=13.0',
+            '-miphoneos-version-min=15.0',
             '-isysroot',
             'path/to/sdk',
             '-c',
@@ -313,7 +313,7 @@ void main() {
             'cc',
             '-arch',
             'arm64',
-            '-miphoneos-version-min=13.0',
+            '-miphoneos-version-min=15.0',
             '-isysroot',
             'path/to/sdk',
             '-c',
@@ -384,7 +384,7 @@ void main() {
             'cc',
             '-arch',
             'arm64',
-            '-miphoneos-version-min=13.0',
+            '-miphoneos-version-min=15.0',
             '-isysroot',
             'path/to/sdk',
             '-c',
