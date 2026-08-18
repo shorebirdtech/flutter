@@ -40,17 +40,22 @@ bool _isDangerousDirectory(String dirPath) {
 bool _isAllowedPath(String entityPath) {
   final String canonicalEntity = path.canonicalize(entityPath);
 
-  // Allow system temp
-  String canonicalTemp;
+  // Allow system temp. Callers reach temp by either name: `Directory.systemTemp`
+  // reports macOS's /var/folders/... while anything that resolves the path first
+  // yields /private/var/folders/.... `path.canonicalize` does not touch symlinks,
+  // so matching only one form rejects the other.
+  final List<String> canonicalTemps;
   final io.IOOverrides? currentOverrides = io.IOOverrides.current;
   if (currentOverrides is FSGuardIOOverrides) {
-    canonicalTemp = currentOverrides._canonicalSystemTemp;
+    canonicalTemps = currentOverrides._canonicalSystemTemps;
   } else {
-    canonicalTemp = path.canonicalize(io.Directory.systemTemp.path);
+    canonicalTemps = <String>[path.canonicalize(io.Directory.systemTemp.path)];
   }
 
-  if (path.isWithin(canonicalTemp, canonicalEntity) || canonicalEntity == canonicalTemp) {
-    return true;
+  for (final String canonicalTemp in canonicalTemps) {
+    if (path.isWithin(canonicalTemp, canonicalEntity) || canonicalEntity == canonicalTemp) {
+      return true;
+    }
   }
 
   // Allow modifications inside the Flutter installation root itself
@@ -573,15 +578,20 @@ final class FSGuardIOOverrides extends io.IOOverrides {
 
   final io.IOOverrides? _parent;
 
-  late final String _canonicalSystemTemp = () {
+  late final List<String> _canonicalSystemTemps = () {
     final io.Directory rawTemp = _parent != null
         ? _parent.getSystemTempDirectory()
         : super.getSystemTempDirectory();
+    final String rawCanonical = path.canonicalize(rawTemp.path);
     try {
-      return path.canonicalize(rawTemp.resolveSymbolicLinksSync());
+      final String resolved = path.canonicalize(rawTemp.resolveSymbolicLinksSync());
+      if (resolved != rawCanonical) {
+        return <String>[rawCanonical, resolved];
+      }
     } on Object catch (_) {
-      return path.canonicalize(rawTemp.path);
+      // Temp is unreadable; the unresolved form is the best available answer.
     }
+    return <String>[rawCanonical];
   }();
 
   @override
