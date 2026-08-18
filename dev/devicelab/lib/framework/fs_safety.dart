@@ -37,6 +37,31 @@ bool _isDangerousDirectory(String dirPath) {
   return false;
 }
 
+/// [entityPath] with symlinks resolved.
+///
+/// Paths are routinely checked before they exist, and `resolveSymbolicLinksSync`
+/// throws on a missing path, so this resolves the nearest existing ancestor and
+/// re-appends the rest. Returns null when no ancestor resolves.
+String? _resolveExistingPrefix(String entityPath) {
+  final List<String> tail = <String>[];
+  String current = entityPath;
+  while (true) {
+    try {
+      final String resolved = io.Directory(current).resolveSymbolicLinksSync();
+      return path.canonicalize(
+        tail.isEmpty ? resolved : path.joinAll(<String>[resolved, ...tail.reversed]),
+      );
+    } on io.FileSystemException {
+      final String parent = path.dirname(current);
+      if (parent == current) {
+        return null;
+      }
+      tail.add(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
 bool _isAllowedPath(String entityPath) {
   final String canonicalEntity = path.canonicalize(entityPath);
 
@@ -55,6 +80,18 @@ bool _isAllowedPath(String entityPath) {
   for (final String canonicalTemp in canonicalTemps) {
     if (path.isWithin(canonicalTemp, canonicalEntity) || canonicalEntity == canonicalTemp) {
       return true;
+    }
+  }
+
+  // A symlink anywhere in the path, not just the macOS /var -> /private/var
+  // head, leaves the two sides spelled differently. Resolving costs I/O, so it
+  // runs only on paths the string comparison above already rejected.
+  final String? resolvedEntity = _resolveExistingPrefix(canonicalEntity);
+  if (resolvedEntity != null) {
+    for (final String canonicalTemp in canonicalTemps) {
+      if (path.isWithin(canonicalTemp, resolvedEntity) || resolvedEntity == canonicalTemp) {
+        return true;
+      }
     }
   }
 
