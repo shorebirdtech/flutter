@@ -260,10 +260,7 @@ void main() {
       processManager.addCommands(<FakeCommand>[
         copyFrameworkCommand,
         lipoInfoFatCommand,
-        FakeCommand(
-          command: <String>['lipo', binary.path, '-verify_arch', 'arm64', 'x86_64'],
-          exitCode: 1,
-        ),
+        FakeCommand(command: <String>['lipo', binary.path, '-verify_arch', 'arm64'], exitCode: 1),
       ]);
 
       await expectLater(
