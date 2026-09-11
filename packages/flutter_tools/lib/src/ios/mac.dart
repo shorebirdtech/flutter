@@ -612,7 +612,7 @@ Future<XcodeBuildResult> buildXcodeProject({
       resultBundleDirectory: resultBundleDirectory,
       runXcresultTool: (List<String> args) => globals.processManager.run(args),
     );
-    traceSession?.finish(printStatus: globals.printStatus);
+    traceSession?.finish(buildTarget: 'ios', printStatus: globals.printStatus);
 
     if (tempDir.existsSync()) {
       // Display additional warning and error message from xcresult bundle.
