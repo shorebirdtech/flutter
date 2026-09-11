@@ -79,8 +79,11 @@ void Updater::ReportLaunchSuccess() {
   // users can implement custom check-for-updates using
   // package:shorebird_code_push.
   // https://github.com/shorebirdtech/shorebird/issues/950
+  // Normal for a build that never configured the updater: Android only calls
+  // ConfigureShorebird in release mode, and iOS skips it when the bundle has
+  // no shorebird.yaml. Also covers an Init that failed.
   if (!initialized_.load()) {
-    FML_LOG(INFO) << "Shorebird updater not initialized, not checking for "
+    FML_LOG(INFO) << "Shorebird updater not configured, not checking for "
                      "updates.";
     return;
   }
