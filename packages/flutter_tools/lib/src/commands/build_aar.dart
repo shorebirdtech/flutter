@@ -49,6 +49,7 @@ class BuildAarCommand extends BuildSubCommand {
     usesExtraDartFlagOptions(verboseHelp: verboseHelp);
     usesTrackWidgetCreation(verboseHelp: false);
     addEnableExperimentation(hide: !verboseHelp);
+    usesShorebirdTraceOption(hide: !verboseHelp);
     addAndroidSpecificBuildOptions(hide: !verboseHelp);
     argParser.addMultiOption(
       'target-platform',
