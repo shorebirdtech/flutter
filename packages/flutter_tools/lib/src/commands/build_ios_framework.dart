@@ -52,6 +52,7 @@ abstract class BuildFrameworkCommand extends BuildSubCommand {
     addDartObfuscationOption();
     usesExtraDartFlagOptions(verboseHelp: verboseHelp);
     addEnableExperimentation(hide: !verboseHelp);
+    usesShorebirdTraceOption(hide: !verboseHelp);
     usesDarwinCodeSignXCFrameworksOption();
 
     argParser
