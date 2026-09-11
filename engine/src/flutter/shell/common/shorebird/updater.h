@@ -75,16 +75,33 @@ struct AppConfig {
 ///    promoted to "current" by the second engine's `ReportLaunchStart`,
 ///    even though that engine is still running the old snapshot.
 ///
+/// ## Update thread
+///
+/// `ReportLaunchSuccess` is also what starts the background update thread
+/// (when `Init` succeeded and auto-update is enabled). The thread must not
+/// run while a boot is in progress:
+/// - The patch check it sends reports the running patch, which the Rust
+///   updater only learns at `ReportLaunchStart`. A check sent before that
+///   omits `current_patch_number`, and the server cannot attribute the
+///   device to a patch.
+/// - An install that completes during a first boot retires the patch being
+///   booted (the Rust lifecycle only protects the last successfully booted
+///   patch) and mislabels the boot breadcrumb. After `ReportLaunchSuccess`
+///   the booted patch is the last booted patch, and installs are safe.
+/// Starting from the once-guarded success report also means one thread per
+/// process, not one per engine.
+///
 /// Tests can call `ResetLaunchStateForTesting()` to re-enable the guards.
 class Updater {
  public:
   virtual ~Updater() = default;
 
-  /// Initialize the updater with configuration.
+  /// Initialize the updater with configuration. Remembers the outcome so
+  /// `ReportLaunchSuccess` knows whether it may start the update thread.
   /// @param config Configuration containing release version, paths, and
   /// callbacks
   /// @return true if initialization succeeded
-  virtual bool Init(const AppConfig& config) = 0;
+  bool Init(const AppConfig& config);
 
   /// Validate the next boot patch. If invalid, falls back to last good state.
   virtual void ValidateNextBootPatch() = 0;
@@ -95,7 +112,8 @@ class Updater {
 
   // Boot lifecycle methods — guarded to run at most once per process.
   // Callers may call these freely; subsequent calls after the first are
-  // silently ignored.
+  // silently ignored. `ReportLaunchSuccess` also starts the update thread;
+  // see the class comment.
   void ReportLaunchStart();
   void ReportLaunchSuccess();
   void ReportLaunchFailure();
@@ -111,14 +129,16 @@ class Updater {
   static void SetInstanceForTesting(std::unique_ptr<Updater> instance);
   static void ResetInstanceForTesting();
 
-  /// Resets the once-per-process launch guards so tests can verify
-  /// start/success/failure calls on fresh Updater instances.
+  /// Resets the once-per-process launch guards and the remembered `Init`
+  /// outcome so tests can verify start/success/failure calls on fresh
+  /// Updater instances.
   static void ResetLaunchStateForTesting();
 
  protected:
   Updater() = default;
 
   // Subclass hooks — called by the public guarded methods above.
+  virtual bool DoInit(const AppConfig& config) = 0;
   virtual void DoReportLaunchStart() = 0;
   virtual void DoReportLaunchSuccess() = 0;
   virtual void DoReportLaunchFailure() = 0;
@@ -130,6 +150,8 @@ class Updater {
   // Once-per-process guards for launch lifecycle.
   static std::atomic<bool> launch_started_;
   static std::atomic<bool> launch_completed_;
+  // Whether `Init` succeeded; the update thread needs a configured updater.
+  static std::atomic<bool> initialized_;
 };
 
 /// No-op implementation for unsupported platforms.
@@ -139,7 +161,7 @@ class NoOpUpdater : public Updater {
   NoOpUpdater() = default;
   ~NoOpUpdater() override = default;
 
-  bool Init(const AppConfig& config) override { return true; }
+  bool DoInit(const AppConfig& config) override { return true; }
   void ValidateNextBootPatch() override {}
   std::string NextBootPatchPath() override { return ""; }
   void DoReportLaunchStart() override {}
@@ -157,7 +179,7 @@ class RealUpdater : public Updater {
   RealUpdater() = default;
   ~RealUpdater() override = default;
 
-  bool Init(const AppConfig& config) override;
+  bool DoInit(const AppConfig& config) override;
   void ValidateNextBootPatch() override;
   std::string NextBootPatchPath() override;
   void DoReportLaunchStart() override;
@@ -175,7 +197,7 @@ class MockUpdater : public Updater {
   MockUpdater() = default;
   ~MockUpdater() override = default;
 
-  bool Init(const AppConfig& config) override;
+  bool DoInit(const AppConfig& config) override;
   void ValidateNextBootPatch() override;
   std::string NextBootPatchPath() override;
   void DoReportLaunchStart() override;

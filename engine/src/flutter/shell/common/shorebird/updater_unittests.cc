@@ -178,6 +178,90 @@ TEST_F(UpdaterTest, ResetLaunchStateReenablesGuards) {
   EXPECT_EQ(mock_->launch_success_count(), 2);
 }
 
+// The update thread starts from the launch-success report, once the boot is
+// recorded, and only then. See the Updater class comment for why it must not
+// start earlier.
+TEST_F(UpdaterTest, LaunchSuccessStartsUpdateThreadAfterBootIsRecorded) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
+  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+  const auto& log = mock_->call_log();
+  ASSERT_EQ(log.size(), 5u);
+  EXPECT_EQ(log[0], "Init");
+  EXPECT_EQ(log[1], "ReportLaunchStart");
+  EXPECT_EQ(log[2], "ReportLaunchSuccess");
+  EXPECT_EQ(log[3], "ShouldAutoUpdate");
+  EXPECT_EQ(log[4], "StartUpdateThread");
+}
+
+TEST_F(UpdaterTest, LaunchSuccessHonorsAutoUpdateDisabled) {
+  mock_->set_should_auto_update(false);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+}
+
+TEST_F(UpdaterTest, LaunchSuccessDoesNotStartUpdateThreadWhenInitFailed) {
+  mock_->set_should_auto_update(true);
+  mock_->set_init_result(false);
+  EXPECT_FALSE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+  // An unconfigured updater is never even asked.
+  const auto& log = mock_->call_log();
+  ASSERT_EQ(log.size(), 3u);
+  EXPECT_EQ(log[2], "ReportLaunchSuccess");
+}
+
+TEST_F(UpdaterTest, LaunchSuccessWithoutInitDoesNotStartUpdateThread) {
+  mock_->set_should_auto_update(true);
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+}
+
+TEST_F(UpdaterTest, LaunchFailureDoesNotStartUpdateThread) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchFailure();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+}
+
+// Add-to-app: every engine reports success, but the process gets one update
+// thread, not one per engine.
+TEST_F(UpdaterTest, MultipleEnginesStartOneUpdateThread) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+}
+
+// ResetLaunchStateForTesting also forgets the Init outcome.
+TEST_F(UpdaterTest, ResetLaunchStateForgetsInit) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::ResetLaunchStateForTesting();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+}
+
 }  // namespace testing
 }  // namespace shorebird
 }  // namespace flutter

@@ -18,6 +18,7 @@ std::unique_ptr<Updater> Updater::instance_;
 std::mutex Updater::instance_mutex_;
 std::atomic<bool> Updater::launch_started_{false};
 std::atomic<bool> Updater::launch_completed_{false};
+std::atomic<bool> Updater::initialized_{false};
 
 Updater& Updater::Instance() {
   std::lock_guard<std::mutex> lock(instance_mutex_);
@@ -44,6 +45,13 @@ void Updater::ResetInstanceForTesting() {
 void Updater::ResetLaunchStateForTesting() {
   launch_started_.store(false);
   launch_completed_.store(false);
+  initialized_.store(false);
+}
+
+bool Updater::Init(const AppConfig& config) {
+  bool result = DoInit(config);
+  initialized_.store(result);
+  return result;
 }
 
 void Updater::ReportLaunchStart() {
@@ -64,6 +72,25 @@ void Updater::ReportLaunchSuccess() {
     return;
   }
   DoReportLaunchSuccess();
+
+  // The boot is complete and recorded, so an install can no longer retire
+  // the patch we booted, and the patch check names the running patch. See
+  // the class comment. We do not support synchronous updates on launch;
+  // users can implement custom check-for-updates using
+  // package:shorebird_code_push.
+  // https://github.com/shorebirdtech/shorebird/issues/950
+  if (!initialized_.load()) {
+    FML_LOG(INFO) << "Shorebird updater not initialized, not checking for "
+                     "updates.";
+    return;
+  }
+  if (ShouldAutoUpdate()) {
+    FML_LOG(INFO) << "Starting Shorebird update";
+    StartUpdateThread();
+  } else {
+    FML_LOG(INFO)
+        << "Shorebird auto_update disabled, not checking for updates.";
+  }
 }
 
 void Updater::ReportLaunchFailure() {
@@ -78,7 +105,7 @@ void Updater::ReportLaunchFailure() {
 #if SHOREBIRD_PLATFORM_SUPPORTED
 // RealUpdater implementation - wraps the Rust C API
 
-bool RealUpdater::Init(const AppConfig& config) {
+bool RealUpdater::DoInit(const AppConfig& config) {
   // Convert paths to C strings
   std::vector<const char*> c_paths;
   c_paths.reserve(config.original_libapp_paths.size());
@@ -140,7 +167,7 @@ void RealUpdater::StartUpdateThread() {
 
 // MockUpdater implementation - for testing
 
-bool MockUpdater::Init(const AppConfig& config) {
+bool MockUpdater::DoInit(const AppConfig& config) {
   init_count_++;
   last_release_version_ = config.release_version;
   last_yaml_config_ = config.yaml_config;
