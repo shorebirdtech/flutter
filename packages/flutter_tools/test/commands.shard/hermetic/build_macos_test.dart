@@ -155,7 +155,7 @@ void main() {
     String configuration, {
     bool verbose = false,
     void Function(List<String> command)? onRun,
-    List<String>? additionalCommandArguments,
+    List<Pattern>? additionalCommandArguments,
     String hostPlatformArch = 'x86_64',
   }) {
     final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
@@ -164,7 +164,7 @@ void main() {
         ? 'platform=macOS,arch=$hostPlatformArch'
         : 'generic/platform=macOS';
     return FakeCommand(
-      command: <String>[
+      command: <Pattern>[
         '/usr/bin/env',
         'xcrun',
         'xcodebuild',
@@ -485,6 +485,70 @@ STDERR STUFF
       FileSystem: () => fileSystem,
       ProcessManager: () =>
           FakeProcessManager.list(<FakeCommand>[setUpFakeXcodeBuildHandler('Release')]),
+      Platform: () => macosPlatform,
+      Pub: ThrowingPub.new,
+      FeatureFlags: () => TestFeatureFlags(isMacOSEnabled: true),
+      OperatingSystemUtils: () => FakeOperatingSystemUtils(hostPlatform: HostPlatform.darwin_x64),
+    },
+  );
+
+  // Shorebird-specific: --shorebird-trace threads the assemble trace path
+  // and an xcresult bundle into xcodebuild and writes the merged trace.
+  testUsingContext(
+    'macOS build with --shorebird-trace passes trace plumbing to xcodebuild and writes the trace',
+    () async {
+      final command = BuildCommand(
+        androidSdk: FakeAndroidSdk(),
+        buildSystem: TestBuildSystem.all(BuildResult(success: true)),
+        fileSystem: fileSystem,
+        logger: logger,
+        osUtils: FakeOperatingSystemUtils(),
+        config: FakeConfig(),
+        platform: FakePlatform(),
+        fileSystemUtils: FakeFileSystemUtils(),
+        terminal: FakeTerminal(),
+        plistParser: FakePlistParser(),
+        processUtils: FakeProcessUtils(),
+        processManager: FakeProcessManager.any(),
+        templateRenderer: FakeTemplateRenderer(),
+        xcode: FakeXcode(),
+        artifacts: FakeArtifacts(),
+        cache: FakeCache(),
+        flutterVersion: FakeFlutterVersion(),
+      );
+      createMinimalMockProjectFiles();
+
+      await createTestCommandRunner(
+        command,
+      ).run(const <String>['build', 'macos', '--no-pub', '--shorebird-trace=build/trace.json']);
+
+      final File traceFile = fileSystem.file('build/trace.json');
+      expect(traceFile, exists);
+      expect(traceFile.readAsStringSync(), contains('"flutter build macos"'));
+      expect(traceFile.readAsStringSync(), contains('"xcode build"'));
+      expect(testLogger.statusText, contains('Shorebird build trace written to build/trace.json'));
+      // The session's temp xcresult directory is cleaned up.
+      expect(
+        fileSystem.systemTempDirectory.listSync().where(
+          (FileSystemEntity e) => e.basename.startsWith('shorebird_trace_xcresult'),
+        ),
+        isEmpty,
+      );
+    },
+    overrides: <Type, Generator>{
+      FileSystem: () => fileSystem,
+      ProcessManager: () => FakeProcessManager.list(<FakeCommand>[
+        setUpFakeXcodeBuildHandler(
+          'Release',
+          additionalCommandArguments: <Pattern>[
+            'SHOREBIRD_TRACE_FILE=/build/macos/shorebird_assemble_trace.json',
+            '-resultBundlePath',
+            RegExp(r'^/\.tmp_rand\d+/shorebird_trace_xcresult.*/temporary_xcresult_bundle$'),
+            '-resultBundleVersion',
+            '3',
+          ],
+        ),
+      ]),
       Platform: () => macosPlatform,
       Pub: ThrowingPub.new,
       FeatureFlags: () => TestFeatureFlags(isMacOSEnabled: true),
@@ -1542,6 +1606,18 @@ STDERR STUFF
         fileSystem: MemoryFileSystem.test(),
         logger: BufferLogger.test(),
         osUtils: FakeOperatingSystemUtils(),
+        config: FakeConfig(),
+        platform: FakePlatform(),
+        fileSystemUtils: FakeFileSystemUtils(),
+        terminal: FakeTerminal(),
+        plistParser: FakePlistParser(),
+        processUtils: FakeProcessUtils(),
+        processManager: FakeProcessManager.any(),
+        templateRenderer: FakeTemplateRenderer(),
+        xcode: FakeXcode(),
+        artifacts: FakeArtifacts(),
+        cache: FakeCache(),
+        flutterVersion: FakeFlutterVersion(),
       );
       createMinimalMockProjectFiles();
       final File shorebirdYamlFile =
