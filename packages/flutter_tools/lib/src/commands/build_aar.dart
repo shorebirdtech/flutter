@@ -32,6 +32,7 @@ class BuildAarCommand extends BuildSubCommand {
       DartCompileOptionsBundle(),
       AndroidGradleOptionsBundle(),
     ]);
+    usesShorebirdTraceOption(hide: !verboseHelp);
     argParser.addDescriptors(const <OptionDescriptor<Object?>>[
       _debugMode,
       _profileMode,

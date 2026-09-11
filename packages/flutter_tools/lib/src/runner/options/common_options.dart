@@ -514,6 +514,17 @@ class DesktopBuildOptionsBundle extends OptionBundle {
     help: 'Update the project configuration without performing a build.',
   );
 
+  static const shorebirdTrace = StringOptionDescriptor(
+    name: FlutterOptions.kShorebirdTrace,
+    verboseOnly: true,
+    valueHelp: 'path/to/shorebird-trace.json',
+    help:
+        'Output a Chrome Trace Event Format JSON file for build '
+        'profiling. The resulting file can be viewed at '
+        'https://ui.perfetto.dev. Shorebird-specific; named to avoid '
+        'colliding with any future upstream trace option.',
+  );
+
   @override
   List<OptionBundle> get subBundles => const <OptionBundle>[
     CommonBuildOptionsBundle(),
@@ -529,6 +540,7 @@ class DesktopBuildOptionsBundle extends OptionBundle {
     BuildInfoOptions.extraFrontEndOptions,
     BuildInfoOptions.extraGenSnapshotOptions,
     BuildInfoOptions.performanceMeasurementFile,
+    shorebirdTrace,
     BuildInfoOptions.analyzeSize,
     BuildInfoOptions.codeSizeDirectory,
     BuildInfoOptions.trackWidgetCreation,
