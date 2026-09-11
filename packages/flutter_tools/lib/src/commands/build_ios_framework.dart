@@ -42,6 +42,7 @@ abstract class BuildFrameworkCommand extends BuildSubCommand {
   }) : _toolContext = toolContext,
        super(logger: toolContext.logger) {
     registerOptionBundle(const DarwinAddToAppOptionsBundle());
+    usesShorebirdTraceOption(hide: !verboseHelp);
     argParser.addDescriptors(const <OptionDescriptor<Object?>>[
       debugMode,
       profileMode,
