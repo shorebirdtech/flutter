@@ -50,7 +50,11 @@ void Updater::ResetLaunchStateForTesting() {
 
 bool Updater::Init(const AppConfig& config) {
   bool result = DoInit(config);
-  initialized_.store(result);
+  // Latch rather than assign: add-to-app calls Init once per engine, and a
+  // later failure must not forget that the process already configured.
+  if (result) {
+    initialized_.store(true);
+  }
   return result;
 }
 

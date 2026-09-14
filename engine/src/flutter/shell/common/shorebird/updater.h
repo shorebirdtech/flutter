@@ -96,8 +96,10 @@ class Updater {
  public:
   virtual ~Updater() = default;
 
-  /// Initialize the updater with configuration. Remembers the outcome so
-  /// `ReportLaunchSuccess` knows whether it may start the update thread.
+  /// Initialize the updater with configuration. Remembers a success so
+  /// `ReportLaunchSuccess` knows whether it may start the update thread; a
+  /// later failed call (add-to-app calls this once per engine) does not
+  /// forget an earlier success.
   /// @param config Configuration containing release version, paths, and
   /// callbacks
   /// @return true if initialization succeeded
@@ -150,7 +152,8 @@ class Updater {
   // Once-per-process guards for launch lifecycle.
   static std::atomic<bool> launch_started_;
   static std::atomic<bool> launch_completed_;
-  // Whether `Init` succeeded; the update thread needs a configured updater.
+  // Whether any `Init` succeeded; the update thread needs a configured
+  // updater. Latched, never cleared outside tests.
   static std::atomic<bool> initialized_;
 };
 

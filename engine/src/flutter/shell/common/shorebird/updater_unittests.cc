@@ -252,6 +252,19 @@ TEST_F(UpdaterTest, MultipleEnginesStartOneUpdateThread) {
   EXPECT_EQ(mock_->start_update_thread_count(), 1);
 }
 
+// Add-to-app calls Init once per engine. A later failure does not undo an
+// earlier success: the process is still configured.
+TEST_F(UpdaterTest, InitSuccessIsLatchedAcrossLaterFailure) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  mock_->set_init_result(false);
+  EXPECT_FALSE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+}
+
 // ResetLaunchStateForTesting also forgets the Init outcome.
 TEST_F(UpdaterTest, ResetLaunchStateForgetsInit) {
   mock_->set_should_auto_update(true);
