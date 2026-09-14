@@ -74,8 +74,7 @@ void SetBaseSnapshot(Settings& settings) {
   const uint8_t* iso_data_ptr = isolate_snapshot->GetDataMapping();
   const uint8_t* vm_insns_ptr = vm_snapshot->GetInstructionsMapping();
   const uint8_t* iso_insns_ptr = isolate_snapshot->GetInstructionsMapping();
-  intptr_t vm_data_size =
-      vm_data_ptr ? Dart_SnapshotDataSize(vm_data_ptr) : -1;
+  intptr_t vm_data_size = vm_data_ptr ? Dart_SnapshotDataSize(vm_data_ptr) : -1;
   intptr_t iso_data_size =
       iso_data_ptr ? Dart_SnapshotDataSize(iso_data_ptr) : -1;
   intptr_t vm_insns_size =
@@ -179,11 +178,6 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
 
   bool init_result = shorebird::Updater::Instance().Init(config);
 
-  // We do not support synchronous updates on launch, it's a terrible UX.
-  // Users can implement custom check-for-updates using
-  // package:shorebird_code_push.
-  // https://github.com/shorebirdtech/shorebird/issues/950
-
   FML_LOG(INFO) << "Checking for active patch";
   shorebird::Updater::Instance().ValidateNextBootPatch();
   std::string active_path = shorebird::Updater::Instance().NextBootPatchPath();
@@ -197,20 +191,10 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   // Launch reporting does not happen here. ResolveIsolateData in
   // runtime/dart_snapshot.cc reports the start, so a FlutterEngineGroup or
   // add-to-app host that calls ConfigureShorebird() without ever creating a
-  // Shell does not record a boot that never happened.
-  if (!init_result) {
-    return false;
-  }
-
-  if (shorebird::Updater::Instance().ShouldAutoUpdate()) {
-    FML_LOG(INFO) << "Starting Shorebird update";
-    shorebird::Updater::Instance().StartUpdateThread();
-  } else {
-    FML_LOG(INFO)
-        << "Shorebird auto_update disabled, not checking for updates.";
-  }
-
-  return true;
+  // Shell does not record a boot that never happened. The update thread
+  // starts from the Shell's launch-success report, after the boot is
+  // recorded; see the Updater class comment.
+  return init_result;
 }
 
 /// Older api used by iOS and Android, directly manipulates Settings.
@@ -249,12 +233,7 @@ void ConfigureShorebird(std::string code_cache_path,
   config.file_callbacks = ShorebirdFileCallbacks();
   config.yaml_config = shorebird_yaml;
 
-  bool init_result = shorebird::Updater::Instance().Init(config);
-
-  // We do not support synchronous updates on launch, it's a terrible UX.
-  // Users can implement custom check-for-updates using
-  // package:shorebird_code_push.
-  // https://github.com/shorebirdtech/shorebird/issues/950
+  shorebird::Updater::Instance().Init(config);
 
   // We only set the base snapshot on iOS for now.
 #if SHOREBIRD_USE_INTERPRETER
@@ -285,19 +264,9 @@ void ConfigureShorebird(std::string code_cache_path,
   // Launch reporting does not happen here. ResolveIsolateData in
   // runtime/dart_snapshot.cc reports the start, so a FlutterEngineGroup or
   // add-to-app host that calls ConfigureShorebird() without ever creating a
-  // Shell does not record a boot that never happened.
-
-  if (!init_result) {
-    return;
-  }
-
-  if (shorebird::Updater::Instance().ShouldAutoUpdate()) {
-    FML_LOG(INFO) << "Starting Shorebird update";
-    shorebird::Updater::Instance().StartUpdateThread();
-  } else {
-    FML_LOG(INFO)
-        << "Shorebird auto_update disabled, not checking for updates.";
-  }
+  // Shell does not record a boot that never happened. The update thread
+  // starts from the Shell's launch-success report, after the boot is
+  // recorded; see the Updater class comment.
 }
 
 void* FileCallbacksImpl::Open() {
