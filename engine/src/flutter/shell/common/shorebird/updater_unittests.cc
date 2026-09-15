@@ -4,6 +4,8 @@
 
 #include "flutter/shell/common/shorebird/updater.h"
 
+#include <algorithm>
+
 #include "gtest/gtest.h"
 
 namespace flutter {
@@ -306,6 +308,20 @@ TEST_F(UpdaterTest, LaunchFailureThenMultipleEnginesStartOneUpdateThread) {
   Updater::Instance().ReportLaunchSuccess();
 
   EXPECT_EQ(mock_->start_update_thread_count(), 1);
+}
+
+// The guard sits ahead of ShouldAutoUpdate, so the virtual call stays one per
+// process rather than one per engine reporting success.
+TEST_F(UpdaterTest, UpdateThreadGuardPrecedesShouldAutoUpdate) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+  const auto& log = mock_->call_log();
+  EXPECT_EQ(std::count(log.begin(), log.end(), "ShouldAutoUpdate"), 1);
 }
 
 // ResetLaunchStateForTesting also forgets that the thread already started.

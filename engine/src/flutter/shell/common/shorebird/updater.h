@@ -119,10 +119,10 @@ class Updater {
   /// @return Path to patch, or empty string if no patch available
   virtual std::string NextBootPatchPath() = 0;
 
-  // Boot lifecycle methods — guarded to run at most once per process.
-  // Callers may call these freely; subsequent calls after the first are
-  // silently ignored. `ReportLaunchSuccess` also starts the update thread;
-  // see the class comment.
+  // Boot lifecycle methods. The reports themselves run at most once per
+  // process, and later calls are silently ignored. `ReportLaunchSuccess`
+  // still attempts the update-thread start on every call, which carries its
+  // own guard. See the class comment.
   void ReportLaunchStart();
   void ReportLaunchSuccess();
   void ReportLaunchFailure();
