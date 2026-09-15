@@ -230,6 +230,20 @@ TEST_F(UpdaterTest, LaunchSuccessWithoutInitDoesNotStartUpdateThread) {
   EXPECT_EQ(mock_->start_update_thread_count(), 0);
 }
 
+// An engine that never configured must not consume the update-thread guard on
+// behalf of one that did. The `initialized_` check runs ahead of the guard, so
+// a later configured engine in the same process still starts the thread.
+TEST_F(UpdaterTest, UnconfiguredEngineDoesNotClaimUpdateThreadGuard) {
+  mock_->set_should_auto_update(true);
+  Updater::Instance().ReportLaunchSuccess();
+  ASSERT_EQ(mock_->start_update_thread_count(), 0);
+
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+}
+
 TEST_F(UpdaterTest, LaunchFailureDoesNotStartUpdateThread) {
   mock_->set_should_auto_update(true);
   EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
