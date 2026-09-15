@@ -86,9 +86,13 @@ void Updater::ReportLaunchSuccess() {
 }
 
 void Updater::MaybeStartUpdateThread() {
-  // The boot is complete and recorded, so an install can no longer retire
-  // the patch we booted, and the patch check names the running patch. See
-  // the class comment. We do not support synchronous updates on launch;
+  // Two paths reach here and they do not share an invariant. After a
+  // successful boot the success report has gone to the updater, so an
+  // install can no longer retire the patch we booted and the patch check
+  // names it. After a failed patch load the failure report claimed the
+  // guard in ReportLaunchSuccess, nothing is recorded as booted, and the
+  // process is running base code. See the class comment.
+  // We do not support synchronous updates on launch;
   // users can implement custom check-for-updates using
   // package:shorebird_code_push.
   // https://github.com/shorebirdtech/shorebird/issues/950
