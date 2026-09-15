@@ -88,8 +88,15 @@ struct AppConfig {
 ///   booted (the Rust lifecycle only protects the last successfully booted
 ///   patch) and mislabels the boot breadcrumb. After `ReportLaunchSuccess`
 ///   the booted patch is the last booted patch, and installs are safe.
-/// Starting from the once-guarded success report also means one thread per
-/// process, not one per engine.
+///
+/// The start carries its own once-per-process guard rather than riding on
+/// the success report's. A patch that fails to load reports launch failure
+/// from `TryLoadFromPatch`, before any Shell exists, and that claims the
+/// shared report guard. The base-code boot that follows still reports
+/// success, and that launch is precisely the one that needs a replacement
+/// patch. The failure report itself does not start the thread, because the
+/// boot is still in progress at that point, which the bullets above rule
+/// out.
 ///
 /// Tests can call `ResetLaunchStateForTesting()` to re-enable the guards.
 class Updater {
@@ -131,9 +138,9 @@ class Updater {
   static void SetInstanceForTesting(std::unique_ptr<Updater> instance);
   static void ResetInstanceForTesting();
 
-  /// Resets the once-per-process launch guards and the remembered `Init`
-  /// outcome so tests can verify start/success/failure calls on fresh
-  /// Updater instances.
+  /// Resets the once-per-process launch guards, the update-thread guard, and
+  /// the remembered `Init` outcome so tests can verify start/success/failure
+  /// calls on fresh Updater instances.
   static void ResetLaunchStateForTesting();
 
  protected:
@@ -146,6 +153,10 @@ class Updater {
   virtual void DoReportLaunchFailure() = 0;
 
  private:
+  // Starts the update thread at most once per process, if the updater is
+  // configured and auto-update is on. Called from `ReportLaunchSuccess`.
+  void MaybeStartUpdateThread();
+
   static std::unique_ptr<Updater> instance_;
   static std::mutex instance_mutex_;
 
@@ -155,6 +166,9 @@ class Updater {
   // Whether any `Init` succeeded; the update thread needs a configured
   // updater. Latched, never cleared outside tests.
   static std::atomic<bool> initialized_;
+  // Separate from the launch guards above: a reported failure must not stop
+  // a later successful boot from starting the thread. See the class comment.
+  static std::atomic<bool> update_thread_started_;
 };
 
 /// No-op implementation for unsupported platforms.
