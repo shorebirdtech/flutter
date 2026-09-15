@@ -4,6 +4,8 @@
 
 #include "flutter/shell/common/shorebird/updater.h"
 
+#include <algorithm>
+
 #include "gtest/gtest.h"
 
 namespace flutter {
@@ -230,6 +232,20 @@ TEST_F(UpdaterTest, LaunchSuccessWithoutInitDoesNotStartUpdateThread) {
   EXPECT_EQ(mock_->start_update_thread_count(), 0);
 }
 
+// An engine that never configured must not consume the update-thread guard on
+// behalf of one that did. The `initialized_` check runs ahead of the guard, so
+// a later configured engine in the same process still starts the thread.
+TEST_F(UpdaterTest, UnconfiguredEngineDoesNotClaimUpdateThreadGuard) {
+  mock_->set_should_auto_update(true);
+  Updater::Instance().ReportLaunchSuccess();
+  ASSERT_EQ(mock_->start_update_thread_count(), 0);
+
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+}
+
 TEST_F(UpdaterTest, LaunchFailureDoesNotStartUpdateThread) {
   mock_->set_should_auto_update(true);
   EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
@@ -263,6 +279,63 @@ TEST_F(UpdaterTest, InitSuccessIsLatchedAcrossLaterFailure) {
   Updater::Instance().ReportLaunchSuccess();
 
   EXPECT_EQ(mock_->start_update_thread_count(), 1);
+}
+
+// A patch that fails to load reports failure before any Shell exists, then
+// the base-code boot that follows reports success. That launch is the one
+// that needs a replacement patch, so it still starts the update thread.
+TEST_F(UpdaterTest, LaunchFailureThenSuccessStartsUpdateThread) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchFailure();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+  // The boot outcome is already recorded, so the success is not forwarded.
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+}
+
+// The thread start is guarded on its own, so a failure followed by several
+// engines reporting success still yields one thread.
+TEST_F(UpdaterTest, LaunchFailureThenMultipleEnginesStartOneUpdateThread) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchFailure();
+  Updater::Instance().ReportLaunchSuccess();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+}
+
+// The guard sits ahead of ShouldAutoUpdate, so the virtual call stays one per
+// process rather than one per engine reporting success.
+TEST_F(UpdaterTest, UpdateThreadGuardPrecedesShouldAutoUpdate) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+  const auto& log = mock_->call_log();
+  EXPECT_EQ(std::count(log.begin(), log.end(), "ShouldAutoUpdate"), 1);
+}
+
+// ResetLaunchStateForTesting also forgets that the thread already started.
+TEST_F(UpdaterTest, ResetLaunchStateForgetsUpdateThreadGuard) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchSuccess();
+  ASSERT_EQ(mock_->start_update_thread_count(), 1);
+
+  Updater::ResetLaunchStateForTesting();
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 2);
 }
 
 // ResetLaunchStateForTesting also forgets the Init outcome.
