@@ -19,6 +19,7 @@ std::mutex Updater::instance_mutex_;
 std::atomic<bool> Updater::launch_started_{false};
 std::atomic<bool> Updater::launch_completed_{false};
 std::atomic<bool> Updater::initialized_{false};
+std::atomic<bool> Updater::update_thread_started_{false};
 
 Updater& Updater::Instance() {
   std::lock_guard<std::mutex> lock(instance_mutex_);
@@ -46,6 +47,7 @@ void Updater::ResetLaunchStateForTesting() {
   launch_started_.store(false);
   launch_completed_.store(false);
   initialized_.store(false);
+  update_thread_started_.store(false);
 }
 
 bool Updater::Init(const AppConfig& config) {
@@ -70,25 +72,43 @@ void Updater::ReportLaunchStart() {
 
 void Updater::ReportLaunchSuccess() {
   // Guard: only report success once per process. Subsequent engines reuse
-  // the same patch and don't need to re-confirm the boot.
+  // the same patch and don't need to re-confirm the boot. A boot already
+  // reported as failed keeps that outcome, so the success is not forwarded.
   bool expected = false;
-  if (!launch_completed_.compare_exchange_strong(expected, true)) {
-    return;
+  if (launch_completed_.compare_exchange_strong(expected, true)) {
+    DoReportLaunchSuccess();
   }
-  DoReportLaunchSuccess();
 
-  // The boot is complete and recorded, so an install can no longer retire
-  // the patch we booted, and the patch check names the running patch. See
-  // the class comment. We do not support synchronous updates on launch;
+  // Outside the guard above: a patch that failed to load already claimed it
+  // from TryLoadFromPatch, and the base-code boot reaching here is the launch
+  // that most needs a replacement patch. See the class comment.
+  MaybeStartUpdateThread();
+}
+
+void Updater::MaybeStartUpdateThread() {
+  // Two paths reach here and they do not share an invariant. After a
+  // successful boot the success report has gone to the updater, so an
+  // install can no longer retire the patch we booted and the patch check
+  // names it. After a failed patch load the failure report claimed the
+  // guard in ReportLaunchSuccess, nothing is recorded as booted, and the
+  // process is running base code. See the class comment.
+  // We do not support synchronous updates on launch;
   // users can implement custom check-for-updates using
   // package:shorebird_code_push.
   // https://github.com/shorebirdtech/shorebird/issues/950
   // Normal for a build that never configured the updater: Android only calls
   // ConfigureShorebird in release mode, and iOS skips it when the bundle has
   // no shorebird.yaml. Also covers an Init that failed.
+  // Checked before the guard below so an engine that never configured cannot
+  // claim it on behalf of one that did.
   if (!initialized_.load()) {
     FML_LOG(INFO) << "Shorebird updater not configured, not checking for "
                      "updates.";
+    return;
+  }
+  // Guard: one update thread per process, not one per engine.
+  bool expected = false;
+  if (!update_thread_started_.compare_exchange_strong(expected, true)) {
     return;
   }
   if (ShouldAutoUpdate()) {
