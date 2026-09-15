@@ -61,7 +61,8 @@ struct AppConfig {
 ///   state. If the app crashes before `ReportLaunchSuccess`, the updater
 ///   assumes the patch caused the crash and rolls back on the next launch.
 ///
-/// These calls are guarded to execute at most once per process because:
+/// `ReportLaunchStart` and `ReportLaunchFailure` are guarded to execute at
+/// most once per process because:
 /// 1. The Rust updater is a process-global singleton — calling
 ///    `report_launch_start` multiple times would repeatedly copy `next_boot`
 ///    → `current_boot`, which could promote a newly-downloaded (but not yet
@@ -69,41 +70,29 @@ struct AppConfig {
 ///    old snapshot.
 /// 2. In add-to-app, multiple FlutterEngines may be created and destroyed
 ///    within a single process. Each engine creation resolves snapshots and
-///    constructs a Shell, but we must only report launch start/success once
-///    — for the first engine that actually boots. Without this guard, a
+///    constructs a Shell, but we must only report launch start once — for
+///    the first engine that actually boots. Without this guard, a
 ///    background update that completes between engine creations would get
 ///    promoted to "current" by the second engine's `ReportLaunchStart`,
 ///    even though that engine is still running the old snapshot.
 ///
-/// ## Update thread
-///
-/// `ReportLaunchSuccess` is also what starts the background update thread
-/// (when `Init` succeeded and auto-update is enabled). The thread must not
-/// run while a boot is in progress:
-/// - The patch check it sends reports the running patch, which the Rust
-///   updater only learns at `ReportLaunchStart`. A check sent before that
-///   omits `current_patch_number`, and the server cannot attribute the
-///   device to a patch.
-/// - An install that completes during a first boot retires the patch being
-///   booted (the Rust lifecycle only protects the last successfully booted
-///   patch) and mislabels the boot breadcrumb. After `ReportLaunchSuccess`
-///   the booted patch is the last booted patch, and installs are safe.
-/// Starting from the once-guarded success report also means one thread per
-/// process, not one per engine.
+/// `ReportLaunchSuccess` is forwarded on every call. The Rust side records
+/// a boot only while one is in progress, and it is also where the
+/// background update thread starts, once per process, from the first
+/// success report. A patch that fails to load reports failure from
+/// `TryLoadFromPatch` and the base-code boot that follows still reports
+/// success, so that launch gets its update check.
 ///
 /// Tests can call `ResetLaunchStateForTesting()` to re-enable the guards.
 class Updater {
  public:
   virtual ~Updater() = default;
 
-  /// Initialize the updater with configuration. Remembers a success so
-  /// `ReportLaunchSuccess` knows whether it may start the update thread; a
-  /// later failed call (add-to-app calls this once per engine) does not
-  /// forget an earlier success.
+  /// Initialize the updater with configuration.
   /// @param config Configuration containing release version, paths, and
   /// callbacks
   /// @return true if initialization succeeded
-  bool Init(const AppConfig& config);
+  virtual bool Init(const AppConfig& config) = 0;
 
   /// Validate the next boot patch. If invalid, falls back to last good state.
   virtual void ValidateNextBootPatch() = 0;
@@ -112,17 +101,12 @@ class Updater {
   /// @return Path to patch, or empty string if no patch available
   virtual std::string NextBootPatchPath() = 0;
 
-  // Boot lifecycle methods — guarded to run at most once per process.
-  // Callers may call these freely; subsequent calls after the first are
-  // silently ignored. `ReportLaunchSuccess` also starts the update thread;
-  // see the class comment.
+  // Boot lifecycle methods. Start and failure run at most once per process;
+  // later calls are silently ignored. Success is forwarded every time. See
+  // the class comment.
   void ReportLaunchStart();
   void ReportLaunchSuccess();
   void ReportLaunchFailure();
-
-  // Update checking
-  virtual bool ShouldAutoUpdate() = 0;
-  virtual void StartUpdateThread() = 0;
 
   // Singleton access
   static Updater& Instance();
@@ -131,16 +115,14 @@ class Updater {
   static void SetInstanceForTesting(std::unique_ptr<Updater> instance);
   static void ResetInstanceForTesting();
 
-  /// Resets the once-per-process launch guards and the remembered `Init`
-  /// outcome so tests can verify start/success/failure calls on fresh
-  /// Updater instances.
+  /// Resets the once-per-process launch guards so tests can verify
+  /// start/success/failure calls on fresh Updater instances.
   static void ResetLaunchStateForTesting();
 
  protected:
   Updater() = default;
 
   // Subclass hooks — called by the public guarded methods above.
-  virtual bool DoInit(const AppConfig& config) = 0;
   virtual void DoReportLaunchStart() = 0;
   virtual void DoReportLaunchSuccess() = 0;
   virtual void DoReportLaunchFailure() = 0;
@@ -152,9 +134,6 @@ class Updater {
   // Once-per-process guards for launch lifecycle.
   static std::atomic<bool> launch_started_;
   static std::atomic<bool> launch_completed_;
-  // Whether any `Init` succeeded; the update thread needs a configured
-  // updater. Latched, never cleared outside tests.
-  static std::atomic<bool> initialized_;
 };
 
 /// No-op implementation for unsupported platforms.
@@ -164,14 +143,12 @@ class NoOpUpdater : public Updater {
   NoOpUpdater() = default;
   ~NoOpUpdater() override = default;
 
-  bool DoInit(const AppConfig& config) override { return true; }
+  bool Init(const AppConfig& config) override { return true; }
   void ValidateNextBootPatch() override {}
   std::string NextBootPatchPath() override { return ""; }
   void DoReportLaunchStart() override {}
   void DoReportLaunchSuccess() override {}
   void DoReportLaunchFailure() override {}
-  bool ShouldAutoUpdate() override { return false; }
-  void StartUpdateThread() override {}
 };
 
 #if SHOREBIRD_PLATFORM_SUPPORTED
@@ -182,14 +159,12 @@ class RealUpdater : public Updater {
   RealUpdater() = default;
   ~RealUpdater() override = default;
 
-  bool DoInit(const AppConfig& config) override;
+  bool Init(const AppConfig& config) override;
   void ValidateNextBootPatch() override;
   std::string NextBootPatchPath() override;
   void DoReportLaunchStart() override;
   void DoReportLaunchSuccess() override;
   void DoReportLaunchFailure() override;
-  bool ShouldAutoUpdate() override;
-  void StartUpdateThread() override;
 };
 #endif  // SHOREBIRD_PLATFORM_SUPPORTED
 
@@ -200,14 +175,12 @@ class MockUpdater : public Updater {
   MockUpdater() = default;
   ~MockUpdater() override = default;
 
-  bool DoInit(const AppConfig& config) override;
+  bool Init(const AppConfig& config) override;
   void ValidateNextBootPatch() override;
   std::string NextBootPatchPath() override;
   void DoReportLaunchStart() override;
   void DoReportLaunchSuccess() override;
   void DoReportLaunchFailure() override;
-  bool ShouldAutoUpdate() override;
-  void StartUpdateThread() override;
 
   // Test accessors
   int init_count() const { return init_count_; }
@@ -215,7 +188,6 @@ class MockUpdater : public Updater {
   int launch_start_count() const { return launch_start_count_; }
   int launch_success_count() const { return launch_success_count_; }
   int launch_failure_count() const { return launch_failure_count_; }
-  int start_update_thread_count() const { return start_update_thread_count_; }
   const std::vector<std::string>& call_log() const { return call_log_; }
 
   // Last init parameters (for verification)
@@ -226,7 +198,6 @@ class MockUpdater : public Updater {
 
   // Test configuration
   void set_init_result(bool value) { init_result_ = value; }
-  void set_should_auto_update(bool value) { should_auto_update_ = value; }
   void set_next_boot_patch_path(const std::string& path) {
     next_boot_patch_path_ = path;
   }
@@ -240,9 +211,7 @@ class MockUpdater : public Updater {
   int launch_start_count_ = 0;
   int launch_success_count_ = 0;
   int launch_failure_count_ = 0;
-  int start_update_thread_count_ = 0;
   bool init_result_ = true;
-  bool should_auto_update_ = false;
   std::string next_boot_patch_path_;
   std::string last_release_version_;
   std::string last_yaml_config_;

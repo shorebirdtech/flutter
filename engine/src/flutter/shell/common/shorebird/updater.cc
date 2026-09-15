@@ -4,8 +4,6 @@
 
 #include "flutter/shell/common/shorebird/updater.h"
 
-#include "flutter/fml/logging.h"
-
 #if SHOREBIRD_PLATFORM_SUPPORTED
 #include "third_party/updater/library/include/updater_engine.h"
 #endif
@@ -18,7 +16,6 @@ std::unique_ptr<Updater> Updater::instance_;
 std::mutex Updater::instance_mutex_;
 std::atomic<bool> Updater::launch_started_{false};
 std::atomic<bool> Updater::launch_completed_{false};
-std::atomic<bool> Updater::initialized_{false};
 
 Updater& Updater::Instance() {
   std::lock_guard<std::mutex> lock(instance_mutex_);
@@ -45,17 +42,6 @@ void Updater::ResetInstanceForTesting() {
 void Updater::ResetLaunchStateForTesting() {
   launch_started_.store(false);
   launch_completed_.store(false);
-  initialized_.store(false);
-}
-
-bool Updater::Init(const AppConfig& config) {
-  bool result = DoInit(config);
-  // Latch rather than assign: add-to-app calls Init once per engine, and a
-  // later failure must not forget that the process already configured.
-  if (result) {
-    initialized_.store(true);
-  }
-  return result;
 }
 
 void Updater::ReportLaunchStart() {
@@ -69,39 +55,18 @@ void Updater::ReportLaunchStart() {
 }
 
 void Updater::ReportLaunchSuccess() {
-  // Guard: only report success once per process. Subsequent engines reuse
-  // the same patch and don't need to re-confirm the boot.
-  bool expected = false;
-  if (!launch_completed_.compare_exchange_strong(expected, true)) {
-    return;
-  }
+  // Not guarded: the Rust side records a boot only while one is in progress
+  // and starts the update thread once per process, so repeat calls from
+  // later engines are cheap no-ops there. A success after a failed patch
+  // load must get through; see the class comment. Recorded as an outcome so
+  // a later engine's failure does not retract it.
+  launch_completed_.store(true);
   DoReportLaunchSuccess();
-
-  // The boot is complete and recorded, so an install can no longer retire
-  // the patch we booted, and the patch check names the running patch. See
-  // the class comment. We do not support synchronous updates on launch;
-  // users can implement custom check-for-updates using
-  // package:shorebird_code_push.
-  // https://github.com/shorebirdtech/shorebird/issues/950
-  // Normal for a build that never configured the updater: Android only calls
-  // ConfigureShorebird in release mode, and iOS skips it when the bundle has
-  // no shorebird.yaml. Also covers an Init that failed.
-  if (!initialized_.load()) {
-    FML_LOG(INFO) << "Shorebird updater not configured, not checking for "
-                     "updates.";
-    return;
-  }
-  if (ShouldAutoUpdate()) {
-    FML_LOG(INFO) << "Starting Shorebird update";
-    StartUpdateThread();
-  } else {
-    FML_LOG(INFO)
-        << "Shorebird auto_update disabled, not checking for updates.";
-  }
 }
 
 void Updater::ReportLaunchFailure() {
-  // Guard: only report failure once per process.
+  // Guard: only report one boot outcome per process. A failure after a
+  // success would name a boot the Rust side has already retired.
   bool expected = false;
   if (!launch_completed_.compare_exchange_strong(expected, true)) {
     return;
@@ -112,7 +77,7 @@ void Updater::ReportLaunchFailure() {
 #if SHOREBIRD_PLATFORM_SUPPORTED
 // RealUpdater implementation - wraps the Rust C API
 
-bool RealUpdater::DoInit(const AppConfig& config) {
+bool RealUpdater::Init(const AppConfig& config) {
   // Convert paths to C strings
   std::vector<const char*> c_paths;
   c_paths.reserve(config.original_libapp_paths.size());
@@ -162,19 +127,11 @@ void RealUpdater::DoReportLaunchSuccess() {
 void RealUpdater::DoReportLaunchFailure() {
   shorebird_report_launch_failure();
 }
-
-bool RealUpdater::ShouldAutoUpdate() {
-  return shorebird_should_auto_update();
-}
-
-void RealUpdater::StartUpdateThread() {
-  shorebird_start_update_thread();
-}
 #endif  // SHOREBIRD_PLATFORM_SUPPORTED
 
 // MockUpdater implementation - for testing
 
-bool MockUpdater::DoInit(const AppConfig& config) {
+bool MockUpdater::Init(const AppConfig& config) {
   init_count_++;
   last_release_version_ = config.release_version;
   last_yaml_config_ = config.yaml_config;
@@ -207,25 +164,13 @@ void MockUpdater::DoReportLaunchFailure() {
   call_log_.push_back("ReportLaunchFailure");
 }
 
-bool MockUpdater::ShouldAutoUpdate() {
-  call_log_.push_back("ShouldAutoUpdate");
-  return should_auto_update_;
-}
-
-void MockUpdater::StartUpdateThread() {
-  start_update_thread_count_++;
-  call_log_.push_back("StartUpdateThread");
-}
-
 void MockUpdater::Reset() {
   init_count_ = 0;
   validate_count_ = 0;
   launch_start_count_ = 0;
   launch_success_count_ = 0;
   launch_failure_count_ = 0;
-  start_update_thread_count_ = 0;
   init_result_ = true;
-  should_auto_update_ = false;
   next_boot_patch_path_.clear();
   last_release_version_.clear();
   last_yaml_config_.clear();

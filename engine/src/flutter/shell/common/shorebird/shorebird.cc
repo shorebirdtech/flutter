@@ -191,9 +191,9 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   // Launch reporting does not happen here. ResolveIsolateData in
   // runtime/dart_snapshot.cc reports the start, so a FlutterEngineGroup or
   // add-to-app host that calls ConfigureShorebird() without ever creating a
-  // Shell does not record a boot that never happened. The update thread
-  // starts from the Shell's launch-success report, after the boot is
-  // recorded; see the Updater class comment.
+  // Shell does not record a boot that never happened. The Rust updater
+  // starts the update thread from that success report; see the Updater
+  // class comment.
   return init_result;
 }
 
@@ -264,9 +264,9 @@ void ConfigureShorebird(std::string code_cache_path,
   // Launch reporting does not happen here. ResolveIsolateData in
   // runtime/dart_snapshot.cc reports the start, so a FlutterEngineGroup or
   // add-to-app host that calls ConfigureShorebird() without ever creating a
-  // Shell does not record a boot that never happened. The update thread
-  // starts from the Shell's launch-success report, after the boot is
-  // recorded; see the Updater class comment.
+  // Shell does not record a boot that never happened. The Rust updater
+  // starts the update thread from that success report; see the Updater
+  // class comment.
 }
 
 void* FileCallbacksImpl::Open() {
