@@ -236,6 +236,8 @@ class AOTSnapshotter {
 
     final targetingAndroidPlatform = platform.os == .android;
     _logger.printTrace('targetingAndroidPlatform = $targetingAndroidPlatform');
+
+    final bool shouldSplitDebugInfo = splitDebugInfo?.isNotEmpty ?? false;
     // We strip snapshot by default, but allow to suppress this behavior
     // by supplying --no-strip in extraGenSnapshotOptions.
     var shouldStrip = true;
@@ -244,6 +246,16 @@ class AOTSnapshotter {
       for (final option in extraGenSnapshotOptions) {
         if (option == '--no-strip') {
           shouldStrip = false;
+          continue;
+        }
+        // Stripping in gen_snapshot drops the DWARF before it reaches the
+        // assembly, leaving dsymutil nothing to build a dSYM from. The shipped
+        // binary is still stripped, after the dSYM is extracted.
+        if (option == '--strip' && targetingApplePlatform && shouldSplitDebugInfo) {
+          _logger.printTrace(
+            'Ignoring --strip because --split-debug-info needs the DWARF to '
+            'reach dsymutil. The built binary is still stripped afterwards.',
+          );
           continue;
         }
         genSnapshotArgs.add(option);
@@ -310,7 +322,6 @@ class AOTSnapshotter {
     // multiple debug files.
     final String archName = platform.getName(cpuArch: cpuArch);
     final debugFilename = 'app.$archName.symbols';
-    final bool shouldSplitDebugInfo = splitDebugInfo?.isNotEmpty ?? false;
     if (shouldSplitDebugInfo) {
       _fileSystem.directory(splitDebugInfo).createSync(recursive: true);
     }
@@ -320,7 +331,11 @@ class AOTSnapshotter {
       if (shouldSplitDebugInfo) ...<String>[
         '--dwarf-stack-traces',
         '--resolve-dwarf-paths',
-        '--save-debugging-info=${_fileSystem.path.join(splitDebugInfo!, debugFilename)}',
+        // Alongside an assembly snapshot this writes an ELF with no build ID,
+        // which symbol servers skip (dartbug.com/43274). Apple takes the
+        // companion from dsymutil in _buildFramework instead.
+        if (!targetingApplePlatform)
+          '--save-debugging-info=${_fileSystem.path.join(splitDebugInfo!, debugFilename)}',
       ],
       if (dartObfuscation) '--obfuscate',
     ]);
@@ -391,6 +406,19 @@ class AOTSnapshotter {
           return dsymResult.exitCode;
         }
 
+        // dsymutil derives the dSYM from the linked binary, so its UUID equals
+        // App.framework's by construction.
+        if (shouldSplitDebugInfo) {
+          final File dwarf = _fileSystem.file(
+            _fileSystem.path.join('$frameworkPath.dSYM', 'Contents', 'Resources', 'DWARF', 'App'),
+          );
+          if (!dwarf.existsSync()) {
+            _logger.printError('dsymutil reported success but wrote no DWARF at ${dwarf.path}');
+            return 1;
+          }
+          dwarf.copySync(_fileSystem.path.join(splitDebugInfo!, debugFilename));
+        }
+
         if (stripAfterBuild) {
           // See https://www.unix.com/man-page/osx/1/strip/ for arguments
           final RunResult stripResult = await xcode.strip(<String>[
@@ -408,22 +436,15 @@ class AOTSnapshotter {
         }
       } else {
         assert(!stripAfterBuild);
-      }
-
-      if (stripAfterBuild) {
-        // See https://www.unix.com/man-page/osx/1/strip/ for arguments
-        final RunResult stripResult = await _xcode.strip(<String>['-x', appLib, '-o', appLib]);
-        if (stripResult.exitCode != 0) {
+        if (shouldSplitDebugInfo) {
           _logger.printError(
-            'Failed to strip debugging symbols from the generated AOT snapshot - strip terminated with exit code ${stripResult.exitCode}',
+            'Cannot split debug info for ${cpuArch!.darwinArchName}: debug symbols are only '
+            'extracted for profile and release builds.',
           );
-          return stripResult.exitCode;
+          return 1;
         }
       }
-    } else {
-      assert(!stripAfterBuild);
     }
-
     return 0;
   }
 
