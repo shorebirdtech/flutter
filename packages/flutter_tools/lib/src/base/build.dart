@@ -235,6 +235,8 @@ class AOTSnapshotter {
         buildMode == BuildMode.profile || buildMode == BuildMode.release;
     _logger.printTrace('extractAppleDebugSymbols = $extractAppleDebugSymbols');
 
+    final bool shouldSplitDebugInfo = splitDebugInfo?.isNotEmpty ?? false;
+
     // We strip snapshot by default, but allow to suppress this behavior
     // by supplying --no-strip in extraGenSnapshotOptions.
     var shouldStrip = true;
@@ -243,6 +245,16 @@ class AOTSnapshotter {
       for (final option in extraGenSnapshotOptions) {
         if (option == '--no-strip') {
           shouldStrip = false;
+          continue;
+        }
+        // Stripping in gen_snapshot drops the DWARF before it reaches the
+        // assembly, leaving dsymutil nothing to build a dSYM from. The shipped
+        // binary is still stripped, after the dSYM is extracted.
+        if (option == '--strip' && targetingApplePlatform && shouldSplitDebugInfo) {
+          _logger.printTrace(
+            'Ignoring --strip because --split-debug-info needs the DWARF to '
+            'reach dsymutil. The built binary is still stripped afterwards.',
+          );
           continue;
         }
         genSnapshotArgs.add(option);
@@ -287,7 +299,6 @@ class AOTSnapshotter {
     // multiple debug files.
     final String archName = platform.getName(darwinArch: darwinArch);
     final debugFilename = 'app.$archName.symbols';
-    final bool shouldSplitDebugInfo = splitDebugInfo?.isNotEmpty ?? false;
     if (shouldSplitDebugInfo) {
       _fileSystem.directory(splitDebugInfo).createSync(recursive: true);
     }
@@ -297,7 +308,11 @@ class AOTSnapshotter {
       if (shouldSplitDebugInfo) ...<String>[
         '--dwarf-stack-traces',
         '--resolve-dwarf-paths',
-        '--save-debugging-info=${_fileSystem.path.join(splitDebugInfo!, debugFilename)}',
+        // Alongside an assembly snapshot this writes an ELF with no build ID,
+        // which symbol servers skip (dartbug.com/43274). Apple takes the
+        // companion from dsymutil in _buildFramework instead.
+        if (!targetingApplePlatform)
+          '--save-debugging-info=${_fileSystem.path.join(splitDebugInfo!, debugFilename)}',
       ],
       if (dartObfuscation) '--obfuscate',
     ]);
@@ -360,6 +375,9 @@ class AOTSnapshotter {
         quiet: quiet,
         stripAfterBuild: stripAfterBuild,
         extractAppleDebugSymbols: extractAppleDebugSymbols,
+        splitDebugInfoSymbols: shouldSplitDebugInfo
+            ? _fileSystem.path.join(splitDebugInfo!, debugFilename)
+            : null,
       );
     } else {
       return 0;
@@ -510,6 +528,7 @@ class AOTSnapshotter {
     required bool quiet,
     required bool stripAfterBuild,
     required bool extractAppleDebugSymbols,
+    required String? splitDebugInfoSymbols,
   }) async {
     final String targetArch = appleArch.name;
     if (!quiet) {
@@ -586,6 +605,19 @@ class AOTSnapshotter {
         return dsymResult.exitCode;
       }
 
+      // dsymutil derives the dSYM from the linked binary, so its UUID equals
+      // App.framework's by construction.
+      if (splitDebugInfoSymbols != null) {
+        final File dwarf = _fileSystem.file(
+          _fileSystem.path.join('$frameworkDir.dSYM', 'Contents', 'Resources', 'DWARF', 'App'),
+        );
+        if (!dwarf.existsSync()) {
+          _logger.printError('dsymutil reported success but wrote no DWARF at ${dwarf.path}');
+          return 1;
+        }
+        dwarf.copySync(splitDebugInfoSymbols);
+      }
+
       if (stripAfterBuild) {
         // See https://www.unix.com/man-page/osx/1/strip/ for arguments
         final RunResult stripResult = await _xcode.strip(<String>['-x', appLib, '-o', appLib]);
@@ -598,6 +630,13 @@ class AOTSnapshotter {
       }
     } else {
       assert(!stripAfterBuild);
+      if (splitDebugInfoSymbols != null) {
+        _logger.printError(
+          'Cannot split debug info for $targetArch: debug symbols are only '
+          'extracted for profile and release builds.',
+        );
+        return 1;
+      }
     }
 
     return 0;
