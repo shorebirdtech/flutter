@@ -19,14 +19,8 @@ void main() {
         expect(projectDirectory.getGeneratedIosShorebirdYaml(), completes);
       });
 
-      // Shorebird builds Apple snapshots via `gen_snapshot
-      // --snapshot_kind=app-aot-assembly`, and the debug companion gen_snapshot
-      // writes for that format is an ELF with no build ID, which every symbol
-      // server silently skips. The companion has to come from dsymutil instead.
-      //
-      // This lives here rather than in a flutter_tools unit test because the
-      // defect is in the produced bytes: a FakeProcessManager never runs a real
-      // dsymutil, so only a real build distinguishes a Mach-O dSYM from an ELF.
+      // Needs a real build: FakeProcessManager never runs a real dsymutil, so a
+      // flutter_tools unit test cannot tell a Mach-O dSYM from an ELF.
       testWithShorebirdProject(
         '--split-debug-info emits a Mach-O dSYM matching App.framework',
         (projectDirectory) async {
@@ -72,12 +66,11 @@ void main() {
           expect(appMachO, isNotNull);
           expect(appMachO!.fileType, MachO.dylib);
 
-          // The whole point: a symbol server matches the companion to the
-          // shipped image by this value.
           expect(
             companionMachO.uuid,
             equals(appMachO.uuid),
-            reason: 'companion UUID does not match App.framework',
+            reason: 'companion UUID does not match App.framework, so a symbol '
+                'server cannot associate the two',
           );
         },
       );

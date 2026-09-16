@@ -50,9 +50,6 @@ const kLinkInfoArgs = <String>[
   '--print_dispatch_table_link_info_to=build/App.dt.link',
 ];
 
-// Stand-in for the Mach-O dSYM dsymutil would write. The copy step only moves
-// bytes, so any recognizable payload proves the right file reached the right
-// place.
 const _kFakeDwarf = 'fake-macho-dsym';
 
 void _writeFakeDwarf(FileSystem fileSystem, String dsymBundle) {
@@ -223,9 +220,6 @@ void main() {
       );
     });
 
-    // Apple targets must not ask gen_snapshot for a debug companion: the ELF it
-    // writes alongside an assembly snapshot carries no build ID, so symbol
-    // servers skip it. The dSYM dsymutil produces is used instead.
     testWithoutContext('builds iOS snapshot with dwarfStackTraces', () async {
       final String outputPath = fileSystem.path.join('build', 'foo');
       final String assembly = fileSystem.path.join(outputPath, 'snapshot_assembly.S');
@@ -528,9 +522,8 @@ void main() {
       expect(processManager, hasNoRemainingExpectations);
     });
 
-    // Xcode._run passes throwOnError, so a failing dsymutil surfaces as a
-    // ProcessException rather than a non-zero return. Either way the build stops
-    // before anything is written to the split-debug-info directory.
+    // Xcode._run passes throwOnError, so dsymutil throws rather than returning
+    // non-zero.
     testWithoutContext('iOS split debug info fails when dsymutil fails', () async {
       final String outputPath = fileSystem.path.join('build', 'foo');
       final String assembly = fileSystem.path.join(outputPath, 'snapshot_assembly.S');
@@ -642,8 +635,6 @@ void main() {
           ],
         ),
         const FakeCommand(command: <String>['xcrun', 'clang', '-arch', 'arm64', ...kDefaultClang]),
-        // Exits 0 but produces nothing; without an explicit check the build
-        // would succeed and ship no debug companion at all.
         const FakeCommand(
           command: <String>[
             'xcrun',

@@ -1,20 +1,13 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-/// Minimal Mach-O reader, enough to answer two questions about a debug
-/// companion: is it a dSYM, and does its debug ID match the image it describes?
-///
-/// Symbol servers key on the debug ID, which for Mach-O is the `LC_UUID` load
-/// command. A companion whose UUID does not match the shipped binary is as
-/// useless as one with no UUID at all, so both facts have to be checked
-/// together.
+/// Minimal Mach-O reader: file type and `LC_UUID`, the debug ID symbol servers
+/// match a companion to its image by.
 class MachO {
   MachO._(this.fileType, this.uuid);
 
-  /// Reads [file], transparently unwrapping a single-slice universal binary.
-  ///
-  /// Returns `null` when the file is not Mach-O at all, which is how the
-  /// pre-fix ELF companion shows up.
+  /// Returns `null` when [file] is not Mach-O, which is how an ELF companion
+  /// shows up.
   static MachO? read(File file) {
     final bytes = file.readAsBytesSync();
     if (bytes.length < 32) return null;
@@ -22,9 +15,8 @@ class MachO {
 
     var offset = 0;
     if (data.getUint32(0) == _fatMagic) {
-      // Big-endian fat header; take the first slice. iOS release builds are
-      // single-architecture, and the macOS universal case is lipo'd only after
-      // AOTSnapshotter has already written the per-arch companion.
+      // First slice only. iOS release builds are single-architecture, and macOS
+      // is lipo'd after AOTSnapshotter writes the per-arch companion.
       offset = data.getUint32(8 + 8);
     }
 

@@ -297,11 +297,9 @@ class AOTSnapshotter {
       if (shouldSplitDebugInfo) ...<String>[
         '--dwarf-stack-traces',
         '--resolve-dwarf-paths',
-        // Apple targets take their debug companion from dsymutil instead, in
-        // _buildFramework. The debug-info ELF this would write carries no build
-        // ID: the writer derives one by hashing a .text section, and an assembly
-        // snapshot leaves that section empty (dartbug.com/43274). Symbol servers
-        // key on the debug ID, so they skip such a file entirely.
+        // Alongside an assembly snapshot this writes an ELF with no build ID,
+        // which symbol servers skip (dartbug.com/43274). Apple takes the
+        // companion from dsymutil in _buildFramework instead.
         if (!targetingApplePlatform)
           '--save-debugging-info=${_fileSystem.path.join(splitDebugInfo!, debugFilename)}',
       ],
@@ -596,9 +594,8 @@ class AOTSnapshotter {
         return dsymResult.exitCode;
       }
 
-      // The dSYM is the only debug companion on Apple that carries a debug ID
-      // symbol servers can match: dsymutil derives it from the linked binary, so
-      // its UUID equals App.framework's by construction.
+      // dsymutil derives the dSYM from the linked binary, so its UUID equals
+      // App.framework's by construction.
       if (splitDebugInfoSymbols != null) {
         final File dwarf = _fileSystem.file(
           _fileSystem.path.join('$frameworkDir.dSYM', 'Contents', 'Resources', 'DWARF', 'App'),
