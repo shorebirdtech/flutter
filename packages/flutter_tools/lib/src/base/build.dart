@@ -297,7 +297,13 @@ class AOTSnapshotter {
       if (shouldSplitDebugInfo) ...<String>[
         '--dwarf-stack-traces',
         '--resolve-dwarf-paths',
-        '--save-debugging-info=${_fileSystem.path.join(splitDebugInfo!, debugFilename)}',
+        // Apple targets take their debug companion from dsymutil instead, in
+        // _buildFramework. The debug-info ELF this would write carries no build
+        // ID: the writer derives one by hashing a .text section, and an assembly
+        // snapshot leaves that section empty (dartbug.com/43274). Symbol servers
+        // key on the debug ID, so they skip such a file entirely.
+        if (!targetingApplePlatform)
+          '--save-debugging-info=${_fileSystem.path.join(splitDebugInfo!, debugFilename)}',
       ],
       if (dartObfuscation) '--obfuscate',
     ]);
@@ -360,6 +366,9 @@ class AOTSnapshotter {
         quiet: quiet,
         stripAfterBuild: stripAfterBuild,
         extractAppleDebugSymbols: extractAppleDebugSymbols,
+        splitDebugInfoSymbols: shouldSplitDebugInfo
+            ? _fileSystem.path.join(splitDebugInfo!, debugFilename)
+            : null,
       );
     } else {
       return 0;
@@ -510,6 +519,7 @@ class AOTSnapshotter {
     required bool quiet,
     required bool stripAfterBuild,
     required bool extractAppleDebugSymbols,
+    required String? splitDebugInfoSymbols,
   }) async {
     final String targetArch = appleArch.name;
     if (!quiet) {
@@ -586,6 +596,20 @@ class AOTSnapshotter {
         return dsymResult.exitCode;
       }
 
+      // The dSYM is the only debug companion on Apple that carries a debug ID
+      // symbol servers can match: dsymutil derives it from the linked binary, so
+      // its UUID equals App.framework's by construction.
+      if (splitDebugInfoSymbols != null) {
+        final File dwarf = _fileSystem.file(
+          _fileSystem.path.join('$frameworkDir.dSYM', 'Contents', 'Resources', 'DWARF', 'App'),
+        );
+        if (!dwarf.existsSync()) {
+          _logger.printError('dsymutil reported success but wrote no DWARF at ${dwarf.path}');
+          return 1;
+        }
+        dwarf.copySync(splitDebugInfoSymbols);
+      }
+
       if (stripAfterBuild) {
         // See https://www.unix.com/man-page/osx/1/strip/ for arguments
         final RunResult stripResult = await _xcode.strip(<String>['-x', appLib, '-o', appLib]);
@@ -598,6 +622,13 @@ class AOTSnapshotter {
       }
     } else {
       assert(!stripAfterBuild);
+      if (splitDebugInfoSymbols != null) {
+        _logger.printError(
+          'Cannot split debug info for $targetArch: debug symbols are only '
+          'extracted for profile and release builds.',
+        );
+        return 1;
+      }
     }
 
     return 0;
