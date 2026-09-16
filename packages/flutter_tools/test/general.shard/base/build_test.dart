@@ -700,6 +700,7 @@ void main() {
 
       expect(genSnapshotExitCode, 0);
       expect(fileSystem.file(debugPath).readAsStringSync(), _kFakeDwarf);
+      expect(logger.traceText, contains('Ignoring --strip'));
       expect(processManager, hasNoRemainingExpectations);
     });
 

@@ -251,6 +251,10 @@ class AOTSnapshotter {
         // assembly, leaving dsymutil nothing to build a dSYM from. The shipped
         // binary is still stripped, after the dSYM is extracted.
         if (option == '--strip' && targetingApplePlatform && shouldSplitDebugInfo) {
+          _logger.printTrace(
+            'Ignoring --strip because --split-debug-info needs the DWARF to '
+            'reach dsymutil. The built binary is still stripped afterwards.',
+          );
           continue;
         }
         genSnapshotArgs.add(option);
