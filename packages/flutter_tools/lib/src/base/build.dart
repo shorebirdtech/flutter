@@ -235,6 +235,8 @@ class AOTSnapshotter {
         buildMode == BuildMode.profile || buildMode == BuildMode.release;
     _logger.printTrace('extractAppleDebugSymbols = $extractAppleDebugSymbols');
 
+    final bool shouldSplitDebugInfo = splitDebugInfo?.isNotEmpty ?? false;
+
     // We strip snapshot by default, but allow to suppress this behavior
     // by supplying --no-strip in extraGenSnapshotOptions.
     var shouldStrip = true;
@@ -243,6 +245,12 @@ class AOTSnapshotter {
       for (final option in extraGenSnapshotOptions) {
         if (option == '--no-strip') {
           shouldStrip = false;
+          continue;
+        }
+        // Stripping in gen_snapshot drops the DWARF before it reaches the
+        // assembly, leaving dsymutil nothing to build a dSYM from. The shipped
+        // binary is still stripped, after the dSYM is extracted.
+        if (option == '--strip' && targetingApplePlatform && shouldSplitDebugInfo) {
           continue;
         }
         genSnapshotArgs.add(option);
@@ -287,7 +295,6 @@ class AOTSnapshotter {
     // multiple debug files.
     final String archName = platform.getName(darwinArch: darwinArch);
     final debugFilename = 'app.$archName.symbols';
-    final bool shouldSplitDebugInfo = splitDebugInfo?.isNotEmpty ?? false;
     if (shouldSplitDebugInfo) {
       _fileSystem.directory(splitDebugInfo).createSync(recursive: true);
     }

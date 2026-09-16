@@ -522,6 +522,165 @@ void main() {
       expect(processManager, hasNoRemainingExpectations);
     });
 
+    // The argv `shorebird release ios --obfuscate` produces. Forwarding --strip
+    // to gen_snapshot here would leave dsymutil no DWARF to work from, and the
+    // companion would ship empty.
+    testWithoutContext('iOS split debug info keeps DWARF when --strip is passed', () async {
+      final String outputPath = fileSystem.path.join('build', 'foo');
+      final String assembly = fileSystem.path.join(outputPath, 'snapshot_assembly.S');
+      final String debugPath = fileSystem.path.join('foo', 'app.ios-arm64.symbols');
+      final String genSnapshotPath = artifacts.getArtifactPath(
+        Artifact.genSnapshotArm64,
+        platform: TargetPlatform.ios,
+        mode: BuildMode.release,
+      );
+      processManager.addCommands(<FakeCommand>[
+        FakeCommand(
+          command: <String>[
+            genSnapshotPath,
+            '--deterministic',
+            ...kLinkInfoArgs,
+            '--snapshot_kind=app-aot-assembly',
+            '--assembly=$assembly',
+            '--dwarf-stack-traces',
+            '--resolve-dwarf-paths',
+            '--obfuscate',
+            'main.dill',
+          ],
+        ),
+        kWhichSysctlCommand,
+        kARMCheckCommand,
+        const FakeCommand(
+          command: <String>[
+            'xcrun',
+            'cc',
+            '-arch',
+            'arm64',
+            '-miphoneos-version-min=15.0',
+            '-isysroot',
+            'path/to/sdk',
+            '-c',
+            'build/foo/snapshot_assembly.S',
+            '-o',
+            'build/foo/snapshot_assembly.o',
+          ],
+        ),
+        const FakeCommand(command: <String>['xcrun', 'clang', '-arch', 'arm64', ...kDefaultClang]),
+        FakeCommand(
+          command: const <String>[
+            'xcrun',
+            'dsymutil',
+            '-o',
+            'build/foo/App.framework.dSYM',
+            'build/foo/App.framework/App',
+          ],
+          onRun: (_) => _writeFakeDwarf(fileSystem, 'build/foo/App.framework.dSYM'),
+        ),
+        const FakeCommand(
+          command: <String>[
+            'xcrun',
+            'strip',
+            '-x',
+            'build/foo/App.framework/App',
+            '-o',
+            'build/foo/App.framework/App',
+          ],
+        ),
+      ]);
+
+      final int genSnapshotExitCode = await snapshotter.build(
+        platform: TargetPlatform.ios,
+        buildMode: BuildMode.release,
+        mainPath: 'main.dill',
+        outputPath: outputPath,
+        darwinArch: DarwinArch.arm64,
+        sdkRoot: 'path/to/sdk',
+        splitDebugInfo: 'foo',
+        extraGenSnapshotOptions: const <String>['--strip'],
+        dartObfuscation: true,
+      );
+
+      expect(genSnapshotExitCode, 0);
+      expect(fileSystem.file(debugPath).readAsStringSync(), _kFakeDwarf);
+      expect(processManager, hasNoRemainingExpectations);
+    });
+
+    // Without --split-debug-info there is no companion to protect, so --strip
+    // still reaches gen_snapshot.
+    testWithoutContext('iOS forwards --strip when not splitting debug info', () async {
+      final String outputPath = fileSystem.path.join('build', 'foo');
+      final String assembly = fileSystem.path.join(outputPath, 'snapshot_assembly.S');
+      final String genSnapshotPath = artifacts.getArtifactPath(
+        Artifact.genSnapshotArm64,
+        platform: TargetPlatform.ios,
+        mode: BuildMode.release,
+      );
+      processManager.addCommands(<FakeCommand>[
+        FakeCommand(
+          command: <String>[
+            genSnapshotPath,
+            '--deterministic',
+            ...kLinkInfoArgs,
+            '--strip',
+            '--snapshot_kind=app-aot-assembly',
+            '--assembly=$assembly',
+            'main.dill',
+          ],
+        ),
+        kWhichSysctlCommand,
+        kARMCheckCommand,
+        const FakeCommand(
+          command: <String>[
+            'xcrun',
+            'cc',
+            '-arch',
+            'arm64',
+            '-miphoneos-version-min=15.0',
+            '-isysroot',
+            'path/to/sdk',
+            '-c',
+            'build/foo/snapshot_assembly.S',
+            '-o',
+            'build/foo/snapshot_assembly.o',
+          ],
+        ),
+        const FakeCommand(command: <String>['xcrun', 'clang', '-arch', 'arm64', ...kDefaultClang]),
+        const FakeCommand(
+          command: <String>[
+            'xcrun',
+            'dsymutil',
+            '-o',
+            'build/foo/App.framework.dSYM',
+            'build/foo/App.framework/App',
+          ],
+        ),
+        const FakeCommand(
+          command: <String>[
+            'xcrun',
+            'strip',
+            '-x',
+            'build/foo/App.framework/App',
+            '-o',
+            'build/foo/App.framework/App',
+          ],
+        ),
+      ]);
+
+      final int genSnapshotExitCode = await snapshotter.build(
+        platform: TargetPlatform.ios,
+        buildMode: BuildMode.release,
+        mainPath: 'main.dill',
+        outputPath: outputPath,
+        darwinArch: DarwinArch.arm64,
+        sdkRoot: 'path/to/sdk',
+        extraGenSnapshotOptions: const <String>['--strip'],
+        dartObfuscation: false,
+      );
+
+      expect(genSnapshotExitCode, 0);
+      expect(processManager, hasNoRemainingExpectations);
+    });
+
     // Xcode._run passes throwOnError, so dsymutil throws rather than returning
     // non-zero.
     testWithoutContext('iOS split debug info fails when dsymutil fails', () async {
