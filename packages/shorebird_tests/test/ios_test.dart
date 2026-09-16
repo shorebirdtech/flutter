@@ -31,6 +31,9 @@ void main() {
           await projectDirectory.runFlutterBuildIos(
             extraArgs: [
               '--obfuscate',
+              // The argv shorebird_cli produces for an obfuscated Apple
+              // release. Without --strip this misses the case that matters.
+              '--extra-gen-snapshot-options=--strip',
               '--split-debug-info=${symbolsDirectory.path}',
             ],
           );
@@ -60,6 +63,12 @@ void main() {
             companionMachO.uuid,
             isNotNull,
             reason: 'companion has no LC_UUID, so it has no debug ID',
+          );
+          expect(
+            companionMachO.debugInfoSize,
+            greaterThan(0),
+            reason: 'companion has no DWARF; a dSYM of the right shape and no '
+                'debug info symbolicates nothing',
           );
 
           final appMachO = MachO.read(projectDirectory.iosAppFrameworkBinary());

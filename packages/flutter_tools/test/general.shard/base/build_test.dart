@@ -522,6 +522,104 @@ void main() {
       expect(processManager, hasNoRemainingExpectations);
     });
 
+    // macos.dart forwards --split-debug-info into the same Apple branches, and
+    // the companion is named per-arch.
+    testWithoutContext('builds macOS snapshot with dwarfStackTraces', () async {
+      final String outputPath = fileSystem.path.join('build', 'foo');
+      final String assembly = fileSystem.path.join(outputPath, 'snapshot_assembly.S');
+      final String debugPath = fileSystem.path.join('foo', 'app.darwin-arm64.symbols');
+      final String genSnapshotPath = artifacts.getArtifactPath(
+        Artifact.genSnapshotArm64,
+        platform: TargetPlatform.darwin,
+        mode: BuildMode.release,
+      );
+      processManager.addCommands(<FakeCommand>[
+        FakeCommand(
+          command: <String>[
+            genSnapshotPath,
+            '--deterministic',
+            ...kLinkInfoArgs,
+            '--snapshot_kind=app-aot-assembly',
+            '--assembly=$assembly',
+            '--dwarf-stack-traces',
+            '--resolve-dwarf-paths',
+            'main.dill',
+          ],
+        ),
+        kWhichSysctlCommand,
+        kARMCheckCommand,
+        const FakeCommand(
+          command: <String>[
+            'xcrun',
+            'cc',
+            '-arch',
+            'arm64',
+            '-c',
+            'build/foo/snapshot_assembly.S',
+            '-o',
+            'build/foo/snapshot_assembly.o',
+          ],
+        ),
+        const FakeCommand(
+          command: <String>[
+            'xcrun',
+            'clang',
+            '-arch',
+            'arm64',
+            '-dynamiclib',
+            '-Xlinker',
+            '-rpath',
+            '-Xlinker',
+            '@executable_path/Frameworks',
+            '-Xlinker',
+            '-rpath',
+            '-Xlinker',
+            '@loader_path/Frameworks',
+            '-fapplication-extension',
+            '-install_name',
+            '@rpath/App.framework/App',
+            '-o',
+            'build/foo/App.framework/App',
+            'build/foo/snapshot_assembly.o',
+          ],
+        ),
+        FakeCommand(
+          command: const <String>[
+            'xcrun',
+            'dsymutil',
+            '-o',
+            'build/foo/App.framework.dSYM',
+            'build/foo/App.framework/App',
+          ],
+          onRun: (_) => _writeFakeDwarf(fileSystem, 'build/foo/App.framework.dSYM'),
+        ),
+        const FakeCommand(
+          command: <String>[
+            'xcrun',
+            'strip',
+            '-x',
+            'build/foo/App.framework/App',
+            '-o',
+            'build/foo/App.framework/App',
+          ],
+        ),
+      ]);
+
+      final int genSnapshotExitCode = await snapshotter.build(
+        platform: TargetPlatform.darwin,
+        buildMode: BuildMode.release,
+        mainPath: 'main.dill',
+        outputPath: outputPath,
+        darwinArch: DarwinArch.arm64,
+        splitDebugInfo: 'foo',
+        dartObfuscation: false,
+      );
+
+      expect(genSnapshotExitCode, 0);
+      expect(fileSystem.file(debugPath).readAsStringSync(), _kFakeDwarf);
+      expect(processManager, hasNoRemainingExpectations);
+    });
+
     // The argv `shorebird release ios --obfuscate` produces. Forwarding --strip
     // to gen_snapshot here would leave dsymutil no DWARF to work from, and the
     // companion would ship empty.
