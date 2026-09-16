@@ -352,11 +352,18 @@ $flavors
   Future<void> runFlutterBuildIos({
     Map<String, String>? environment,
     String? flavor,
+    List<String> extraArgs = const [],
   }) async {
     final result = await _runFlutterCommand(
       // The projects used to test are generated on spot, to make it simpler we don't
       // configure any apple accounts on it, so we skip code signing here.
-      ['build', 'ipa', '--no-codesign', if (flavor != null) '--flavor=$flavor'],
+      [
+        'build',
+        'ipa',
+        '--no-codesign',
+        if (flavor != null) '--flavor=$flavor',
+        ...extraArgs,
+      ],
       workingDirectory: this,
       environment: environment,
     );
@@ -365,6 +372,19 @@ $flavors
       throw Exception('Failed to run `flutter build ios`: ${result.stderr}');
     }
   }
+
+  /// The `App.framework` binary inside the built `Runner.xcarchive`.
+  File iosAppFrameworkBinary() => File(
+        path.join(
+          iosArchiveFile().path,
+          'Products',
+          'Applications',
+          'Runner.app',
+          'Frameworks',
+          'App.framework',
+          'App',
+        ),
+      );
 
   File apkFile({String? flavor}) => File(
         path.join(
