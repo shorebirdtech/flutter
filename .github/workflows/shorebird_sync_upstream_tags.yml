@@ -1,0 +1,55 @@
+name: sync_upstream_tags
+
+# Mirrors flutter/flutter tags into this repo once a day so our tags don't
+# drift from upstream's. Tags only; branches are never touched.
+#
+# Neither the fetch nor the push forces. A tag that already exists here at a
+# different sha than upstream fails the run instead of being overwritten: that
+# means someone hand-tagged this repo and a person has to look. Tags upstream
+# deletes are left in place (no --prune).
+#
+# The push uses GITHUB_TOKEN, which never triggers other workflows, so mirrored
+# tags don't start CI runs.
+
+on:
+  schedule:
+    - cron: "17 6 * * *" # daily, 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: github.repository == 'shorebirdtech/flutter'
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history plus all of our tags, so the fetch and push below
+          # only move the delta.
+          fetch-depth: 0
+
+      - name: ⬇️ Fetch upstream tags
+        run: |
+          git remote add upstream https://github.com/flutter/flutter.git
+          git fetch --no-tags upstream 'refs/tags/*:refs/tags/*'
+
+      - name: ⬆️ Push tags
+        run: |
+          git push --porcelain origin 'refs/tags/*:refs/tags/*' | tee push.log
+          # Porcelain lines are "<flag>\t<from>:<to>\t<summary>"; "*" flags a new ref.
+          awk -F'\t' '$1 == "*" { sub(/.*:refs\/tags\//, "", $2); print $2 }' push.log > new_tags.txt
+          {
+            echo "### Mirrored $(wc -l < new_tags.txt) new tag(s)"
+            sed 's/^/- /' new_tags.txt
+          } >> "$GITHUB_STEP_SUMMARY"
