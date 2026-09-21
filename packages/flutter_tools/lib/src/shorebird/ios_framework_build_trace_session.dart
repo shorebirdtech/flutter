@@ -21,7 +21,8 @@ import 'network_trace_span.dart';
 /// app through xcodebuild: App.framework comes from the in-process
 /// build system (so its per-target timings are recorded via
 /// [addAssembleResult] rather than merged from a `flutter assemble`
-/// child), and xcodebuild is only invoked for plugin frameworks.
+/// child). xcodebuild runs to build plugins, which [xcodeSpan]
+/// covers, and to package xcframeworks, which it does not.
 class IosFrameworkBuildTraceSession {
   IosFrameworkBuildTraceSession._({
     required BuildTracer tracer,
@@ -122,21 +123,27 @@ class IosFrameworkBuildTraceSession {
   /// Writes the trace to disk and clears [BuildTracer.current].
   /// Records the outer `flutter build ios-framework` span first.
   void finish({required void Function(String) printStatus}) {
-    _tracer
-      ..addCompleteEvent(
-        name: '${TraceNames.flutterBuildSpanPrefix}ios-framework',
-        cat: TraceCategory.flutter.wireName,
-        pid: _flutterPid,
-        tid: _flutterToolTid,
-        start: _buildStart,
-        end: DateTime.now(),
-      )
-      ..writeToFile(_fs.file(_tracePath));
-    printStatus(
-      'Shorebird build trace written to $_tracePath. '
-      'View at https://ui.perfetto.dev',
-    );
-    BuildTracer.stop();
+    // A failed write must still uninstall the tracer: BuildTracer.start
+    // throws when one is already installed, so leaving it would poison
+    // every later session in the isolate.
+    try {
+      _tracer
+        ..addCompleteEvent(
+          name: '${TraceNames.flutterBuildSpanPrefix}ios-framework',
+          cat: TraceCategory.flutter.wireName,
+          pid: _flutterPid,
+          tid: _flutterToolTid,
+          start: _buildStart,
+          end: DateTime.now(),
+        )
+        ..writeToFile(_fs.file(_tracePath));
+      printStatus(
+        'Shorebird build trace written to $_tracePath. '
+        'View at https://ui.perfetto.dev',
+      );
+    } finally {
+      BuildTracer.stop();
+    }
   }
 
   Future<T> _span<T>(
