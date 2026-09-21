@@ -186,6 +186,11 @@ static fml::RefPtr<DartSnapshot> MakeSnapshot(
           instructions.size()));
 }
 
+// The regions below are fabricated strings, not serialized snapshots.
+static SnapshotsDataHandle::RegionSizer SizedAt(size_t size) {
+  return [size](const uint8_t*) { return size; };
+}
+
 // Guards blob count and order, which the Read/Seek tests above never touch
 // because they build handles through the public constructor.
 //
@@ -198,7 +203,8 @@ TEST(SnapshotsDataHandle, CreateForSnapshotsEmitsDataThenInstructionsOnce) {
   const std::string instructions = "INSTRUCTIONS";
   auto snapshot = MakeSnapshot(data, instructions);
 
-  auto handle = SnapshotsDataHandle::createForSnapshots(*snapshot);
+  auto handle = SnapshotsDataHandle::createForSnapshots(
+      *snapshot, SizedAt(data.size()), SizedAt(instructions.size()));
 
   EXPECT_EQ(handle->FullSize(), data.size() + instructions.size());
 
@@ -215,7 +221,8 @@ TEST(SnapshotsDataHandle, CreateForSnapshotsPutsDataBeforeInstructions) {
   const std::string instructions = "BB";
   auto snapshot = MakeSnapshot(data, instructions);
 
-  auto handle = SnapshotsDataHandle::createForSnapshots(*snapshot);
+  auto handle = SnapshotsDataHandle::createForSnapshots(
+      *snapshot, SizedAt(data.size()), SizedAt(instructions.size()));
 
   uint8_t first[4] = {0, 0, 0, 0};
   EXPECT_EQ(handle->Read(first, 4), 4u);
@@ -234,7 +241,8 @@ TEST(SnapshotsDataHandle, CreateForSnapshotsKeepsEmptyInstructionsRegion) {
   const std::string instructions;
   auto snapshot = MakeSnapshot(data, instructions);
 
-  auto handle = SnapshotsDataHandle::createForSnapshots(*snapshot);
+  auto handle = SnapshotsDataHandle::createForSnapshots(
+      *snapshot, SizedAt(data.size()), SizedAt(instructions.size()));
 
   EXPECT_EQ(handle->FullSize(), data.size());
 }

@@ -4,17 +4,10 @@
 
 namespace flutter {
 
-static std::unique_ptr<fml::Mapping> DataMapping(const DartSnapshot& snapshot) {
-  auto ptr = snapshot.GetDataMapping();
-  return std::make_unique<fml::NonOwnedMapping>(ptr,
-                                                Dart_SnapshotDataSize(ptr));
-}
-
-static std::unique_ptr<fml::Mapping> InstructionsMapping(
-    const DartSnapshot& snapshot) {
-  auto ptr = snapshot.GetInstructionsMapping();
-  return std::make_unique<fml::NonOwnedMapping>(ptr,
-                                                Dart_SnapshotInstrSize(ptr));
+static std::unique_ptr<fml::Mapping> RegionMapping(
+    const uint8_t* region,
+    const SnapshotsDataHandle::RegionSizer& size) {
+  return std::make_unique<fml::NonOwnedMapping>(region, size(region));
 }
 
 // The size of the snapshot data is the sum of the sizes of the blobs.
@@ -83,6 +76,16 @@ BlobsIndex SnapshotsDataHandle::IndexForAbsoluteOffset(int64_t offset,
 
 std::unique_ptr<SnapshotsDataHandle> SnapshotsDataHandle::createForSnapshots(
     const DartSnapshot& base_snapshot) {
+  return createForSnapshots(
+      base_snapshot,
+      [](const uint8_t* region) { return Dart_SnapshotDataSize(region); },
+      [](const uint8_t* region) { return Dart_SnapshotInstrSize(region); });
+}
+
+std::unique_ptr<SnapshotsDataHandle> SnapshotsDataHandle::createForSnapshots(
+    const DartSnapshot& base_snapshot,
+    const RegionSizer& data_size,
+    const RegionSizer& instructions_size) {
   // Order and count must match HandleDumpBlobs in
   // runtime/bin/analyze_snapshot.cc, which writes the data region then the
   // text region. One snapshot supplies both. The VM isolate's contents were
@@ -95,8 +98,9 @@ std::unique_ptr<SnapshotsDataHandle> SnapshotsDataHandle::createForSnapshots(
   // The caller must pass a snapshot resolved through the VM path. That path is
   // patch-blind, and this stream has to be the unpatched base the diff was
   // computed against.
-  auto data = DataMapping(base_snapshot);
-  auto insns = InstructionsMapping(base_snapshot);
+  auto data = RegionMapping(base_snapshot.GetDataMapping(), data_size);
+  auto insns =
+      RegionMapping(base_snapshot.GetInstructionsMapping(), instructions_size);
 
   // Per-blob observability for the base byte stream the updater is about to
   // patch against. Logged at every patch-apply attempt so customer syslogs
