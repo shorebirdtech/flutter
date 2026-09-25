@@ -3,13 +3,15 @@ name: sync_upstream_tags
 # Mirrors flutter/flutter tags into this repo once a day so our tags don't
 # drift from upstream's. Tags only; branches are never touched.
 #
-# Tags are created through the REST refs API rather than `git push`. GitHub
-# rejects a push whose commits touch .github/workflows/, and GITHUB_TOKEN
-# cannot hold the `workflows` permission that would lift it -- there is no such
-# permissions: key. Upstream tags carry workflow changes routinely, so the push
-# path cannot mirror them at all. The refs API uploads no objects: this repo is
-# a fork of flutter/flutter and shares its object store, so every upstream sha
-# already resolves here.
+# Mirroring runs on a GitHub App token, not GITHUB_TOKEN. GitHub refuses any
+# ref write whose commits touch .github/workflows/ unless the writer holds the
+# `workflows` permission, and GITHUB_TOKEN cannot hold it -- there is no such
+# permissions: key. Upstream tags carry workflow changes routinely, so
+# GITHUB_TOKEN cannot mirror them at all. The REST refs API is subject to the
+# same check and returns 403 there, so it is not a way around the permission,
+# only a way around cloning: it uploads no objects, because this repo is a fork
+# of flutter/flutter and shares its object store, so every upstream sha already
+# resolves here.
 #
 # A tag that exists here at a different sha than upstream is reported and fails
 # the run rather than being overwritten: that means someone hand-tagged this
@@ -22,8 +24,8 @@ on:
     - cron: "17 6 * * *" # daily, 06:17 UTC
   workflow_dispatch:
 
-permissions:
-  contents: write
+# Every write goes through the app token below, so the job token needs nothing.
+permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}
@@ -38,6 +40,13 @@ jobs:
         shell: bash
 
     steps:
+      - name: 🔑 Mint an app token
+        id: app_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.TAG_SYNC_APP_ID }}
+          private-key: ${{ secrets.TAG_SYNC_APP_PRIVATE_KEY }}
+
       - name: 🔍 Diff our tags against upstream's
         run: |
           set -euo pipefail
@@ -62,7 +71,7 @@ jobs:
 
       - name: ⬆️ Create missing tags
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
           set -euo pipefail
           : > created.md
