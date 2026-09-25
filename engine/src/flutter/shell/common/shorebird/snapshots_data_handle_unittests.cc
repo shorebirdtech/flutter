@@ -193,12 +193,17 @@ static fml::RefPtr<DartSnapshot> MakeSnapshot(
 // createForSnapshots taking two snapshots appended every byte twice and
 // silently misaligned this stream against the host's dump_blobs extraction.
 // Neither end validates the length, so only the bytes catch it.
+//
+// These three cases pass their region lengths because the regions are
+// fabricated strings: the VM's header parser dereferences whatever a
+// four-byte buffer's leading bytes point at.
 TEST(SnapshotsDataHandle, CreateForSnapshotsEmitsDataThenInstructionsOnce) {
   const std::string data = "DATA";
   const std::string instructions = "INSTRUCTIONS";
   auto snapshot = MakeSnapshot(data, instructions);
 
-  auto handle = SnapshotsDataHandle::createForSnapshots(*snapshot);
+  auto handle = SnapshotsDataHandle::createForSnapshots(*snapshot, data.size(),
+                                                        instructions.size());
 
   EXPECT_EQ(handle->FullSize(), data.size() + instructions.size());
 
@@ -215,7 +220,8 @@ TEST(SnapshotsDataHandle, CreateForSnapshotsPutsDataBeforeInstructions) {
   const std::string instructions = "BB";
   auto snapshot = MakeSnapshot(data, instructions);
 
-  auto handle = SnapshotsDataHandle::createForSnapshots(*snapshot);
+  auto handle = SnapshotsDataHandle::createForSnapshots(*snapshot, data.size(),
+                                                        instructions.size());
 
   uint8_t first[4] = {0, 0, 0, 0};
   EXPECT_EQ(handle->Read(first, 4), 4u);
@@ -234,7 +240,8 @@ TEST(SnapshotsDataHandle, CreateForSnapshotsKeepsEmptyInstructionsRegion) {
   const std::string instructions;
   auto snapshot = MakeSnapshot(data, instructions);
 
-  auto handle = SnapshotsDataHandle::createForSnapshots(*snapshot);
+  auto handle = SnapshotsDataHandle::createForSnapshots(*snapshot, data.size(),
+                                                        instructions.size());
 
   EXPECT_EQ(handle->FullSize(), data.size());
 }
