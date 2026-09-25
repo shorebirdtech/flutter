@@ -17,7 +17,8 @@ name: sync_upstream_tags
 # the run rather than being overwritten: that means someone hand-tagged this
 # repo and a person has to look. Tags upstream deletes are left in place.
 #
-# GITHUB_TOKEN never triggers other workflows, so mirrored tags don't start CI.
+# No workflow here has a tags, create or release trigger, so mirrored tags
+# start no CI runs. An app token would not suppress them if one did.
 
 on:
   schedule:
@@ -75,18 +76,28 @@ jobs:
         run: |
           set -euo pipefail
           : > created.md
+          : > failed.txt
+          # One tag that cannot be created must not strand the tags behind it,
+          # or a single durable failure stalls mirroring on every later run.
           while read -r name sha; do
-            gh api --silent -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
-              -f "ref=refs/tags/$name" -f "sha=$sha"
-            echo "- \`$name\` -> \`$sha\`" >> created.md
+            if gh api --silent -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+                 -f "ref=refs/tags/$name" -f "sha=$sha"; then
+              echo "- \`$name\` -> \`$sha\`" >> created.md
+            else
+              echo "$name $sha" >> failed.txt
+            fi
           done < missing.txt
 
       - name: 📝 Summarize
         if: always()
         run: |
           {
-            echo "### Mirrored $(wc -l < missing.txt) new tag(s)"
+            echo "### Mirrored $(wc -l < created.md) new tag(s)"
             cat created.md 2>/dev/null || true
+            if [[ -s failed.txt ]]; then
+              printf '\n### Tags that could not be created\n\n'
+              awk '{ printf "- `%s` -> `%s`\n", $1, $2 }' failed.txt
+            fi
             if [[ -s conflicts.txt ]]; then
               printf '\n### Tags here at a different sha than upstream\n\n'
               echo "| tag | upstream | here |"
@@ -95,5 +106,5 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: 🚨 Fail on divergent tags
-        run: test ! -s conflicts.txt
+      - name: 🚨 Fail on divergent or unmirrored tags
+        run: test ! -s conflicts.txt && test ! -s failed.txt
