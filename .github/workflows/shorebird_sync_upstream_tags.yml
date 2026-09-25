@@ -3,21 +3,30 @@ name: sync_upstream_tags
 # Mirrors flutter/flutter tags into this repo once a day so our tags don't
 # drift from upstream's. Tags only; branches are never touched.
 #
-# Neither the fetch nor the push forces. A tag that already exists here at a
-# different sha than upstream fails the run instead of being overwritten: that
-# means someone hand-tagged this repo and a person has to look. Tags upstream
-# deletes are left in place (no --prune).
+# Mirroring runs on a GitHub App token, not GITHUB_TOKEN. GitHub refuses any
+# ref write whose commits touch .github/workflows/ unless the writer holds the
+# `workflows` permission, and GITHUB_TOKEN cannot hold it -- there is no such
+# permissions: key. Upstream tags carry workflow changes routinely, so
+# GITHUB_TOKEN cannot mirror them at all. The REST refs API is subject to the
+# same check and returns 403 there, so it is not a way around the permission,
+# only a way around cloning: it uploads no objects, because this repo is a fork
+# of flutter/flutter and shares its object store, so every upstream sha already
+# resolves here.
 #
-# The push uses GITHUB_TOKEN, which never triggers other workflows, so mirrored
-# tags don't start CI runs.
+# A tag that exists here at a different sha than upstream is reported and fails
+# the run rather than being overwritten: that means someone hand-tagged this
+# repo and a person has to look. Tags upstream deletes are left in place.
+#
+# No workflow here has a tags, create or release trigger, so mirrored tags
+# start no CI runs. An app token would not suppress them if one did.
 
 on:
   schedule:
     - cron: "17 6 * * *" # daily, 06:17 UTC
   workflow_dispatch:
 
-permissions:
-  contents: write
+# Every write goes through the app token below, so the job token needs nothing.
+permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}
@@ -32,24 +41,70 @@ jobs:
         shell: bash
 
     steps:
-      - name: 📚 Git Checkout
-        uses: actions/checkout@v4
+      - name: 🔑 Mint an app token
+        id: app_token
+        uses: actions/create-github-app-token@v2
         with:
-          # Full history plus all of our tags, so the fetch and push below
-          # only move the delta.
-          fetch-depth: 0
+          app-id: ${{ vars.TAG_SYNC_APP_ID }}
+          private-key: ${{ secrets.TAG_SYNC_APP_PRIVATE_KEY }}
 
-      - name: ⬇️ Fetch upstream tags
+      - name: 🔍 Diff our tags against upstream's
         run: |
-          git remote add upstream https://github.com/flutter/flutter.git
-          git fetch --no-tags upstream 'refs/tags/*:refs/tags/*'
+          set -euo pipefail
+          # ls-remote keeps this off a multi-gigabyte clone of flutter. Peeled
+          # "^{}" lines are dropped so an annotated tag mirrors as its tag
+          # object, which is what upstream's ref points at.
+          tags() {
+            git ls-remote --tags "$1" \
+              | grep -v '\^{}$' \
+              | sed -E 's|^([0-9a-f]+)[[:space:]]+refs/tags/|\1 |'
+          }
+          tags https://github.com/flutter/flutter.git > upstream.txt
+          tags "https://github.com/$GITHUB_REPOSITORY.git" > ours.txt
 
-      - name: ⬆️ Push tags
+          : > missing.txt
+          : > conflicts.txt
+          awk '
+            NR == FNR    { ours[$2] = $1; next }
+            !($2 in ours) { print $2, $1 > "missing.txt"; next }
+            ours[$2] != $1 { print $2, $1, ours[$2] > "conflicts.txt" }
+          ' ours.txt upstream.txt
+
+      - name: ⬆️ Create missing tags
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
-          git push --porcelain origin 'refs/tags/*:refs/tags/*' | tee push.log
-          # Porcelain lines are "<flag>\t<from>:<to>\t<summary>"; "*" flags a new ref.
-          awk -F'\t' '$1 == "*" { sub(/.*:refs\/tags\//, "", $2); print $2 }' push.log > new_tags.txt
+          set -euo pipefail
+          : > created.md
+          : > failed.txt
+          # One tag that cannot be created must not strand the tags behind it,
+          # or a single durable failure stalls mirroring on every later run.
+          while read -r name sha; do
+            if gh api --silent -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+                 -f "ref=refs/tags/$name" -f "sha=$sha"; then
+              echo "- \`$name\` -> \`$sha\`" >> created.md
+            else
+              echo "$name $sha" >> failed.txt
+            fi
+          done < missing.txt
+
+      - name: 📝 Summarize
+        if: always()
+        run: |
           {
-            echo "### Mirrored $(wc -l < new_tags.txt) new tag(s)"
-            sed 's/^/- /' new_tags.txt
+            echo "### Mirrored $(wc -l < created.md) new tag(s)"
+            cat created.md 2>/dev/null || true
+            if [[ -s failed.txt ]]; then
+              printf '\n### Tags that could not be created\n\n'
+              awk '{ printf "- `%s` -> `%s`\n", $1, $2 }' failed.txt
+            fi
+            if [[ -s conflicts.txt ]]; then
+              printf '\n### Tags here at a different sha than upstream\n\n'
+              echo "| tag | upstream | here |"
+              echo "|---|---|---|"
+              awk '{ printf "| `%s` | `%s` | `%s` |\n", $1, $2, $3 }' conflicts.txt
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 🚨 Fail on divergent or unmirrored tags
+        run: test ! -s conflicts.txt && test ! -s failed.txt
