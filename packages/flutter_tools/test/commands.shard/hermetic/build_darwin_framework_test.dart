@@ -4,6 +4,7 @@
 
 import 'package:args/command_runner.dart';
 import 'package:file/memory.dart';
+import 'package:file_testing/file_testing.dart';
 import 'package:flutter_tools/src/artifacts.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
 import 'package:flutter_tools/src/base/logger.dart';
@@ -14,10 +15,12 @@ import 'package:flutter_tools/src/cache.dart';
 import 'package:flutter_tools/src/commands/build_ios_framework.dart';
 import 'package:flutter_tools/src/commands/build_macos_framework.dart';
 import 'package:flutter_tools/src/commands/darwin_add_to_app.dart';
+import 'package:flutter_tools/src/convert.dart';
 import 'package:flutter_tools/src/darwin/darwin.dart';
 import 'package:flutter_tools/src/ios/plist_parser.dart';
 import 'package:flutter_tools/src/version.dart';
 import 'package:flutter_tools/src/xcode_project.dart';
+import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import 'package:test/fake.dart';
 
 import '../../src/common.dart';
@@ -560,6 +563,165 @@ void main() {
         Artifacts: () => Artifacts.test(fileSystem: memoryFileSystem),
       },
     );
+
+    // Shorebird-specific: --shorebird-trace tracing across the framework build.
+    group('--shorebird-trace', () {
+      // Minimal module project whose App.framework slices carry consistent
+      // (empty) native-asset manifests so the build reaches the end.
+      void createTraceableProject() {
+        final Directory projectDir = memoryFileSystem.directory('project')..createSync();
+        projectDir.childDirectory('ios').createSync();
+        projectDir.childDirectory('ios').childDirectory('Pods').createSync();
+        projectDir.childDirectory('lib').childFile('main.dart').createSync(recursive: true);
+        projectDir.childDirectory('.dart_tool').childFile('package_config.json')
+          ..createSync(recursive: true)
+          ..writeAsStringSync(
+            '{"configVersion": 2, "packages": [{"name": "project", "rootUri": "../", "packageUri": "lib/", "languageVersion": "3.0"}]}',
+          );
+        projectDir
+            .childDirectory('.dart_tool')
+            .childFile('package_graph.json')
+            .writeAsStringSync(
+              '{"configVersion": 1, "packages": [{"name": "project", "rootUri": "..", "packageUri": "lib/", "dependencies": []}]}',
+            );
+        projectDir.childFile('pubspec.yaml').writeAsStringSync('name: project');
+        projectDir.childFile('.metadata').createSync();
+        // Debug builds copy the LLDB init file into the output directory.
+        projectDir
+            .childDirectory('ios')
+            .childDirectory('Flutter')
+            .childDirectory('ephemeral')
+            .childFile('flutter_lldbinit')
+            .createSync(recursive: true);
+        projectDir
+            .childDirectory('ios')
+            .childDirectory('Flutter')
+            .childDirectory('ephemeral')
+            .childFile('flutter_lldb_helper.py')
+            .createSync(recursive: true);
+        memoryFileSystem.currentDirectory = projectDir;
+        memoryFileSystem
+            .directory('Artifact.flutterXcframework.TargetPlatform.ios.debug')
+            .createSync(recursive: true);
+        projectDir.childDirectory('.dart_tool').childDirectory('flutter_build')
+          ..createSync(recursive: true)
+          ..childFile('link_hooks_result.json').writeAsStringSync(
+            '{"codeAssets": [], "dataAssets": [], "dependencies": []}',
+          );
+      }
+
+      BuildIOSFrameworkCommand createCommand({required bool consistentAssets}) {
+        return BuildIOSFrameworkCommand(
+          logger: BufferLogger.test(),
+          buildSystem: TestBuildSystem.all(
+            BuildResult(
+              success: true,
+              performance: <String, PerformanceMeasurement>{
+                'kernel_snapshot': PerformanceMeasurement(
+                  analyticsName: 'kernel_snapshot',
+                  target: 'kernel_snapshot',
+                  skipped: false,
+                  succeeded: true,
+                  elapsedMilliseconds: 500,
+                  startTimeMicroseconds: 1000000,
+                ),
+              },
+            ),
+            (Target target, Environment environment) {
+              final Directory output = environment.outputDir;
+              output.childDirectory('App.framework').childFile('App').createSync(recursive: true);
+              final File manifest = output
+                  .childDirectory('App.framework')
+                  .childDirectory('flutter_assets')
+                  .childFile('NativeAssetsManifest.json');
+              manifest.createSync(recursive: true);
+              if (consistentAssets || output.path.contains('iphoneos')) {
+                manifest.writeAsStringSync('{"format-version": [1, 0, 0], "native-assets": {}}');
+              } else {
+                manifest.writeAsStringSync(
+                  '{"format-version": [1, 0, 0], "native-assets": {"ios_x64": {"package:project/asset1": ["absolute", "Foo.framework/Foo"]}}}',
+                );
+              }
+            },
+          ),
+          platform: fakePlatform,
+          flutterVersion: fakeFlutterVersion,
+          cache: cache,
+          verboseHelp: false,
+          codesign: FakeDarwinAddToAppCodesigning(),
+        );
+      }
+
+      testUsingContext(
+        'writes a trace with build spans and in-process assemble events',
+        () async {
+          createTraceableProject();
+          final BuildIOSFrameworkCommand command = createCommand(consistentAssets: true);
+
+          await createTestCommandRunner(command).run(<String>[
+            'ios-framework',
+            '--no-pub',
+            '--no-plugins',
+            '--no-profile',
+            '--no-release',
+            '--shorebird-trace=trace.json',
+          ]);
+
+          final File traceFile = memoryFileSystem.file('trace.json');
+          expect(traceFile, exists);
+          final List<Map<String, Object?>> spans =
+              (json.decode(traceFile.readAsStringSync()) as List<Object?>)
+                  .cast<Map<String, Object?>>()
+                  .where((Map<String, Object?> e) => e['ph'] == 'X')
+                  .toList();
+          Iterable<Map<String, Object?>> named(String name) =>
+              spans.where((Map<String, Object?> e) => e['name'] == name);
+          expect(named('flutter build ios-framework').single['cat'], 'flutter');
+          expect(named('copy Flutter.xcframework').single['cat'], 'flutter');
+          expect(named('build App.xcframework').single['cat'], 'flutter');
+          expect(named('pod install').single['cat'], 'subprocess');
+          // One assemble event per App.framework slice (device + simulator).
+          expect(named('kernel_snapshot').map((Map<String, Object?> e) => e['cat']), <String>[
+            'assemble',
+            'assemble',
+          ]);
+          expect(BuildTracer.current, isNull);
+        },
+        overrides: <Type, Generator>{
+          FileSystem: () => memoryFileSystem,
+          ProcessManager: () => FakeProcessManager.any(),
+          Artifacts: () => Artifacts.test(fileSystem: memoryFileSystem),
+        },
+      );
+
+      testUsingContext(
+        'aborts the trace without writing it when the build fails',
+        () async {
+          createTraceableProject();
+          final BuildIOSFrameworkCommand command = createCommand(consistentAssets: false);
+
+          await expectLater(
+            () => createTestCommandRunner(command).run(<String>[
+              'ios-framework',
+              '--no-pub',
+              '--no-plugins',
+              '--no-profile',
+              '--no-release',
+              '--shorebird-trace=trace.json',
+            ]),
+            throwsToolExit(),
+          );
+
+          expect(memoryFileSystem.file('trace.json'), isNot(exists));
+          expect(BuildTracer.current, isNull);
+        },
+        overrides: <Type, Generator>{
+          FileSystem: () => memoryFileSystem,
+          ProcessManager: () => FakeProcessManager.any(),
+          Artifacts: () => Artifacts.test(fileSystem: memoryFileSystem),
+        },
+      );
+    });
   });
 
   group('build macos-framework', () {
