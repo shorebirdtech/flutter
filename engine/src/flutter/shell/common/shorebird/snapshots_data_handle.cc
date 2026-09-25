@@ -4,12 +4,6 @@
 
 namespace flutter {
 
-static std::unique_ptr<fml::Mapping> RegionMapping(
-    const uint8_t* region,
-    const SnapshotsDataHandle::RegionSizer& size) {
-  return std::make_unique<fml::NonOwnedMapping>(region, size(region));
-}
-
 // The size of the snapshot data is the sum of the sizes of the blobs.
 size_t SnapshotsDataHandle::FullSize() const {
   size_t size = 0;
@@ -77,15 +71,14 @@ BlobsIndex SnapshotsDataHandle::IndexForAbsoluteOffset(int64_t offset,
 std::unique_ptr<SnapshotsDataHandle> SnapshotsDataHandle::createForSnapshots(
     const DartSnapshot& base_snapshot) {
   return createForSnapshots(
-      base_snapshot,
-      [](const uint8_t* region) { return Dart_SnapshotDataSize(region); },
-      [](const uint8_t* region) { return Dart_SnapshotInstrSize(region); });
+      base_snapshot, Dart_SnapshotDataSize(base_snapshot.GetDataMapping()),
+      Dart_SnapshotInstrSize(base_snapshot.GetInstructionsMapping()));
 }
 
 std::unique_ptr<SnapshotsDataHandle> SnapshotsDataHandle::createForSnapshots(
     const DartSnapshot& base_snapshot,
-    const RegionSizer& data_size,
-    const RegionSizer& instructions_size) {
+    size_t data_size,
+    size_t instructions_size) {
   // Order and count must match HandleDumpBlobs in
   // runtime/bin/analyze_snapshot.cc, which writes the data region then the
   // text region. One snapshot supplies both. The VM isolate's contents were
@@ -98,9 +91,10 @@ std::unique_ptr<SnapshotsDataHandle> SnapshotsDataHandle::createForSnapshots(
   // The caller must pass a snapshot resolved through the VM path. That path is
   // patch-blind, and this stream has to be the unpatched base the diff was
   // computed against.
-  auto data = RegionMapping(base_snapshot.GetDataMapping(), data_size);
-  auto insns =
-      RegionMapping(base_snapshot.GetInstructionsMapping(), instructions_size);
+  auto data = std::make_unique<fml::NonOwnedMapping>(
+      base_snapshot.GetDataMapping(), data_size);
+  auto insns = std::make_unique<fml::NonOwnedMapping>(
+      base_snapshot.GetInstructionsMapping(), instructions_size);
 
   // Per-blob observability for the base byte stream the updater is about to
   // patch against. Logged at every patch-apply attempt so customer syslogs
