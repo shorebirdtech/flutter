@@ -28,6 +28,7 @@ import '../macos/cocoapod_utils.dart';
 import '../macos/xcode.dart';
 import '../project.dart';
 import '../runner/flutter_command.dart';
+import '../shorebird/ios_framework_build_trace_session.dart';
 import '../version.dart';
 import 'build.dart';
 import 'darwin_add_to_app.dart';
@@ -521,15 +522,59 @@ class BuildIOSFrameworkCommand extends BuildFrameworkCommand {
   @override
   bool get regeneratePlatformSpecificToolingDuringVerify => false;
 
+  /// Shorebird build-trace session for the current run; null unless
+  /// `--shorebird-trace` was passed. Set by [runCommand], read by the
+  /// `_produce*` helpers.
+  IosFrameworkBuildTraceSession? _traceSession;
+
   @override
   Future<FlutterCommandResult> runCommand() async {
+    final ToolContext(:FileSystem fs, :Logger logger) = toolContext;
+
+    // Shorebird-specific: the whole framework build is one trace. The
+    // body lives in _buildFrameworks so it stays unindented against
+    // upstream; exceptions on any of its many exit paths abort the
+    // session without writing a partial trace.
+    final IosFrameworkBuildTraceSession? traceSession = IosFrameworkBuildTraceSession.maybeStart(
+      shorebirdTraceFilePath: stringArg(FlutterOptions.kShorebirdTrace),
+      fileSystem: fs,
+    );
+    _traceSession = traceSession;
+    final FlutterCommandResult result;
+    try {
+      result = await _buildFrameworks();
+    } catch (_) {
+      traceSession?.abortOnFailure();
+      rethrow;
+    }
+    traceSession?.finish(printStatus: logger.printStatus);
+    return result;
+  }
+
+  // Trace-span helpers. Each runs [body] as-is when no session is
+  // active, so the call sites below read the same with tracing off.
+  Future<T> _traced<T>(String name, Future<T> Function() body) {
+    final IosFrameworkBuildTraceSession? session = _traceSession;
+    return session == null ? body() : session.flutterSpan(name, body);
+  }
+
+  Future<T> _tracedPodInstall<T>(Future<T> Function() body) {
+    final IosFrameworkBuildTraceSession? session = _traceSession;
+    return session == null ? body() : session.podInstallSpan(body);
+  }
+
+  Future<T> _tracedXcode<T>(String sdk, Future<T> Function() body) {
+    final IosFrameworkBuildTraceSession? session = _traceSession;
+    return session == null ? body() : session.xcodeSpan(sdk, body);
+  }
+
+  Future<FlutterCommandResult> _buildFrameworks() async {
     final ToolContext(
       :Config config,
       :FileSystem fs,
       :Logger logger,
       :ProcessManager processManager,
     ) = toolContext;
-
     final String outputArgument =
         getValue(BuildFrameworkCommand.output) ??
         fs.path.join(fs.currentDirectory.path, getBuildDirectory(config, fs), 'ios', 'framework');
@@ -583,7 +628,10 @@ class BuildIOSFrameworkCommand extends BuildFrameworkCommand {
         );
       } else {
         // Copy Flutter.xcframework.
-        await _produceFlutterFramework(buildInfo, modeDirectory, codesignIdentity);
+        await _traced(
+          'copy Flutter.xcframework',
+          () => _produceFlutterFramework(buildInfo, modeDirectory, codesignIdentity),
+        );
       }
 
       // Build aot, create module.framework and copy.
@@ -593,19 +641,23 @@ class BuildIOSFrameworkCommand extends BuildFrameworkCommand {
       final Directory simulatorBuildOutput = modeDirectory.childDirectory(
         XcodeSdk.IPhoneSimulator.platformName,
       );
-      await _produceAppFramework(
-        buildInfo,
-        modeDirectory,
-        iPhoneBuildOutput,
-        simulatorBuildOutput,
-        codesignIdentity,
+      await _traced(
+        'build App.xcframework',
+        () => _produceAppFramework(
+          buildInfo,
+          modeDirectory,
+          iPhoneBuildOutput,
+          simulatorBuildOutput,
+          codesignIdentity,
+        ),
       );
 
       // Build and copy plugins.
       if (getValue(BuildFrameworkCommand.plugins)) {
-        await processPodsIfNeeded(
-          project.ios,
-          getIosBuildDirectory(config: config, fileSystem: fs),
+        await _tracedPodInstall(
+          () => processPodsIfNeeded(
+            project.ios,
+            getIosBuildDirectory(config: config, fileSystem: fs),
           buildInfo.mode,
           forceCocoaPodsOnly: true,
         );
@@ -871,6 +923,7 @@ end
           target = const ReleaseIosApplicationBundle();
         }
         final BuildResult result = await buildSystem.build(target, environment);
+        _traceSession?.addAssembleResult(result);
         if (!result.success) {
           for (final ExceptionMeasurement measurement in result.exceptions.values) {
             logger.printError(measurement.exception.toString());
@@ -924,9 +977,12 @@ end
         if (getValue(BuildFrameworkCommand.staticFrameworks)) 'MACH_O_TYPE=staticlib',
       ];
 
-      RunResult buildPluginsResult = await processUtils.run(
-        pluginsBuildCommand,
-        workingDirectory: project.ios.hostAppRoot.childDirectory('Pods').path,
+      RunResult buildPluginsResult = await _tracedXcode(
+        XcodeSdk.IPhoneOS.platformName,
+        () => processUtils.run(
+          pluginsBuildCommand,
+          workingDirectory: project.ios.hostAppRoot.childDirectory('Pods').path,
+        ),
       );
 
       if (buildPluginsResult.exitCode != 0) {
@@ -949,9 +1005,12 @@ end
         if (getValue(BuildFrameworkCommand.staticFrameworks)) 'MACH_O_TYPE=staticlib',
       ];
 
-      buildPluginsResult = await processUtils.run(
-        pluginsBuildCommand,
-        workingDirectory: project.ios.hostAppRoot.childDirectory('Pods').path,
+      buildPluginsResult = await _tracedXcode(
+        XcodeSdk.IPhoneSimulator.platformName,
+        () => processUtils.run(
+          pluginsBuildCommand,
+          workingDirectory: project.ios.hostAppRoot.childDirectory('Pods').path,
+        ),
       );
 
       if (buildPluginsResult.exitCode != 0) {

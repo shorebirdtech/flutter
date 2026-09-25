@@ -28,6 +28,7 @@ import '../convert.dart';
 import '../features.dart';
 import '../project.dart';
 import '../runner/flutter_command.dart';
+import '../shorebird/assemble_trace_events.dart';
 
 /// All currently implemented targets.
 var _kDefaultTargets = <Target>[
@@ -482,21 +483,6 @@ void writeTraceData(Iterable<PerformanceMeasurement> measurements, File outFile)
   final tracer = BuildTracer()
     ..addProcessNameMetadata(pid: pid, name: 'flutter assemble')
     ..addThreadNameMetadata(pid: pid, tid: 1, name: 'flutter assemble');
-  for (final measurement in measurements) {
-    final start = DateTime.fromMicrosecondsSinceEpoch(measurement.startTimeMicroseconds);
-    tracer.addCompleteEvent(
-      name: measurement.analyticsName,
-      cat: TraceCategory.assemble.wireName,
-      pid: pid,
-      tid: 1,
-      start: start,
-      end: start.add(Duration(milliseconds: measurement.elapsedMilliseconds)),
-      args: <String, Object?>{
-        'target': measurement.target,
-        'skipped': measurement.skipped,
-        'succeeded': measurement.succeeded,
-      },
-    );
-  }
+  addAssembleTraceEvents(tracer, measurements, pid: pid, tid: 1);
   tracer.writeToFile(outFile);
 }
