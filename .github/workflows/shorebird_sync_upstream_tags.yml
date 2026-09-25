@@ -3,13 +3,19 @@ name: sync_upstream_tags
 # Mirrors flutter/flutter tags into this repo once a day so our tags don't
 # drift from upstream's. Tags only; branches are never touched.
 #
-# Neither the fetch nor the push forces. A tag that already exists here at a
-# different sha than upstream fails the run instead of being overwritten: that
-# means someone hand-tagged this repo and a person has to look. Tags upstream
-# deletes are left in place (no --prune).
+# Tags are created through the REST refs API rather than `git push`. GitHub
+# rejects a push whose commits touch .github/workflows/, and GITHUB_TOKEN
+# cannot hold the `workflows` permission that would lift it -- there is no such
+# permissions: key. Upstream tags carry workflow changes routinely, so the push
+# path cannot mirror them at all. The refs API uploads no objects: this repo is
+# a fork of flutter/flutter and shares its object store, so every upstream sha
+# already resolves here.
 #
-# The push uses GITHUB_TOKEN, which never triggers other workflows, so mirrored
-# tags don't start CI runs.
+# A tag that exists here at a different sha than upstream is reported and fails
+# the run rather than being overwritten: that means someone hand-tagged this
+# repo and a person has to look. Tags upstream deletes are left in place.
+#
+# GITHUB_TOKEN never triggers other workflows, so mirrored tags don't start CI.
 
 on:
   schedule:
@@ -32,24 +38,53 @@ jobs:
         shell: bash
 
     steps:
-      - name: 📚 Git Checkout
-        uses: actions/checkout@v4
-        with:
-          # Full history plus all of our tags, so the fetch and push below
-          # only move the delta.
-          fetch-depth: 0
-
-      - name: ⬇️ Fetch upstream tags
+      - name: 🔍 Diff our tags against upstream's
         run: |
-          git remote add upstream https://github.com/flutter/flutter.git
-          git fetch --no-tags upstream 'refs/tags/*:refs/tags/*'
+          set -euo pipefail
+          # ls-remote keeps this off a multi-gigabyte clone of flutter. Peeled
+          # "^{}" lines are dropped so an annotated tag mirrors as its tag
+          # object, which is what upstream's ref points at.
+          tags() {
+            git ls-remote --tags "$1" \
+              | grep -v '\^{}$' \
+              | sed -E 's|^([0-9a-f]+)[[:space:]]+refs/tags/|\1 |'
+          }
+          tags https://github.com/flutter/flutter.git > upstream.txt
+          tags "https://github.com/$GITHUB_REPOSITORY.git" > ours.txt
 
-      - name: ⬆️ Push tags
+          : > missing.txt
+          : > conflicts.txt
+          awk '
+            NR == FNR    { ours[$2] = $1; next }
+            !($2 in ours) { print $2, $1 > "missing.txt"; next }
+            ours[$2] != $1 { print $2, $1, ours[$2] > "conflicts.txt" }
+          ' ours.txt upstream.txt
+
+      - name: ⬆️ Create missing tags
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git push --porcelain origin 'refs/tags/*:refs/tags/*' | tee push.log
-          # Porcelain lines are "<flag>\t<from>:<to>\t<summary>"; "*" flags a new ref.
-          awk -F'\t' '$1 == "*" { sub(/.*:refs\/tags\//, "", $2); print $2 }' push.log > new_tags.txt
+          set -euo pipefail
+          : > created.md
+          while read -r name sha; do
+            gh api --silent -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f "ref=refs/tags/$name" -f "sha=$sha"
+            echo "- \`$name\` -> \`$sha\`" >> created.md
+          done < missing.txt
+
+      - name: 📝 Summarize
+        if: always()
+        run: |
           {
-            echo "### Mirrored $(wc -l < new_tags.txt) new tag(s)"
-            sed 's/^/- /' new_tags.txt
+            echo "### Mirrored $(wc -l < missing.txt) new tag(s)"
+            cat created.md 2>/dev/null || true
+            if [[ -s conflicts.txt ]]; then
+              printf '\n### Tags here at a different sha than upstream\n\n'
+              echo "| tag | upstream | here |"
+              echo "|---|---|---|"
+              awk '{ printf "| `%s` | `%s` | `%s` |\n", $1, $2, $3 }' conflicts.txt
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 🚨 Fail on divergent tags
+        run: test ! -s conflicts.txt
