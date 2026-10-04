@@ -12,11 +12,14 @@ import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import '../base/file_system.dart';
 import 'network_trace_span.dart';
 
-/// Wraps the lifecycle of a Shorebird build trace across one iOS
-/// build. Returned by [maybeStart] only when `--shorebird-trace=<path>`
-/// was passed; the constructor installs [BuildTracer.current] and
-/// [finish] / [abortOnFailure] clear it, so mac.dart itself never
-/// touches the static.
+/// Wraps the lifecycle of a Shorebird build trace across one
+/// xcodebuild-driven build (`flutter build ios` in mac.dart, `flutter
+/// build macos` in build_macos.dart — both run the same
+/// xcode_backend.dart script phase, so the plumbing is identical).
+/// Returned by [maybeStart] only when `--shorebird-trace=<path>` was
+/// passed; the constructor installs [BuildTracer.current] and
+/// [finish] / [abortOnFailure] clear it, so the callers never touch
+/// the static.
 ///
 /// Manual start/stop (rather than a body-wrapping closure) because
 /// wrapping the ~300-line `buildXcodeProject` body would force a
@@ -83,6 +86,7 @@ class IosBuildTraceSession {
   DateTime? _xcodeStart;
   DateTime? _xcodeEnd;
   String? _assembleTraceFilePath;
+  Directory? _ownedResultBundleTempDir;
 
   /// Call immediately before `processPodsIfNeeded` so the resulting
   /// span covers its full wall-clock.
@@ -123,6 +127,24 @@ class IosBuildTraceSession {
     return <String>['SHOREBIRD_TRACE_FILE=$assembleTrace'];
   }
 
+  /// Returns xcodebuild arguments that write an xcresult bundle into a
+  /// fresh temp directory, for callers that don't already request one
+  /// (`flutter build macos`). `flutter build ios` requests its own
+  /// bundle for error reporting and passes it to [onXcodeFinished]
+  /// directly. The temp directory is deleted by [onXcodeFinished].
+  List<String> ownResultBundleArgs() {
+    final Directory tempDir = _fs.systemTempDirectory.createTempSync('shorebird_trace_xcresult');
+    _ownedResultBundleTempDir = tempDir;
+    return <String>[
+      '-resultBundlePath',
+      tempDir.childDirectory(_kOwnedResultBundleName).absolute.path,
+      '-resultBundleVersion',
+      '3',
+    ];
+  }
+
+  static const String _kOwnedResultBundleName = 'temporary_xcresult_bundle';
+
   /// Call right before `_runBuildWithRetries` so the outer build span
   /// can compute the pre-xcode setup interval.
   void onXcodeAboutToStart() {
@@ -144,11 +166,13 @@ class IosBuildTraceSession {
   ///
   /// [runXcresultTool] is injected so callers can route through their
   /// own `ProcessManager`; the session avoids a direct `globals.*`
-  /// dependency.
+  /// dependency. [resultBundleDirectory] defaults to the bundle
+  /// requested by [ownResultBundleArgs]; subsection events are skipped
+  /// when neither is available.
   Future<void> onXcodeFinished({
     required String buildActionName,
-    required Directory resultBundleDirectory,
     required Future<ProcessResult> Function(List<String>) runXcresultTool,
+    Directory? resultBundleDirectory,
   }) async {
     final xcodeEnd = DateTime.now();
     _xcodeEnd = xcodeEnd;
@@ -160,10 +184,18 @@ class IosBuildTraceSession {
       start: _xcodeStart ?? _buildStart,
       end: xcodeEnd,
     );
-    await _emitXcodeSubsectionEvents(
-      resultBundleDirectory: resultBundleDirectory,
-      runXcresultTool: runXcresultTool,
-    );
+    final Directory? ownedTempDir = _ownedResultBundleTempDir;
+    final Directory? bundle =
+        resultBundleDirectory ?? ownedTempDir?.childDirectory(_kOwnedResultBundleName);
+    if (bundle != null) {
+      await _emitXcodeSubsectionEvents(
+        resultBundleDirectory: bundle,
+        runXcresultTool: runXcresultTool,
+      );
+    }
+    if (ownedTempDir != null && ownedTempDir.existsSync()) {
+      ownedTempDir.deleteSync(recursive: true);
+    }
     final String? assembleTraceFilePath = _assembleTraceFilePath;
     if (assembleTraceFilePath != null) {
       _tracer.mergeEventsFromFile(_fs.file(assembleTraceFilePath));
@@ -177,8 +209,10 @@ class IosBuildTraceSession {
   }
 
   /// Writes the merged trace to disk and clears [BuildTracer.current].
-  /// Records the post-xcode + outer `flutter build ios` spans first.
-  void finish({required void Function(String) printStatus}) {
+  /// Records the post-xcode + outer `flutter build <buildTarget>` spans
+  /// first. [buildTarget] is `ios` or `macos`; the outer span name is
+  /// assembled as `TraceNames.flutterBuildSpanPrefix + buildTarget`.
+  void finish({required String buildTarget, required void Function(String) printStatus}) {
     final buildEnd = DateTime.now();
     _tracer
       ..addCompleteEvent(
@@ -190,7 +224,7 @@ class IosBuildTraceSession {
         end: buildEnd,
       )
       ..addCompleteEvent(
-        name: '${TraceNames.flutterBuildSpanPrefix}ios',
+        name: '${TraceNames.flutterBuildSpanPrefix}$buildTarget',
         cat: TraceCategory.flutter.wireName,
         pid: _flutterPid,
         tid: _flutterToolTid,

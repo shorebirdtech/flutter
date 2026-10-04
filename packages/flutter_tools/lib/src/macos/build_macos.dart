@@ -26,6 +26,7 @@ import '../migrations/xcode_project_object_version_migration.dart';
 import '../migrations/xcode_script_build_phase_migration.dart';
 import '../migrations/xcode_thin_binary_build_phase_input_paths_migration.dart';
 import '../project.dart';
+import '../shorebird/ios_build_trace_session.dart';
 import 'application_package.dart';
 import 'cocoapod_utils.dart';
 import 'darwin_dependency_management.dart';
@@ -200,7 +201,16 @@ Future<void> buildMacOS({
     }
   }
 
+  // Created early enough to capture pod install; see mac.dart.
+  final IosBuildTraceSession? traceSession = IosBuildTraceSession.maybeStart(
+    shorebirdTraceFilePath: buildInfo.shorebirdTraceFilePath,
+    fileSystem: globals.fs,
+    buildDirectoryPath: buildDirectoryPath,
+  );
+
+  traceSession?.onBeforePodInstall();
   await processPodsIfNeeded(flutterProject.macos, buildDirectoryPath, buildInfo.mode);
+  traceSession?.onAfterPodInstall();
   // If the xcfilelists do not exist, create empty version.
   if (!flutterProject.macos.inputFileList.existsSync()) {
     flutterProject.macos.inputFileList.createSync(recursive: true);
@@ -209,6 +219,7 @@ Future<void> buildMacOS({
     flutterProject.macos.outputFileList.createSync(recursive: true);
   }
   if (configOnly) {
+    traceSession?.abortOnFailure();
     return;
   }
 
@@ -289,6 +300,7 @@ Future<void> buildMacOS({
           globals.fs.directory(buildDirectoryPath),
           skipPackageValidation: false,
         );
+    traceSession?.onXcodeAboutToStart();
     result = await globals.processUtils.stream(
       <String>[
         '/usr/bin/env',
@@ -307,6 +319,10 @@ Future<void> buildMacOS({
         'SYMROOT=${globals.fs.path.join(flutterBuildDir.absolute.path, 'Build', 'Products')}',
         if (verboseLogging) 'VERBOSE_SCRIPT_LOGGING=YES' else '-quiet',
         'COMPILER_INDEX_STORE_ENABLE=NO',
+        if (traceSession != null) ...<String>[
+          ...traceSession.extraBuildCommands(),
+          ...traceSession.ownResultBundleArgs(),
+        ],
         if (disabledSandboxEntitlementFile != null)
           'CODE_SIGN_ENTITLEMENTS=${disabledSandboxEntitlementFile.path}',
         // Pass EXCLUDED_ARCHS from Xcode project to xcodebuild command
@@ -337,7 +353,13 @@ Future<void> buildMacOS({
     status.cancel();
   }
 
+  await traceSession?.onXcodeFinished(
+    buildActionName: 'build',
+    runXcresultTool: (List<String> args) => globals.processManager.run(args),
+  );
+
   if (result != 0) {
+    traceSession?.abortOnFailure();
     if (hasMacOSMinDeploymentTargetIssue) {
       globals.logger.printError(
         _macOSDeploymentTargetTooLowMessage(macOSMinDeploymentTarget),
@@ -363,6 +385,7 @@ Future<void> buildMacOS({
     );
   }
   await _writeCodeSizeAnalysis(buildInfo, sizeAnalyzer);
+  traceSession?.finish(buildTarget: 'macos', printStatus: globals.printStatus);
   final Duration elapsedDuration = sw.elapsed;
   globals.analytics.send(
     Event.timing(
