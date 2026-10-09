@@ -96,7 +96,8 @@
     "compose_input": "macos-framework",
     "artifacts": [
       {"src": "host_release_arm64/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-darwin-arm64.zip", "zip": true, "content_hash": true},
-      {"src": "mac_release_arm64/zip_archives/darwin-arm64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64-release/artifacts.zip"}
+      {"src": "mac_release_arm64/zip_archives/darwin-arm64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64-release/artifacts.zip"},
+      {"src": "mac_release_arm64/analyze_snapshot_arm64", "dst": "shorebird/$engine/analyze-snapshot-macos-arm64"}
     ]
   },
   "mac-x64": {
@@ -125,7 +126,8 @@
     "compose_input": "macos-framework",
     "artifacts": [
       {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-darwin-x64.zip", "zip": true, "content_hash": true},
-      {"src": "mac_release/engine_stamp.json", "dst": "flutter_infra_release/flutter/$engine/engine_stamp.json"}
+      {"src": "mac_release/engine_stamp.json", "dst": "flutter_infra_release/flutter/$engine/engine_stamp.json"},
+      {"src": "mac_release/analyze_snapshot_x64", "dst": "shorebird/$engine/analyze-snapshot-macos-x64"}
     ]
   }
 }
