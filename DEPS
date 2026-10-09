@@ -17,10 +17,10 @@ vars = {
   'llvm_git': 'https://llvm.googlesource.com',
   'dart_ai_rev': '9c96bfe5f091c9451eff5b59c9bffeb2e806b875',
   'skia_revision': '8df24be66531469e576a806749a0202ae26b8d08',
-  "dart_sdk_revision": "8e02b847f6e8ef9039bcb773ecba8a53417ef158",
+  "dart_sdk_revision": "45acf5f57d5b0c1a85ccc5d47998a702977d63e7",
   "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
   "updater_git": "https://github.com/shorebirdtech/updater.git",
-  "updater_rev": "06b7bbc4ce2c6305f7b22e3ecbd32ea9a13daa6e",
+  "updater_rev": "d4a7ca1f7a60908d0e79677a38684bad40cdb934",
 
   # Do not download the Emscripten SDK by default.
   # This prevents us from downloading the Emscripten toolchain for builds
@@ -411,9 +411,9 @@ deps = {
     'objects': [
       {
         'object_name': Var('dart_sdk_revision') + '/dart-sdk-darwin-arm64.tar.gz',
-        'sha256sum': '8f0fe22c2f8718148173d09873da60aeb6e24f83e7ca81f1226568d51c87e729',
-        'size_bytes': 215225452,
-        'generation': 1790965591946011,
+        'sha256sum': '7d5a55b67dcc43627d1d977e18f324ab41091698ba99bf5184b24a91d8a247ef',
+        'size_bytes': 215235469,
+        'generation': 1791561498851959,
       }
     ],
     'dep_type': 'gcs',
