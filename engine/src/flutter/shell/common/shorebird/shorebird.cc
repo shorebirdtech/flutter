@@ -45,18 +45,20 @@ extern "C" __attribute__((weak)) unsigned long getauxval(unsigned long type) {
 }
 #endif
 
-#if SHOREBIRD_USE_INTERPRETER
-// Global references to the base (unpatched) snapshots from the App.framework.
-// These are process-global because:
+// Global reference to the base (unpatched) snapshot from the App.framework,
+// set on iOS and macOS. Patches there are diffed against just the Dart
+// snapshot regions of the app binary, which FileCallbacksImpl serves to the
+// updater from this snapshot. It is process-global because:
 // 1. The Shorebird updater library is a process-global singleton with its own
-//    internal state. FileCallbacksImpl provides it access to the base snapshot
-//    data for patch generation/validation.
-// 2. The base snapshots are immutable (baked into the IPA) so sharing them
-//    across isolate groups is safe.
+//    internal state.
+// 2. The base snapshot is immutable (baked into the app) so sharing it across
+//    isolate groups is safe.
 //
 // Note: This design doesn't support multiple engines with different base
-// snapshots, but I'm not aware of any use cases for that on iOS.
+// snapshots, but I'm not aware of any use cases for that.
 static fml::RefPtr<const DartSnapshot> vm_snapshot;
+
+#if SHOREBIRD_USE_INTERPRETER
 static fml::RefPtr<const DartSnapshot> isolate_snapshot;
 
 void SetBaseSnapshot(Settings& settings) {
@@ -176,6 +178,20 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   config.file_callbacks = ShorebirdFileCallbacks();
   config.yaml_config = args.shorebird_yaml;
 
+#if FML_OS_MACOSX && !FML_OS_IOS
+  // macOS patches are diffed against the Dart snapshot regions of
+  // App.framework/App rather than the whole file, so re-signing the app after
+  // release (notarization, Mac App Store) doesn't invalidate them.
+  // Resolved through the VM path, which never returns a patch.
+  Settings base_settings;
+  base_settings.application_library_paths = {args.release_app_library_path};
+  vm_snapshot = DartSnapshot::VMSnapshotFromSettings(base_settings);
+  if (!vm_snapshot) {
+    FML_LOG(ERROR) << "Shorebird updater: failed to resolve base snapshot from "
+                   << args.release_app_library_path;
+  }
+#endif  // FML_OS_MACOSX && !FML_OS_IOS
+
   bool init_result = shorebird::Updater::Instance().Init(config);
 
   FML_LOG(INFO) << "Checking for active patch";
@@ -270,18 +286,16 @@ void ConfigureShorebird(std::string code_cache_path,
 }
 
 void* FileCallbacksImpl::Open() {
-#if SHOREBIRD_USE_INTERPRETER
+  // Only iOS and macOS set a base snapshot. Their patches are generated from
+  // just the Dart parts of the snapshot, excluding the Mach-O headers and code
+  // signature, which change on every build and whenever the app is re-signed.
+  if (!vm_snapshot) {
+    return nullptr;
+  }
   // vm_snapshot, not isolate_snapshot: both resolve the same symbol now, but
   // only the VM path is patch-blind, and this stream must be the unpatched
   // base.
   return SnapshotsDataHandle::createForSnapshots(*vm_snapshot).release();
-#else
-  // SnapshotsDataHandle exists on all platforms (for testing) but is only used
-  // on iOS. iOS patches are generated from just the Dart parts of the snapshot,
-  // excluding the Mach-O specific headers which contain dates and paths that
-  // make them change on every build.
-  return nullptr;
-#endif  // SHOREBIRD_USE_INTERPRETER
 }
 
 uintptr_t FileCallbacksImpl::Read(void* file,
