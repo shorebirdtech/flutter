@@ -66,6 +66,57 @@ void main() {
     expect(context.stderr, contains('warning: Unrecognized platform: null. Defaulting to iOS.\n'));
   });
 
+  test('forwards Shorebird settings to flutter assemble as defines', () {
+    final Directory buildDir = fileSystem.directory('/path/to/builds')..createSync(recursive: true);
+    final Directory flutterRoot = fileSystem.directory('/path/to/flutter')
+      ..createSync(recursive: true);
+    const buildMode = 'Release';
+    TestContext(
+      <String>['build', 'ios'],
+      <String, String>{
+        'BUILT_PRODUCTS_DIR': buildDir.path,
+        'CONFIGURATION': buildMode,
+        'FLUTTER_ROOT': flutterRoot.path,
+        'INFOPLIST_PATH': 'Info.plist',
+        'SHOREBIRD_ENCODED_PUBLIC_KEY': 'a2V5Ly9h',
+        'SHOREBIRD_DD_MAX_BYTES': '100000',
+        'SHOREBIRD_PUBLIC_KEY': 'ignored',
+      },
+      commands: <FakeCommand>[
+        FakeCommand(
+          command: <String>[
+            '${flutterRoot.path}/bin/flutter',
+            'assemble',
+            '--no-version-check',
+            '--output=${buildDir.path}/',
+            '-dTargetPlatform=ios',
+            '-dTargetFile=lib/main.dart',
+            '-dBuildMode=${buildMode.toLowerCase()}',
+            '-dConfiguration=$buildMode',
+            '-dIosArchs=',
+            '-dSdkRoot=',
+            '-dSplitDebugInfo=',
+            '-dTreeShakeIcons=',
+            '-dTrackWidgetCreation=',
+            '-dDartObfuscation=',
+            '-dAction=',
+            '-dFrontendServerStarterPath=',
+            '--ExtraGenSnapshotOptions=',
+            '--DartDefines=',
+            '--ExtraFrontEndOptions=',
+            '-dSrcRoot=',
+            '-dXcodeBuildScript=build',
+            '-dTargetDeviceOSVersion=',
+            '-dShorebirdPublicKey=a2V5Ly9h',
+            '-dShorebirdDdMaxBytes=100000',
+            'release_ios_bundle_flutter_assets',
+          ],
+        ),
+      ],
+      fileSystem: fileSystem,
+    ).run();
+  });
+
   const List<TargetPlatform> platforms = TargetPlatform.values;
   for (final platform in platforms) {
     final String platformName = platform.name;

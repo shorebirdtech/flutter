@@ -705,6 +705,14 @@ class Context {
       flutterArgs.add('-dCodeSizeDirectory=${environment['CODE_SIZE_DIRECTORY']}');
     }
 
+    // Shorebird-specific: settings from BuildInfo.toEnvironmentConfig.
+    if (environment['SHOREBIRD_ENCODED_PUBLIC_KEY']?.isNotEmpty ?? false) {
+      flutterArgs.add('-dShorebirdPublicKey=${environment['SHOREBIRD_ENCODED_PUBLIC_KEY']}');
+    }
+    if (environment['SHOREBIRD_DD_MAX_BYTES']?.isNotEmpty ?? false) {
+      flutterArgs.add('-dShorebirdDdMaxBytes=${environment['SHOREBIRD_DD_MAX_BYTES']}');
+    }
+
     return flutterArgs;
   }
 }

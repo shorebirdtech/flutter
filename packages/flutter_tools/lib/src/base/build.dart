@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:io' show Platform;
-
 import 'package:process/process.dart';
 
 import '../artifacts.dart';
@@ -194,6 +192,9 @@ class AOTSnapshotter {
     String? splitDebugInfo,
     required bool dartObfuscation,
     bool quiet = false,
+    // Shorebird: the cap on the DD table, from kShorebirdDdMaxBytes. 0 means
+    // no DD pass.
+    int ddMaxBytes = 0,
   }) async {
     assert(platform != TargetPlatform.ios || darwinArch != null);
 
@@ -321,7 +322,6 @@ class AOTSnapshotter {
 
     final snapshotType = SnapshotType(platform, buildMode);
 
-    final int ddMaxBytes = _readDdMaxBytes();
     // DD pass requires:
     //   1. an analyze_snapshot binary whose --sdk_version matches gen_snapshot's
     //      --version, and
@@ -350,6 +350,20 @@ class AOTSnapshotter {
       );
       if (pass1Exit != 0) {
         return pass1Exit;
+      }
+    } else if (usesLinker && ddPassSupported) {
+      // Don't let LinkSupplement ship the tables from an earlier DD build.
+      for (final name in <String>[
+        'App.dd_identity.link',
+        'App.dd.link',
+        'App.dd_callers.link',
+        'App.dd_slots.link',
+        'App.dd_resolution.tsv',
+      ]) {
+        final File file = outputDir.parent.childFile(name);
+        if (file.existsSync()) {
+          file.deleteSync();
+        }
       }
     }
 
@@ -382,17 +396,6 @@ class AOTSnapshotter {
     } else {
       return 0;
     }
-  }
-
-  /// Reads the SHOREBIRD_DD_MAX_BYTES env var (preferring `dart-define` over
-  /// the process environment). Returns 0 if unset, malformed, or non-positive,
-  /// which signals "no DD pass."
-  int _readDdMaxBytes() {
-    const fromDefine = String.fromEnvironment('SHOREBIRD_DD_MAX_BYTES');
-    final String? raw = fromDefine.isNotEmpty
-        ? fromDefine
-        : Platform.environment['SHOREBIRD_DD_MAX_BYTES'];
-    return int.tryParse(raw ?? '') ?? 0;
   }
 
   /// Runs the DD analysis pass: gen_snapshot → ELF + DD identity, then

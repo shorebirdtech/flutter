@@ -30,6 +30,9 @@ Future<void> main(List<String> arguments) async {
   final String? buildNumber = Platform.environment['BUILD_NUMBER'];
   final trackWidgetCreation = Platform.environment['TRACK_WIDGET_CREATION'] == 'true';
   final treeShakeIcons = Platform.environment['TREE_SHAKE_ICONS'] == 'true';
+  // Shorebird-specific.
+  final String? shorebirdPublicKey = Platform.environment['SHOREBIRD_ENCODED_PUBLIC_KEY'];
+  final String? shorebirdDdMaxBytes = Platform.environment['SHOREBIRD_DD_MAX_BYTES'];
   final verbose = Platform.environment['VERBOSE_SCRIPT_LOGGING'] == 'true';
   final prefixedErrors = Platform.environment['PREFIXED_ERROR_LOGGING'] == 'true';
 
@@ -106,6 +109,8 @@ or
     if (extraGenSnapshotOptions != null) '--ExtraGenSnapshotOptions=$extraGenSnapshotOptions',
     if (frontendServerStarterPath != null) '-dFrontendServerStarterPath=$frontendServerStarterPath',
     if (extraFrontEndOptions != null) '--ExtraFrontEndOptions=$extraFrontEndOptions',
+    if (shorebirdPublicKey != null) '-dShorebirdPublicKey=$shorebirdPublicKey',
+    if (shorebirdDdMaxBytes != null) '-dShorebirdDdMaxBytes=$shorebirdDdMaxBytes',
     target,
   ]);
   assembleProcess.stdout

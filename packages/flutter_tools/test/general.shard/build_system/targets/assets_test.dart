@@ -19,6 +19,8 @@ import 'package:flutter_tools/src/build_system/depfile.dart';
 import 'package:flutter_tools/src/build_system/targets/assets.dart';
 import 'package:flutter_tools/src/cache.dart';
 import 'package:flutter_tools/src/globals.dart' as globals;
+import 'package:flutter_tools/src/shorebird/shorebird_defines.dart';
+import 'package:yaml/yaml.dart';
 
 import '../../../src/common.dart';
 import '../../../src/context.dart';
@@ -297,6 +299,55 @@ flutter:
           '${environment.buildDir.path}/flutter_assets/shorebird.yaml',
         );
         expect(compiled.readAsStringSync(), 'app_id: internal-app-id');
+      },
+      overrides: <Type, Generator>{
+        FileSystem: () => fileSystem,
+        ProcessManager: () => FakeProcessManager.any(),
+      },
+    );
+
+    testUsingContext(
+      'writes patch_public_key from the ShorebirdPublicKey define',
+      () async {
+        environment.defines[kShorebirdPublicKey] = encodeShorebirdPublicKey('key//a+b=');
+        writeProjectWithShorebirdYaml();
+
+        await const CopyAssets().build(environment);
+
+        final File compiled = fileSystem.file(
+          '${environment.buildDir.path}/flutter_assets/shorebird.yaml',
+        );
+        expect(loadYaml(compiled.readAsStringSync()), <String, String>{
+          'app_id': 'base-app-id',
+          'patch_public_key': 'key//a+b=',
+        });
+      },
+      overrides: <Type, Generator>{
+        FileSystem: () => fileSystem,
+        ProcessManager: () => FakeProcessManager.any(),
+      },
+    );
+
+    testUsingContext(
+      'ignores SHOREBIRD_PUBLIC_KEY in the environment',
+      () async {
+        environment = Environment.test(
+          fileSystem.currentDirectory,
+          processManager: FakeProcessManager.any(),
+          artifacts: Artifacts.test(),
+          fileSystem: fileSystem,
+          logger: logger,
+          platform: FakePlatform(environment: <String, String>{'SHOREBIRD_PUBLIC_KEY': 'env-key'}),
+          defines: <String, String>{kBuildMode: BuildMode.debug.cliName},
+        );
+        writeProjectWithShorebirdYaml();
+
+        await const CopyAssets().build(environment);
+
+        final File compiled = fileSystem.file(
+          '${environment.buildDir.path}/flutter_assets/shorebird.yaml',
+        );
+        expect(compiled.readAsStringSync(), 'app_id: base-app-id');
       },
       overrides: <Type, Generator>{
         FileSystem: () => fileSystem,

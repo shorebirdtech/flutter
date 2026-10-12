@@ -137,6 +137,12 @@ object BaseFlutterTaskHelper {
             baseFlutterTask.codeSizeDirectory?.let {
                 args("-dCodeSizeDirectory=$it")
             }
+            baseFlutterTask.shorebirdPublicKey?.let {
+                args("-dShorebirdPublicKey=$it")
+            }
+            baseFlutterTask.shorebirdDdMaxBytes?.let {
+                args("-dShorebirdDdMaxBytes=$it")
+            }
             baseFlutterTask.flavor?.let {
                 args("-dFlavor=$it")
             }

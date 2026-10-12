@@ -13,6 +13,7 @@ import '../../dart/package_map.dart';
 import '../../devfs.dart';
 import '../../flutter_manifest.dart';
 import '../../isolated/native_assets/dart_hook_result.dart';
+import '../../shorebird/shorebird_defines.dart';
 import '../../shorebird/shorebird_yaml.dart';
 import '../build_system.dart';
 import '../depfile.dart';
@@ -194,7 +195,7 @@ Future<Depfile> copyAssets(
                 updateShorebirdYaml(
                   environment.defines[kFlavor],
                   file.path,
-                  environment: environment.platform.environment,
+                  publicKey: decodeShorebirdPublicKey(environment.defines),
                 );
               } on Exception catch (error) {
                 throw Exception('Failed to generate shorebird configuration. Error: $error');
