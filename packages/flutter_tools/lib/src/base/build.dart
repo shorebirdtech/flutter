@@ -14,6 +14,19 @@ import 'file_system.dart';
 import 'logger.dart';
 import 'process.dart';
 
+/// The environment variable that turns on the iOS DD pass and caps its table.
+const kShorebirdDdMaxBytesEnvVar = 'SHOREBIRD_DD_MAX_BYTES';
+
+/// The `dd_max_bytes` an AOT build passes to the DD pass, read from
+/// [environment] (preferring a `dart-define` on the tool itself), or 0 if
+/// unset, malformed, or non-positive, which means no DD pass.
+int shorebirdDdMaxBytes(Map<String, String> environment) {
+  const fromDefine = String.fromEnvironment(kShorebirdDdMaxBytesEnvVar);
+  final String? raw = fromDefine.isNotEmpty ? fromDefine : environment[kShorebirdDdMaxBytesEnvVar];
+  final int value = int.tryParse(raw ?? '') ?? 0;
+  return value > 0 ? value : 0;
+}
+
 /// A snapshot build configuration.
 class SnapshotType {
   SnapshotType(this.platform, this.mode);
@@ -351,6 +364,8 @@ class AOTSnapshotter {
       if (pass1Exit != 0) {
         return pass1Exit;
       }
+    } else if (usesLinker && ddPassSupported) {
+      _deleteDdOutputs(outputDir);
     }
 
     final int genSnapshotExitCode = await _genSnapshot.run(
@@ -384,15 +399,28 @@ class AOTSnapshotter {
     }
   }
 
-  /// Reads the SHOREBIRD_DD_MAX_BYTES env var (preferring `dart-define` over
-  /// the process environment). Returns 0 if unset, malformed, or non-positive,
-  /// which signals "no DD pass."
-  int _readDdMaxBytes() {
-    const fromDefine = String.fromEnvironment('SHOREBIRD_DD_MAX_BYTES');
-    final String? raw = fromDefine.isNotEmpty
-        ? fromDefine
-        : Platform.environment['SHOREBIRD_DD_MAX_BYTES'];
-    return int.tryParse(raw ?? '') ?? 0;
+  /// Reads the SHOREBIRD_DD_MAX_BYTES env var. See [shorebirdDdMaxBytes].
+  int _readDdMaxBytes() => shorebirdDdMaxBytes(Platform.environment);
+
+  /// The files a DD pass leaves next to the snapshot's output directory, which
+  /// LinkSupplement copies into the release's supplement.
+  static const _ddOutputFileNames = <String>[
+    'App.dd_identity.link',
+    'App.dd.link',
+    'App.dd_callers.link',
+    'App.dd_slots.link',
+    'App.dd_resolution.tsv',
+  ];
+
+  /// Deletes the files an earlier DD pass left next to [outputDir], so a build
+  /// that skips the pass does not ship that pass's tables.
+  void _deleteDdOutputs(Directory outputDir) {
+    for (final String name in _ddOutputFileNames) {
+      final File file = outputDir.parent.childFile(name);
+      if (file.existsSync()) {
+        file.deleteSync();
+      }
+    }
   }
 
   /// Runs the DD analysis pass: gen_snapshot → ELF + DD identity, then
