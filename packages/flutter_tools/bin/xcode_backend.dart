@@ -709,8 +709,8 @@ class Context {
     if (environment['SHOREBIRD_ENCODED_PUBLIC_KEY']?.isNotEmpty ?? false) {
       flutterArgs.add('-dShorebirdPublicKey=${environment['SHOREBIRD_ENCODED_PUBLIC_KEY']}');
     }
-    if (environment['SHOREBIRD_DD_MAX_BYTES']?.isNotEmpty ?? false) {
-      flutterArgs.add('-dShorebirdDdMaxBytes=${environment['SHOREBIRD_DD_MAX_BYTES']}');
+    if (environment['SHOREBIRD_BUILD_DD_MAX_BYTES']?.isNotEmpty ?? false) {
+      flutterArgs.add('-dShorebirdDdMaxBytes=${environment['SHOREBIRD_BUILD_DD_MAX_BYTES']}');
     }
 
     return flutterArgs;

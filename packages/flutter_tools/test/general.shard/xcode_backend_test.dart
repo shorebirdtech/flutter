@@ -79,8 +79,9 @@ void main() {
         'FLUTTER_ROOT': flutterRoot.path,
         'INFOPLIST_PATH': 'Info.plist',
         'SHOREBIRD_ENCODED_PUBLIC_KEY': 'a2V5Ly9h',
-        'SHOREBIRD_DD_MAX_BYTES': '100000',
+        'SHOREBIRD_BUILD_DD_MAX_BYTES': '100000',
         'SHOREBIRD_PUBLIC_KEY': 'ignored',
+        'SHOREBIRD_DD_MAX_BYTES': 'ignored',
       },
       commands: <FakeCommand>[
         FakeCommand(

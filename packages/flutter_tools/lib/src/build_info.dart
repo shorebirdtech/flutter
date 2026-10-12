@@ -429,7 +429,8 @@ class BuildInfo {
       'FLAVOR': ?flavor,
       if (shorebirdPublicKey != null)
         'SHOREBIRD_ENCODED_PUBLIC_KEY': encodeShorebirdPublicKey(shorebirdPublicKey!),
-      if (shorebirdDdMaxBytes != null) 'SHOREBIRD_DD_MAX_BYTES': shorebirdDdMaxBytes.toString(),
+      if (shorebirdDdMaxBytes != null)
+        'SHOREBIRD_BUILD_DD_MAX_BYTES': shorebirdDdMaxBytes.toString(),
     };
   }
 

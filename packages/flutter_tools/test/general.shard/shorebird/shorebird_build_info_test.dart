@@ -49,7 +49,7 @@ void main() {
   testWithoutContext('toEnvironmentConfig includes the Shorebird values', () {
     final Map<String, String> config = buildInfo.toEnvironmentConfig();
     expect(config['SHOREBIRD_ENCODED_PUBLIC_KEY'], encodeShorebirdPublicKey(publicKey));
-    expect(config['SHOREBIRD_DD_MAX_BYTES'], '100000');
+    expect(config['SHOREBIRD_BUILD_DD_MAX_BYTES'], '100000');
     expect(config.values, isNot(contains(contains('//'))));
   });
 
