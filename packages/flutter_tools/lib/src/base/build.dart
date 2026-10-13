@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:io' show Platform;
-
 import 'package:process/process.dart';
 
 import '../artifacts.dart';
 import '../build_info.dart';
 import '../darwin/darwin.dart';
 import '../macos/xcode.dart';
+import '../shorebird/shorebird_dd.dart';
 import 'file_system.dart';
 import 'logger.dart';
+import 'platform.dart';
 import 'process.dart';
 
 /// A snapshot build configuration.
@@ -165,9 +165,12 @@ class AOTSnapshotter {
     required Xcode xcode,
     required ProcessManager processManager,
     required Artifacts artifacts,
+    // Shorebird: the environment SHOREBIRD_DD_MAX_BYTES is read from.
+    Platform platform = const LocalPlatform(),
   }) : _logger = logger,
        _fileSystem = fileSystem,
        _xcode = xcode,
+       _platform = platform,
        _processUtils = ProcessUtils(logger: logger, processManager: processManager),
        _genSnapshot = GenSnapshot(
          artifacts: artifacts,
@@ -179,6 +182,7 @@ class AOTSnapshotter {
   final Logger _logger;
   final FileSystem _fileSystem;
   final Xcode _xcode;
+  final Platform _platform;
   final ProcessUtils _processUtils;
   final GenSnapshot _genSnapshot;
 
@@ -351,6 +355,8 @@ class AOTSnapshotter {
       if (pass1Exit != 0) {
         return pass1Exit;
       }
+    } else if (usesLinker && ddPassSupported) {
+      _deleteDdOutputs(outputDir);
     }
 
     final int genSnapshotExitCode = await _genSnapshot.run(
@@ -384,15 +390,28 @@ class AOTSnapshotter {
     }
   }
 
-  /// Reads the SHOREBIRD_DD_MAX_BYTES env var (preferring `dart-define` over
-  /// the process environment). Returns 0 if unset, malformed, or non-positive,
-  /// which signals "no DD pass."
-  int _readDdMaxBytes() {
-    const fromDefine = String.fromEnvironment('SHOREBIRD_DD_MAX_BYTES');
-    final String? raw = fromDefine.isNotEmpty
-        ? fromDefine
-        : Platform.environment['SHOREBIRD_DD_MAX_BYTES'];
-    return int.tryParse(raw ?? '') ?? 0;
+  /// Reads the SHOREBIRD_DD_MAX_BYTES env var. See [shorebirdDdMaxBytes].
+  int _readDdMaxBytes() => shorebirdDdMaxBytes(_platform.environment);
+
+  /// The files a DD pass leaves next to the snapshot's output directory, which
+  /// LinkSupplement copies into the release's supplement.
+  static const _ddOutputFileNames = <String>[
+    'App.dd_identity.link',
+    'App.dd.link',
+    'App.dd_callers.link',
+    'App.dd_slots.link',
+    'App.dd_resolution.tsv',
+  ];
+
+  /// Deletes the files an earlier DD pass left next to [outputDir], so a build
+  /// that skips the pass does not ship that pass's tables.
+  void _deleteDdOutputs(Directory outputDir) {
+    for (final String name in _ddOutputFileNames) {
+      final File file = outputDir.parent.childFile(name);
+      if (file.existsSync()) {
+        file.deleteSync();
+      }
+    }
   }
 
   /// Runs the DD analysis pass: gen_snapshot → ELF + DD identity, then

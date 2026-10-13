@@ -7,6 +7,7 @@ import '../../base/file_system.dart';
 import '../../build_info.dart';
 import '../../devfs.dart';
 import '../../isolated/native_assets/dart_hook_result.dart';
+import '../../shorebird/shorebird_build_key.dart';
 import '../build_system.dart';
 import '../depfile.dart';
 import '../exceptions.dart';
@@ -100,7 +101,7 @@ class UnpackWindows extends Target {
 }
 
 /// Creates a bundle for the Windows desktop target.
-abstract class BundleWindowsAssets extends Target {
+abstract class BundleWindowsAssets extends Target with ShorebirdPublicKeyBuildKey {
   const BundleWindowsAssets(this.targetPlatform);
 
   final TargetPlatform targetPlatform;
