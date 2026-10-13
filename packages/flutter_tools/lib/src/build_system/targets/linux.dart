@@ -9,6 +9,7 @@ import '../../convert.dart';
 import '../../devfs.dart';
 import '../../isolated/native_assets/dart_hook_result.dart';
 import '../../project.dart';
+import '../../shorebird/shorebird_build_key.dart';
 import '../build_system.dart';
 import '../depfile.dart';
 import '../exceptions.dart';
@@ -87,7 +88,7 @@ class UnpackLinux extends Target {
 }
 
 /// Creates a bundle for the Linux desktop target.
-abstract class BundleLinuxAssets extends Target {
+abstract class BundleLinuxAssets extends Target with ShorebirdPublicKeyBuildKey {
   const BundleLinuxAssets(this.targetPlatform);
 
   final TargetPlatform targetPlatform;

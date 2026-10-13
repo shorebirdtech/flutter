@@ -14,6 +14,7 @@ import '../../devfs.dart';
 import '../../flutter_manifest.dart';
 import '../../isolated/native_assets/dart_hook_result.dart';
 import '../../project.dart';
+import '../../shorebird/shorebird_build_key.dart';
 import '../../shorebird/shorebird_yaml.dart';
 import '../build_system.dart';
 import '../depfile.dart';
@@ -281,7 +282,7 @@ Future<Depfile> copyAssets(
 }
 
 /// Copy the assets defined in the flutter manifest into a build directory.
-class CopyAssets extends Target {
+class CopyAssets extends Target with ShorebirdPublicKeyBuildKey {
   const CopyAssets();
 
   @override

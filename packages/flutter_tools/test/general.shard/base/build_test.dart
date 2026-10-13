@@ -443,6 +443,98 @@ void main() {
       expect(processManager, hasNoRemainingExpectations);
     });
 
+    testWithoutContext('iOS build without DD deletes tables from an earlier DD pass', () async {
+      // An earlier build with SHOREBIRD_DD_MAX_BYTES left these next to the
+      // output directory, where LinkSupplement would ship them.
+      const ddFiles = <String>[
+        'App.dd_identity.link',
+        'App.dd.link',
+        'App.dd_callers.link',
+        'App.dd_slots.link',
+        'App.dd_resolution.tsv',
+      ];
+      for (final name in <String>[...ddFiles, 'App.ct.link']) {
+        fileSystem.file(fileSystem.path.join('build', name)).createSync(recursive: true);
+      }
+
+      final String outputPath = fileSystem.path.join('build', 'foo');
+      final String genSnapshotPath = artifacts.getArtifactPath(
+        Artifact.genSnapshotArm64,
+        platform: TargetPlatform.ios,
+        mode: BuildMode.release,
+      );
+      processManager.addCommands(<FakeCommand>[
+        FakeCommand(
+          command: <String>[
+            genSnapshotPath,
+            '--deterministic',
+            ...kLinkInfoArgs,
+            '--snapshot_kind=app-aot-assembly',
+            '--assembly=${fileSystem.path.join(outputPath, 'snapshot_assembly.S')}',
+            'main.dill',
+          ],
+        ),
+        kWhichSysctlCommand,
+        kARMCheckCommand,
+        const FakeCommand(
+          command: <String>[
+            'xcrun',
+            'cc',
+            '-arch',
+            'arm64',
+            '-miphoneos-version-min=15.0',
+            '-isysroot',
+            'path/to/sdk',
+            '-c',
+            'build/foo/snapshot_assembly.S',
+            '-o',
+            'build/foo/snapshot_assembly.o',
+          ],
+        ),
+        const FakeCommand(command: <String>['xcrun', 'clang', '-arch', 'arm64', ...kDefaultClang]),
+        const FakeCommand(
+          command: <String>[
+            'xcrun',
+            'dsymutil',
+            '-o',
+            'build/foo/App.framework.dSYM',
+            'build/foo/App.framework/App',
+          ],
+        ),
+        const FakeCommand(
+          command: <String>[
+            'xcrun',
+            'strip',
+            '-x',
+            'build/foo/App.framework/App',
+            '-o',
+            'build/foo/App.framework/App',
+          ],
+        ),
+      ]);
+
+      final int genSnapshotExitCode = await snapshotter.build(
+        platform: TargetPlatform.ios,
+        buildMode: BuildMode.release,
+        mainPath: 'main.dill',
+        outputPath: outputPath,
+        darwinArch: DarwinArch.arm64,
+        sdkRoot: 'path/to/sdk',
+        dartObfuscation: false,
+      );
+
+      expect(genSnapshotExitCode, 0);
+      for (final name in ddFiles) {
+        expect(
+          fileSystem.file(fileSystem.path.join('build', name)).existsSync(),
+          isFalse,
+          reason: name,
+        );
+      }
+      expect(fileSystem.file(fileSystem.path.join('build', 'App.ct.link')).existsSync(), isTrue);
+      expect(processManager, hasNoRemainingExpectations);
+    });
+
     testWithoutContext('builds iOS snapshot with obfuscate and dwarfStackTraces', () async {
       final String outputPath = fileSystem.path.join('build', 'foo');
       final String assembly = fileSystem.path.join(outputPath, 'snapshot_assembly.S');
