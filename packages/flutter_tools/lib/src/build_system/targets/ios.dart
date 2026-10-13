@@ -50,6 +50,7 @@ abstract class AotAssemblyBase extends Target with ShorebirdDdMaxBytesBuildKey {
       xcode: globals.xcode!,
       artifacts: environment.artifacts,
       processManager: environment.processManager,
+      platform: environment.platform,
     );
     final String buildOutputPath = environment.buildDir.path;
     final String? environmentBuildMode = environment.defines[kBuildMode];

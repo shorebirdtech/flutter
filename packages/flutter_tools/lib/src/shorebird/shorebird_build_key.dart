@@ -6,8 +6,8 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 
-import '../base/build.dart';
 import '../build_system/build_system.dart';
+import 'shorebird_dd.dart';
 import 'shorebird_yaml.dart';
 
 /// Folds a digest of Shorebird environment [values] into [buildKey].

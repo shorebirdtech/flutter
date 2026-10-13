@@ -2,30 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:io' show Platform;
-
 import 'package:process/process.dart';
 
 import '../artifacts.dart';
 import '../build_info.dart';
 import '../darwin/darwin.dart';
 import '../macos/xcode.dart';
+import '../shorebird/shorebird_dd.dart';
 import 'file_system.dart';
 import 'logger.dart';
+import 'platform.dart';
 import 'process.dart';
-
-/// The environment variable that turns on the iOS DD pass and caps its table.
-const kShorebirdDdMaxBytesEnvVar = 'SHOREBIRD_DD_MAX_BYTES';
-
-/// The `dd_max_bytes` an AOT build passes to the DD pass, read from
-/// [environment] (preferring a `dart-define` on the tool itself), or 0 if
-/// unset, malformed, or non-positive, which means no DD pass.
-int shorebirdDdMaxBytes(Map<String, String> environment) {
-  const fromDefine = String.fromEnvironment(kShorebirdDdMaxBytesEnvVar);
-  final String? raw = fromDefine.isNotEmpty ? fromDefine : environment[kShorebirdDdMaxBytesEnvVar];
-  final int value = int.tryParse(raw ?? '') ?? 0;
-  return value > 0 ? value : 0;
-}
 
 /// A snapshot build configuration.
 class SnapshotType {
@@ -178,9 +165,12 @@ class AOTSnapshotter {
     required Xcode xcode,
     required ProcessManager processManager,
     required Artifacts artifacts,
+    // Shorebird: the environment SHOREBIRD_DD_MAX_BYTES is read from.
+    Platform platform = const LocalPlatform(),
   }) : _logger = logger,
        _fileSystem = fileSystem,
        _xcode = xcode,
+       _platform = platform,
        _processUtils = ProcessUtils(logger: logger, processManager: processManager),
        _genSnapshot = GenSnapshot(
          artifacts: artifacts,
@@ -192,6 +182,7 @@ class AOTSnapshotter {
   final Logger _logger;
   final FileSystem _fileSystem;
   final Xcode _xcode;
+  final Platform _platform;
   final ProcessUtils _processUtils;
   final GenSnapshot _genSnapshot;
 
@@ -400,7 +391,7 @@ class AOTSnapshotter {
   }
 
   /// Reads the SHOREBIRD_DD_MAX_BYTES env var. See [shorebirdDdMaxBytes].
-  int _readDdMaxBytes() => shorebirdDdMaxBytes(Platform.environment);
+  int _readDdMaxBytes() => shorebirdDdMaxBytes(_platform.environment);
 
   /// The files a DD pass leaves next to the snapshot's output directory, which
   /// LinkSupplement copies into the release's supplement.
