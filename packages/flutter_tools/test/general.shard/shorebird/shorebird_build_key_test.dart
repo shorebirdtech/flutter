@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'package:analyzer/dart/analysis/utilities.dart';
+import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:file/local.dart' as local;
 import 'package:file/memory.dart';
 import 'package:flutter_tools/src/artifacts.dart';
-import 'package:flutter_tools/src/base/build.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
 import 'package:flutter_tools/src/base/logger.dart';
 import 'package:flutter_tools/src/base/platform.dart';
@@ -16,9 +19,13 @@ import 'package:flutter_tools/src/build_system/targets/common.dart';
 import 'package:flutter_tools/src/build_system/targets/ios.dart';
 import 'package:flutter_tools/src/build_system/targets/linux.dart';
 import 'package:flutter_tools/src/build_system/targets/macos.dart';
+import 'package:flutter_tools/src/build_system/targets/web.dart';
 import 'package:flutter_tools/src/build_system/targets/windows.dart';
 import 'package:flutter_tools/src/shorebird/shorebird_build_key.dart';
+import 'package:flutter_tools/src/shorebird/shorebird_dd.dart';
 import 'package:flutter_tools/src/shorebird/shorebird_yaml.dart';
+import 'package:flutter_tools/src/web/compile.dart';
+import 'package:unified_analytics/unified_analytics.dart';
 
 import '../../src/common.dart';
 import '../../src/context.dart';
@@ -26,6 +33,7 @@ import '../../src/context.dart';
 const _keyA = 'PUBLIC-KEY-AAAA';
 const _keyB = 'PUBLIC-KEY-BBBB';
 const _token = 'SECRET-TOKEN-VALUE';
+const _ddMaxBytes = '9876543';
 
 void main() {
   late FileSystem fileSystem;
@@ -106,7 +114,7 @@ void main() {
       () async {
         await build(const <String, String>{
           kShorebirdPublicKeyEnvVar: _keyA,
-          kShorebirdDdMaxBytesEnvVar: '12345',
+          kShorebirdDdMaxBytesEnvVar: _ddMaxBytes,
           'SHOREBIRD_TOKEN': _token,
         });
         final Directory buildDir = environmentWith(const <String, String>{}).rootBuildDir;
@@ -119,6 +127,7 @@ void main() {
         for (final file in files) {
           final contents = String.fromCharCodes(file.readAsBytesSync());
           expect(contents, isNot(contains(_keyA)), reason: file.path);
+          expect(contents, isNot(contains(_ddMaxBytes)), reason: file.path);
           expect(contents, isNot(contains(_token)), reason: file.path);
         }
       },
@@ -140,15 +149,16 @@ void main() {
         target.buildKeyFor(environmentWith(noValues));
 
     test('asset bundling targets track SHOREBIRD_PUBLIC_KEY only', () {
-      const assetTargets = <Target>[
-        CopyAssets(),
-        CopyFlutterBundle(),
-        AotAndroidAssetBundle(),
-        DebugAndroidApplication(),
-        ReleaseIosApplicationBundle(),
-        ReleaseMacOSBundleFlutterAssets(),
-        ReleaseBundleLinuxAssets(TargetPlatform.linux_x64),
-        ReleaseBundleWindowsAssets(TargetPlatform.windows_x64),
+      final assetTargets = <Target>[
+        const CopyAssets(),
+        const CopyFlutterBundle(),
+        const AotAndroidAssetBundle(),
+        const DebugAndroidApplication(),
+        const ReleaseIosApplicationBundle(),
+        const ReleaseMacOSBundleFlutterAssets(),
+        const ReleaseBundleLinuxAssets(TargetPlatform.linux_x64),
+        const ReleaseBundleWindowsAssets(TargetPlatform.windows_x64),
+        WebReleaseBundle(<WebCompilerConfig>[const JsCompilerConfig()], const NoOpAnalytics()),
       ];
       for (final target in assetTargets) {
         expect(changes(target, withKey), isTrue, reason: target.name);
@@ -180,6 +190,81 @@ void main() {
       }
     });
   });
+
+  test('every target that calls copyAssets mixes in ShorebirdPublicKeyBuildKey', () {
+    // copyAssets writes SHOREBIRD_PUBLIC_KEY into the generated shorebird.yaml,
+    // so a target that calls it without the mixin skips when the key changes
+    // and ships the previous key. This catches a new upstream caller.
+    const FileSystem localFileSystem = local.LocalFileSystem();
+    final Directory targetsDir = localFileSystem.directory(
+      localFileSystem.path.join(
+        getFlutterRoot(),
+        'packages',
+        'flutter_tools',
+        'lib',
+        'src',
+        'build_system',
+        'targets',
+      ),
+    );
+    final callers = <String>{};
+    final missingMixin = <String>[];
+    for (final File file in targetsDir.listSync().whereType<File>()) {
+      if (!file.path.endsWith('.dart')) {
+        continue;
+      }
+      final CompilationUnit unit = parseString(
+        content: file.readAsStringSync(),
+        path: file.path,
+        throwIfDiagnostics: false,
+      ).unit;
+      for (final ClassDeclaration declaration in unit.declarations.whereType<ClassDeclaration>()) {
+        final finder = _CopyAssetsCallFinder();
+        declaration.accept(finder);
+        if (!finder.found) {
+          continue;
+        }
+        final String name = declaration.namePart.typeName.lexeme;
+        callers.add(name);
+        final bool hasMixin =
+            declaration.withClause?.mixinTypes.any(
+              (NamedType type) => type.name.lexeme == 'ShorebirdPublicKeyBuildKey',
+            ) ??
+            false;
+        if (!hasMixin) {
+          missingMixin.add('$name (${file.basename})');
+        }
+      }
+    }
+    // Guards against the scan silently finding nothing.
+    expect(
+      callers,
+      containsAll(<String>[
+        'CopyAssets',
+        'CopyFlutterBundle',
+        'AndroidAssetBundle',
+        'IosAssetBundle',
+        'MacOSBundleFlutterAssets',
+        'BundleLinuxAssets',
+        'BundleWindowsAssets',
+        'WebReleaseBundle',
+      ]),
+    );
+    expect(missingMixin, isEmpty, reason: 'These call copyAssets without the mixin.');
+  });
+}
+
+/// Records whether a node contains a call to `copyAssets`.
+class _CopyAssetsCallFinder extends RecursiveAstVisitor<void> {
+  bool found = false;
+
+  @override
+  void visitMethodInvocation(MethodInvocation node) {
+    if (node.methodName.name == 'copyAssets') {
+      found = true;
+    }
+    super.visitMethodInvocation(node);
+  }
 }
 
 /// Compiles shorebird.yaml into the output directory the way `copyAssets`
