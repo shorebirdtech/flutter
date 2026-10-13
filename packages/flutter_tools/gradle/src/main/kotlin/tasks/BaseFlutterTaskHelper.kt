@@ -13,6 +13,7 @@ import org.gradle.api.tasks.OutputFiles
 import org.gradle.kotlin.dsl.support.serviceOf
 import org.gradle.process.ExecOperations
 import org.gradle.process.ExecSpec
+import java.security.MessageDigest
 
 /**
  * Stateless object to contain the logic used in [BaseFlutterTask]. Any required state should be stored
@@ -153,6 +154,19 @@ object BaseFlutterTaskHelper {
             args("-dAndroidArchs=${baseFlutterTask.targetPlatformValues!!.joinToString(" ")}")
             args("-dMinSdkVersion=${baseFlutterTask.minSdkVersion}")
             args(generateRuleNames(baseFlutterTask))
+        }
+
+    /**
+     * Shorebird: the SHA-256 hex digest of SHOREBIRD_PUBLIC_KEY in [environment],
+     * or null when it is unset. Only this digest, never the key, is a task input.
+     */
+    @VisibleForTesting
+    internal fun getShorebirdPublicKeyDigest(environment: Map<String, String>): String? =
+        environment["SHOREBIRD_PUBLIC_KEY"]?.let { key ->
+            MessageDigest
+                .getInstance("SHA-256")
+                .digest(key.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
         }
 
     fun buildBundle(baseFlutterTask: BaseFlutterTask) {
