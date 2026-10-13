@@ -17,6 +17,7 @@ import '../../features.dart';
 import '../../globals.dart' as globals show xcode;
 import '../../isolated/native_assets/dart_hook_result.dart';
 import '../../project.dart';
+import '../../shorebird/shorebird_build_key.dart';
 import '../build_system.dart';
 import '../depfile.dart';
 import '../exceptions.dart';
@@ -29,7 +30,7 @@ import 'native_assets.dart';
 
 /// Copies the pre-built flutter bundle.
 // This is a one-off rule for implementing build bundle in terms of assemble.
-class CopyFlutterBundle extends Target {
+class CopyFlutterBundle extends Target with ShorebirdPublicKeyBuildKey {
   const CopyFlutterBundle();
 
   @override

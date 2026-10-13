@@ -21,6 +21,7 @@ import '../../ios/mac.dart';
 import '../../isolated/native_assets/dart_hook_result.dart';
 import '../../macos/xcode.dart';
 import '../../project.dart';
+import '../../shorebird/shorebird_build_key.dart';
 import '../build_system.dart';
 import '../depfile.dart';
 import '../exceptions.dart';
@@ -35,7 +36,7 @@ import 'native_assets.dart';
 ///
 /// If more than one iOS arch is provided, then this rule will
 /// produce a universal binary.
-abstract class AotAssemblyBase extends Target {
+abstract class AotAssemblyBase extends Target with ShorebirdDdMaxBytesBuildKey {
   const AotAssemblyBase();
 
   @override
@@ -49,6 +50,7 @@ abstract class AotAssemblyBase extends Target {
       xcode: globals.xcode!,
       artifacts: environment.artifacts,
       processManager: environment.processManager,
+      platform: environment.platform,
     );
     final String buildOutputPath = environment.buildDir.path;
     final String? environmentBuildMode = environment.defines[kBuildMode];
@@ -620,7 +622,7 @@ class DebugIosLLDBInit extends Target {
 /// * Copying the precompiled isolate/vm data from the engine (debug)
 /// * Copying the flutter assets to App.framework/flutter_assets
 /// * Copying either the stub or real App assembly file to App.framework/App
-abstract class IosAssetBundle extends Target {
+abstract class IosAssetBundle extends Target with ShorebirdPublicKeyBuildKey {
   const IosAssetBundle();
 
   @override
