@@ -8,6 +8,10 @@ import 'package:yaml_edit/yaml_edit.dart';
 import '../base/file_system.dart';
 import '../globals.dart' as globals;
 
+/// The environment variable whose value is written to the generated
+/// shorebird.yaml as `patch_public_key`.
+const kShorebirdPublicKeyEnvVar = 'SHOREBIRD_PUBLIC_KEY';
+
 void updateShorebirdYaml(
   String? flavor,
   String shorebirdYamlPath, {
@@ -68,7 +72,7 @@ Map<String, dynamic> compileShorebirdYaml(
   copyIfSet('base_url');
   copyIfSet('auto_update');
   copyIfSet('patch_verification');
-  final String? shorebirdPublicKeyEnvVar = environment['SHOREBIRD_PUBLIC_KEY'];
+  final String? shorebirdPublicKeyEnvVar = environment[kShorebirdPublicKeyEnvVar];
   if (shorebirdPublicKeyEnvVar != null) {
     compiled['patch_public_key'] = shorebirdPublicKeyEnvVar;
   }

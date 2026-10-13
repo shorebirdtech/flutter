@@ -117,6 +117,17 @@ open class BaseFlutterTask : DefaultTask() {
     @Input
     var shorebirdTraceFile: String? = null
 
+    // Shorebird-specific: a digest of SHOREBIRD_PUBLIC_KEY, which flutter
+    // assemble writes into the generated shorebird.yaml, so the task reruns
+    // when the key changes. Read from the environment when Gradle checks the
+    // task's inputs, the same environment flutter assemble inherits. Only the
+    // digest is an input, since Gradle persists input values in its task
+    // history and build cache.
+    @get:Optional
+    @get:Input
+    val shorebirdPublicKeyDigest: String?
+        get() = BaseFlutterTaskHelper.getShorebirdPublicKeyDigest(System.getenv())
+
     @Optional
     @Input
     var deferredComponents: Boolean? = null

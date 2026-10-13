@@ -13,6 +13,8 @@ import org.gradle.api.GradleException
 import org.gradle.api.Project
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.logging.LoggingManager
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.Optional
 import org.gradle.kotlin.dsl.support.serviceOf
 import org.gradle.process.ExecOperations
 import org.gradle.process.ExecSpec
@@ -22,6 +24,9 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class BaseFlutterTaskHelperTest {
     object BaseFlutterTaskPropertiesTest {
@@ -390,5 +395,25 @@ class BaseFlutterTaskHelperTest {
         BaseFlutterTaskHelper.getDependenciesFiles(baseFlutterTask)
         verify { projectIntermediary.files() }
         verify { projectIntermediary.files("${BaseFlutterTaskPropertiesTest.intermediateDirFileTest}/flutter_build.d") }
+    }
+
+    @Test
+    fun `getShorebirdPublicKeyDigest returns null when SHOREBIRD_PUBLIC_KEY is unset`() {
+        assertNull(BaseFlutterTaskHelper.getShorebirdPublicKeyDigest(mapOf("SHOREBIRD_TOKEN" to "secret")))
+    }
+
+    @Test
+    fun `getShorebirdPublicKeyDigest returns the SHA-256 of SHOREBIRD_PUBLIC_KEY`() {
+        val digest = BaseFlutterTaskHelper.getShorebirdPublicKeyDigest(mapOf("SHOREBIRD_PUBLIC_KEY" to "key-a"))
+        // printf 'key-a' | shasum -a 256
+        assertEquals("f10f781241e2246678b6b45c857069208152a53863e47fac33f607ab405006f4", digest)
+        assertNotEquals(digest, BaseFlutterTaskHelper.getShorebirdPublicKeyDigest(mapOf("SHOREBIRD_PUBLIC_KEY" to "key-b")))
+    }
+
+    @Test
+    fun `shorebirdPublicKeyDigest is an optional task input`() {
+        val getter = BaseFlutterTask::class.java.getMethod("getShorebirdPublicKeyDigest")
+        assertTrue(getter.isAnnotationPresent(Input::class.java))
+        assertTrue(getter.isAnnotationPresent(Optional::class.java))
     }
 }

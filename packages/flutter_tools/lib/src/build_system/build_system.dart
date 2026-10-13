@@ -156,6 +156,15 @@ abstract class Target {
   /// variant, and the target won't invalidate or rebuild due to this property.
   String? get buildKey => null;
 
+  /// The [buildKey] for this target in [environment].
+  ///
+  /// Shorebird: override this rather than [buildKey] when the target's output
+  /// depends on something only [environment] knows and that is not a define,
+  /// such as a process environment variable. Defines are already part of the
+  /// build directory hash, but an environment variable is not, so without
+  /// this a change in its value would leave the target skipped.
+  String? buildKeyFor(Environment environment) => buildKey;
+
   /// Whether this target can be executed with the given [environment].
   ///
   /// Returning `true` will cause [build] to be skipped. This is equivalent
@@ -174,7 +183,7 @@ abstract class Target {
       inputsFiles.sources,
       outputFiles.sources,
       <Node>[for (final Target target in dependencies) target._toNode(environment)],
-      buildKey,
+      buildKeyFor(environment),
       environment,
       inputsFiles.containsNewDepfile,
     );
@@ -191,7 +200,7 @@ abstract class Target {
     final result = <String, Object>{
       'inputs': inputs.map(getPath).toList(),
       'outputs': outputs.map(getPath).toList(),
-      if (buildKey case final String key) 'buildKey': key,
+      if (buildKeyFor(environment) case final String key) 'buildKey': key,
     };
     final File stamp = _findStampFile(environment);
     if (!stamp.existsSync()) {
@@ -229,7 +238,7 @@ abstract class Target {
   /// This requires constants from the [Environment] to resolve the paths of
   /// inputs and the output stamp.
   Map<String, Object> toJson(Environment environment) {
-    final String? key = buildKey;
+    final String? key = buildKeyFor(environment);
     return <String, Object>{
       'name': name,
       'dependencies': <String>[for (final Target target in dependencies) target.name],

@@ -10,6 +10,7 @@ import '../../build_info.dart';
 import '../../devfs.dart';
 import '../../isolated/native_assets/dart_hook_result.dart';
 import '../../project.dart';
+import '../../shorebird/shorebird_build_key.dart';
 import '../build_system.dart';
 import '../depfile.dart';
 import '../exceptions.dart';
@@ -24,7 +25,7 @@ import 'native_assets.dart';
 /// expected to be in the root output directory.
 ///
 /// All assets and manifests are included from flutter_assets/**.
-abstract class AndroidAssetBundle extends Target {
+abstract class AndroidAssetBundle extends Target with ShorebirdPublicKeyBuildKey {
   const AndroidAssetBundle();
 
   @override

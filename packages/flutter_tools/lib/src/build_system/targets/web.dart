@@ -24,6 +24,7 @@ import '../../flutter_plugins.dart';
 import '../../globals.dart' as globals;
 import '../../isolated/native_assets/dart_hook_result.dart';
 import '../../project.dart';
+import '../../shorebird/shorebird_build_key.dart';
 import '../../web/bootstrap.dart';
 import '../../web/compile.dart';
 import '../../web/content_hash.dart';
@@ -1121,7 +1122,7 @@ Directory _resolveDirectory(Directory directory) {
 
 /// Unpacks the dart2js or dart2wasm compilation and resources to a given
 /// output directory.
-class WebReleaseBundle extends Target {
+class WebReleaseBundle extends Target with ShorebirdPublicKeyBuildKey {
   WebReleaseBundle(List<WebCompilerConfig> configs, Analytics analytics)
     : this._(
         compileTargets: configs
