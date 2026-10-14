@@ -115,8 +115,19 @@ bool HotRestartEngine(Engine& engine,
     // artifacts. Refusing here reports nothing to the updater: the patch
     // stays installed and boots normally (with its own VM snapshot) on the
     // next app launch.
+    //
+    // Resolve it from the base release rather than from restart_settings. A
+    // patch carries only the isolate snapshot (see PatchSymbol), and the VM
+    // and isolate snapshots now share a symbol name, so resolving through a
+    // path list whose first entry is the patch yields the patch's isolate
+    // data in place of VM data and the comparison can never succeed. The VM
+    // snapshot a patch would boot against is the base release's, which the
+    // patch cannot change.
+    Settings vm_snapshot_settings = settings;
+    vm_snapshot_settings.application_library_paths =
+        updater.GetAppConfig().original_libapp_paths;
     auto next_vm_snapshot =
-        DartSnapshot::VMSnapshotFromSettings(restart_settings);
+        DartSnapshot::VMSnapshotFromSettings(vm_snapshot_settings);
     if (!next_vm_snapshot ||
         !VMSnapshotsIdentical(running_vm_snapshot, *next_vm_snapshot)) {
       FML_LOG(ERROR)
