@@ -125,8 +125,14 @@ bool HotRestartEngine(Engine& engine, const Settings& settings) {
     }
   }
 
-  FML_LOG(ERROR) << "Shorebird hot restart could not relaunch the app; the "
-                    "app may be unresponsive until relaunched by the user.";
+  // Every attempt tore the previous isolate down, so returning here would
+  // leave a live Shell with no isolate and a frozen UI the user cannot
+  // escape. Dying is the recovery: the updater's crash handling rolls the
+  // patch back on the next cold boot, which is the same path a process that
+  // dies mid-restart already takes.
+  FML_LOG(FATAL) << "Shorebird hot restart could not relaunch the app on "
+                    "either attempt; terminating so the next launch boots the "
+                    "rolled-back selection.";
   return false;
 }
 

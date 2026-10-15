@@ -50,9 +50,10 @@ std::vector<std::string> LibraryPathsForNextBoot(
 /// was already booting the base release there is nothing to roll back, so no
 /// retry happens.
 ///
-/// Returns whether the relaunch succeeded. A false return can leave the app
-/// with no running isolate, because a failed relaunch has already torn the
-/// previous one down.
+/// Returns true once a relaunch has succeeded. It does not return when every
+/// attempt failed: each one tore the previous isolate down, so the process is
+/// terminated rather than left with a live Shell and a frozen UI, and the
+/// updater's crash handling rolls the patch back on the next cold boot.
 bool HotRestartEngine(Engine& engine, const Settings& settings);
 
 }  // namespace shorebird
