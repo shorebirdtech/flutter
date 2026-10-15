@@ -9,12 +9,10 @@
 #include <vector>
 
 #include "flutter/common/settings.h"
-#include "flutter/fml/memory/ref_ptr.h"
 
 namespace flutter {
 
 class Engine;
-class DartSnapshot;
 
 namespace shorebird {
 
@@ -43,26 +41,16 @@ std::vector<std::string> LibraryPathsForNextBoot(
     const std::vector<std::string>& original_libapp_paths,
     bool use_interpreter);
 
-/// Whether `next_vm_snapshot` is identical to the VM snapshot the running
-/// process booted with. A relaunched isolate keeps running against the
-/// original VM snapshot, so the patch's isolate snapshot must have been
-/// generated against an identical one. Identical Flutter/Dart versions
-/// produce identical VM snapshots (Shorebird requires patches to be built
-/// with the release's Flutter version); this guards against mismatched
-/// artifacts reaching a device. Exposed for testing.
-bool VMSnapshotsIdentical(const DartSnapshot& running_vm_snapshot,
-                          const DartSnapshot& next_vm_snapshot);
-
 /// Tears down `engine`'s root isolate and relaunches it from the current
 /// next-boot patch. Must run on the UI thread. `settings` is the Shell's
-/// settings; `running_vm_snapshot` is the VM snapshot the process booted
-/// with. On failure, reports launch failure to the updater (rolling the
-/// patch back) and retries once with the rolled-back selection so the app
-/// recovers onto a known-good state. Returns whether an isolate is running
-/// when done.
-bool HotRestartEngine(Engine& engine,
-                      const Settings& settings,
-                      const DartSnapshot& running_vm_snapshot);
+/// settings. When a relaunch fails, reports launch failure to the updater,
+/// which rolls the patch back, and retries once against the rolled-back
+/// selection so the app recovers onto a known-good state.
+///
+/// Returns whether the relaunch succeeded. A false return can leave the app
+/// with no running isolate, because a failed relaunch has already torn the
+/// previous one down.
+bool HotRestartEngine(Engine& engine, const Settings& settings);
 
 }  // namespace shorebird
 }  // namespace flutter
