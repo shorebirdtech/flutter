@@ -353,6 +353,38 @@ TEST_F(UpdaterTest, BeginNewLaunchCycleAllowsSecondLaunchCycle) {
   EXPECT_EQ(log[3], "ReportLaunchFailure");
 }
 
+// A hot restart re-runs the launch lifecycle but does not reconfigure the
+// process, so the update thread it already started must keep running.
+TEST_F(UpdaterTest, BeginNewLaunchCycleKeepsUpdateThreadGuard) {
+  mock_.set_should_auto_update(true);
+  ASSERT_TRUE(mock_.Init(AppConfig{}));
+
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
+  ASSERT_EQ(mock_.start_update_thread_count(), 1);
+
+  mock_.BeginNewLaunchCycle();
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_.start_update_thread_count(), 1);
+}
+
+// The Init latch records that the process is configured, which outlives any
+// one launch cycle. Reporting no launch before the new cycle leaves the
+// update-thread guard unclaimed, so the latch is the only thing that can
+// gate the thread start and a cleared one is observable.
+TEST_F(UpdaterTest, BeginNewLaunchCycleKeepsInitLatch) {
+  mock_.set_should_auto_update(true);
+  ASSERT_TRUE(mock_.Init(AppConfig{}));
+
+  mock_.BeginNewLaunchCycle();
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_.start_update_thread_count(), 1);
+}
+
 // Init retains the configuration so the hot restart can fall back to the
 // original libapp paths when no patch is installed.
 TEST_F(UpdaterTest, InitRetainsAppConfig) {
