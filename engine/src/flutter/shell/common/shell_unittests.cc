@@ -5255,6 +5255,148 @@ TEST_F(ShellTest, ShorebirdUpdaterReportsOnlyOnceForMultipleShells) {
   shorebird::Updater::ResetInstanceForTesting();
 }
 
+namespace {
+// Runs |task| on the shell's UI thread, where the engine may be touched, and
+// blocks until it finishes.
+void RunOnUIThreadAndWait(Shell* shell, const fml::closure& task) {
+  fml::AutoResetWaitableEvent latch;
+  fml::TaskRunner::RunNowOrPostTask(shell->GetTaskRunners().GetUITaskRunner(),
+                                    [&]() {
+                                      task();
+                                      latch.Signal();
+                                    });
+  latch.Wait();
+}
+}  // namespace
+
+// A harness-built snapshot is the same JIT snapshot the shell booted with, so
+// these tests pin that the handed snapshot is the one carried, not that a
+// different program boots.
+TEST_F(ShellTest, RestartWithSnapshotInvalidConfigurationLeavesIsolateAlone) {
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
+  auto settings = CreateSettingsForFixture();
+  auto shell = CreateShell(settings);
+  ASSERT_TRUE(ValidateShell(shell.get()));
+
+  fml::AutoResetWaitableEvent main_latch;
+  AddNativeCallback(
+      "NotifyNative",
+      CREATE_NATIVE_ENTRY([&main_latch](auto args) { main_latch.Signal(); }));
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("mainNotifyNative");
+  RunEngine(shell.get(), std::move(configuration));
+  main_latch.Wait();
+
+  bool restarted = true;
+  bool running_after = false;
+  const RuntimeController* controller_before = nullptr;
+  const RuntimeController* controller_after = nullptr;
+  fml::RefPtr<const DartSnapshot> snapshot_before;
+  fml::RefPtr<const DartSnapshot> snapshot_after;
+  RunOnUIThreadAndWait(shell.get(), [&]() {
+    auto engine = shell->GetEngine();
+    controller_before = engine->GetRuntimeController();
+    snapshot_before = controller_before->GetIsolateSnapshot();
+    restarted = engine->RestartWithSnapshot(
+        RunConfiguration(nullptr),
+        DartSnapshot::IsolateSnapshotFromSettings(settings));
+    controller_after = engine->GetRuntimeController();
+    snapshot_after = controller_after->GetIsolateSnapshot();
+    running_after = controller_after->IsRootIsolateRunning();
+  });
+
+  EXPECT_FALSE(restarted);
+  EXPECT_TRUE(running_after);
+  EXPECT_EQ(controller_before, controller_after);
+  EXPECT_EQ(snapshot_before, snapshot_after);
+
+  DestroyShell(std::move(shell));
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
+}
+
+TEST_F(ShellTest, RestartWithSnapshotRelaunchesRootIsolateWithGivenSnapshot) {
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
+  auto settings = CreateSettingsForFixture();
+  auto shell = CreateShell(settings);
+  ASSERT_TRUE(ValidateShell(shell.get()));
+
+  fml::AutoResetWaitableEvent first_latch;
+  fml::AutoResetWaitableEvent second_latch;
+  AddNativeCallback(
+      "NotifyNative",
+      CREATE_NATIVE_ENTRY([&first_latch](auto args) { first_latch.Signal(); }));
+  AddNativeCallback("SayHiFromFixturesAreFunctionalMain",
+                    CREATE_NATIVE_ENTRY(
+                        [&second_latch](auto args) { second_latch.Signal(); }));
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("mainNotifyNative");
+  RunEngine(shell.get(), std::move(configuration));
+  first_latch.Wait();
+
+  auto snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
+  ASSERT_TRUE(snapshot);
+
+  DartVM* vm_before = shell->GetDartVM();
+  const RuntimeController* controller_before = nullptr;
+  bool restarted = false;
+  const RuntimeController* controller_after = nullptr;
+  fml::RefPtr<const DartSnapshot> snapshot_after;
+  DartVM* vm_after = nullptr;
+  std::string last_entry_point;
+  RunOnUIThreadAndWait(shell.get(), [&]() {
+    auto engine = shell->GetEngine();
+    controller_before = engine->GetRuntimeController();
+    auto restart_configuration = RunConfiguration::InferFromSettings(settings);
+    restart_configuration.SetEntrypoint("fixturesAreFunctionalMain");
+    restarted =
+        engine->RestartWithSnapshot(std::move(restart_configuration), snapshot);
+    controller_after = engine->GetRuntimeController();
+    snapshot_after = controller_after->GetIsolateSnapshot();
+    vm_after = controller_after->GetDartVM();
+    last_entry_point = engine->GetLastEntrypoint();
+  });
+
+  ASSERT_TRUE(restarted);
+  // The relaunched isolate ran the new entrypoint.
+  second_latch.Wait();
+  EXPECT_EQ(last_entry_point, "fixturesAreFunctionalMain");
+  EXPECT_NE(controller_before, controller_after);
+  EXPECT_EQ(snapshot_after.get(), snapshot.get());
+  EXPECT_EQ(vm_after, vm_before);
+
+  DestroyShell(std::move(shell));
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
+}
+
+TEST_F(ShellTest, CloneWithSnapshotCarriesSnapshotAndReusesVM) {
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
+  auto settings = CreateSettingsForFixture();
+  auto shell = CreateShell(settings);
+  ASSERT_TRUE(ValidateShell(shell.get()));
+
+  auto snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
+  ASSERT_TRUE(snapshot);
+
+  DartVM* vm = shell->GetDartVM();
+  RunOnUIThreadAndWait(shell.get(), [&]() {
+    const RuntimeController* original =
+        shell->GetEngine()->GetRuntimeController();
+    auto clone = original->CloneWithSnapshot(snapshot);
+    ASSERT_TRUE(clone);
+    EXPECT_NE(clone.get(), original);
+    EXPECT_EQ(clone->GetIsolateSnapshot().get(), snapshot.get());
+    EXPECT_NE(clone->GetIsolateSnapshot().get(),
+              original->GetIsolateSnapshot().get());
+    EXPECT_EQ(clone->GetDartVM(), vm);
+    EXPECT_EQ(clone->GetDartVM(), original->GetDartVM());
+    EXPECT_FALSE(clone->IsRootIsolateRunning());
+  });
+
+  DestroyShell(std::move(shell));
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
+}
+
 }  // namespace testing
 }  // namespace flutter
 

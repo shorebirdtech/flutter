@@ -33,8 +33,9 @@ namespace shorebird {
 /// snapshots from, mirroring how ConfigureShorebird builds the list at cold
 /// boot. `next_boot_patch_path` may be empty (no patch: boot the base
 /// release via `original_libapp_paths`). When `use_interpreter` (iOS), the
-/// patch is prepended so the base library remains visible for VM snapshot
-/// resolution; otherwise (Android) the patch library alone provides all
+/// patch is prepended because a linked patch carries only the code it
+/// rewrote and still runs the rest out of the base library, which must stay
+/// resolvable; otherwise (Android) the patch library alone provides all
 /// symbols.
 std::vector<std::string> LibraryPathsForNextBoot(
     const std::string& next_boot_patch_path,
@@ -45,7 +46,9 @@ std::vector<std::string> LibraryPathsForNextBoot(
 /// next-boot patch. Must run on the UI thread. `settings` is the Shell's
 /// settings. When a relaunch fails, reports launch failure to the updater,
 /// which rolls the patch back, and retries once against the rolled-back
-/// selection so the app recovers onto a known-good state.
+/// selection (the last good patch or the base release). If the failed attempt
+/// was already booting the base release there is nothing to roll back, so no
+/// retry happens.
 ///
 /// Returns whether the relaunch succeeded. A false return can leave the app
 /// with no running isolate, because a failed relaunch has already torn the
