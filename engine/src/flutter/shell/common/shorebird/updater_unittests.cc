@@ -15,8 +15,8 @@ namespace testing {
 class UpdaterTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    // Install a mock for each test and reset the once-per-process guards
-    // so each test starts with a clean slate.
+    // Install a mock for each test and reset the launch-cycle guards so
+    // each test starts with a clean slate.
     auto mock = std::make_unique<MockUpdater>();
     mock_ = mock.get();
     Updater::SetInstanceForTesting(std::move(mock));
@@ -373,6 +373,38 @@ TEST_F(UpdaterTest, BeginNewLaunchCycleAllowsSecondLaunchCycle) {
   EXPECT_EQ(log[1], "ReportLaunchSuccess");
   EXPECT_EQ(log[2], "ReportLaunchStart");
   EXPECT_EQ(log[3], "ReportLaunchFailure");
+}
+
+// A hot restart re-runs the launch lifecycle but does not reconfigure the
+// process, so the update thread it already started must keep running.
+TEST_F(UpdaterTest, BeginNewLaunchCycleKeepsUpdateThreadGuard) {
+  mock_->set_should_auto_update(true);
+  ASSERT_TRUE(Updater::Instance().Init(AppConfig{}));
+
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+  ASSERT_EQ(mock_->start_update_thread_count(), 1);
+
+  Updater::BeginNewLaunchCycle();
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+}
+
+// The Init latch records that the process is configured, which outlives any
+// one launch cycle. Reporting no launch before the new cycle leaves the
+// update-thread guard unclaimed, so the latch is the only thing that can
+// gate the thread start and a cleared one is observable.
+TEST_F(UpdaterTest, BeginNewLaunchCycleKeepsInitLatch) {
+  mock_->set_should_auto_update(true);
+  ASSERT_TRUE(Updater::Instance().Init(AppConfig{}));
+
+  Updater::BeginNewLaunchCycle();
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
 }
 
 // Init retains the configuration so the hot restart can fall back to the

@@ -112,8 +112,9 @@ bool Updater::HotRestartSupported() {
 }
 
 void Updater::ReportLaunchStart() {
-  // Guard: only the first engine in a process should promote next_boot →
-  // current_boot in the Rust updater. See class-level comment for rationale.
+  // Guard: only the first engine in a launch cycle should promote
+  // next_boot → current_boot in the Rust updater. See class-level comment
+  // for rationale.
   bool expected = false;
   if (!launch_started_.compare_exchange_strong(expected, true)) {
     return;
@@ -122,7 +123,8 @@ void Updater::ReportLaunchStart() {
 }
 
 void Updater::ReportLaunchSuccess() {
-  // Guard: only report success once per process. Subsequent engines reuse
+  // Guard: only report success once per launch cycle. Subsequent engines
+  // reuse
   // the same patch and don't need to re-confirm the boot. A boot already
   // reported as failed keeps that outcome, so the success is not forwarded.
   bool expected = false;
@@ -172,7 +174,7 @@ void Updater::MaybeStartUpdateThread() {
 }
 
 void Updater::ReportLaunchFailure() {
-  // Guard: only report failure once per process.
+  // Guard: only report failure once per launch cycle.
   bool expected = false;
   if (!launch_completed_.compare_exchange_strong(expected, true)) {
     return;

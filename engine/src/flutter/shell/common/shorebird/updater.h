@@ -63,7 +63,9 @@ struct AppConfig {
 ///   state. If the app crashes before `ReportLaunchSuccess`, the updater
 ///   assumes the patch caused the crash and rolls back on the next launch.
 ///
-/// These calls are guarded to execute at most once per process because:
+/// These calls are guarded to execute at most once per launch cycle. A
+/// process has exactly one cycle unless a hot restart begins another via
+/// `BeginNewLaunchCycle`. Within a cycle the guard is needed because:
 /// 1. The Rust updater is a process-global singleton — calling
 ///    `report_launch_start` multiple times would repeatedly copy `next_boot`
 ///    → `current_boot`, which could promote a newly-downloaded (but not yet
@@ -91,8 +93,8 @@ struct AppConfig {
 ///   patch) and mislabels the boot breadcrumb. After `ReportLaunchSuccess`
 ///   the booted patch is the last booted patch, and installs are safe.
 ///
-/// The start carries its own once-per-process guard rather than riding on
-/// the success report's. A patch that fails to load reports launch failure
+/// The start carries its own once-per-launch-cycle guard rather than riding
+/// on the success report's. A patch that fails to load reports launch failure
 /// from `TryLoadFromPatch`, before any Shell exists, and that claims the
 /// shared report guard. The base-code boot that follows still reports
 /// success, and that launch is precisely the one that needs a replacement
