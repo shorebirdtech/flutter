@@ -58,6 +58,7 @@ bool Updater::Init(const AppConfig& config) {
 void Updater::BeginNewLaunchCycle() {
   launch_started_.store(false);
   launch_completed_.store(false);
+  patch_load_failed_.store(false);
 }
 
 void Updater::RegisterRestartHost(uintptr_t host_id,
@@ -172,6 +173,17 @@ void Updater::ReportLaunchFailure() {
     return;
   }
   DoReportLaunchFailure();
+}
+
+void Updater::ReportPatchLoadFailure() {
+  // Outside ReportLaunchFailure's guard, so the second symbol lookup in the
+  // same cycle still records the fact even though its report is dropped.
+  patch_load_failed_.store(true);
+  ReportLaunchFailure();
+}
+
+bool Updater::PatchLoadFailed() const {
+  return patch_load_failed_.load();
 }
 
 #if SHOREBIRD_PLATFORM_SUPPORTED

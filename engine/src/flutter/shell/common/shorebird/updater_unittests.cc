@@ -52,6 +52,54 @@ TEST_F(UpdaterTest, ReportLaunchFailureOnlyCallsOnce) {
   EXPECT_EQ(mock_.launch_failure_count(), 1);
 }
 
+// A patch that fails to load is a failed launch plus a fact the hot restart
+// host needs: the snapshot it is about to get back is base code. The report
+// and the flag are separate because the report is dropped on the second
+// symbol lookup of the same cycle.
+
+TEST_F(UpdaterTest, ReportPatchLoadFailureRecordsAndReportsTheFailure) {
+  EXPECT_FALSE(mock_.PatchLoadFailed());
+
+  mock_.ReportPatchLoadFailure();
+  EXPECT_TRUE(mock_.PatchLoadFailed());
+  EXPECT_EQ(mock_.launch_failure_count(), 1);
+
+  // The loader asks for two symbols, so it reports twice in one cycle.
+  mock_.ReportPatchLoadFailure();
+  EXPECT_TRUE(mock_.PatchLoadFailed());
+  EXPECT_EQ(mock_.launch_failure_count(), 1);
+}
+
+// The flag means "the patch could not be loaded", not "the launch failed".
+// A relaunch that fails for any other reason must not look like a base-code
+// boot to the next attempt.
+TEST_F(UpdaterTest, ReportLaunchFailureDoesNotRecordAPatchLoadFailure) {
+  mock_.ReportLaunchFailure();
+  EXPECT_EQ(mock_.launch_failure_count(), 1);
+  EXPECT_FALSE(mock_.PatchLoadFailed());
+}
+
+// The hot restart retry depends on this: attempt two re-arms the cycle and
+// must not inherit attempt one's failed load, or the app never recovers.
+TEST_F(UpdaterTest, BeginNewLaunchCycleClearsThePatchLoadFailure) {
+  mock_.ReportPatchLoadFailure();
+  ASSERT_TRUE(mock_.PatchLoadFailed());
+
+  mock_.BeginNewLaunchCycle();
+  EXPECT_FALSE(mock_.PatchLoadFailed());
+}
+
+// The flag is stored outside ReportLaunchFailure's once-per-cycle guard, so
+// a report that is dropped still records the load failure.
+TEST_F(UpdaterTest, PatchLoadFailureSurvivesADroppedReport) {
+  mock_.ReportLaunchFailure();
+  ASSERT_EQ(mock_.launch_failure_count(), 1);
+
+  mock_.ReportPatchLoadFailure();
+  EXPECT_EQ(mock_.launch_failure_count(), 1);
+  EXPECT_TRUE(mock_.PatchLoadFailed());
+}
+
 TEST_F(UpdaterTest, MockUpdaterTracksShouldAutoUpdate) {
   mock_.set_should_auto_update(false);
   EXPECT_FALSE(mock_.ShouldAutoUpdate());

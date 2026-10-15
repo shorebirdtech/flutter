@@ -450,5 +450,56 @@ TEST_F(LoadedPatchTest, DartVMDataUnwrapsBaseSnapshotFromPatchedSnapshot) {
   EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 1u);
 }
 
+// The loader boots base code rather than aborting, so the failure has to
+// reach the updater: the patch must not stay "running" in its books, and a
+// hot restart reads the flag back to tell a base-code boot from a patch one.
+TEST_F(LoadedPatchTest, ReportsAPatchThatCannotBeLoaded) {
+  auto mock_updater = std::make_shared<shorebird::MockUpdater>();
+  std::vector<uint8_t> base_iso_data = {'B', 'A', 'S', 'E', '_', 'D'};
+  std::vector<uint8_t> base_iso_instr = {'B', 'A', 'S', 'E', '_', 'I'};
+
+  Settings settings;
+  settings.shorebird_updater = mock_updater;
+  settings.application_library_paths = {"/nonexistent/path/to/file.vmcode"};
+  settings.isolate_snapshot_data = [base_iso_data]() {
+    return MakeUniqueBytesMapping(base_iso_data);
+  };
+  settings.isolate_snapshot_instr = [base_iso_instr]() {
+    return MakeUniqueBytesMapping(base_iso_instr);
+  };
+
+  auto snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
+
+  ASSERT_TRUE(snapshot);
+  EXPECT_EQ(snapshot->GetBaseSnapshot().get(), nullptr);
+  EXPECT_EQ(mock_updater->launch_failure_count(), 1);
+  EXPECT_TRUE(mock_updater->PatchLoadFailed());
+}
+
+// A restart that falls back to the base release has no patch to load, and
+// resolving base code is the expected outcome rather than a failure. Marking
+// it would reject the very attempt that recovers the app.
+TEST_F(LoadedPatchTest, DoesNotReportWhenThereIsNoPatchToLoad) {
+  auto mock_updater = std::make_shared<shorebird::MockUpdater>();
+  std::vector<uint8_t> base_iso_data = {'B', 'A', 'S', 'E', '_', 'D'};
+  std::vector<uint8_t> base_iso_instr = {'B', 'A', 'S', 'E', '_', 'I'};
+
+  Settings settings;
+  settings.shorebird_updater = mock_updater;
+  settings.application_library_paths = {"/app/Frameworks/App.framework/App"};
+  settings.isolate_snapshot_data = [base_iso_data]() {
+    return MakeUniqueBytesMapping(base_iso_data);
+  };
+  settings.isolate_snapshot_instr = [base_iso_instr]() {
+    return MakeUniqueBytesMapping(base_iso_instr);
+  };
+
+  auto snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
+
+  ASSERT_TRUE(snapshot);
+  EXPECT_EQ(mock_updater->launch_failure_count(), 0);
+  EXPECT_FALSE(mock_updater->PatchLoadFailed());
+}
+
 }  // namespace testing
 }  // namespace flutter
