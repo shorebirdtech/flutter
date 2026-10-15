@@ -240,9 +240,10 @@ Engine::RunStatus Engine::Run(RunConfiguration configuration) {
 
   last_entry_point_ = configuration.GetEntrypoint();
   last_entry_point_library_ = configuration.GetEntrypointLibrary();
-// This is only used to support restart. Shorebird: also retained in release
-// on supported platforms, where the production hot restart relaunches the
-// isolate with the same entrypoint arguments.
+// This is only used to support restart. Shorebird: also retained in every
+// release build with the updater compiled in, so a production hot restart can
+// relaunch the isolate with the arguments it booted with. The macro covers
+// desktop too, which retains them and never restarts.
 #if (FLUTTER_RUNTIME_MODE == FLUTTER_RUNTIME_MODE_DEBUG) || \
     SHOREBIRD_PLATFORM_SUPPORTED
   last_entry_point_args_ = configuration.GetEntrypointArgs();

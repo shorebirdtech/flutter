@@ -53,7 +53,8 @@ bool HotRestartEngine(Engine& engine, const Settings& settings) {
   // Two attempts: first the requested next-boot patch; if relaunching it
   // fails, ReportLaunchFailure rolls the updater back, and the second
   // attempt boots whatever it fell back to (the last good patch or the base
-  // release) so the app recovers.
+  // release) so the app recovers. A failed base-release attempt has nothing
+  // to roll back, so it ends the loop rather than repeating itself.
   for (int attempt = 0; attempt < 2; ++attempt) {
     updater.ValidateNextBootPatch();
     const std::string patch_path = updater.NextBootPatchPath();
@@ -66,10 +67,9 @@ bool HotRestartEngine(Engine& engine, const Settings& settings) {
         patch_path, updater.GetAppConfig().original_libapp_paths,
         kUseInterpreter);
 
-    // A patch carries only the isolate snapshot (PatchSymbol exposes
-    // kIsolateData and kIsolateInstructions and nothing for the VM), so the
-    // relaunched isolate's VM snapshot is the one this process booted with
-    // by construction. There is nothing to validate.
+    // A restart re-resolves only the isolate snapshot and reuses the running
+    // DartVM, so the VM snapshot it booted with cannot change here whatever
+    // the patch library contains. There is nothing to validate.
 
     // Begin a fresh launch cycle: ReportLaunchStart is re-armed and fires
     // during isolate snapshot resolution below (in ResolveIsolateData),
@@ -82,6 +82,9 @@ bool HotRestartEngine(Engine& engine, const Settings& settings) {
       FML_LOG(ERROR)
           << "Shorebird hot restart: failed to resolve the isolate snapshot.";
       updater.ReportLaunchFailure();
+      if (patch_path.empty()) {
+        break;
+      }
       continue;
     }
 
@@ -114,6 +117,9 @@ bool HotRestartEngine(Engine& engine, const Settings& settings) {
 
     FML_LOG(ERROR) << "Shorebird hot restart: relaunch failed.";
     updater.ReportLaunchFailure();
+    if (patch_path.empty()) {
+      break;
+    }
   }
 
   FML_LOG(ERROR) << "Shorebird hot restart could not relaunch the app; the "

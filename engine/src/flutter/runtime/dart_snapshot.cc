@@ -153,9 +153,10 @@ static std::shared_ptr<const fml::Mapping> ResolveIsolateData(
 #else  // DART_SNAPSHOT_STATIC_LINK
   // Tell the Rust updater we're booting from whatever patch it selected.
   // This copies next_boot → current_boot in the Rust state. The call is
-  // guarded inside Updater to execute at most once per process — see the
-  // Updater class comment for why this matters in add-to-app and
-  // FlutterEngineGroup scenarios.
+  // guarded inside Updater to execute at most once per launch cycle — see
+  // the Updater class comment for why this matters in add-to-app and
+  // FlutterEngineGroup scenarios, and how a hot restart begins a second
+  // cycle.
   shorebird::Updater::Instance().ReportLaunchStart();
 #if SHOREBIRD_USE_INTERPRETER
   // Try loading from a Shorebird patch first.

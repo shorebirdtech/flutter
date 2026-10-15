@@ -78,8 +78,10 @@ void Updater::RegisterRestartHost(uintptr_t host_id,
 }
 
 void Updater::UnregisterRestartHost(uintptr_t host_id) {
-  // Blocks while RequestRestart is invoking this host's callback, so a
-  // callback never runs against a destroyed host. Host callbacks must only
+  // Blocks while RequestRestart is invoking this host's callback, so no
+  // callback is still scheduling work as its host goes away. It does not
+  // cover the scheduled work itself; a restart already posted is guarded by
+  // the engine weak pointer the posted task holds. Host callbacks must only
   // schedule work (never restart synchronously), both to keep this window
   // short and because the request arrives on an arbitrary thread.
   std::lock_guard<std::mutex> lock(restart_hosts_mutex_);
