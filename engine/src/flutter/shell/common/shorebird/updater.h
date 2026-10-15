@@ -139,6 +139,22 @@ class Updater {
   void ReportLaunchSuccess();
   void ReportLaunchFailure();
 
+  /// Reports a patch the snapshot loader could not load: a failed launch,
+  /// plus the fact that the process is about to run base code. Call this
+  /// rather than `ReportLaunchFailure` from the loader, so a hot restart can
+  /// tell the two apart — see `PatchLoadFailed`.
+  void ReportPatchLoadFailure();
+
+  /// Whether this launch cycle reported a patch that failed to load.
+  ///
+  /// A failed load is not always visible in the snapshot that comes back. A
+  /// patch carries only the code it rewrote, so on iOS the base library
+  /// stays in `application_library_paths` and the loader resolves the
+  /// isolate snapshot out of the base image already mapped into the process
+  /// instead of returning null. That boot runs base code while looking
+  /// exactly like a patch boot, and this is what distinguishes them.
+  static bool PatchLoadFailed();
+
   /// Re-arms the launch lifecycle guards so a hot restart can report a new
   /// launch cycle (start, then success/failure) to the Rust updater —
   /// exactly like a fresh process boot. Only the hot restart host may call
@@ -208,6 +224,10 @@ class Updater {
   // Once-per-launch-cycle guards. See `BeginNewLaunchCycle`.
   static std::atomic<bool> launch_started_;
   static std::atomic<bool> launch_completed_;
+  // Set when the loader reports a patch it could not load, and cleared with
+  // the guards above. Read by the hot restart host, which cannot see that
+  // failure in the snapshot it gets back. See `PatchLoadFailed`.
+  static std::atomic<bool> patch_load_failed_;
   // Whether any `Init` succeeded; the update thread needs a configured
   // updater. Latched, never cleared outside tests.
   static std::atomic<bool> initialized_;

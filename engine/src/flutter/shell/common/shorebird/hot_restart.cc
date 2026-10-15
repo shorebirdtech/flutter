@@ -90,9 +90,19 @@ bool HotRestartEngine(Engine& engine, const Settings& settings) {
     Updater::BeginNewLaunchCycle();
     auto isolate_snapshot =
         DartSnapshot::IsolateSnapshotFromSettings(restart_settings);
-    if (!isolate_snapshot) {
-      FML_LOG(ERROR)
-          << "Shorebird hot restart: failed to resolve the isolate snapshot.";
+    // A patch that fails to load does not always resolve to null. On iOS the
+    // patch is prepended to the base library rather than replacing it, so
+    // the loader falls back to the base image already mapped into the
+    // process and hands back a valid snapshot of base code. Relaunching that
+    // would report success while running the code the patch was meant to
+    // replace, and the retry below would never fire.
+    const bool patch_load_failed = Updater::PatchLoadFailed();
+    if (!isolate_snapshot || patch_load_failed) {
+      FML_LOG(ERROR) << "Shorebird hot restart: "
+                     << (patch_load_failed
+                             ? "the patch failed to load; the isolate "
+                               "snapshot resolved to base code."
+                             : "failed to resolve the isolate snapshot.");
       updater.ReportLaunchFailure();
       if (patch_path.empty()) {
         break;
