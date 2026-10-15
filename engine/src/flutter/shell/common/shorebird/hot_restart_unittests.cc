@@ -4,8 +4,6 @@
 
 #include "flutter/shell/common/shorebird/hot_restart.h"
 
-#include "flutter/fml/mapping.h"
-#include "flutter/runtime/dart_snapshot.h"
 #include "gtest/gtest.h"
 
 namespace flutter {
@@ -48,31 +46,6 @@ TEST(HotRestart, LibraryPathsWithPatchAndInterpreterPrependPatch) {
 TEST(HotRestart, LibraryPathsWithoutPatchOrOriginalsAreEmpty) {
   EXPECT_TRUE(
       LibraryPathsForNextBoot("", {}, /*use_interpreter=*/false).empty());
-}
-
-// VMSnapshotsIdentical must accept the same underlying buffers (e.g. both
-// snapshots resolved to the App.framework symbols already loaded in this
-// process) without parsing them. The byte-comparison path requires real
-// snapshot headers and is exercised by device tests.
-TEST(HotRestart, VMSnapshotsIdenticalForSameBuffers) {
-  static const uint8_t data[16] = {0};
-  static const uint8_t instructions[16] = {0};
-
-  auto make_snapshot = [] {
-    return DartSnapshot::IsolateSnapshotFromMappings(
-        std::make_shared<fml::NonOwnedMapping>(data, sizeof(data)),
-        std::make_shared<fml::NonOwnedMapping>(instructions,
-                                               sizeof(instructions)));
-  };
-
-  auto running = make_snapshot();
-  auto next = make_snapshot();
-  ASSERT_TRUE(running);
-  ASSERT_TRUE(next);
-
-  // Distinct DartSnapshot objects over the same buffers are identical.
-  EXPECT_TRUE(VMSnapshotsIdentical(*running, *next));
-  EXPECT_TRUE(VMSnapshotsIdentical(*running, *running));
 }
 
 }  // namespace testing

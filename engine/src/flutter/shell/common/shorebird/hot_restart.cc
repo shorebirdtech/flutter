@@ -4,7 +4,6 @@
 
 #include "flutter/shell/common/shorebird/hot_restart.h"
 
-#include <cstring>
 #include <utility>
 
 #include "flutter/assets/asset_manager.h"
@@ -16,7 +15,6 @@
 #include "flutter/shell/common/run_configuration.h"
 #include "flutter/shell/common/shell.h"
 #include "flutter/shell/common/shorebird/updater.h"
-#include "third_party/dart/runtime/include/dart_native_api.h"
 
 namespace flutter {
 namespace shorebird {
@@ -49,47 +47,7 @@ std::vector<std::string> LibraryPathsForNextBoot(
   return {next_boot_patch_path};
 }
 
-bool VMSnapshotsIdentical(const DartSnapshot& running_vm_snapshot,
-                          const DartSnapshot& next_vm_snapshot) {
-  const uint8_t* running_data = running_vm_snapshot.GetDataMapping();
-  const uint8_t* next_data = next_vm_snapshot.GetDataMapping();
-  if (running_data == nullptr || next_data == nullptr) {
-    return false;
-  }
-  // Same mapping — e.g. both resolved to the App.framework symbols already
-  // loaded in this process.
-  if (running_data != next_data) {
-    int64_t running_data_size = Dart_SnapshotDataSize(running_data);
-    if (running_data_size <= 0 ||
-        running_data_size != Dart_SnapshotDataSize(next_data)) {
-      return false;
-    }
-    if (memcmp(running_data, next_data,
-               static_cast<size_t>(running_data_size)) != 0) {
-      return false;
-    }
-  }
-
-  const uint8_t* running_instrs = running_vm_snapshot.GetInstructionsMapping();
-  const uint8_t* next_instrs = next_vm_snapshot.GetInstructionsMapping();
-  if (running_instrs == next_instrs) {
-    return true;
-  }
-  if (running_instrs == nullptr || next_instrs == nullptr) {
-    return false;
-  }
-  int64_t running_instrs_size = Dart_SnapshotInstrSize(running_instrs);
-  if (running_instrs_size <= 0 ||
-      running_instrs_size != Dart_SnapshotInstrSize(next_instrs)) {
-    return false;
-  }
-  return memcmp(running_instrs, next_instrs,
-                static_cast<size_t>(running_instrs_size)) == 0;
-}
-
-bool HotRestartEngine(Engine& engine,
-                      const Settings& settings,
-                      const DartSnapshot& running_vm_snapshot) {
+bool HotRestartEngine(Engine& engine, const Settings& settings) {
   auto& updater = Updater::Instance();
 
   // Two attempts: first the requested next-boot patch; if relaunching it
@@ -108,34 +66,10 @@ bool HotRestartEngine(Engine& engine,
         patch_path, updater.GetAppConfig().original_libapp_paths,
         kUseInterpreter);
 
-    // The relaunched isolate keeps running against the VM snapshot this
-    // process booted with, so the next boot's VM snapshot must be
-    // identical. It always is for correctly built patches (same
-    // Flutter/Dart version as the release); this guards against mismatched
-    // artifacts. Refusing here reports nothing to the updater: the patch
-    // stays installed and boots normally (with its own VM snapshot) on the
-    // next app launch.
-    //
-    // Resolve it from the base release rather than from restart_settings. A
-    // patch carries only the isolate snapshot (see PatchSymbol), and the VM
-    // and isolate snapshots now share a symbol name, so resolving through a
-    // path list whose first entry is the patch yields the patch's isolate
-    // data in place of VM data and the comparison can never succeed. The VM
-    // snapshot a patch would boot against is the base release's, which the
-    // patch cannot change.
-    Settings vm_snapshot_settings = settings;
-    vm_snapshot_settings.application_library_paths =
-        updater.GetAppConfig().original_libapp_paths;
-    auto next_vm_snapshot =
-        DartSnapshot::VMSnapshotFromSettings(vm_snapshot_settings);
-    if (!next_vm_snapshot ||
-        !VMSnapshotsIdentical(running_vm_snapshot, *next_vm_snapshot)) {
-      FML_LOG(ERROR)
-          << "Shorebird hot restart: the next boot's VM snapshot does not "
-             "match the running VM snapshot; the patch will instead take "
-             "effect on the next app launch.";
-      return false;
-    }
+    // A patch carries only the isolate snapshot (PatchSymbol exposes
+    // kIsolateData and kIsolateInstructions and nothing for the VM), so the
+    // relaunched isolate's VM snapshot is the one this process booted with
+    // by construction. There is nothing to validate.
 
     // Begin a fresh launch cycle: ReportLaunchStart is re-armed and fires
     // during isolate snapshot resolution below (in ResolveIsolateData),
@@ -208,21 +142,19 @@ void Shell::ShorebirdRegisterRestartHost() {
   shorebird::Updater::RegisterRestartHost(
       reinterpret_cast<uintptr_t>(this),
       [ui_task_runner = task_runners_.GetUITaskRunner(),
-       weak_engine = weak_engine_, settings = settings_,
-       vm_data = vm_->GetVMData()]() {
+       weak_engine = weak_engine_, settings = settings_]() {
         // Invoked on an arbitrary thread (whichever thread ran the Dart FFI
         // call). Restart asynchronously on the UI thread — the same thread
         // the debug hot restart runs on — and report the request as
         // accepted.
-        ui_task_runner->PostTask([weak_engine, settings, vm_data]() {
+        ui_task_runner->PostTask([weak_engine, settings]() {
           if (!weak_engine) {
             FML_LOG(WARNING)
                 << "Shorebird hot restart: engine was destroyed before the "
                    "restart could run.";
             return;
           }
-          shorebird::HotRestartEngine(*weak_engine.get(), settings,
-                                      vm_data->GetVMSnapshot());
+          shorebird::HotRestartEngine(*weak_engine.get(), settings);
         });
         return true;
       });
