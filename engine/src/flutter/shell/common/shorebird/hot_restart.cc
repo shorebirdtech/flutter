@@ -53,6 +53,15 @@ std::vector<std::string> LibraryPathsForNextBoot(
 bool HotRestartEngine(Engine& engine, const Settings& settings) {
   auto& updater = Updater::Instance();
 
+  // Whether any attempt reached `Engine::RestartWithSnapshot`, which tears
+  // the running isolate down before it can fail. Snapshot resolution fails
+  // ahead of that, so a run where every attempt failed to resolve still has
+  // the isolate it started with. Set before the call rather than after,
+  // because a relaunch that fails partway has already torn down; the one
+  // case this over-reports is an invalid RunConfiguration, a programming
+  // error rather than something the app recovers from.
+  bool isolate_torn_down = false;
+
   // Two attempts: first the requested next-boot patch; if relaunching it
   // fails, ReportLaunchFailure rolls the updater back, and the second
   // attempt boots whatever it fell back to (the last good patch or the base
@@ -111,6 +120,7 @@ bool HotRestartEngine(Engine& engine, const Settings& settings) {
       }
     }
 
+    isolate_torn_down = true;
     if (engine.RestartWithSnapshot(std::move(configuration),
                                    std::move(isolate_snapshot))) {
       updater.ReportLaunchSuccess();
@@ -123,6 +133,17 @@ bool HotRestartEngine(Engine& engine, const Settings& settings) {
     if (patch_path.empty()) {
       break;
     }
+  }
+
+  if (!isolate_torn_down) {
+    // The app is still running the code it had, and the loader already
+    // reported the failure, so the updater's selection is rolled back for the
+    // next cold boot. There is nothing to recover from.
+    FML_LOG(ERROR) << "Shorebird hot restart: no attempt could resolve an "
+                      "isolate snapshot; the app keeps running its current "
+                      "code and the next launch boots the rolled-back "
+                      "selection.";
+    return false;
   }
 
   // Every attempt tore the previous isolate down, so returning here would
