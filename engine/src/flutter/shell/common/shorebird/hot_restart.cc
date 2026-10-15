@@ -4,6 +4,8 @@
 
 #include "flutter/shell/common/shorebird/hot_restart.h"
 
+#include <atomic>
+#include <memory>
 #include <utility>
 
 #include "flutter/assets/asset_manager.h"
@@ -36,7 +38,8 @@ std::vector<std::string> LibraryPathsForNextBoot(
   }
   if (use_interpreter) {
     // Mirrors the iOS branch of ConfigureShorebird: the patch is prepended
-    // so the base library remains visible for VM snapshot resolution.
+    // because a linked patch carries only the code it rewrote and still
+    // executes the rest out of the base library, which must stay resolvable.
     std::vector<std::string> paths = {next_boot_patch_path};
     paths.insert(paths.end(), original_libapp_paths.begin(),
                  original_libapp_paths.end());
@@ -145,22 +148,36 @@ void Shell::ShorebirdRegisterRestartHost() {
     return;
   }
 
+  // Set by the callback (arbitrary thread) and cleared by the posted task
+  // (UI thread), hence atomic. Shared because the callback is copied and the
+  // posted task can outlive it.
+  auto restart_in_flight = std::make_shared<std::atomic<bool>>(false);
+
   shorebird::Updater::RegisterRestartHost(
       reinterpret_cast<uintptr_t>(this),
       [ui_task_runner = task_runners_.GetUITaskRunner(),
-       weak_engine = weak_engine_, settings = settings_]() {
+       weak_engine = weak_engine_, settings = settings_, restart_in_flight]() {
         // Invoked on an arbitrary thread (whichever thread ran the Dart FFI
         // call). Restart asynchronously on the UI thread — the same thread
         // the debug hot restart runs on — and report the request as
-        // accepted.
-        ui_task_runner->PostTask([weak_engine, settings]() {
+        // accepted. A restart already in flight refuses further requests, so
+        // a restartApp() call from the relaunched entrypoint cannot loop.
+        if (restart_in_flight->exchange(true)) {
+          FML_LOG(WARNING)
+              << "Shorebird restart requested, but a hot restart is already "
+                 "in progress.";
+          return false;
+        }
+        ui_task_runner->PostTask([weak_engine, settings, restart_in_flight]() {
           if (!weak_engine) {
             FML_LOG(WARNING)
                 << "Shorebird hot restart: engine was destroyed before the "
                    "restart could run.";
+            restart_in_flight->store(false);
             return;
           }
           shorebird::HotRestartEngine(*weak_engine.get(), settings);
+          restart_in_flight->store(false);
         });
         return true;
       });
