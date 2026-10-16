@@ -61,12 +61,22 @@ static fml::RefPtr<const DartSnapshot> vm_snapshot;
 #if SHOREBIRD_USE_INTERPRETER
 static fml::RefPtr<const DartSnapshot> isolate_snapshot;
 
-void SetBaseSnapshot(Settings& settings) {
+void SetBaseSnapshot(Settings& settings,
+                     fml::RefPtr<const DartSnapshot> resolved_vm_snapshot) {
   // These mappings happen to be to static data in the App.framework, but
   // we still need to seem to hold onto the DartSnapshot objects to keep
   // the mappings alive.
-  vm_snapshot = DartSnapshot::VMSnapshotFromSettings(settings);
+  //
+  // The VM snapshot is resolved by the caller and moved in rather than
+  // resolved again here. Resolving walks settings.application_library_paths
+  // with dlopen, and the library stays mapped only while a DartSnapshot holds
+  // it, so a second resolution means closing App.framework and re-opening it.
+  // That re-open is not guaranteed to succeed, and a failure here is fatal:
+  // the patch machinery reads every base blob through these two objects.
+  vm_snapshot = std::move(resolved_vm_snapshot);
   isolate_snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
+  FML_CHECK(vm_snapshot && isolate_snapshot)
+      << "Shorebird failed to resolve the base isolate snapshot";
 
   // Per-mapping observability for the base snapshot. Logged at every app boot
   // so customer syslogs include the exact sizes the on-device base reader
@@ -246,7 +256,8 @@ void ConfigureShorebird(std::string code_cache_path,
   // config, where the AOT snapshot won't be linked into the process, and thus
   // lookups will fail.  Change your Scheme to Release to fix:
   // https://github.com/flutter/flutter/wiki/Debugging-the-engine#debugging-ios-builds-with-xcode
-  FML_CHECK(DartSnapshot::VMSnapshotFromSettings(settings))
+  auto base_vm_snapshot = DartSnapshot::VMSnapshotFromSettings(settings);
+  FML_CHECK(base_vm_snapshot)
       << "XCode Scheme must be set to Release to use Shorebird";
 
   auto shorebird_updater_dir_name = "shorebird_updater";
@@ -274,7 +285,7 @@ void ConfigureShorebird(std::string code_cache_path,
 
   // We only set the base snapshot on iOS for now.
 #if SHOREBIRD_USE_INTERPRETER
-  SetBaseSnapshot(settings);
+  SetBaseSnapshot(settings, std::move(base_vm_snapshot));
 #endif
 
   shorebird::Updater::Instance().ValidateNextBootPatch();
