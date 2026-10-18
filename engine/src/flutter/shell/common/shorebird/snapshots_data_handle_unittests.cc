@@ -175,9 +175,8 @@ TEST(SnapshotsDataHandle, SeekFromEnd) {
 
 // Builds a snapshot whose data and instructions mappings are distinguishable,
 // so a stream that repeats or reorders a region shows up in the bytes.
-static fml::RefPtr<DartSnapshot> MakeSnapshot(
-    const std::string& data,
-    const std::string& instructions) {
+static fml::RefPtr<DartSnapshot> MakeSnapshot(const std::string& data,
+                                              const std::string& instructions) {
   return fml::MakeRefCounted<DartSnapshot>(
       std::make_shared<const fml::NonOwnedMapping>(
           reinterpret_cast<const uint8_t*>(data.data()), data.size()),
