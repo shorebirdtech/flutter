@@ -94,15 +94,45 @@ if (shorebird_updater_supported) {
   }
 }
 
+# The updater's HTTP client, on the engine's BoringSSL.
+source_set("http_client") {
+  sources = [
+    "http_client.cc",
+    "http_client.h",
+    "http_trust.h",
+  ]
+  if (is_android || is_linux) {
+    sources += [ "http_trust_linux.cc" ]
+  } else if (is_ios || is_mac) {
+    sources += [ "http_trust_apple.cc" ]
+    frameworks = [
+      "CoreFoundation.framework",
+      "Security.framework",
+    ]
+  } else if (is_win) {
+    sources += [ "http_trust_win.cc" ]
+  } else {
+    sources += [ "http_trust_unsupported.cc" ]
+  }
+
+  public_deps = [ "//flutter/third_party/boringssl" ]
+  deps = [ "//flutter/fml" ]
+}
+
 # C++ wrapper around the Rust updater C API.
 # This provides a testable abstraction layer that can be mocked for testing.
 source_set("updater") {
   sources = [
+    "engine_callbacks.cc",
+    "engine_callbacks.h",
     "updater.cc",
     "updater.h",
   ]
 
-  deps = [ "//flutter/fml" ]
+  deps = [
+    ":http_client",
+    "//flutter/fml",
+  ]
 
   # For the Rust updater C API (shorebird_report_launch_start, etc.)
   include_dirs = [ "//flutter" ]
@@ -158,6 +188,23 @@ if (enable_unittests) {
       "//flutter/runtime/shorebird:patch_cache",
       "//flutter/testing",
       "//flutter/testing:fixture_test",
+    ]
+  }
+
+  # Kept apart from shorebird_unittests so it builds without the rest of the
+  # engine: the HTTP client, the C callbacks the updater calls, and BoringSSL.
+  executable("shorebird_http_unittests") {
+    testonly = true
+
+    sources = [ "http_client_unittests.cc" ]
+
+    # For the updater C API header that engine_callbacks.h includes.
+    include_dirs = [ "//flutter" ]
+
+    deps = [
+      ":http_client",
+      ":updater",
+      "//flutter/third_party/googletest:gtest_main",
     ]
   }
 }
