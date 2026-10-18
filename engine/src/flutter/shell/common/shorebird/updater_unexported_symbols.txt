@@ -1,0 +1,15 @@
+# Symbols the Rust updater's static library leaves globally visible that the
+# Flutter framework must not export on iOS and macOS. Android gets the same
+# result from shell/platform/android/android_exports.lst.
+#
+# The Dart-facing shorebird_* C API stays exported: package:shorebird_code_push
+# looks those up at runtime.
+#
+# Rust mangled symbols (v0 mangling: _R...).
+__R*
+_rust_eh_personality
+# Clang builtins pulled in by Rust's compiler_builtins.
+___isOSVersionAtLeast
+___isPlatformVersionAtLeast
+# C shims from the oslog crate.
+_wrapped_*
