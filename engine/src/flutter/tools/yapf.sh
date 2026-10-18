@@ -43,42 +43,34 @@ YAPF_DIR="$(
   pwd -P
 )"
 
-has_lib2to3_check_script="
-import sys
-version = sys.version_info
-try:
-    __import__('lib2to3')
-    print(f'Python3 version {version.major}.{version.minor} has '
-          f'the lib2to3 import.')
-except ImportError:
-    print(f'Python3 version {version.major}.{version.minor} does not have '
-          f'the lib2to3 import.',
-          file=sys.stderr)
-    sys.exit(1)
-"
+# Succeeds if the given Python command can run yapf. Its output is discarded
+# so that it doesn't end up mixed into yapf's output.
+function can_run_yapf() {
+  command -v "$1" &>/dev/null && "$@" -c "import lib2to3" &>/dev/null
+}
 
 # TODO: https://github.com/flutter/flutter/issues/158384
 # Migrate to a supported Python formatter.
-if command -v python3.10 &>/dev/null && (python3.10 -c "$has_lib2to3_check_script" || exit 1); then
-  PYTHON_EXEC="python3.10"
-elif command -v python3.11 &>/dev/null && (python3.11 -c "$has_lib2to3_check_script" || exit 1); then
-  PYTHON_EXEC="python3.11"
-elif command -v python3.12 &>/dev/null && (python3.12 -c "$has_lib2to3_check_script" || exit 1); then
-  PYTHON_EXEC="python3.12"
+if can_run_yapf python3.10; then
+  PYTHON_EXEC=(python3.10)
+elif can_run_yapf python3.11; then
+  PYTHON_EXEC=(python3.11)
+elif can_run_yapf python3.12; then
+  PYTHON_EXEC=(python3.12)
+elif can_run_yapf python3; then
+  PYTHON_EXEC=(python3)
+# python3 is missing or too new (lib2to3 was removed in 3.13). Fall back to a
+# Python 3.12 from uv, which downloads one if needed, or to depot_tools'
+# vpython3 (what yapf.bat uses).
+elif can_run_yapf uv run --quiet --no-project --python 3.12 python; then
+  PYTHON_EXEC=(uv run --quiet --no-project --python 3.12 python)
+elif can_run_yapf vpython3; then
+  PYTHON_EXEC=(vpython3)
 else
-  python3 -c "
-import sys
-version = sys.version_info
-if (version.major, version.minor) > (3, 12):
-    print(f'Error: The yapf Python formatter requires Python version 3.12 or '
-          f'earlier. The installed python3 version is '
-          f'{version.major}.{version.minor}.',
-          file=sys.stderr)
-    sys.exit(1)
-else:
-    print(f'Using python3 version {version.major}.{version.minor}.')
-" || exit 1
-  PYTHON_EXEC="python3"
+  echo "Error: The yapf Python formatter requires Python 3.12 or earlier" \
+    "with lib2to3, and none was found. Install python3.12, uv" \
+    "(https://docs.astral.sh/uv/) or depot_tools (vpython3)." >&2
+  exit 1
 fi
 
-PYTHONPATH="$YAPF_DIR" $PYTHON_EXEC "$YAPF_DIR/yapf" "$@"
+PYTHONPATH="$YAPF_DIR" "${PYTHON_EXEC[@]}" "$YAPF_DIR/yapf" "$@"
