@@ -1,0 +1,132 @@
+name: shorebird_engine_tests
+
+# Builds the engine's Shorebird sources and runs shorebird_unittests (the C++
+# suite in engine/src/flutter/shell/common/shorebird/, which covers the
+# updater/engine boundary) on every PR that touches the engine. Before this,
+# the suite only ran by hand during a release.
+#
+# The sync mirrors _build_engine's shard-build.yaml: a Namespace runner whose
+# persistent volume holds the gclient git mirrors, depot_tools and the CIPD
+# cache (the same `engine-linux` cache tag the engine build warms), so a sync
+# is incremental rather than gigabytes from googlesource.com.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths:
+      - DEPS
+      - engine/**
+      - .github/workflows/shorebird_engine_tests.yml
+  push:
+    branches:
+      - shorebird/dev
+    paths:
+      - DEPS
+      - engine/**
+      - .github/workflows/shorebird_engine_tests.yml
+
+permissions:
+  contents: read
+
+jobs:
+  shorebird-unittests:
+    name: 🧪 Shorebird Engine Unit Tests
+    runs-on:
+      - nscloud-ubuntu-22.04-amd64-8x32-with-cache
+      - nscloud-cache-tag-engine-linux
+      - nscloud-cache-size-100gb
+    timeout-minutes: 90
+
+    steps:
+      # Full history so the engine version scripts can find tags.
+      - name: 📚 Git Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📦 Setup namespace cache
+        uses: namespacelabs/nscloud-cache-action@v1
+        with:
+          path: |
+            ~/git_cache
+            ~/depot_tools
+            ~/cipd_cache
+
+      # CIPD_CACHE_DIR must be absolute; ~ doesn't expand in `env:`.
+      - name: 📦 Configure CIPD cache
+        run: |
+          mkdir -p "$HOME/cipd_cache"
+          echo "CIPD_CACHE_DIR=$HOME/cipd_cache" >> "$GITHUB_ENV"
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.8"
+
+      # build_rust_updater.py builds the updater with cargo for the host.
+      - name: 🦀 Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      # DEPS pulls shorebirdtech/dart-sdk (private) over SSH.
+      - name: 🔑 Setup SSH
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DART_SDK_DEPLOY_KEY }}
+
+      - name: 🧰 Setup depot_tools
+        run: |
+          if [[ ! -d $HOME/depot_tools/.git ]]; then
+            git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git $HOME/depot_tools
+          else
+            cd $HOME/depot_tools
+            git checkout main 2>/dev/null || git checkout -b main origin/main
+            git pull --quiet
+          fi
+          echo "$HOME/depot_tools" >> "$GITHUB_PATH"
+
+      # Unmanaged solution rooted at this checkout, so gclient syncs the DEPS
+      # of the commit under test and leaves the checkout itself alone.
+      - name: ⚙️ Setup gclient config
+        run: |
+          cat > .gclient << EOF
+          solutions = [
+            {
+              "managed": False,
+              "name": ".",
+              "url": "git@github.com:shorebirdtech/flutter.git",
+              "custom_deps": {},
+              "deps_file": "DEPS",
+              "safesync_url": "",
+            },
+          ]
+          cache_dir = "$HOME/git_cache"
+          EOF
+
+      - name: 🔄 Sync engine dependencies (gclient)
+        run: |
+          for attempt in 1 2 3; do
+            gclient sync --delete_unversioned_trees --with_tags && exit 0
+            echo "gclient sync failed (attempt $attempt), retrying in $((attempt * 30))s"
+            sleep $((attempt * 30))
+          done
+          exit 1
+
+      - name: ⚙️ Generate build files (gn)
+        run: ./flutter/tools/gn --runtime-mode debug --unoptimized --enable-unittests --no-rbe
+        working-directory: engine/src
+
+      # shorebird_unittests depends on every Shorebird engine target
+      # (shell/common/shorebird, runtime/shorebird and the Rust updater), so
+      # building it compiles all of the Shorebird sources for the host.
+      - name: 🔨 Build shorebird_unittests
+        run: ninja -C out/host_debug_unopt shorebird_unittests
+        working-directory: engine/src
+
+      - name: 🧪 Run shorebird_unittests
+        run: ./out/host_debug_unopt/shorebird_unittests
+        working-directory: engine/src
