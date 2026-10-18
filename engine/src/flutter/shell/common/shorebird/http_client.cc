@@ -209,8 +209,8 @@ class Socket {
   static bool ConnectWithTimeout(SocketHandle s,
                                  const addrinfo* address,
                                  const HttpClientOptions& options) {
-    int result = connect(s, address->ai_addr,
-                         static_cast<int>(address->ai_addrlen));
+    int result =
+        connect(s, address->ai_addr, static_cast<int>(address->ai_addrlen));
     if (result == 0) {
       return true;
     }
@@ -221,8 +221,8 @@ class Socket {
     WSAPOLLFD poll_fd = {};
     poll_fd.fd = s;
     poll_fd.events = POLLWRNORM;
-    int ready = WSAPoll(&poll_fd, 1,
-                        static_cast<INT>(options.connect_timeout.count()));
+    int ready =
+        WSAPoll(&poll_fd, 1, static_cast<INT>(options.connect_timeout.count()));
 #else
     if (errno != EINPROGRESS) {
       return false;
@@ -232,7 +232,8 @@ class Socket {
     poll_fd.events = POLLOUT;
     int ready;
     do {
-      ready = poll(&poll_fd, 1, static_cast<int>(options.connect_timeout.count()));
+      ready =
+          poll(&poll_fd, 1, static_cast<int>(options.connect_timeout.count()));
     } while (ready < 0 && errno == EINTR);
 #endif
     if (ready <= 0) {
@@ -278,8 +279,8 @@ int SocketBioWrite(BIO* bio, const char* data, int length) {
 
 int SocketBioRead(BIO* bio, char* buffer, int length) {
   auto* socket = static_cast<Socket*>(BIO_get_data(bio));
-  ptrdiff_t n =
-      socket->Read(reinterpret_cast<uint8_t*>(buffer), static_cast<size_t>(length));
+  ptrdiff_t n = socket->Read(reinterpret_cast<uint8_t*>(buffer),
+                             static_cast<size_t>(length));
   return n < 0 ? -1 : static_cast<int>(n);
 }
 
@@ -434,10 +435,10 @@ class Connection : public ByteSource {
     X509_VERIFY_PARAM* param = SSL_get0_param(ssl_.get());
     X509_VERIFY_PARAM_set_hostflags(param,
                                     X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
-    bool host_set = url.host_is_ip_literal
-                        ? X509_VERIFY_PARAM_set1_ip_asc(param, host_.c_str())
-                        : X509_VERIFY_PARAM_set1_host(param, host_.data(),
-                                                      host_.size());
+    bool host_set =
+        url.host_is_ip_literal
+            ? X509_VERIFY_PARAM_set1_ip_asc(param, host_.c_str())
+            : X509_VERIFY_PARAM_set1_host(param, host_.data(), host_.size());
     if (!host_set) {
       return HttpResult::kTlsError;
     }
@@ -509,7 +510,8 @@ std::optional<std::string> BuildRequest(const HttpRequest& request,
         IsReservedHeader(header.name)) {
       return std::nullopt;
     }
-    has_user_agent |= http_internal::EqualsIgnoreCase(header.name, "user-agent");
+    has_user_agent |=
+        http_internal::EqualsIgnoreCase(header.name, "user-agent");
     has_accept |= http_internal::EqualsIgnoreCase(header.name, "accept");
     head += header.name + ": " + header.value + "\r\n";
   }

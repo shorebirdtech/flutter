@@ -24,8 +24,7 @@ class CallbackHandler : public HttpResponseHandler {
   explicit CallbackHandler(const ShorebirdHttpResponseCallbacks& callbacks)
       : callbacks_(callbacks) {}
 
-  bool OnResponse(int status,
-                  const std::vector<HttpHeader>& headers) override {
+  bool OnResponse(int status, const std::vector<HttpHeader>& headers) override {
     std::vector<ShorebirdHttpHeader> c_headers;
     c_headers.reserve(headers.size());
     for (const auto& header : headers) {

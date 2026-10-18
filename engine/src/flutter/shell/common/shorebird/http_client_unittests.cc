@@ -16,7 +16,6 @@
 
 #include "flutter/shell/common/shorebird/engine_callbacks.h"
 #include "flutter/shell/common/shorebird/http_parser.h"
-#include "third_party/updater/library/include/updater_dart.h"
 #include "gtest/gtest.h"
 #include "openssl/base64.h"
 #include "openssl/bio.h"
@@ -31,6 +30,7 @@
 #include "openssl/ssl.h"
 #include "openssl/x509.h"
 #include "openssl/x509v3.h"
+#include "third_party/updater/library/include/updater_dart.h"
 
 #if !defined(_WIN32)
 #include <arpa/inet.h>
@@ -54,8 +54,7 @@ using http_internal::Url;
 // Records what a request delivered.
 class RecordingHandler : public HttpResponseHandler {
  public:
-  bool OnResponse(int status,
-                  const std::vector<HttpHeader>& headers) override {
+  bool OnResponse(int status, const std::vector<HttpHeader>& headers) override {
     response_count++;
     this->status = status;
     this->headers = headers;
@@ -295,10 +294,10 @@ TEST(HttpClientParseTest, SkipsInterimResponses) {
 TEST(HttpClientParseTest, NoBodyFor204And304) {
   for (const char* status : {"204 No Content", "304 Not Modified"}) {
     RecordingHandler handler;
-    EXPECT_EQ(Parse(std::string("HTTP/1.1 ") + status +
-                        "\r\n\r\nshould not be read",
-                    handler),
-              HttpResult::kOk);
+    EXPECT_EQ(
+        Parse(std::string("HTTP/1.1 ") + status + "\r\n\r\nshould not be read",
+              handler),
+        HttpResult::kOk);
     EXPECT_EQ(handler.body, "");
   }
 }
@@ -344,8 +343,8 @@ TEST(HttpClientParseTest, ControlCharactersInHeaderValuesAreRejected) {
 
 TEST(HttpClientParseTest, OversizedHeadIsRejected) {
   RecordingHandler handler;
-  std::string response = "HTTP/1.1 200 OK\r\nBig: " +
-                         std::string(70 * 1024, 'a') + "\r\n\r\n";
+  std::string response =
+      "HTTP/1.1 200 OK\r\nBig: " + std::string(70 * 1024, 'a') + "\r\n\r\n";
   EXPECT_EQ(Parse(response, handler), HttpResult::kProtocolError);
 }
 
@@ -393,9 +392,9 @@ TEST(HttpClientParseTest, ReadErrorMidBodyIsATransportError) {
 TEST(HttpClientParseTest, HandlerCanAbort) {
   RecordingHandler on_response;
   on_response.abort_on_response = true;
-  EXPECT_EQ(Parse("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi",
-                  on_response),
-            HttpResult::kAborted);
+  EXPECT_EQ(
+      Parse("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi", on_response),
+      HttpResult::kAborted);
 
   RecordingHandler on_body;
   on_body.abort_after_bytes = 1;
@@ -481,8 +480,8 @@ bool Verify(const std::vector<uint8_t>& key,
 }
 
 TEST(UpdaterVerifySignatureTest, AcceptsValidSignature) {
-  EXPECT_TRUE(Verify(Base64Decode(kPublicKey), kMessage,
-                     Base64Decode(kSignature)));
+  EXPECT_TRUE(
+      Verify(Base64Decode(kPublicKey), kMessage, Base64Decode(kSignature)));
 }
 
 TEST(UpdaterVerifySignatureTest, RejectsWrongMessageOrSignature) {
@@ -518,8 +517,7 @@ TEST(UpdaterVerifySignatureTest, RejectsBadOrSmallKeys) {
   std::vector<uint8_t> small_signature(RSA_size(small.get()));
   unsigned signature_length = 0;
   ASSERT_TRUE(RSA_sign(NID_sha256, digest, sizeof(digest),
-                       small_signature.data(), &signature_length,
-                       small.get()));
+                       small_signature.data(), &signature_length, small.get()));
   small_signature.resize(signature_length);
   EXPECT_FALSE(Verify(small_key, kMessage, small_signature));
 }
@@ -550,8 +548,8 @@ TestCertificate MakeCertificate(const char* dns_name) {
   X509_gmtime_adj(X509_getm_notAfter(cert), 3600);
   X509_NAME* name = X509_get_subject_name(cert);
   X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
-                             reinterpret_cast<const uint8_t*>(dns_name), -1,
-                             -1, 0);
+                             reinterpret_cast<const uint8_t*>(dns_name), -1, -1,
+                             0);
   X509_set_issuer_name(cert, name);
   X509_set_pubkey(cert, result.key.get());
   std::string san = std::string("DNS:") + dns_name + ",IP:127.0.0.1";
@@ -719,8 +717,7 @@ TEST(HttpClientLiveTest, GetsAResponse) {
   EXPECT_EQ(handler.status, 200);
   EXPECT_EQ(handler.body, "ok");
   ASSERT_EQ(requests.size(), 1u);
-  EXPECT_EQ(requests[0].rfind("GET /p?q=1 HTTP/1.1\r\n", 0), 0u)
-      << requests[0];
+  EXPECT_EQ(requests[0].rfind("GET /p?q=1 HTTP/1.1\r\n", 0), 0u) << requests[0];
   EXPECT_NE(requests[0].find("\r\nHost: 127.0.0.1:"), std::string::npos);
   EXPECT_NE(requests[0].find("\r\nUser-Agent: Shorebird-Updater\r\n"),
             std::string::npos);
@@ -782,14 +779,14 @@ TEST(HttpClientLiveTest, StopsAfterTooManyRedirects) {
   RecordingHandler handler;
   HttpClientOptions options;
   options.max_redirects = 2;
-  EXPECT_EQ(Get(server.Url("/"), handler, options),
-            HttpResult::kProtocolError);
+  EXPECT_EQ(Get(server.Url("/"), handler, options), HttpResult::kProtocolError);
   EXPECT_EQ(handler.response_count, 0);
 }
 
 TEST(HttpClientLiveTest, RedirectToAnUnusableUrlIsAProtocolError) {
-  TestServer server({{"HTTP/1.1 302 Found\r\nLocation: ftp://example.com/\r\n"
-                      "Content-Length: 0\r\n\r\n"}});
+  TestServer server(
+      {{"HTTP/1.1 302 Found\r\nLocation: ftp://example.com/\r\n"
+        "Content-Length: 0\r\n\r\n"}});
   RecordingHandler handler;
   EXPECT_EQ(Get(server.Url("/"), handler), HttpResult::kProtocolError);
   EXPECT_EQ(handler.response_count, 0);
@@ -818,10 +815,10 @@ TEST(HttpClientLiveTest, ConnectionRefusedIsATransportError) {
   getsockname(s, reinterpret_cast<sockaddr*>(&address), &length);
   close(s);
   RecordingHandler handler;
-  EXPECT_EQ(Get("http://127.0.0.1:" + std::to_string(ntohs(address.sin_port)) +
-                    "/",
-                handler),
-            HttpResult::kTransportError);
+  EXPECT_EQ(
+      Get("http://127.0.0.1:" + std::to_string(ntohs(address.sin_port)) + "/",
+          handler),
+      HttpResult::kTransportError);
 }
 
 TEST(HttpClientLiveTest, UnresolvableHostIsATransportError) {
@@ -847,15 +844,15 @@ TEST(HttpClientLiveTest, ServerHangingUpIsATransportError) {
 
 TEST(HttpClientLiveTest, RejectsUnsafeRequests) {
   RecordingHandler handler;
-  EXPECT_EQ(Get("http://127.0.0.1:1/", handler, {}, {{"X", "a\r\nInjected: 1"}}),
-            HttpResult::kInvalidRequest);
+  EXPECT_EQ(
+      Get("http://127.0.0.1:1/", handler, {}, {{"X", "a\r\nInjected: 1"}}),
+      HttpResult::kInvalidRequest);
   EXPECT_EQ(Get("http://127.0.0.1:1/", handler, {}, {{"Bad Name", "a"}}),
             HttpResult::kInvalidRequest);
   EXPECT_EQ(Get("http://127.0.0.1:1/", handler, {}, {{"Host", "evil"}}),
             HttpResult::kInvalidRequest);
-  EXPECT_EQ(
-      Get("http://127.0.0.1:1/", handler, {}, {{"content-length", "1"}}),
-      HttpResult::kInvalidRequest);
+  EXPECT_EQ(Get("http://127.0.0.1:1/", handler, {}, {{"content-length", "1"}}),
+            HttpResult::kInvalidRequest);
   HttpRequest put;
   put.method = "PUT";
   put.url = "http://127.0.0.1:1/";
@@ -948,9 +945,9 @@ TEST(HttpClientTlsTest, PlainHttpServerIsNotTls) {
 // run by default (it needs the network); run with
 // --gtest_also_run_disabled_tests.
 TEST(HttpClientTlsTest, DISABLED_ReachesShorebirdApiWithPlatformRoots) {
-  for (const char* url : {"https://api.shorebird.dev/",
-                          "https://cdn.shorebird.cloud/",
-                          "https://storage.googleapis.com/"}) {
+  for (const char* url :
+       {"https://api.shorebird.dev/", "https://cdn.shorebird.cloud/",
+        "https://storage.googleapis.com/"}) {
     RecordingHandler handler;
     EXPECT_EQ(Get(url, handler), HttpResult::kOk) << url;
     EXPECT_GT(handler.status, 0) << url;
@@ -993,8 +990,9 @@ TEST(UpdaterHttpRequestTest, SendsThroughTheCInterface) {
     std::string url = server.Url("/events");
     ShorebirdHttpHeader header = {"Content-Type", "application/json"};
     const char body[] = "{}";
-    ShorebirdHttpRequest request = {"POST", url.c_str(), &header, 1,
-                                    reinterpret_cast<const uint8_t*>(body), 2};
+    ShorebirdHttpRequest request = {
+        "POST", url.c_str(), &header, 1, reinterpret_cast<const uint8_t*>(body),
+        2};
     ShorebirdHttpResponseCallbacks callbacks = {&recorder, COnResponse,
                                                 COnBody};
     EXPECT_EQ(UpdaterHttpRequest(&request, &callbacks), SHOREBIRD_HTTP_OK);
@@ -1002,10 +1000,10 @@ TEST(UpdaterHttpRequestTest, SendsThroughTheCInterface) {
   }
   EXPECT_EQ(recorder.status, 201);
   EXPECT_EQ(recorder.body, "done");
-  EXPECT_NE(std::find(recorder.headers.begin(), recorder.headers.end(),
-                      std::make_pair(std::string("X-Reply"),
-                                     std::string("yes"))),
-            recorder.headers.end());
+  EXPECT_NE(
+      std::find(recorder.headers.begin(), recorder.headers.end(),
+                std::make_pair(std::string("X-Reply"), std::string("yes"))),
+      recorder.headers.end());
   ASSERT_EQ(requests.size(), 1u);
   EXPECT_EQ(requests[0].substr(requests[0].size() - 2), "{}");
 }
@@ -1013,8 +1011,8 @@ TEST(UpdaterHttpRequestTest, SendsThroughTheCInterface) {
 TEST(UpdaterHttpRequestTest, RejectsNullArguments) {
   CRecorder recorder;
   ShorebirdHttpResponseCallbacks callbacks = {&recorder, COnResponse, COnBody};
-  ShorebirdHttpRequest request = {"GET", "http://127.0.0.1:1/", nullptr, 0,
-                                  nullptr, 0};
+  ShorebirdHttpRequest request = {
+      "GET", "http://127.0.0.1:1/", nullptr, 0, nullptr, 0};
   EXPECT_EQ(UpdaterHttpRequest(nullptr, &callbacks),
             SHOREBIRD_HTTP_INVALID_REQUEST);
   EXPECT_EQ(UpdaterHttpRequest(&request, nullptr),
@@ -1077,11 +1075,11 @@ TEST(UpdaterHttpRequestTest, RustUpdaterChecksForPatchesThroughThisClient) {
       snprintf(buffer, sizeof(buffer), "%zx", n);
       return std::string(buffer);
     };
-    TestServer server({{"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
-                        "Transfer-Encoding: chunked\r\n\r\n" +
-                        hex(first.size()) + "\r\n" + first + "\r\n" +
-                        hex(second.size()) + "\r\n" + second +
-                        "\r\n0\r\n\r\n"}});
+    TestServer server(
+        {{"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+          "Transfer-Encoding: chunked\r\n\r\n" +
+          hex(first.size()) + "\r\n" + first + "\r\n" + hex(second.size()) +
+          "\r\n" + second + "\r\n0\r\n\r\n"}});
     shorebird_set_engine_callbacks(&UpdaterEngineCallbacks());
     const char* paths[] = {libapp.c_str()};
     AppParameters params = {"1.0.0+1", paths, 1, storage.c_str(),
@@ -1101,8 +1099,7 @@ TEST(UpdaterHttpRequestTest, RustUpdaterChecksForPatchesThroughThisClient) {
       request.find("\r\nContent-Type: application/json; charset=utf-8\r\n"),
       std::string::npos);
   EXPECT_NE(request.find("\"app_id\":\"test-app-id\""), std::string::npos);
-  EXPECT_NE(request.find("\"release_version\":\"1.0.0+1\""),
-            std::string::npos);
+  EXPECT_NE(request.find("\"release_version\":\"1.0.0+1\""), std::string::npos);
 }
 
 #endif  // !defined(_WIN32)

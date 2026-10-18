@@ -215,7 +215,6 @@ bool ParseWithLlhttp(const uint8_t* data,
   return true;
 }
 
-
 // Where the two parsers are known to differ, and the reader is right.
 bool KnownDivergence(const Parsed& llhttp, bool interim_with_framing) {
   // RFC 9112 6.3: a 1xx response ends at its blank line whatever its
@@ -227,8 +226,7 @@ bool KnownDivergence(const Parsed& llhttp, bool interim_with_framing) {
     // RFC 9110 5.5: whitespace around a field value is not part of it, so
     // "chunked<TAB>" is chunked. llhttp only recognizes the coding (and
     // the length) without trailing whitespace, and reads to close.
-    if (IsFramingHeader(header.name) &&
-        TrimOws(header.value) != header.value) {
+    if (IsFramingHeader(header.name) && TrimOws(header.value) != header.value) {
       return true;
     }
   }

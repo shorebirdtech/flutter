@@ -39,9 +39,8 @@ int AddCertificatesFromStore(const wchar_t* name,
   }
   int added = 0;
   PCCERT_CONTEXT cert_context = nullptr;
-  while ((cert_context = CertEnumCertificatesInStore(cert_store,
-                                                     cert_context)) !=
-         nullptr) {
+  while ((cert_context = CertEnumCertificatesInStore(
+              cert_store, cert_context)) != nullptr) {
     const unsigned char* der = cert_context->pbCertEncoded;
     X509* cert = d2i_X509(nullptr, &der, cert_context->cbCertEncoded);
     if (cert == nullptr) {

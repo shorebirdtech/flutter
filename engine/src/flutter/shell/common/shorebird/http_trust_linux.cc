@@ -39,8 +39,7 @@ bool LoadFile(SSL_CTX* context, const char* file) {
 #endif
 
 bool LoadDirectory(SSL_CTX* context, const char* directory) {
-  bool loaded =
-      SSL_CTX_load_verify_locations(context, nullptr, directory) == 1;
+  bool loaded = SSL_CTX_load_verify_locations(context, nullptr, directory) == 1;
   ERR_clear_error();
   return loaded;
 }

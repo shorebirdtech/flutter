@@ -228,9 +228,8 @@ std::optional<Url> ParseUrl(const std::string& url) {
 
   size_t fragment = url.find('#', authority_end);
   std::string target = url.substr(
-      authority_end,
-      fragment == std::string::npos ? std::string::npos
-                                    : fragment - authority_end);
+      authority_end, fragment == std::string::npos ? std::string::npos
+                                                   : fragment - authority_end);
   if (target.empty() || target[0] == '?') {
     target = "/" + target;
   }

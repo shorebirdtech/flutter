@@ -23,14 +23,15 @@ namespace shorebird {
 namespace {
 
 int HostIndex() {
-  static int index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+  static int index =
+      SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
   return index;
 }
 
 ssl_verify_result_t VerifyWithSystemTrust(SSL* ssl, uint8_t* out_alert) {
   *out_alert = SSL_AD_CERTIFICATE_UNKNOWN;
-  const auto* host = static_cast<const std::string*>(
-      SSL_get_ex_data(ssl, HostIndex()));
+  const auto* host =
+      static_cast<const std::string*>(SSL_get_ex_data(ssl, HostIndex()));
   const STACK_OF(CRYPTO_BUFFER)* chain = SSL_get0_peer_certificates(ssl);
   if (host == nullptr || chain == nullptr || sk_CRYPTO_BUFFER_num(chain) == 0) {
     return ssl_verify_invalid;
@@ -42,8 +43,8 @@ ssl_verify_result_t VerifyWithSystemTrust(SSL* ssl, uint8_t* out_alert) {
     return ssl_verify_invalid;
   }
   for (const CRYPTO_BUFFER* buffer : chain) {
-    fml::CFRef<CFDataRef> der(CFDataCreate(
-        nullptr, CRYPTO_BUFFER_data(buffer), CRYPTO_BUFFER_len(buffer)));
+    fml::CFRef<CFDataRef> der(CFDataCreate(nullptr, CRYPTO_BUFFER_data(buffer),
+                                           CRYPTO_BUFFER_len(buffer)));
     if (!der) {
       return ssl_verify_invalid;
     }
@@ -55,8 +56,8 @@ ssl_verify_result_t VerifyWithSystemTrust(SSL* ssl, uint8_t* out_alert) {
     CFArrayAppendValue(certificates, certificate);
   }
 
-  fml::CFRef<CFStringRef> hostname(CFStringCreateWithCString(
-      nullptr, host->c_str(), kCFStringEncodingUTF8));
+  fml::CFRef<CFStringRef> hostname(
+      CFStringCreateWithCString(nullptr, host->c_str(), kCFStringEncodingUTF8));
   if (!hostname) {
     return ssl_verify_invalid;
   }
