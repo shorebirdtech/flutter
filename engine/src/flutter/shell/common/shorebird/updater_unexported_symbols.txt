@@ -5,9 +5,15 @@
 # The Dart-facing shorebird_* C API stays exported: package:shorebird_code_push
 # looks those up at runtime.
 #
-# Rust mangled symbols (v0 mangling: _R...).
+# Rust mangled symbols, v0 mangling (_R...) and legacy mangling
+# (_ZN...17h<16 hex digits>E), depending on the Rust toolchain.
 __R*
-_rust_eh_personality
+__ZN*17h????????????????E
+# Rust runtime and allocator shims.
+_rust_*
+___rust_*
+___rdl_*
+___rg_*
 # Clang builtins pulled in by Rust's compiler_builtins.
 ___isOSVersionAtLeast
 ___isPlatformVersionAtLeast
