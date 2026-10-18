@@ -540,7 +540,9 @@ HttpResult SendHttpRequest(const HttpRequest& request,
   for (int redirects = 0;; redirects++) {
     std::optional<Url> url = http_internal::ParseUrl(url_text);
     if (!url.has_value()) {
-      return HttpResult::kInvalidRequest;
+      // After a redirect, the bad URL came from the server.
+      return redirects == 0 ? HttpResult::kInvalidRequest
+                            : HttpResult::kProtocolError;
     }
     std::optional<std::string> wire = BuildRequest(request, *url);
     if (!wire.has_value()) {

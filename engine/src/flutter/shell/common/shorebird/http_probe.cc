@@ -5,8 +5,8 @@
 // Fetches each URL on the command line with the updater's HTTP client and
 // prints one line per URL: the URL, the result, the status and the body's
 // size and SHA-256. Used to build the TLS accept/reject table on each
-// platform and compare it with dart:io (tool/http_probe.dart in the updater
-// repo prints the same lines).
+// platform and compare it with dart:io (http_probe.dart prints the first
+// three columns the same way).
 
 #include <cstdio>
 #include <string>

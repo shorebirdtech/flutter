@@ -787,6 +787,14 @@ TEST(HttpClientLiveTest, StopsAfterTooManyRedirects) {
   EXPECT_EQ(handler.response_count, 0);
 }
 
+TEST(HttpClientLiveTest, RedirectToAnUnusableUrlIsAProtocolError) {
+  TestServer server({{"HTTP/1.1 302 Found\r\nLocation: ftp://example.com/\r\n"
+                      "Content-Length: 0\r\n\r\n"}});
+  RecordingHandler handler;
+  EXPECT_EQ(Get(server.Url("/"), handler), HttpResult::kProtocolError);
+  EXPECT_EQ(handler.response_count, 0);
+}
+
 TEST(HttpClientLiveTest, DoesNotFollowPostRedirects) {
   TestServer server(
       {{"HTTP/1.1 302 Found\r\nLocation: /elsewhere\r\nContent-Length: 0\r\n"
