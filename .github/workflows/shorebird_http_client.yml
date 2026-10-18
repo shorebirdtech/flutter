@@ -1,0 +1,104 @@
+name: shorebird_http_client
+
+# The updater's HTTP client (engine/src/flutter/shell/common/shorebird/
+# http_*.cc), built on its own: the TLS accept/reject table on each desktop
+# OS must match dart:io's on the same runner, and the parser is fuzzed
+# under ASan/UBSan, including against llhttp.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/shorebird_http_client.yml"
+      - "engine/src/flutter/shell/common/shorebird/**"
+      - "engine/src/flutter/fml/log*"
+  push:
+    branches:
+      - shorebird/dev
+    paths:
+      - ".github/workflows/shorebird_http_client.yml"
+      - "engine/src/flutter/shell/common/shorebird/**"
+      - "engine/src/flutter/fml/log*"
+
+jobs:
+  tls-table:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    name: 🔒 TLS table vs dart:io (${{ matrix.os }})
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            DEPS
+            engine/src/flutter/shell/common/shorebird
+            engine/src/flutter/fml
+
+      - name: 🔐 Fetch BoringSSL at the engine's revision
+        run: |
+          rev=$(sed -n "s/.*'dart_boringssl_rev': '\([0-9a-f]*\)'.*/\1/p" DEPS)
+          git init -q boringssl
+          git -C boringssl fetch -q --depth 1 \
+            https://boringssl.googlesource.com/boringssl "$rev"
+          git -C boringssl checkout -q FETCH_HEAD
+
+      - name: 🛠️ Build shorebird_http_probe
+        run: |
+          cmake -S engine/src/flutter/shell/common/shorebird/standalone \
+            -B out -DBORINGSSL_DIR="$PWD/boringssl" \
+            -DCMAKE_BUILD_TYPE=Release -DOPENSSL_NO_ASM=1
+          cmake --build out --config Release --target shorebird_http_probe
+
+      - name: 🎯 Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: 🔒 Compare with dart:io
+        run: |
+          dir=engine/src/flutter/shell/common/shorebird
+          probe=$(find out -name 'shorebird_http_probe' -o -name 'shorebird_http_probe.exe' | head -1)
+          urls=$(tr -d '\r' < $dir/tls_matrix_urls.txt)
+          "$probe" $urls | tr -d '\r' | cut -f1,2 > cpp.tsv
+          dart $dir/http_probe.dart $urls | tr -d '\r' | cut -f1,2 > dart.tsv
+          # Outcomes only: statuses from the third-party test hosts vary.
+          cat cpp.tsv
+          diff dart.tsv cpp.tsv
+          # Our own hosts must always be reachable.
+          for host in api.shorebird.dev cdn.shorebird.cloud \
+                      storage.googleapis.com download.shorebird.dev; do
+            grep -q "^https://$host/	accept" cpp.tsv
+          done
+
+  fuzz:
+    runs-on: ubuntu-latest
+
+    name: 🐛 Fuzz the HTTP parser
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            engine/src/flutter/shell/common/shorebird
+
+      - name: 🐛 Fuzz for 5 minutes per target
+        run: CXX=clang++ engine/src/flutter/shell/common/shorebird/fuzz/run.sh 300
+
+      - name: 📦 Upload crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashes
+          path: engine/src/flutter/shell/common/shorebird/fuzz/out/*crash*

@@ -1,0 +1,2 @@
+# Raw HTTP responses: keep CRLF line endings byte for byte.
+* -text

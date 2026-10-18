@@ -486,6 +486,7 @@ def run_cc_tests(
         # https://github.com/flutter/flutter/issues/36295
         make_test('shell_unittests'),
         make_test('shorebird_unittests'),
+        make_test('shorebird_http_unittests'),
     ]
 
   if is_windows():
