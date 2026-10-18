@@ -12,9 +12,19 @@ import subprocess
 import sys
 
 
-SRC_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+# core.hooksPath is an absolute path shared by every worktree of the
+# repository, so this script may belong to a different worktree than the one
+# being pushed. Git runs hooks from the root of the worktree being pushed, so
+# check that one rather than the one this script lives in.
+REPO_ROOT = subprocess.run(['git', 'rev-parse', '--show-toplevel'],
+                           check=True, capture_output=True, text=True).stdout.strip()
+SRC_ROOT = os.path.join(REPO_ROOT, 'engine', 'src')
 FLUTTER_DIR = os.path.join(SRC_ROOT, 'flutter')
 ENABLE_CLANG_TIDY = os.environ.get('PRE_PUSH_CLANG_TIDY')
+
+
+def IsWindows():
+  return sys.platform.startswith('win32') or sys.platform.startswith('cygwin')
 
 
 def GetDartBin():
@@ -25,6 +35,15 @@ def GetDartBin():
 
 
 def Main(argv):
+  # A worktree without `gclient sync` has neither the Dart SDK nor the package
+  # config the checks run with.
+  package_config = os.path.join(FLUTTER_DIR, '.dart_tool', 'package_config.json')
+  dart = os.path.join(GetDartBin(), 'dart.exe' if IsWindows() else 'dart')
+  if not os.path.exists(dart) or not os.path.exists(package_config):
+    print('\033[1m\033[31mWarning:\033[0m \033[1mPre-push checks skipped: %s is not synced.\033[0m' % REPO_ROOT)
+    print('\033[1m\033[33mNote:\033[0m \033[1mRun "gclient sync -D" in %s to enable them.\033[0m' % SRC_ROOT)
+    return 0
+
   githook_args = [
     '--flutter',
     FLUTTER_DIR,
@@ -35,12 +54,19 @@ def Main(argv):
       '--enable-clang-tidy',
     ]
 
+  # Git sets GIT_DIR (but not GIT_WORK_TREE) for hooks run in a linked
+  # worktree, which makes git take the cwd as the work tree root. The
+  # clang-tidy check runs git from FLUTTER_DIR, so it would get the wrong list
+  # of changed files.
+  env = {k: v for k, v in os.environ.items()
+         if k not in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_PREFIX', 'GIT_INDEX_FILE')}
+
   result = subprocess.run([
-    os.path.join(GetDartBin(), 'dart'),
+    dart,
     os.path.join(FLUTTER_DIR, 'tools', 'githooks', 'bin', 'main.dart'),
   ] + githook_args + [
     'pre-push',
-  ] + argv[1:], cwd=SRC_ROOT)
+  ] + argv[1:], cwd=SRC_ROOT, env=env)
   return result.returncode
 
 
