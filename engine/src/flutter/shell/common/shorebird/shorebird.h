@@ -52,12 +52,27 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
 /// the first call's patch rather than asking the updater again: a patch
 /// installed by the update thread in between must not boot in a second
 /// engine while the first still runs the old one. Android calls this once.
+///
+/// Later calls get the first call's patch even if their Settings come from a
+/// different bundle; the updater is configured for the first bundle only.
+/// A patch the updater deletes later in the process (a server rollback, or a
+/// failed load marking it bad) fails to load in later engines, which then
+/// boot the release's own code.
 void ConfigureShorebird(std::string code_cache_path,
                         std::string app_storage_path,
                         Settings& settings,
                         const std::string& shorebird_yaml,
                         const std::string& version,
                         const std::string& version_code);
+
+/// ConfigureShorebird without its check that the AOT snapshot is linked in,
+/// which unit tests don't have. Exposed for testing.
+void ConfigureShorebirdSkippingSnapshotCheck(std::string code_cache_path,
+                                             std::string app_storage_path,
+                                             Settings& settings,
+                                             const std::string& shorebird_yaml,
+                                             const std::string& version,
+                                             const std::string& version_code);
 
 /// Used for reading app_id from shorebird.yaml.
 /// Exposed for testing.

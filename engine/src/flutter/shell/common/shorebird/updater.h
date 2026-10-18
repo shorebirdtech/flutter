@@ -105,7 +105,8 @@ class Updater {
 
   /// Initialize the updater with configuration. Remembers a success so
   /// `ReportLaunchSuccess` knows whether it may start the update thread; a
-  /// later failed call (add-to-app calls this once per engine) does not
+  /// later failed call (the desktop ConfigureShorebird calls this once per
+  /// engine) does not
   /// forget an earlier success.
   /// @param config Configuration containing release version, paths, and
   /// callbacks

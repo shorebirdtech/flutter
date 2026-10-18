@@ -291,6 +291,17 @@ void ConfigureShorebird(std::string code_cache_path,
   FML_CHECK(DartSnapshot::VMSnapshotFromSettings(settings))
       << "XCode Scheme must be set to Release to use Shorebird";
 
+  ConfigureShorebirdSkippingSnapshotCheck(
+      std::move(code_cache_path), std::move(app_storage_path), settings,
+      shorebird_yaml, version, version_code);
+}
+
+void ConfigureShorebirdSkippingSnapshotCheck(std::string code_cache_path,
+                                             std::string app_storage_path,
+                                             Settings& settings,
+                                             const std::string& shorebird_yaml,
+                                             const std::string& version,
+                                             const std::string& version_code) {
   // iOS calls this once per engine. Every engine in the process boots the
   // patch the first one chose, like Android, where this runs once. Asking the
   // updater again would boot a patch the update thread installed after the
