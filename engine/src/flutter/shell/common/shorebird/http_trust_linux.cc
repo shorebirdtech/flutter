@@ -18,21 +18,25 @@ namespace shorebird {
 
 namespace {
 
+#if !defined(FML_OS_ANDROID)
 bool IsFile(const char* path) {
   struct stat info;
   return stat(path, &info) == 0 && S_ISREG(info.st_mode);
 }
+#endif
 
 bool IsDirectory(const char* path) {
   struct stat info;
   return stat(path, &info) == 0 && S_ISDIR(info.st_mode);
 }
 
+#if !defined(FML_OS_ANDROID)
 bool LoadFile(SSL_CTX* context, const char* file) {
   bool loaded = SSL_CTX_load_verify_locations(context, file, nullptr) == 1;
   ERR_clear_error();
   return loaded;
 }
+#endif
 
 bool LoadDirectory(SSL_CTX* context, const char* directory) {
   bool loaded =
