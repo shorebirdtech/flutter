@@ -7,12 +7,16 @@ name: shorebird_engine_tests
 #
 # The sync mirrors _build_engine's shard-build.yaml: a Namespace runner whose
 # persistent volume holds the gclient git mirrors, depot_tools and the CIPD
-# cache (the same `engine-linux` cache tag the engine build warms), so a sync
-# is incremental rather than gigabytes from googlesource.com.
+# cache, so a sync is incremental rather than gigabytes from
+# googlesource.com. The volume has its own cache tag, not the release build's
+# `engine-linux`: PR code (DEPS hooks, gn, ninja actions) runs with it
+# mounted, and must not be able to plant anything a release build later runs.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Cancel superseded PR runs, but let every push to shorebird/dev finish so
+  # each engine merge gets a result.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 on:
   pull_request:
@@ -34,18 +38,18 @@ permissions:
 jobs:
   shorebird-unittests:
     name: 🧪 Shorebird Engine Unit Tests
+    # Fork PRs get no secrets (the sync needs the dart-sdk deploy key) and
+    # must not run on our Namespace runners.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on:
       - nscloud-ubuntu-22.04-amd64-8x32-with-cache
-      - nscloud-cache-tag-engine-linux
+      - nscloud-cache-tag-shorebird-engine-tests
       - nscloud-cache-size-100gb
     timeout-minutes: 90
 
     steps:
-      # Full history so the engine version scripts can find tags.
       - name: 📚 Git Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: 📦 Setup namespace cache
         uses: namespacelabs/nscloud-cache-action@v1
@@ -104,6 +108,11 @@ jobs:
               "safesync_url": "",
             },
           ]
+          # A host build needs neither; skipping them shortens the sync.
+          custom_vars = {
+            "download_android_deps": False,
+            "download_fuchsia_deps": False,
+          }
           cache_dir = "$HOME/git_cache"
           EOF
 
@@ -116,17 +125,28 @@ jobs:
           done
           exit 1
 
+      # Only the sync needs the deploy key; drop it before running PR code.
+      - name: 🔑 Remove deploy key
+        run: ssh-add -D
+
+      # --no-prebuilt-dart-sdk: build with our Dart fork, as the release
+      # build does, rather than Google's prebuilt upstream SDK.
       - name: ⚙️ Generate build files (gn)
-        run: ./flutter/tools/gn --runtime-mode debug --unoptimized --enable-unittests --no-rbe
+        run: ./flutter/tools/gn --runtime-mode debug --unoptimized --enable-unittests --no-prebuilt-dart-sdk --no-rbe
         working-directory: engine/src
 
-      # shorebird_unittests depends on every Shorebird engine target
-      # (shell/common/shorebird, runtime/shorebird and the Rust updater), so
-      # building it compiles all of the Shorebird sources for the host.
-      - name: 🔨 Build shorebird_unittests
-        run: ninja -C out/host_debug_unopt shorebird_unittests
+      # shorebird_unittests covers shell/common/shorebird, runtime/shorebird
+      # and the Rust updater. flutter_linux_sources adds the Linux embedder's
+      # Shorebird code (fl_shorebird.cc, fl_engine.cc), and shell_unittests
+      # holds the Shell's Shorebird boot-flow tests.
+      - name: 🔨 Build
+        run: ninja -C out/host_debug_unopt shorebird_unittests shell_unittests flutter/shell/platform/linux:flutter_linux_sources
         working-directory: engine/src
 
       - name: 🧪 Run shorebird_unittests
         run: ./out/host_debug_unopt/shorebird_unittests
+        working-directory: engine/src
+
+      - name: 🧪 Run Shorebird shell_unittests
+        run: ./out/host_debug_unopt/shell_unittests '--gtest_filter=*Shorebird*'
         working-directory: engine/src
