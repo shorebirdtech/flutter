@@ -1,0 +1,24 @@
+HTTP/1.1 200 OK
+Transfer-Encoding: chunked
+
+6;ext=1m
+hello
+6
+ wed
+
+6;ext=1m
+hello
+6
+ world
+0
+X-TEncoding: ch#unkedodi OK
+Transfer-Encoding: chÿÿÿunkedoding: chunked
+
+6
+hello
+ng: chunked
+
+6
+heoll
+6;t
+

@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "flutter/shell/common/shorebird/engine_callbacks.h"
+#include "flutter/shell/common/shorebird/http_parser.h"
 #include "third_party/updater/library/include/updater_dart.h"
 #include "gtest/gtest.h"
 #include "openssl/base64.h"
@@ -247,6 +248,21 @@ TEST(HttpClientParseTest, ChunkedWinsOverContentLength) {
                   handler),
             HttpResult::kOk);
   EXPECT_EQ(handler.body, "hi");
+}
+
+TEST(HttpClientParseTest, RepeatedTransferEncodingFieldsCombine) {
+  // "chunked" then "gzip" is the list "chunked, gzip": the last coding is
+  // not chunked, so the body runs to close (found by the llhttp
+  // differential fuzzer).
+  RecordingHandler handler;
+  EXPECT_EQ(Parse("HTTP/1.1 200 OK\r\n"
+                  "Transfer-Encoding: chunked\r\n"
+                  "Transfer-Encoding: gzip\r\n"
+                  "\r\n"
+                  "2\r\nhi\r\n0\r\n\r\n",
+                  handler),
+            HttpResult::kOk);
+  EXPECT_EQ(handler.body, "2\r\nhi\r\n0\r\n\r\n");
 }
 
 TEST(HttpClientParseTest, BodyUntilClose) {
@@ -850,6 +866,21 @@ TEST(HttpClientTlsTest, TrustedServerSucceeds) {
   EXPECT_EQ(Get(server.Url("/", "localhost"), handler, options),
             HttpResult::kOk);
   EXPECT_EQ(handler.body, "secure");
+}
+
+TEST(HttpClientTlsTest, RefusesRedirectFromHttpsToHttp) {
+  TestServer plain({{"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nleak"}});
+  TestCertificate certificate = MakeCertificate("localhost");
+  TestServer server({{"HTTP/1.1 302 Found\r\nLocation: " + plain.Url("/") +
+                      "\r\nContent-Length: 0\r\n\r\n"}},
+                    &certificate);
+  HttpClientOptions options;
+  options.trusted_roots_pem = certificate.pem;
+  RecordingHandler handler;
+  EXPECT_EQ(Get(server.Url("/", "localhost"), handler, options),
+            HttpResult::kProtocolError);
+  EXPECT_EQ(handler.response_count, 0);
+  EXPECT_TRUE(plain.requests().empty());
 }
 
 TEST(HttpClientTlsTest, TrustedServerByIpSucceeds) {

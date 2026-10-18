@@ -99,6 +99,8 @@ source_set("http_client") {
   sources = [
     "http_client.cc",
     "http_client.h",
+    "http_parser.cc",
+    "http_parser.h",
     "http_trust.h",
   ]
   if (is_android || is_linux) {
@@ -117,6 +119,19 @@ source_set("http_client") {
 
   public_deps = [ "//flutter/third_party/boringssl" ]
   deps = [ "//flutter/fml" ]
+}
+
+# Fetches URLs with the HTTP client and prints what happened, to build the
+# TLS accept/reject table on a device (see tls_matrix_urls.txt). Outside
+# enable_unittests so it builds for Android and iOS too.
+executable("shorebird_http_probe") {
+  testonly = true
+  sources = [ "http_probe.cc" ]
+  deps = [ ":http_client" ]
+  if (is_android) {
+    # fml logs through liblog.
+    libs = [ "log" ]
+  }
 }
 
 # C++ wrapper around the Rust updater C API.
