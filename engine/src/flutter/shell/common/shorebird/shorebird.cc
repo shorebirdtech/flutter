@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -61,7 +62,7 @@ static fml::RefPtr<const DartSnapshot> vm_snapshot;
 #if SHOREBIRD_USE_INTERPRETER
 static fml::RefPtr<const DartSnapshot> isolate_snapshot;
 
-void SetBaseSnapshot(Settings& settings) {
+void SetBaseSnapshot(const Settings& settings) {
   // These mappings happen to be to static data in the App.framework, but
   // we still need to seem to hold onto the DartSnapshot objects to keep
   // the mappings alive.
@@ -213,21 +214,36 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   return init_result;
 }
 
-/// Older api used by iOS and Android, directly manipulates Settings.
-// TODO(eseidel): Consolidate this with the other ConfigureShorebird() API.
-void ConfigureShorebird(std::string code_cache_path,
-                        std::string app_storage_path,
-                        Settings& settings,
-                        const std::string& shorebird_yaml,
-                        const std::string& version,
-                        const std::string& version_code) {
-  // If you are crashing here, you probably are running Shorebird in a Debug
-  // config, where the AOT snapshot won't be linked into the process, and thus
-  // lookups will fail.  Change your Scheme to Release to fix:
-  // https://github.com/flutter/flutter/wiki/Debugging-the-engine#debugging-ios-builds-with-xcode
-  FML_CHECK(DartSnapshot::VMSnapshotFromSettings(settings))
-      << "XCode Scheme must be set to Release to use Shorebird";
+// The patch the legacy ConfigureShorebird() chose for this process. nullopt
+// until the first call; an empty string means the release's own code.
+static std::mutex boot_patch_mutex;
+static std::optional<std::string> boot_patch_path;
 
+std::string ChooseBootPatchOnce(const std::function<std::string()>& choose) {
+  std::lock_guard<std::mutex> lock(boot_patch_mutex);
+  if (!boot_patch_path.has_value()) {
+    boot_patch_path = choose();
+  } else {
+    FML_LOG(INFO) << "Shorebird updater: reusing this process's patch choice: "
+                  << (boot_patch_path->empty() ? "no patch" : *boot_patch_path);
+  }
+  return *boot_patch_path;
+}
+
+void ResetBootPatchForTesting() {
+  std::lock_guard<std::mutex> lock(boot_patch_mutex);
+  boot_patch_path.reset();
+}
+
+// Configures the updater and returns the patch to boot, or an empty string
+// for none. Runs once per process, from ChooseBootPatchOnce.
+static std::string ConfigureUpdaterAndChooseBootPatch(
+    std::string code_cache_path,
+    std::string app_storage_path,
+    const Settings& settings,
+    const std::string& shorebird_yaml,
+    const std::string& version,
+    const std::string& version_code) {
   auto shorebird_updater_dir_name = "shorebird_updater";
 
   auto code_cache_dir = fml::paths::JoinPaths(
@@ -257,7 +273,33 @@ void ConfigureShorebird(std::string code_cache_path,
 #endif
 
   shorebird::Updater::Instance().ValidateNextBootPatch();
-  std::string active_path = shorebird::Updater::Instance().NextBootPatchPath();
+  return shorebird::Updater::Instance().NextBootPatchPath();
+}
+
+/// Older api used by iOS and Android, directly manipulates Settings.
+// TODO(eseidel): Consolidate this with the other ConfigureShorebird() API.
+void ConfigureShorebird(std::string code_cache_path,
+                        std::string app_storage_path,
+                        Settings& settings,
+                        const std::string& shorebird_yaml,
+                        const std::string& version,
+                        const std::string& version_code) {
+  // If you are crashing here, you probably are running Shorebird in a Debug
+  // config, where the AOT snapshot won't be linked into the process, and thus
+  // lookups will fail.  Change your Scheme to Release to fix:
+  // https://github.com/flutter/flutter/wiki/Debugging-the-engine#debugging-ios-builds-with-xcode
+  FML_CHECK(DartSnapshot::VMSnapshotFromSettings(settings))
+      << "XCode Scheme must be set to Release to use Shorebird";
+
+  // iOS calls this once per engine. Every engine in the process boots the
+  // patch the first one chose, like Android, where this runs once. Asking the
+  // updater again would boot a patch the update thread installed after the
+  // first engine started, so engines in one process would run different code.
+  std::string active_path = ChooseBootPatchOnce([&] {
+    return ConfigureUpdaterAndChooseBootPatch(
+        std::move(code_cache_path), std::move(app_storage_path), settings,
+        shorebird_yaml, version, version_code);
+  });
   if (!active_path.empty()) {
     FML_LOG(INFO) << "Shorebird updater: active path: " << active_path;
 

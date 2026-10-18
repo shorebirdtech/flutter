@@ -1,6 +1,9 @@
 #ifndef FLUTTER_SHELL_COMMON_SHOREBIRD_SHOREBIRD_H_
 #define FLUTTER_SHELL_COMMON_SHOREBIRD_SHOREBIRD_H_
 
+#include <functional>
+#include <string>
+
 #include "flutter/common/settings.h"
 #include "flutter/fml/memory/ref_ptr.h"
 #include "shell/platform/embedder/embedder.h"
@@ -43,6 +46,12 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
                         std::string& patch_path);
 
 /// Older api used by iOS and Android, directly manipulates Settings.
+///
+/// Chooses the patch once per process. iOS calls this for every engine
+/// (each FlutterDartProject builds its own Settings), so later calls reuse
+/// the first call's patch rather than asking the updater again: a patch
+/// installed by the update thread in between must not boot in a second
+/// engine while the first still runs the old one. Android calls this once.
 void ConfigureShorebird(std::string code_cache_path,
                         std::string app_storage_path,
                         Settings& settings,
@@ -53,6 +62,14 @@ void ConfigureShorebird(std::string code_cache_path,
 /// Used for reading app_id from shorebird.yaml.
 /// Exposed for testing.
 std::string GetValueFromYaml(const std::string& yaml, const std::string& key);
+
+/// Returns the patch path `choose` returns on the first call in this process,
+/// and that same path on every later call without calling `choose` again. An
+/// empty path means the release's own code. Exposed for testing.
+std::string ChooseBootPatchOnce(const std::function<std::string()>& choose);
+
+/// Forgets the patch ChooseBootPatchOnce chose, so tests can choose again.
+void ResetBootPatchForTesting();
 
 }  // namespace flutter
 
