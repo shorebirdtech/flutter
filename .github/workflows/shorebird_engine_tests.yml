@@ -51,6 +51,10 @@ jobs:
     steps:
       - name: 📚 Git Checkout
         uses: actions/checkout@v4
+        with:
+          # The PR merge commit and its first parent (the base), for the
+          # format check below.
+          fetch-depth: 2
 
       - name: 📦 Setup namespace cache
         uses: namespacelabs/nscloud-cache-action@v1
@@ -118,6 +122,7 @@ jobs:
           EOF
 
       - name: 🔄 Sync engine dependencies (gclient)
+        id: sync
         run: |
           for attempt in 1 2 3; do
             gclient sync --delete_unversioned_trees --with_tags && exit 0
@@ -151,3 +156,19 @@ jobs:
       - name: 🧪 Run Shorebird shell_unittests
         run: ./out/host_debug_unopt/shell_unittests '--gtest_filter=*Shorebird*'
         working-directory: engine/src
+
+      # ci/format.sh is what `et format` and the engine pre-push hook run.
+      # Without it here, a misformatted file lands and fails the hook for the
+      # next person to push, whatever their change. Runs last so a format
+      # error doesn't hide test results.
+      #
+      # format.dart only checks files changed since `git fetch upstream main`.
+      # Point `upstream` at this checkout with `main` at the PR's base, so it
+      # checks exactly what the PR changes (the shallow checkout can't reach
+      # flutter/flutter's main, which is what developer checkouts use).
+      - name: 🎨 Check formatting
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.sync.outcome == 'success' }}
+        run: |
+          git branch -f main HEAD^1
+          git remote add upstream "$GITHUB_WORKSPACE"
+          engine/src/flutter/ci/format.sh
