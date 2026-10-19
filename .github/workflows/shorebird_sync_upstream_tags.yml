@@ -17,8 +17,10 @@ name: sync_upstream_tags
 # the run rather than being overwritten: that means someone hand-tagged this
 # repo and a person has to look. Tags upstream deletes are left in place.
 #
-# No workflow here has a tags, create or release trigger, so mirrored tags
-# start no CI runs. An app token would not suppress them if one did.
+# A tag the app token creates does fire push and create events, and GitHub
+# runs the workflows in the tagged commit's tree: upstream's, not ours. None of
+# upstream's workflows trigger on tags, create or release today, so mirrored
+# tags start no CI runs. An app token would not suppress them if one did.
 
 on:
   schedule:
@@ -43,10 +45,13 @@ jobs:
     steps:
       - name: 🔑 Mint an app token
         id: app_token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.TAG_SYNC_APP_ID }}
           private-key: ${{ secrets.TAG_SYNC_APP_PRIVATE_KEY }}
+          # Only what a ref write needs, whatever else the app is granted.
+          permission-contents: write
+          permission-workflows: write
 
       - name: 🔍 Diff our tags against upstream's
         run: |
@@ -61,6 +66,9 @@ jobs:
           }
           tags https://github.com/flutter/flutter.git > upstream.txt
           tags "https://github.com/$GITHUB_REPOSITORY.git" > ours.txt
+          # An empty list would make the awk below read upstream's as ours and
+          # report nothing missing.
+          [[ -s upstream.txt && -s ours.txt ]] || { echo "::error::empty tag list"; exit 1; }
 
           : > missing.txt
           : > conflicts.txt
@@ -92,7 +100,8 @@ jobs:
         if: always()
         run: |
           {
-            echo "### Mirrored $(wc -l < created.md) new tag(s)"
+            touch created.md
+            echo "### Mirrored $(wc -l < created.md | tr -d ' ') new tag(s)"
             cat created.md 2>/dev/null || true
             if [[ -s failed.txt ]]; then
               printf '\n### Tags that could not be created\n\n'
