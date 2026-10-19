@@ -21,6 +21,10 @@ name: sync_upstream_tags
 # runs the workflows in the tagged commit's tree: upstream's, not ours. None of
 # upstream's workflows trigger on tags, create or release today, so mirrored
 # tags start no CI runs. An app token would not suppress them if one did.
+#
+# The app's private key is a secret of the tag-sync environment, which only
+# shorebird/dev may deploy to. A workflow on any other branch, including a
+# pull request's, can't read it, so it can't mint a token that writes workflows.
 
 on:
   schedule:
@@ -38,6 +42,7 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     if: github.repository == 'shorebirdtech/flutter'
+    environment: tag-sync
     defaults:
       run:
         shell: bash
