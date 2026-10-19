@@ -22,9 +22,10 @@ name: sync_upstream_tags
 # upstream's workflows trigger on tags, create or release today, so mirrored
 # tags start no CI runs. An app token would not suppress them if one did.
 #
-# The app's private key is a secret of the tag-sync environment, which only
-# shorebird/dev may deploy to. A workflow on any other branch, including a
-# pull request's, can't read it, so it can't mint a token that writes workflows.
+# The app's private key belongs in the tag-sync environment's secrets, which
+# only shorebird/dev may deploy to, and not in the repo's secrets, which a
+# workflow on any branch can read. Kept there, no other branch can mint a token
+# that writes workflows.
 
 on:
   schedule:
