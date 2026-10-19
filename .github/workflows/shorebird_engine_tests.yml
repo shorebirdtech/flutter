@@ -1,0 +1,153 @@
+name: shorebird_engine_tests
+
+# Builds the engine's Shorebird sources and runs shorebird_unittests (the C++
+# suite in engine/src/flutter/shell/common/shorebird/, which covers the
+# updater/engine boundary) on every PR that touches the engine. Before this,
+# the suite only ran by hand during a release.
+#
+# The sync mirrors _build_engine's shard-build.yaml: a Namespace runner whose
+# persistent volume holds the gclient git mirrors, depot_tools and the CIPD
+# cache, so a sync is incremental rather than gigabytes from
+# googlesource.com. The volume has its own cache tag, not the release build's
+# `engine-linux`: PR code (DEPS hooks, gn, ninja actions) runs with it
+# mounted, and must not be able to plant anything a release build later runs.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel superseded PR runs, but let every push to shorebird/dev finish so
+  # each engine merge gets a result.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+on:
+  pull_request:
+    paths:
+      - DEPS
+      - engine/**
+      - .github/workflows/shorebird_engine_tests.yml
+  push:
+    branches:
+      - shorebird/dev
+    paths:
+      - DEPS
+      - engine/**
+      - .github/workflows/shorebird_engine_tests.yml
+
+permissions:
+  contents: read
+
+jobs:
+  shorebird-unittests:
+    name: 🧪 Shorebird Engine Unit Tests
+    # Fork PRs get no secrets (the sync needs the dart-sdk deploy key) and
+    # must not run on our Namespace runners.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on:
+      - nscloud-ubuntu-22.04-amd64-8x32-with-cache
+      - nscloud-cache-tag-shorebird-engine-tests
+      - nscloud-cache-size-100gb
+    # The first run, on an empty cache, took 12 minutes (sync 3, build 8).
+    timeout-minutes: 30
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup namespace cache
+        uses: namespacelabs/nscloud-cache-action@v1
+        with:
+          path: |
+            ~/git_cache
+            ~/depot_tools
+            ~/cipd_cache
+
+      # CIPD_CACHE_DIR must be absolute; ~ doesn't expand in `env:`.
+      - name: 📦 Configure CIPD cache
+        run: |
+          mkdir -p "$HOME/cipd_cache"
+          echo "CIPD_CACHE_DIR=$HOME/cipd_cache" >> "$GITHUB_ENV"
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.8"
+
+      # build_rust_updater.py builds the updater with cargo for the host.
+      - name: 🦀 Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      # DEPS pulls shorebirdtech/dart-sdk (private) over SSH.
+      - name: 🔑 Setup SSH
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DART_SDK_DEPLOY_KEY }}
+
+      - name: 🧰 Setup depot_tools
+        run: |
+          if [[ ! -d $HOME/depot_tools/.git ]]; then
+            git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git $HOME/depot_tools
+          else
+            cd $HOME/depot_tools
+            git checkout main 2>/dev/null || git checkout -b main origin/main
+            git pull --quiet
+          fi
+          echo "$HOME/depot_tools" >> "$GITHUB_PATH"
+
+      # Unmanaged solution rooted at this checkout, so gclient syncs the DEPS
+      # of the commit under test and leaves the checkout itself alone.
+      - name: ⚙️ Setup gclient config
+        run: |
+          cat > .gclient << EOF
+          solutions = [
+            {
+              "managed": False,
+              "name": ".",
+              "url": "git@github.com:shorebirdtech/flutter.git",
+              "custom_deps": {},
+              "deps_file": "DEPS",
+              "safesync_url": "",
+            },
+          ]
+          # A host build needs neither; skipping them shortens the sync.
+          custom_vars = {
+            "download_android_deps": False,
+            "download_fuchsia_deps": False,
+          }
+          cache_dir = "$HOME/git_cache"
+          EOF
+
+      - name: 🔄 Sync engine dependencies (gclient)
+        run: |
+          for attempt in 1 2 3; do
+            gclient sync --delete_unversioned_trees --with_tags && exit 0
+            echo "gclient sync failed (attempt $attempt), retrying in $((attempt * 30))s"
+            sleep $((attempt * 30))
+          done
+          exit 1
+
+      # Only the sync needs the deploy key; drop it before running PR code.
+      - name: 🔑 Remove deploy key
+        run: ssh-add -D
+
+      # --no-prebuilt-dart-sdk: build with our Dart fork, as the release
+      # build does, rather than Google's prebuilt upstream SDK.
+      - name: ⚙️ Generate build files (gn)
+        run: ./flutter/tools/gn --runtime-mode debug --unoptimized --enable-unittests --no-prebuilt-dart-sdk --no-rbe
+        working-directory: engine/src
+
+      # shorebird_unittests covers shell/common/shorebird, runtime/shorebird
+      # and the Rust updater. flutter_linux_sources adds the Linux embedder's
+      # Shorebird code (fl_shorebird.cc, fl_engine.cc), and shell_unittests
+      # holds the Shell's Shorebird boot-flow tests.
+      - name: 🔨 Build
+        run: ninja -C out/host_debug_unopt shorebird_unittests shell_unittests flutter/shell/platform/linux:flutter_linux_sources
+        working-directory: engine/src
+
+      - name: 🧪 Run shorebird_unittests
+        run: ./out/host_debug_unopt/shorebird_unittests
+        working-directory: engine/src
+
+      - name: 🧪 Run Shorebird shell_unittests
+        run: ./out/host_debug_unopt/shell_unittests '--gtest_filter=*Shorebird*'
+        working-directory: engine/src
