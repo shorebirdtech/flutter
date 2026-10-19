@@ -45,7 +45,8 @@ jobs:
       - nscloud-ubuntu-22.04-amd64-8x32-with-cache
       - nscloud-cache-tag-shorebird-engine-tests
       - nscloud-cache-size-100gb
-    timeout-minutes: 90
+    # The first run, on an empty cache, took 12 minutes (sync 3, build 8).
+    timeout-minutes: 30
 
     steps:
       - name: 📚 Git Checkout
