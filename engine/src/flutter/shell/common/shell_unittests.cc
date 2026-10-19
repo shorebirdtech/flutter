@@ -5230,6 +5230,12 @@ TEST_F(ShellTest, ShorebirdUpdaterReportsOnlyOnceForMultipleShells) {
   EXPECT_EQ(mock_ptr->launch_start_count(), 1);
   EXPECT_EQ(mock_ptr->launch_success_count(), 1);
 
+  // The guard is per process, so the second shell need not overlap the
+  // first. Destroying the first shell before creating the second keeps the
+  // test from running two GL test surfaces at once: on Linux they share one
+  // EGL display, and the first one's teardown terminates it under the second.
+  DestroyShell(std::move(shell1), task_runners1);
+
   // Create second shell — guarded, no additional Start or Success calls.
   auto task_runners2 = GetTaskRunnersForFixture();
   auto shell2 = CreateShell(settings, task_runners2);
@@ -5243,7 +5249,6 @@ TEST_F(ShellTest, ShorebirdUpdaterReportsOnlyOnceForMultipleShells) {
   EXPECT_EQ(log[0], "ReportLaunchStart");
   EXPECT_EQ(log[1], "ReportLaunchSuccess");
 
-  DestroyShell(std::move(shell1), task_runners1);
   DestroyShell(std::move(shell2), task_runners2);
 
   shorebird::Updater::ResetLaunchStateForTesting();
