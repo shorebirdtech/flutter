@@ -94,6 +94,18 @@ if (shorebird_updater_supported) {
   }
 }
 
+if (shorebird_updater_supported && is_apple) {
+  # Keeps the Rust updater's internals out of Flutter.framework's export
+  # table. Without it the framework exports ~9,500 Rust symbols, which costs
+  # several MiB of symbol table and stops the linker dead-stripping them.
+  config("updater_unexported_symbols") {
+    _list = "updater_unexported_symbols.txt"
+    inputs = [ _list ]
+    ldflags =
+        [ "-Wl,-unexported_symbols_list," + rebase_path(_list, root_build_dir) ]
+  }
+}
+
 # C++ wrapper around the Rust updater C API.
 # This provides a testable abstraction layer that can be mocked for testing.
 source_set("updater") {
@@ -110,6 +122,10 @@ source_set("updater") {
   if (shorebird_updater_supported) {
     deps += [ ":build_rust_updater" ]
     libs = [ shorebird_updater_output_lib ]
+
+    if (is_apple) {
+      all_dependent_configs = [ ":updater_unexported_symbols" ]
+    }
 
     if (is_win) {
       libs += [ "userenv.lib" ]
