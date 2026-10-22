@@ -68,6 +68,9 @@ class FlutterProjectBundle {
   // Sets engine switches.
   void SetSwitches(const std::vector<std::string>& switches);
 
+  // Returns the path to the AOT library LoadAotData loads.
+  const std::filesystem::path& aot_library_path() { return aot_library_path_; }
+
   void SetAotLibraryPath(const std::filesystem::path& aot_library_path) {
     aot_library_path_ = aot_library_path;
   }
