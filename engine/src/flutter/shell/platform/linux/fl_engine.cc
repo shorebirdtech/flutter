@@ -11,6 +11,7 @@
 
 #include "flutter/common/constants.h"
 #include "flutter/fml/logging.h"
+#include "flutter/shell/common/shorebird/shorebird.h"
 #include "flutter/shell/platform/common/engine_switches.h"
 #include "flutter/shell/platform/embedder/embedder.h"
 #include "flutter/shell/platform/linux/fl_accessibility_handler.h"
@@ -895,24 +896,24 @@ gboolean fl_engine_start(FlEngine* self, GError** error) {
   args.compositor = &compositor;
 
   if (self->embedder_api.RunsAOTCompiledDartCode()) {
-    // This struct contains raw C strings and needs to have its lifetime scoped
-    // to this block.
-    FlutterEngineAOTDataSource source = {};
-    source.type = kFlutterEngineAOTDataSourceTypeElfPath;
     std::string patch_path;
-    auto setup_shorebird_result =
-        flutter::SetUpShorebird(args.assets_path, patch_path);
-    if (setup_shorebird_result) {
-      // If we have a patch installed, we replace the default AOT library path
-      // with the patch path here.
-      source.elf_path = patch_path.c_str();
-    } else {
+    if (!flutter::SetUpShorebird(args.assets_path, patch_path)) {
       FML_LOG(ERROR) << "Failed to configure Shorebird.";
-      source.elf_path = fl_dart_project_get_aot_library_path(self->project);
+      patch_path.clear();
     }
 
-    if (self->embedder_api.CreateAOTData(&source, &self->aot_data) !=
-        kSuccess) {
+    // A patch that fails to load is reported and replaced by the release's
+    // own library.
+    bool loaded = flutter::LoadPatchOrBase(
+        patch_path, fl_dart_project_get_aot_library_path(self->project),
+        [self](const std::string& path) {
+          FlutterEngineAOTDataSource source = {};
+          source.type = kFlutterEngineAOTDataSourceTypeElfPath;
+          source.elf_path = path.c_str();
+          return self->embedder_api.CreateAOTData(&source, &self->aot_data) ==
+                 kSuccess;
+        });
+    if (!loaded) {
       g_set_error(error, fl_engine_error_quark(), FL_ENGINE_ERROR_FAILED,
                   "Failed to create AOT data");
       return FALSE;

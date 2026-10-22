@@ -688,6 +688,9 @@ static void SetThreadPriority(FlutterThreadPriority priority) {
   }
 
   NSLog(@"[shorebird] ConfigureShorebird success!");
+  if (patch_path.empty()) {
+    return NO;
+  }
   *patchPath = [NSString stringWithUTF8String:patch_path.c_str()];
   NSLog(@"[shorebird] patchPath: %@", *patchPath);
   return YES;
@@ -815,18 +818,25 @@ static void SetThreadPriority(FlutterThreadPriority priority) {
   };
   flutterArguments.custom_task_runners = &custom_task_runners;
 
-  NSString* elfPath;
-  BOOL configureShorebirdRes = [self configureShorebird:&elfPath];
-  if (!configureShorebirdRes) {
-    // No patch exists, or we failed to configure shorebird. This is a fallback.
-    // Upstream, this code lives in -(void)loadAOTData:.
-    //
-    // This is the location where the test fixture places the snapshot file.
-    // For applications built by Flutter tool, this is in "App.framework".
-    elfPath = [NSString pathWithComponents:@[ _project.assetsPath, @"app_elf_snapshot.so" ]];
+  NSString* patchPath = nil;
+  if (![self configureShorebird:&patchPath]) {
+    // No patch exists, or we failed to configure shorebird.
+    patchPath = nil;
   }
-
-  [self loadAOTData:elfPath];
+  // Without a patch, upstream's -(void)loadAOTData: path. This is the location
+  // where the test fixture places the snapshot file. For applications built by
+  // Flutter tool there is no file here, and the snapshot is resolved from the
+  // linked App.framework instead.
+  NSString* baseElfPath =
+      [NSString pathWithComponents:@[ _project.assetsPath, @"app_elf_snapshot.so" ]];
+  // A patch that fails to load is reported, and the release's own code boots.
+  if (_embedderAPI.RunsAOTCompiledDartCode()) {
+    flutter::LoadPatchOrBase(patchPath ? patchPath.UTF8String : "", baseElfPath.UTF8String,
+                             [self](const std::string& path) {
+                               [self loadAOTData:@(path.c_str())];
+                               return self->_aotData != nullptr;
+                             });
+  }
 
   if (_aotData) {
     flutterArguments.aot_data = _aotData;
