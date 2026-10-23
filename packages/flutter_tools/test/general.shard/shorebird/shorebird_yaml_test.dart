@@ -95,22 +95,31 @@ patch_verification: strict
         expect(compiled, <String, dynamic>{'app_id': '1-a', 'patch_verification': 'install_only'});
       });
 
-      test('does not override patch_verification in shorebird.yaml', () {
+      test('overrides patch_verification in shorebird.yaml', () {
         final Map<String, dynamic> compiled = compileShorebirdYaml(
-          parse('app_id: 1-a\npatch_verification: strict'),
+          parse('app_id: 1-a\npatch_verification: install_only'),
           flavor: null,
-          environment: <String, String>{'SHOREBIRD_PATCH_VERIFICATION': 'install_only'},
+          environment: <String, String>{'SHOREBIRD_PATCH_VERIFICATION': 'strict'},
         );
         expect(compiled['patch_verification'], 'strict');
       });
 
+      test('leaves patch_verification from shorebird.yaml when unset', () {
+        final Map<String, dynamic> compiled = compileShorebirdYaml(
+          parse('app_id: 1-a\npatch_verification: install_only'),
+          flavor: null,
+          environment: <String, String>{},
+        );
+        expect(compiled['patch_verification'], 'install_only');
+      });
+
       test('treats an empty value as unset', () {
         final Map<String, dynamic> compiled = compileShorebirdYaml(
-          parse('app_id: 1-a'),
+          parse('app_id: 1-a\npatch_verification: strict'),
           flavor: null,
           environment: <String, String>{'SHOREBIRD_PATCH_VERIFICATION': ''},
         );
-        expect(compiled, <String, dynamic>{'app_id': '1-a'});
+        expect(compiled, <String, dynamic>{'app_id': '1-a', 'patch_verification': 'strict'});
       });
 
       test('rejects a value the updater does not know', () {

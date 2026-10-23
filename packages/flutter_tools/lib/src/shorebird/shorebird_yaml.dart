@@ -13,9 +13,11 @@ import '../globals.dart' as globals;
 const kShorebirdPublicKeyEnvVar = 'SHOREBIRD_PUBLIC_KEY';
 
 /// The environment variable whose value is written to the generated
-/// shorebird.yaml as `patch_verification`, unless the project's shorebird.yaml
-/// sets it. The Shorebird CLI sets it for releases signed with a
-/// Shorebird-managed key.
+/// shorebird.yaml as `patch_verification`, over any value in the project's
+/// shorebird.yaml. The Shorebird CLI resolves the mode (the project's
+/// setting, the managed-signing default, Flutter builds where a mode is
+/// unsafe) and passes the result here; the project's value is only used when
+/// the variable is unset, as in a plain `flutter build`.
 const kShorebirdPatchVerificationEnvVar = 'SHOREBIRD_PATCH_VERIFICATION';
 
 /// The `patch_verification` values the updater accepts.
@@ -82,9 +84,7 @@ Map<String, dynamic> compileShorebirdYaml(
   copyIfSet('auto_update');
   copyIfSet('patch_verification');
   final String? patchVerificationEnvVar = environment[kShorebirdPatchVerificationEnvVar];
-  if (patchVerificationEnvVar != null &&
-      patchVerificationEnvVar.isNotEmpty &&
-      !compiled.containsKey('patch_verification')) {
+  if (patchVerificationEnvVar != null && patchVerificationEnvVar.isNotEmpty) {
     // The updater refuses to start on a value it doesn't know, so fail the
     // build instead of shipping one.
     if (!kShorebirdPatchVerificationModes.contains(patchVerificationEnvVar)) {
