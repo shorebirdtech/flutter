@@ -129,9 +129,9 @@ open class BaseFlutterTask : DefaultTask() {
         get() = BaseFlutterTaskHelper.getShorebirdPublicKeyDigest(System.getenv())
 
     // Shorebird-specific: SHOREBIRD_PATCH_VERIFICATION, which flutter
-    // assemble writes into the generated shorebird.yaml over the project.s
-    // patch_verification, so the task reruns when it
-    // changes. Not secret, so the value itself is the input.
+    // assemble writes into the generated shorebird.yaml over the project's
+    // patch_verification, so the task reruns when it changes. Not secret, so
+    // the value itself is the input.
     @get:Optional
     @get:Input
     val shorebirdPatchVerification: String?
