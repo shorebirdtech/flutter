@@ -23,17 +23,21 @@ String? _withShorebirdDigest(String? buildKey, Map<String, String> values) {
   return jsonEncode(<String, String>{'buildKey': ?buildKey, 'shorebird': digest});
 }
 
-/// Reruns an asset bundling target when `SHOREBIRD_PUBLIC_KEY` changes.
+/// Reruns an asset bundling target when `SHOREBIRD_PUBLIC_KEY` or
+/// `SHOREBIRD_PATCH_VERIFICATION` changes.
 ///
-/// `copyAssets` writes the key into the generated shorebird.yaml in
-/// flutter_assets, but the variable is not a define, so it is not part of the
-/// build directory hash.
+/// `copyAssets` writes both into the generated shorebird.yaml in
+/// flutter_assets, but the variables are not defines, so they are not part of
+/// the build directory hash.
 mixin ShorebirdPublicKeyBuildKey on Target {
   @override
   String? buildKeyFor(Environment environment) {
     final String? publicKey = environment.platform.environment[kShorebirdPublicKeyEnvVar];
+    final String? patchVerification =
+        environment.platform.environment[kShorebirdPatchVerificationEnvVar];
     return _withShorebirdDigest(super.buildKeyFor(environment), <String, String>{
       kShorebirdPublicKeyEnvVar: ?publicKey,
+      kShorebirdPatchVerificationEnvVar: ?patchVerification,
     });
   }
 }

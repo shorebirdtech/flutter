@@ -83,6 +83,44 @@ patch_verification: strict
         'patch_public_key': '4-a',
       });
     });
+    group('SHOREBIRD_PATCH_VERIFICATION', () {
+      YamlMap parse(String contents) => loadYamlDocument(contents).contents as YamlMap;
+
+      test('sets patch_verification when shorebird.yaml does not', () {
+        final Map<String, dynamic> compiled = compileShorebirdYaml(
+          parse('app_id: 1-a'),
+          flavor: null,
+          environment: <String, String>{'SHOREBIRD_PATCH_VERIFICATION': 'install_only'},
+        );
+        expect(compiled, <String, dynamic>{'app_id': '1-a', 'patch_verification': 'install_only'});
+      });
+
+      test('does not override patch_verification in shorebird.yaml', () {
+        final Map<String, dynamic> compiled = compileShorebirdYaml(
+          parse('app_id: 1-a\npatch_verification: strict'),
+          flavor: null,
+          environment: <String, String>{'SHOREBIRD_PATCH_VERIFICATION': 'install_only'},
+        );
+        expect(compiled['patch_verification'], 'strict');
+      });
+
+      test('rejects a value the updater does not know', () {
+        expect(
+          () => compileShorebirdYaml(
+            parse('app_id: 1-a'),
+            flavor: null,
+            environment: <String, String>{'SHOREBIRD_PATCH_VERIFICATION': 'bogus'},
+          ),
+          throwsA(
+            isA<Exception>().having(
+              (Exception e) => e.toString(),
+              'message',
+              contains('SHOREBIRD_PATCH_VERIFICATION'),
+            ),
+          ),
+        );
+      });
+    });
     test('edit in place', () {
       const String yamlContents = '''
 app_id: 1-a

@@ -141,6 +141,7 @@ void main() {
   group('buildKeyFor', () {
     final noValues = <String, String>{};
     final withKey = <String, String>{kShorebirdPublicKeyEnvVar: _keyA};
+    final withVerification = <String, String>{kShorebirdPatchVerificationEnvVar: 'install_only'};
     final withDd = <String, String>{kShorebirdDdMaxBytesEnvVar: '100000'};
     final withToken = <String, String>{'SHOREBIRD_TOKEN': _token};
 
@@ -148,30 +149,35 @@ void main() {
         target.buildKeyFor(environmentWith(processEnvironment)) !=
         target.buildKeyFor(environmentWith(noValues));
 
-    test('asset bundling targets track SHOREBIRD_PUBLIC_KEY only', () {
-      final assetTargets = <Target>[
-        const CopyAssets(),
-        const CopyFlutterBundle(),
-        const AotAndroidAssetBundle(),
-        const DebugAndroidApplication(),
-        const ReleaseIosApplicationBundle(),
-        const ReleaseMacOSBundleFlutterAssets(),
-        const ReleaseBundleLinuxAssets(TargetPlatform.linux_x64),
-        const ReleaseBundleWindowsAssets(TargetPlatform.windows_x64),
-        WebReleaseBundle(<WebCompilerConfig>[const JsCompilerConfig()], const NoOpAnalytics()),
-      ];
-      for (final target in assetTargets) {
-        expect(changes(target, withKey), isTrue, reason: target.name);
-        expect(changes(target, withDd), isFalse, reason: target.name);
-        expect(changes(target, withToken), isFalse, reason: target.name);
-      }
-    });
+    test(
+      'asset bundling targets track SHOREBIRD_PUBLIC_KEY and SHOREBIRD_PATCH_VERIFICATION only',
+      () {
+        final assetTargets = <Target>[
+          const CopyAssets(),
+          const CopyFlutterBundle(),
+          const AotAndroidAssetBundle(),
+          const DebugAndroidApplication(),
+          const ReleaseIosApplicationBundle(),
+          const ReleaseMacOSBundleFlutterAssets(),
+          const ReleaseBundleLinuxAssets(TargetPlatform.linux_x64),
+          const ReleaseBundleWindowsAssets(TargetPlatform.windows_x64),
+          WebReleaseBundle(<WebCompilerConfig>[const JsCompilerConfig()], const NoOpAnalytics()),
+        ];
+        for (final target in assetTargets) {
+          expect(changes(target, withKey), isTrue, reason: target.name);
+          expect(changes(target, withVerification), isTrue, reason: target.name);
+          expect(changes(target, withDd), isFalse, reason: target.name);
+          expect(changes(target, withToken), isFalse, reason: target.name);
+        }
+      },
+    );
 
     test('iOS AOT tracks SHOREBIRD_DD_MAX_BYTES only', () {
       const target = AotAssemblyRelease();
       expect(changes(target, withDd), isTrue);
       expect(changes(target, <String, String>{kShorebirdDdMaxBytesEnvVar: '0'}), isFalse);
       expect(changes(target, withKey), isFalse);
+      expect(changes(target, withVerification), isFalse);
       expect(changes(target, withToken), isFalse);
       expect(target.buildKeyFor(environmentWith(withDd)), isNot(contains('100000')));
     });
@@ -184,7 +190,12 @@ void main() {
         CompileMacOSFramework(),
       ];
       for (final target in otherTargets) {
-        for (final processEnvironment in <Map<String, String>>[withKey, withDd, withToken]) {
+        for (final processEnvironment in <Map<String, String>>[
+          withKey,
+          withVerification,
+          withDd,
+          withToken,
+        ]) {
           expect(changes(target, processEnvironment), isFalse, reason: target.name);
         }
       }
