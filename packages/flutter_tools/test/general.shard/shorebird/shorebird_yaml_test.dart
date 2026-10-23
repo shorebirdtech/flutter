@@ -104,6 +104,15 @@ patch_verification: strict
         expect(compiled['patch_verification'], 'strict');
       });
 
+      test('treats an empty value as unset', () {
+        final Map<String, dynamic> compiled = compileShorebirdYaml(
+          parse('app_id: 1-a'),
+          flavor: null,
+          environment: <String, String>{'SHOREBIRD_PATCH_VERIFICATION': ''},
+        );
+        expect(compiled, <String, dynamic>{'app_id': '1-a'});
+      });
+
       test('rejects a value the updater does not know', () {
         expect(
           () => compileShorebirdYaml(

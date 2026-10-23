@@ -82,7 +82,9 @@ Map<String, dynamic> compileShorebirdYaml(
   copyIfSet('auto_update');
   copyIfSet('patch_verification');
   final String? patchVerificationEnvVar = environment[kShorebirdPatchVerificationEnvVar];
-  if (patchVerificationEnvVar != null && !compiled.containsKey('patch_verification')) {
+  if (patchVerificationEnvVar != null &&
+      patchVerificationEnvVar.isNotEmpty &&
+      !compiled.containsKey('patch_verification')) {
     // The updater refuses to start on a value it doesn't know, so fail the
     // build instead of shipping one.
     if (!kShorebirdPatchVerificationModes.contains(patchVerificationEnvVar)) {
