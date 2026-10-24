@@ -1,6 +1,9 @@
 #ifndef FLUTTER_SHELL_COMMON_SHOREBIRD_SHOREBIRD_H_
 #define FLUTTER_SHELL_COMMON_SHOREBIRD_SHOREBIRD_H_
 
+#include <functional>
+#include <string>
+
 #include "flutter/common/settings.h"
 #include "flutter/fml/memory/ref_ptr.h"
 #include "shell/platform/embedder/embedder.h"
@@ -39,8 +42,21 @@ struct ShorebirdConfigArgs {
 
 /// Newer api, used by Desktop implementations.
 /// Does not directly manipulate Settings.
+/// Sets |patch_path| to the patch to boot, or clears it when there is none.
+/// Load it with LoadPatchOrBase.
 bool ConfigureShorebird(const ShorebirdConfigArgs& args,
                         std::string& patch_path);
+
+/// Loads the AOT code for this boot with |load|, which returns whether it
+/// loaded the library at the path it is given. Tries |patch_path| first,
+/// unless it is empty. If the patch does not load, reports the launch as
+/// failed, so the updater marks the patch bad and sends a failure event, and
+/// loads |base_path|, the release's own code, instead. Returns whether the
+/// last load succeeded. Used by the desktop embedders, which load the AOT
+/// library themselves before any Shell exists.
+bool LoadPatchOrBase(const std::string& patch_path,
+                     const std::string& base_path,
+                     const std::function<bool(const std::string&)>& load);
 
 /// Older api used by iOS and Android, directly manipulates Settings.
 void ConfigureShorebird(std::string code_cache_path,
