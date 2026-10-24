@@ -66,6 +66,10 @@
   "ios-sim-arm64": {
     "steps": [
       {
+        "type": "rust",
+        "targets": ["aarch64-apple-ios-sim"]
+      },
+      {
         "type": "gn_ninja",
         "gn_args": ["--ios", "--runtime-mode=debug", "--simulator", "--simulator-cpu=arm64"],
         "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
@@ -73,6 +77,27 @@
       }
     ],
     "compose_input": "ios-framework"
+  },
+  "ios-sim-arm64-release": {
+    "steps": [
+      {
+        "type": "rust",
+        "targets": ["aarch64-apple-ios-sim"]
+      },
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--ios", "--runtime-mode=release", "--simulator", "--simulator-cpu=arm64"],
+        "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework"],
+        "out_dir": "ios_release_sim_arm64"
+      },
+      {
+        "type": "shell",
+        "command": "xcrun strip -x -S out/ios_release_sim_arm64/Flutter.framework/Flutter"
+      }
+    ],
+    "artifacts": [
+      {"src": "ios_release_sim_arm64/Flutter.framework", "dst": "flutter_infra_release/flutter/$engine/ios-release-simulator/Flutter.framework.zip", "zip": true}
+    ]
   },
   "mac-arm64": {
     "steps": [
