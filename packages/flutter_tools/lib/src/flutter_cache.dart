@@ -20,6 +20,7 @@ import 'dart/package_map.dart';
 import 'dart/pub.dart';
 import 'globals.dart' as globals;
 import 'project.dart';
+import 'shorebird/shorebird_ios_aot_simulator.dart';
 
 /// An implementation of the [Cache] which provides all of Flutter's default artifacts.
 class FlutterCache extends Cache {
@@ -514,7 +515,11 @@ class IOSEngineArtifacts extends EngineCachedArtifact {
 
   @override
   List<List<String>> getBinaryDirs() {
-    return <List<String>>[if (_platform.isMacOS || ignorePlatformFiltering) ..._iosBinaryDirs];
+    return <List<String>>[
+      if (_platform.isMacOS || ignorePlatformFiltering) ..._iosBinaryDirs,
+      if (_platform.isMacOS && shorebirdIosAotSimulator(_platform.environment))
+        <String>[kIosReleaseSimulatorEngineDir, '$kIosReleaseSimulatorEngineDir/Flutter.framework.zip'],
+    ];
   }
 
   @override

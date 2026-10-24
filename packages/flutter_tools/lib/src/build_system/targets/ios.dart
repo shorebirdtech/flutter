@@ -22,6 +22,7 @@ import '../../isolated/native_assets/dart_hook_result.dart';
 import '../../macos/xcode.dart';
 import '../../project.dart';
 import '../../shorebird/shorebird_build_key.dart';
+import '../../shorebird/shorebird_ios_aot_simulator.dart';
 import '../build_system.dart';
 import '../depfile.dart';
 import '../exceptions.dart';
@@ -85,7 +86,8 @@ abstract class AotAssemblyBase extends Target with ShorebirdDdMaxBytesBuildKey {
       sdkRoot,
       environment.fileSystem,
     );
-    if (environmentType == EnvironmentType.simulator) {
+    final isSimulator = environmentType == EnvironmentType.simulator;
+    if (isSimulator && !shorebirdIosAotSimulator(environment.platform.environment)) {
       throw Exception(
         'release/profile builds are only supported for physical devices. '
         'attempted to build for simulator.',
@@ -146,11 +148,15 @@ abstract class AotAssemblyBase extends Target with ShorebirdDdMaxBytesBuildKey {
       skipMissingInputs: true,
     );
 
-    await LinkSupplement.create(
-      environment,
-      inputBuildDir: buildOutputPath,
-      outputBuildDir: getIosBuildDirectory(),
-    );
+    // The link supplement is the device build's. A simulator build compiles
+    // the same snapshot, and must not overwrite it.
+    if (!isSimulator) {
+      await LinkSupplement.create(
+        environment,
+        inputBuildDir: buildOutputPath,
+        outputBuildDir: getIosBuildDirectory(),
+      );
+    }
   }
 }
 

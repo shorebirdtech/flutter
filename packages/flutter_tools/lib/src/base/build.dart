@@ -375,6 +375,9 @@ class AOTSnapshotter {
       return _buildFramework(
         appleArch: darwinArch!,
         isIOS: platform == TargetPlatform.ios,
+        isIOSSimulator:
+            sdkRoot != null &&
+            environmentTypeFromSdkroot(sdkRoot, _fileSystem) == EnvironmentType.simulator,
         sdkRoot: sdkRoot,
         assemblyPath: assembly,
         outputPath: outputDir.path,
@@ -541,6 +544,7 @@ class AOTSnapshotter {
   Future<int> _buildFramework({
     required DarwinArch appleArch,
     required bool isIOS,
+    required bool isIOSSimulator,
     String? sdkRoot,
     required String assemblyPath,
     required String outputPath,
@@ -557,7 +561,9 @@ class AOTSnapshotter {
     final commonBuildOptions = <String>[
       '-arch',
       targetArch,
-      if (isIOS)
+      if (isIOSSimulator)
+        '-miphonesimulator-version-min=${FlutterDarwinPlatform.ios.deploymentTarget()}'
+      else if (isIOS)
         // When the minimum version is updated, remember to update
         // template MinimumOSVersion.
         // https://github.com/flutter/flutter/pull/62902

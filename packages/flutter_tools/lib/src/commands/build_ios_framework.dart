@@ -27,6 +27,7 @@ import '../macos/cocoapod_utils.dart';
 import '../runner/flutter_command.dart'
     show DevelopmentArtifact, FlutterCommandResult, FlutterOptions;
 import '../shorebird/ios_framework_build_trace_session.dart';
+import '../shorebird/shorebird_ios_aot_simulator.dart';
 import '../version.dart';
 import 'build.dart';
 import 'darwin_add_to_app.dart';
@@ -825,10 +826,17 @@ end
 
     try {
       // Copy xcframework engine cache framework to mode directory.
-      copyDirectory(
-        globals.fs.directory(engineCacheFlutterFrameworkDirectory),
-        flutterFrameworkCopy,
-      );
+      if (buildInfo.isRelease && shorebirdIosAotSimulator(globals.platform.environment)) {
+        await _createFlutterFrameworkWithReleaseSimulator(
+          globals.fs.directory(engineCacheFlutterFrameworkDirectory),
+          flutterFrameworkCopy,
+        );
+      } else {
+        copyDirectory(
+          globals.fs.directory(engineCacheFlutterFrameworkDirectory),
+          flutterFrameworkCopy,
+        );
+      }
       if (codesignIdentity != null) {
         await DarwinAddToAppCodesigning.codesignFlutterXCFramework(
           codesignIdentity: codesignIdentity,
@@ -842,6 +850,44 @@ end
     }
   }
 
+  /// Creates [output], a Flutter.xcframework of the device slice of
+  /// [engineXcframework] and the release arm64 simulator engine, in place of
+  /// the debug simulator slice. See [kShorebirdIosAotSimulatorEnvVar].
+  Future<void> _createFlutterFrameworkWithReleaseSimulator(
+    Directory engineXcframework,
+    Directory output,
+  ) async {
+    final Directory simulatorFramework = globals.cache
+        .getArtifactDirectory('engine')
+        .childDirectory(kIosReleaseSimulatorEngineDir)
+        .childDirectory('Flutter.framework');
+    if (!simulatorFramework.existsSync()) {
+      throwToolExit(
+        '$kShorebirdIosAotSimulatorEnvVar is set, but there is no release simulator engine at '
+        '${simulatorFramework.path}. Only engines built for Shorebird internal testing have one.',
+      );
+    }
+    final Directory deviceSlice = engineXcframework.childDirectory('ios-arm64');
+    final Directory deviceDsym = deviceSlice
+        .childDirectory('dSYMs')
+        .childDirectory('Flutter.framework.dSYM');
+    final ProcessResult result = await globals.processManager.run(<String>[
+      'xcrun',
+      'xcodebuild',
+      '-create-xcframework',
+      '-framework',
+      deviceSlice.childDirectory('Flutter.framework').path,
+      if (deviceDsym.existsSync()) ...<String>['-debug-symbols', deviceDsym.absolute.path],
+      '-framework',
+      simulatorFramework.path,
+      '-output',
+      output.path,
+    ]);
+    if (result.exitCode != 0) {
+      throwToolExit('Unable to create Flutter.xcframework: ${result.stderr}');
+    }
+  }
+
   Future<void> _produceAppFramework(
     BuildInfo buildInfo,
     Directory outputDirectory,
@@ -852,6 +898,8 @@ end
     const appFrameworkName = 'App.framework';
     final Status status = globals.logger.startProgress(' ├─Building App.xcframework...');
     final frameworks = <Directory>[];
+    final bool aotSimulator =
+        buildInfo.isRelease && shorebirdIosAotSimulator(globals.platform.environment);
 
     try {
       for (final EnvironmentType sdkType in EnvironmentType.values) {
@@ -870,10 +918,13 @@ end
           defines: <String, String>{
             kTargetFile: targetFile,
             kTargetPlatform: TargetPlatform.ios.getName(),
-            kIosArchs: defaultIOSArchsForEnvironment(
-              sdkType,
-              globals.artifacts!,
-            ).map((DarwinArch e) => e.name).join(' '),
+            kIosArchs:
+                (sdkType == EnvironmentType.simulator && aotSimulator
+                        // The release simulator engine is arm64 only.
+                        ? <DarwinArch>[DarwinArch.arm64]
+                        : defaultIOSArchsForEnvironment(sdkType, globals.artifacts!))
+                    .map((DarwinArch e) => e.name)
+                    .join(' '),
             kSdkRoot: await globals.xcode!.sdkLocation(sdkType),
             ...buildInfo.toBuildSystemEnvironment(),
           },
@@ -889,8 +940,9 @@ end
           generateDartPluginRegistry: true,
         );
         Target target;
-        // Always build debug for simulator.
-        if (buildInfo.isDebug || sdkType == EnvironmentType.simulator) {
+        // Build debug for simulator, unless it is to run on the release
+        // simulator engine.
+        if (buildInfo.isDebug || (sdkType == EnvironmentType.simulator && !aotSimulator)) {
           target = const DebugIosApplicationBundle();
         } else if (buildInfo.isProfile) {
           target = const ProfileIosApplicationBundle();
