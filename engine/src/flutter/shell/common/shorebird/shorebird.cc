@@ -144,7 +144,7 @@ std::string GetValueFromYaml(const std::string& yaml, const std::string& key) {
 // TODO(eseidel): Consolidate this with the other ConfigureShorebird() API.
 bool ConfigureShorebird(const ShorebirdConfigArgs& args,
                         std::string& patch_path) {
-  patch_path = args.release_app_library_path;
+  patch_path.clear();
   auto shorebird_updater_dir_name = "shorebird_updater";
 
   // Parse app id from shorebird.yaml
@@ -211,6 +211,27 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   // starts from the Shell's launch-success report, after the boot is
   // recorded; see the Updater class comment.
   return init_result;
+}
+
+bool LoadPatchOrBase(const std::string& patch_path,
+                     const std::string& base_path,
+                     const std::function<bool(const std::string&)>& load) {
+  if (patch_path.empty()) {
+    return load(base_path);
+  }
+  if (load(patch_path)) {
+    return true;
+  }
+  FML_LOG(ERROR) << "Shorebird: patch load failed, running base code from "
+                 << base_path << " instead of " << patch_path;
+  // The failure report marks the booting patch bad, and a patch is only
+  // booting once the start is reported. Both are guarded once per process,
+  // so the Shell's own start report (ResolveIsolateData) is a no-op, and its
+  // success report does not record the base-code boot as the patch's. This
+  // is the same sequence TryLoadFromPatch runs on iOS.
+  shorebird::Updater::Instance().ReportLaunchStart();
+  shorebird::Updater::Instance().ReportLaunchFailure();
+  return load(base_path);
 }
 
 /// Older api used by iOS and Android, directly manipulates Settings.
