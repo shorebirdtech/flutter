@@ -416,19 +416,24 @@ bool FlutterWindowsEngine::Run(std::string_view entrypoint) {
   std::string icu_path_string = fml::PathToUtf8(project_->icu_path());
 
   std::string patch_path;
-  auto setup_shorebird_result = SetUpShorebird(assets_path_string, patch_path);
-  if (setup_shorebird_result) {
-    // If we have a patch installed, we replace the default AOT library path
-    // with the patch path here.
-    FML_LOG(INFO) << "Setting project patch path: " << patch_path;
-    project_->SetAotLibraryPath(patch_path);
-  } else {
+  if (!SetUpShorebird(assets_path_string, patch_path)) {
     FML_LOG(ERROR) << "Failed to configure Shorebird.";
+    patch_path.clear();
   }
 
-  // This loads AOT data from the project_'s aot_library_path_.
+  // This loads AOT data from the project_'s aot_library_path_. A patch that
+  // fails to load is reported and replaced by the release's own library.
   if (embedder_api_.RunsAOTCompiledDartCode()) {
-    aot_data_ = project_->LoadAotData(embedder_api_);
+    const std::filesystem::path base_path = project_->aot_library_path();
+    LoadPatchOrBase(
+        patch_path, fml::PathToUtf8(base_path), [&](const std::string& path) {
+          // The base keeps its own path object, since a round
+          // trip through a narrow string is lossy on Windows.
+          project_->SetAotLibraryPath(
+              path == patch_path ? std::filesystem::path(path) : base_path);
+          aot_data_ = project_->LoadAotData(embedder_api_);
+          return aot_data_ != nullptr;
+        });
     if (!aot_data_) {
       FML_LOG(ERROR) << "Unable to start engine without AOT data.";
       return false;
