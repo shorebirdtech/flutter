@@ -365,12 +365,11 @@ bool GetLocalAppDataPath(std::string& outPath) {
     return false;
   }
 
-  std::wstring widePath(path);
-  std::string localAppDataPath(widePath.begin(), widePath.end());
+  // The updater takes UTF-8 paths.
+  outPath = fml::WideStringToUtf8(path);
   // The calling process is responsible for freeing this resource
   // https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shgetknownfolderpath
   CoTaskMemFree(path);
-  outPath = localAppDataPath;
   return true;
 }
 
@@ -427,10 +426,13 @@ bool FlutterWindowsEngine::Run(std::string_view entrypoint) {
     const std::filesystem::path base_path = project_->aot_library_path();
     LoadPatchOrBase(
         patch_path, fml::PathToUtf8(base_path), [&](const std::string& path) {
-          // The base keeps its own path object, since a round
-          // trip through a narrow string is lossy on Windows.
+          // The patch path is UTF-8, which a narrow std::filesystem::path
+          // would decode as the ANSI code page. The base keeps its own
+          // path object.
           project_->SetAotLibraryPath(
-              path == patch_path ? std::filesystem::path(path) : base_path);
+              path == patch_path
+                  ? std::filesystem::path(fml::Utf8ToWideString(path))
+                  : base_path);
           aot_data_ = project_->LoadAotData(embedder_api_);
           return aot_data_ != nullptr;
         });
