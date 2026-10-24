@@ -15,6 +15,7 @@
 #include <string>
 
 #include "flutter/fml/logging.h"
+#include "flutter/fml/mapping.h"
 #include "flutter/fml/paths.h"
 #include "flutter/fml/platform/win/wstring_conversion.h"
 #include "flutter/fml/synchronization/waitable_event.h"
@@ -34,7 +35,6 @@
 #include "flutter/shell/platform/windows/window_manager.h"
 #include "flutter/third_party/accessibility/ax/ax_node.h"
 #include "shell/platform/windows/flutter_project_bundle.h"
-#include "third_party/tonic/filesystem/filesystem/file.h"
 
 // winbase.h defines GetCurrentTime as a macro.
 #undef GetCurrentTime
@@ -289,24 +289,25 @@ bool FlutterWindowsEngine::Run() {
 }
 
 int GetReleaseVersionAndBuildNumber(ReleaseVersion* release_version) {
-  char module_path[MAX_PATH];
+  // The wide APIs, since the ANSI ones can't represent every path.
+  wchar_t module_path[MAX_PATH];
   // Get the full path of the currently running executable. The return value is
-  // the size of the string that was copied to the buffer, with -1 indicating
+  // the size of the string that was copied to the buffer, with 0 indicating
   // failure.
-  if (GetModuleFileNameA(NULL, module_path, MAX_PATH) == -1) {
+  if (GetModuleFileNameW(NULL, module_path, MAX_PATH) == 0) {
     return -1;
   }
 
   // Get the size of the version information
-  DWORD handle = -1;
-  DWORD version_info_size = GetFileVersionInfoSizeA(module_path, &handle);
-  if (version_info_size == -1) {
+  DWORD handle = 0;
+  DWORD version_info_size = GetFileVersionInfoSizeW(module_path, &handle);
+  if (version_info_size == 0) {
     return -1;
   }
 
   // Allocate memory for version info
   std::unique_ptr<char[]> version_data(new char[version_info_size]);
-  if (!GetFileVersionInfoA(module_path, handle, version_info_size,
+  if (!GetFileVersionInfoW(module_path, handle, version_info_size,
                            version_data.get())) {
     return -1;
   }
@@ -320,20 +321,20 @@ int GetReleaseVersionAndBuildNumber(ReleaseVersion* release_version) {
   }* lpTranslate;
 
   UINT cbTranslate = 0;
-  if (!VerQueryValueA(version_data.get(), "\\VarFileInfo\\Translation",
+  if (!VerQueryValueW(version_data.get(), L"\\VarFileInfo\\Translation",
                       (LPVOID*)&lpTranslate, &cbTranslate)) {
     FML_LOG(ERROR) << "Error: Unable to get translation info.";
     return -1;
   }
 
   // Construct the query string using the first translation found
-  char subBlock[64];
-  sprintf_s(subBlock, "\\StringFileInfo\\%04x%04x\\ProductVersion",
-            lpTranslate[0].wLanguage, lpTranslate[0].wCodePage);
+  wchar_t subBlock[64];
+  swprintf_s(subBlock, L"\\StringFileInfo\\%04x%04x\\ProductVersion",
+             lpTranslate[0].wLanguage, lpTranslate[0].wCodePage);
 
-  LPSTR versionString = nullptr;
+  LPWSTR versionString = nullptr;
   UINT size = 0;
-  if (!VerQueryValueA(version_data.get(), subBlock, (LPVOID*)&versionString,
+  if (!VerQueryValueW(version_data.get(), subBlock, (LPVOID*)&versionString,
                       &size)) {
     return -1;
   }
@@ -344,7 +345,7 @@ int GetReleaseVersionAndBuildNumber(ReleaseVersion* release_version) {
 
   // The version string is in the format of "1.0.0+1", with the label ("+1")
   // being optional.
-  auto version = std::string(versionString);
+  auto version = fml::WideStringToUtf8(versionString);
   auto plusPos = version.find("+");
   if (plusPos != std::string::npos) {
     auto semVer = version.substr(0, plusPos);
@@ -376,12 +377,16 @@ bool GetLocalAppDataPath(std::string& outPath) {
 bool SetUpShorebird(std::string assets_path_string, std::string& patch_path) {
   auto shorebird_yaml_path =
       fml::paths::JoinPaths({assets_path_string, "shorebird.yaml"});
-  std::string shorebird_yaml_contents("");
-  if (!filesystem::ReadFileToString(shorebird_yaml_path,
-                                    &shorebird_yaml_contents)) {
+  // fml opens the UTF-8 path as wide; tonic's ReadFileToString would decode
+  // it as the ANSI code page.
+  auto shorebird_yaml = fml::FileMapping::CreateReadOnly(shorebird_yaml_path);
+  if (!shorebird_yaml || !shorebird_yaml->GetMapping()) {
     FML_LOG(ERROR) << "Failed to read shorebird.yaml.";
     return false;
   }
+  std::string shorebird_yaml_contents(
+      reinterpret_cast<const char*>(shorebird_yaml->GetMapping()),
+      shorebird_yaml->GetSize());
 
   std::string code_cache_path;
   if (!GetLocalAppDataPath(code_cache_path)) {
