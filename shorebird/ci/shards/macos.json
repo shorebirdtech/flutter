@@ -33,38 +33,24 @@
       {"src": "android_release_x64/zip_archives/android-x64-release/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/darwin-x64.zip"}
     ]
   },
-  "ios-release": {
+  "ios": {
     "steps": [
       {
         "type": "rust",
-        "targets": ["aarch64-apple-ios"]
+        "targets": ["aarch64-apple-ios", "x86_64-apple-ios"]
       },
       {
         "type": "gn_ninja",
         "gn_args": ["--ios", "--runtime-mode=release", "--gn-arg=shorebird_runtime=true"],
         "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
         "out_dir": "ios_release"
-      }
-    ],
-    "compose_input": "ios-framework"
-  },
-  "ios-sim-x64": {
-    "steps": [
-      {
-        "type": "rust",
-        "targets": ["x86_64-apple-ios"]
       },
       {
         "type": "gn_ninja",
         "gn_args": ["--ios", "--runtime-mode=debug", "--simulator"],
         "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
         "out_dir": "ios_debug_sim"
-      }
-    ],
-    "compose_input": "ios-framework"
-  },
-  "ios-sim-arm64": {
-    "steps": [
+      },
       {
         "type": "gn_ninja",
         "gn_args": ["--ios", "--runtime-mode=debug", "--simulator", "--simulator-cpu=arm64"],
