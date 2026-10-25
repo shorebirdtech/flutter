@@ -656,6 +656,87 @@ void main() {
       },
     );
 
+    testUsingContext(
+      'looks up the code-signing identity after regenerating the iOS project',
+      () async {
+        final Directory projectDir = memoryFileSystem.directory('/project')..createSync();
+        projectDir.childDirectory('ios').childDirectory('Pods').createSync(recursive: true);
+        projectDir.childDirectory('lib').childFile('main.dart').createSync(recursive: true);
+        projectDir.childDirectory('.dart_tool').childFile('package_config.json')
+          ..createSync(recursive: true)
+          ..writeAsStringSync(
+            '{"configVersion": 2, "packages": [{"name": "project", "rootUri": "../", "packageUri": "lib/", "languageVersion": "3.0"}]}',
+          );
+        projectDir
+            .childDirectory('.dart_tool')
+            .childFile('package_graph.json')
+            .writeAsStringSync(
+              '{"configVersion": 1, "packages": [{"name": "project", "rootUri": "..", "packageUri": "lib/", "dependencies": []}]}',
+            );
+        projectDir.childFile('pubspec.yaml').writeAsStringSync('name: project');
+        projectDir.childFile('.metadata').createSync();
+        // Debug builds copy the LLDB files into the output directory.
+        final Directory ephemeral = projectDir
+            .childDirectory('ios')
+            .childDirectory('Flutter')
+            .childDirectory('ephemeral');
+        ephemeral.childFile('flutter_lldbinit').createSync(recursive: true);
+        ephemeral.childFile('flutter_lldb_helper.py').createSync();
+        memoryFileSystem.currentDirectory = projectDir;
+        memoryFileSystem
+            .directory('Artifact.flutterXcframework.TargetPlatform.ios.debug')
+            .createSync(recursive: true);
+        projectDir.childDirectory('.dart_tool').childDirectory('flutter_build')
+          ..createSync(recursive: true)
+          ..childFile(
+            'link_hooks_result.json',
+          ).writeAsStringSync('{"codeAssets": [], "dataAssets": [], "dependencies": []}');
+        // Like a fresh module's .ios/, the generated tooling doesn't exist
+        // until the build regenerates it.
+        final File pluginRegistrant = projectDir
+            .childDirectory('ios')
+            .childDirectory('Runner')
+            .childFile('GeneratedPluginRegistrant.m');
+        expect(pluginRegistrant.existsSync(), isFalse);
+
+        final codesign = FakeDarwinAddToAppCodesigning();
+        final command = BuildIOSFrameworkCommand(
+          logger: BufferLogger.test(),
+          buildSystem: TestBuildSystem.all(BuildResult(success: true), (
+            Target target,
+            Environment environment,
+          ) {
+            final Directory output = environment.outputDir;
+            output.childDirectory('App.framework').childFile('App').createSync(recursive: true);
+            output
+                .childDirectory('App.framework')
+                .childDirectory('flutter_assets')
+                .childFile('NativeAssetsManifest.json')
+              ..createSync(recursive: true)
+              ..writeAsStringSync('{"format-version": [1, 0, 0], "native-assets": {}}');
+          }),
+          platform: fakePlatform,
+          flutterVersion: fakeFlutterVersion,
+          cache: cache,
+          verboseHelp: false,
+          codesign: codesign,
+        );
+
+        await createTestCommandRunner(
+          command,
+        ).run(<String>['ios-framework', '--no-plugins', '--no-profile', '--no-release']);
+
+        expect(codesign.pluginRegistrantExistedAtLookup, <bool>[true]);
+      },
+      overrides: <Type, Generator>{
+        FileSystem: () => memoryFileSystem,
+        ProcessManager: () => FakeProcessManager.any(),
+        Artifacts: () => Artifacts.test(fileSystem: memoryFileSystem),
+        Cache: () => cache,
+        Pub: () => FakePub(),
+      },
+    );
+
     // Shorebird-specific: --shorebird-trace tracing across the framework build.
     group('--shorebird-trace', () {
       // Minimal module project whose App.framework slices carry consistent
@@ -2183,6 +2264,10 @@ class FakePub extends Fake implements Pub {
 }
 
 class FakeDarwinAddToAppCodesigning extends Fake implements DarwinAddToAppCodesigning {
+  /// For each lookup, whether the iOS project's plugin registrant, which
+  /// only platform tooling regeneration writes, existed then.
+  final pluginRegistrantExistedAtLookup = <bool>[];
+
   @override
   Future<String?> getCodesignIdentity({
     required BuildInfo buildInfo,
@@ -2191,6 +2276,9 @@ class FakeDarwinAddToAppCodesigning extends Fake implements DarwinAddToAppCodesi
     required File identityFile,
     required XcodeBasedProject xcodeProject,
   }) async {
+    pluginRegistrantExistedAtLookup.add(
+      (xcodeProject as IosProject).pluginRegistrantImplementation.existsSync(),
+    );
     return null;
   }
 }
