@@ -560,15 +560,8 @@ class BuildIOSFrameworkCommand extends BuildFrameworkCommand {
     );
     final List<BuildInfo> buildInfos = await getBuildInfos();
 
-    final String? codesignIdentity = await codesign.getCodesignIdentity(
-      buildInfo: buildInfos.first,
-      codesignEnabled: boolArg(FlutterOptions.kCodesign),
-      codesignIdentityOption: stringArg(FlutterOptions.kCodesignIdentity),
-      identityFile: outputDirectory.childFile('.codesign_identity'),
-      xcodeProject: project.ios,
-    );
-
-    for (final buildInfo in buildInfos) {
+    String? codesignIdentity;
+    for (final (int index, BuildInfo buildInfo) in buildInfos.indexed) {
       // Create the build-mode specific metadata.
       //
       // This normally would be done in the verifyAndRun step of FlutterCommand, but special "meta"
@@ -591,6 +584,19 @@ class BuildIOSFrameworkCommand extends BuildFrameworkCommand {
         buildInfo: buildInfo,
         targetOverride: targetFile,
       );
+
+      // Look up the identity only after regenerating: it reads the development
+      // team from the iOS project's build settings, and a module's .ios/
+      // project may not exist until regeneration creates it.
+      if (index == 0) {
+        codesignIdentity = await codesign.getCodesignIdentity(
+          buildInfo: buildInfo,
+          codesignEnabled: boolArg(FlutterOptions.kCodesign),
+          codesignIdentityOption: stringArg(FlutterOptions.kCodesignIdentity),
+          identityFile: outputDirectory.childFile('.codesign_identity'),
+          xcodeProject: project.ios,
+        );
+      }
 
       final String? productBundleIdentifier = await project.ios.productBundleIdentifier(buildInfo);
       globals.printStatus(

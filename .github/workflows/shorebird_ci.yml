@@ -73,10 +73,48 @@ jobs:
         working-directory: packages/shorebird_tests
 
   shorebird-ios-tests:
-    # iOS tests require macOS for Xcode
+    # iOS tests require macOS for Xcode. Five sequential iOS builds make this
+    # the slowest check, so it gets the 5-core xlarge runner.
+    runs-on: macos-latest-xlarge
+
+    name: 🍎 Shorebird iOS Tests
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎯 Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      # warmUpTemplateProject builds an APK when the Gradle cache is empty.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
+      - name: 📦 Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # base_test.dart runs in shorebird-android-tests.
+      - name: 🍎 Run iOS Tests
+        run: dart test test/ios_test.dart
+        working-directory: packages/shorebird_tests
+
+  shorebird-macos-android-smoke-test:
+    # Quick sanity check that Android builds work on macOS too. Its own job so
+    # it runs alongside the iOS tests instead of after them.
     runs-on: macos-latest
 
-    name: 🍎 Shorebird iOS + Android Smoke Tests
+    name: 🤖 Shorebird Android Smoke Test (macOS)
 
     steps:
       - name: 📚 Git Checkout
@@ -102,12 +140,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: 🍎 Run iOS Tests
-        run: dart test test/base_test.dart test/ios_test.dart
-        working-directory: packages/shorebird_tests
-
       - name: 🤖 Run Android Smoke Test (macOS)
-        # Quick sanity check that Android builds work on macOS too
         run: dart test test/android_test.dart --name "can build an apk"
         working-directory: packages/shorebird_tests
         env:
@@ -122,6 +155,7 @@ jobs:
       - flutter-tools-tests
       - shorebird-android-tests
       - shorebird-ios-tests
+      - shorebird-macos-android-smoke-test
     runs-on: ubuntu-latest
     steps:
       - if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
