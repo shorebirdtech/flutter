@@ -42,10 +42,10 @@ jobs:
     # must not run on our Namespace runners.
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on:
-      - nscloud-ubuntu-22.04-amd64-8x32-with-cache
+      - nscloud-ubuntu-22.04-amd64-16x64-with-cache
       - nscloud-cache-tag-shorebird-engine-tests
       - nscloud-cache-size-100gb
-    # The first run, on an empty cache, took 12 minutes (sync 3, build 8).
+    # 16 vCPU: the build is the job's critical path (8.5 min on 8 vCPU).
     timeout-minutes: 30
 
     steps:
