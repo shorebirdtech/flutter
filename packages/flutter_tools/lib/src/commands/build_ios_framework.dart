@@ -21,6 +21,7 @@ import '../darwin/darwin.dart';
 import '../flutter_plugins.dart';
 import '../globals.dart' as globals;
 import '../ios/plist_parser.dart';
+import '../ios/xcode_build_settings.dart';
 import '../ios/xcodeproj.dart';
 import '../macos/cocoapod_utils.dart';
 import '../runner/flutter_command.dart'
@@ -578,6 +579,17 @@ class BuildIOSFrameworkCommand extends BuildFrameworkCommand {
       await regeneratePlatformSpecificToolingIfApplicable(
         project,
         releaseMode: buildInfo.mode.isRelease,
+      );
+
+      // Regeneration above rewrites Generated.xcconfig only when it is older
+      // than this Flutter's tools stamp, so a file another Flutter wrote
+      // since (an IDE's pub get) survives it, and pod install below would
+      // then use that Flutter's FLUTTER_ROOT. Always rewrite it, as
+      // `flutter build ios` does.
+      await updateGeneratedXcodeProperties(
+        project: project,
+        buildInfo: buildInfo,
+        targetOverride: targetFile,
       );
 
       final String? productBundleIdentifier = await project.ios.productBundleIdentifier(buildInfo);
