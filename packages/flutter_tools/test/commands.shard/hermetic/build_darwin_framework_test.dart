@@ -693,11 +693,11 @@ void main() {
           ).writeAsStringSync('{"codeAssets": [], "dataAssets": [], "dependencies": []}');
         // Like a fresh module's .ios/, the generated tooling doesn't exist
         // until the build regenerates it.
-        final File generatedXcconfig = projectDir
+        final File pluginRegistrant = projectDir
             .childDirectory('ios')
-            .childDirectory('Flutter')
-            .childFile('Generated.xcconfig');
-        expect(generatedXcconfig, isNot(exists));
+            .childDirectory('Runner')
+            .childFile('GeneratedPluginRegistrant.m');
+        expect(pluginRegistrant.existsSync(), isFalse);
 
         final codesign = FakeDarwinAddToAppCodesigning();
         final command = BuildIOSFrameworkCommand(
@@ -726,7 +726,7 @@ void main() {
           command,
         ).run(<String>['ios-framework', '--no-plugins', '--no-profile', '--no-release']);
 
-        expect(codesign.generatedXcconfigExistedAtLookup, <bool>[true]);
+        expect(codesign.pluginRegistrantExistedAtLookup, <bool>[true]);
       },
       overrides: <Type, Generator>{
         FileSystem: () => memoryFileSystem,
@@ -2264,8 +2264,9 @@ class FakePub extends Fake implements Pub {
 }
 
 class FakeDarwinAddToAppCodesigning extends Fake implements DarwinAddToAppCodesigning {
-  /// For each lookup, whether the project's Generated.xcconfig existed then.
-  final generatedXcconfigExistedAtLookup = <bool>[];
+  /// For each lookup, whether the iOS project's plugin registrant, which
+  /// only platform tooling regeneration writes, existed then.
+  final pluginRegistrantExistedAtLookup = <bool>[];
 
   @override
   Future<String?> getCodesignIdentity({
@@ -2275,7 +2276,9 @@ class FakeDarwinAddToAppCodesigning extends Fake implements DarwinAddToAppCodesi
     required File identityFile,
     required XcodeBasedProject xcodeProject,
   }) async {
-    generatedXcconfigExistedAtLookup.add(xcodeProject.generatedXcodePropertiesFile.existsSync());
+    pluginRegistrantExistedAtLookup.add(
+      (xcodeProject as IosProject).pluginRegistrantImplementation.existsSync(),
+    );
     return null;
   }
 }
