@@ -598,21 +598,20 @@ void main() {
         final File toolsStamp = cache.getStampFileFor('flutter_tools')
           ..createSync(recursive: true)
           ..setLastModifiedSync(DateTime(2026));
-        final File generatedXcconfig =
-            projectDir
-                .childDirectory('ios')
-                .childDirectory('Flutter')
-                .childFile('Generated.xcconfig')
-              ..writeAsStringSync('FLUTTER_ROOT=/other/flutter\n')
-              ..setLastModifiedSync(toolsStamp.lastModifiedSync().add(const Duration(minutes: 1)));
+        final File generatedXcconfig = projectDir
+            .childDirectory('ios')
+            .childDirectory('Flutter')
+            .childFile('Generated.xcconfig')
+          ..writeAsStringSync('FLUTTER_ROOT=/other/flutter\n')
+          ..setLastModifiedSync(toolsStamp.lastModifiedSync().add(const Duration(minutes: 1)));
         memoryFileSystem
             .directory('Artifact.flutterXcframework.TargetPlatform.ios.debug')
             .createSync(recursive: true);
         projectDir.childDirectory('.dart_tool').childDirectory('flutter_build')
           ..createSync(recursive: true)
-          ..childFile(
-            'link_hooks_result.json',
-          ).writeAsStringSync('{"codeAssets": [], "dataAssets": [], "dependencies": []}');
+          ..childFile('link_hooks_result.json').writeAsStringSync(
+            '{"codeAssets": [], "dataAssets": [], "dependencies": []}',
+          );
 
         final command = BuildIOSFrameworkCommand(
           logger: BufferLogger.test(),
@@ -636,9 +635,12 @@ void main() {
           codesign: FakeDarwinAddToAppCodesigning(),
         );
 
-        await createTestCommandRunner(
-          command,
-        ).run(<String>['ios-framework', '--no-plugins', '--no-profile', '--no-release']);
+        await createTestCommandRunner(command).run(<String>[
+          'ios-framework',
+          '--no-plugins',
+          '--no-profile',
+          '--no-release',
+        ]);
 
         expect(
           generatedXcconfig.readAsStringSync(),
@@ -776,9 +778,9 @@ void main() {
             .createSync(recursive: true);
         projectDir.childDirectory('.dart_tool').childDirectory('flutter_build')
           ..createSync(recursive: true)
-          ..childFile(
-            'link_hooks_result.json',
-          ).writeAsStringSync('{"codeAssets": [], "dataAssets": [], "dependencies": []}');
+          ..childFile('link_hooks_result.json').writeAsStringSync(
+            '{"codeAssets": [], "dataAssets": [], "dependencies": []}',
+          );
       }
 
       BuildIOSFrameworkCommand createCommand({required bool consistentAssets}) {
