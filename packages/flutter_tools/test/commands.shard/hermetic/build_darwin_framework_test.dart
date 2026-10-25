@@ -16,8 +16,10 @@ import 'package:flutter_tools/src/commands/build_ios_framework.dart';
 import 'package:flutter_tools/src/commands/build_macos_framework.dart';
 import 'package:flutter_tools/src/commands/darwin_add_to_app.dart';
 import 'package:flutter_tools/src/convert.dart';
+import 'package:flutter_tools/src/dart/pub.dart';
 import 'package:flutter_tools/src/darwin/darwin.dart';
 import 'package:flutter_tools/src/ios/plist_parser.dart';
+import 'package:flutter_tools/src/project.dart' show FlutterProject;
 import 'package:flutter_tools/src/version.dart';
 import 'package:flutter_tools/src/xcode_project.dart';
 import 'package:shorebird_build_trace/shorebird_build_trace.dart';
@@ -590,14 +592,18 @@ void main() {
             .childDirectory('ephemeral');
         ephemeral.childFile('flutter_lldbinit').createSync(recursive: true);
         ephemeral.childFile('flutter_lldb_helper.py').createSync();
+        memoryFileSystem.currentDirectory = projectDir;
         // Written by another Flutter after this one's tools stamp, so the
         // stamp-based regeneration keeps it.
+        final File toolsStamp = cache.getStampFileFor('flutter_tools')
+          ..createSync(recursive: true)
+          ..setLastModifiedSync(DateTime(2026));
         final File generatedXcconfig = projectDir
             .childDirectory('ios')
             .childDirectory('Flutter')
             .childFile('Generated.xcconfig')
-          ..writeAsStringSync('FLUTTER_ROOT=/other/flutter\n');
-        memoryFileSystem.currentDirectory = projectDir;
+          ..writeAsStringSync('FLUTTER_ROOT=/other/flutter\n')
+          ..setLastModifiedSync(toolsStamp.lastModifiedSync().add(const Duration(minutes: 1)));
         memoryFileSystem
             .directory('Artifact.flutterXcframework.TargetPlatform.ios.debug')
             .createSync(recursive: true);
@@ -631,7 +637,6 @@ void main() {
 
         await createTestCommandRunner(command).run(<String>[
           'ios-framework',
-          '--no-pub',
           '--no-plugins',
           '--no-profile',
           '--no-release',
@@ -646,6 +651,8 @@ void main() {
         FileSystem: () => memoryFileSystem,
         ProcessManager: () => FakeProcessManager.any(),
         Artifacts: () => Artifacts.test(fileSystem: memoryFileSystem),
+        Cache: () => cache,
+        Pub: () => FakePub(),
       },
     );
 
@@ -2158,6 +2165,21 @@ class FakePlistParser extends PlistParser {
   String? plistJsonContent(String filePath) {
     return _jsonContentByPath[filePath];
   }
+}
+
+class FakePub extends Fake implements Pub {
+  @override
+  Future<void> get({
+    PubContext? context,
+    required FlutterProject project,
+    bool upgrade = false,
+    bool offline = false,
+    String? flutterRootOverride,
+    bool checkUpToDate = false,
+    bool shouldSkipThirdPartyGenerator = true,
+    bool enforceLockfile = false,
+    PubOutputMode outputMode = PubOutputMode.all,
+  }) async {}
 }
 
 class FakeDarwinAddToAppCodesigning extends Fake implements DarwinAddToAppCodesigning {
