@@ -19,6 +19,7 @@ std::mutex Updater::instance_mutex_;
 std::atomic<bool> Updater::launch_started_{false};
 std::atomic<bool> Updater::launch_completed_{false};
 std::atomic<bool> Updater::patch_load_failed_{false};
+std::atomic<bool> Updater::patch_load_failed_for_testing_{false};
 std::atomic<bool> Updater::initialized_{false};
 std::atomic<bool> Updater::update_thread_started_{false};
 std::mutex Updater::restart_hosts_mutex_;
@@ -202,7 +203,11 @@ void Updater::ReportPatchLoadFailure() {
 }
 
 bool Updater::PatchLoadFailed() {
-  return patch_load_failed_.load();
+  return patch_load_failed_.load() || patch_load_failed_for_testing_.load();
+}
+
+void Updater::SetPatchLoadFailedForTesting(bool failed) {
+  patch_load_failed_for_testing_.store(failed);
 }
 
 #if SHOREBIRD_PLATFORM_SUPPORTED

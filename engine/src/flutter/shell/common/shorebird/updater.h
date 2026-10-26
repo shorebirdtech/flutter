@@ -158,6 +158,13 @@ class Updater {
   /// exactly like a patch boot, and this is what distinguishes them.
   static bool PatchLoadFailed();
 
+  /// Testing only: reports a patch load failure that survives
+  /// `BeginNewLaunchCycle`. The real flag is set by the loader while it
+  /// resolves the isolate snapshot, which a test cannot drive, and is cleared
+  /// at the start of every restart attempt, so a test has no other way to
+  /// reach the paths that react to a failed load.
+  static void SetPatchLoadFailedForTesting(bool failed);
+
   /// Re-arms the launch lifecycle guards so a hot restart can report a new
   /// launch cycle (start, then success/failure) to the Rust updater —
   /// exactly like a fresh process boot. Only the hot restart host may call
@@ -233,6 +240,9 @@ class Updater {
   // the guards above. Read by the hot restart host, which cannot see that
   // failure in the snapshot it gets back. See `PatchLoadFailed`.
   static std::atomic<bool> patch_load_failed_;
+  // Stands in for the loader's report, which a test cannot produce. Kept
+  // apart from the flag above so the launch-cycle reset does not clear it.
+  static std::atomic<bool> patch_load_failed_for_testing_;
   // Whether any `Init` succeeded; the update thread needs a configured
   // updater. Latched, never cleared outside tests.
   static std::atomic<bool> initialized_;

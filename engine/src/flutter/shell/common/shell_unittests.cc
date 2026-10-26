@@ -5372,6 +5372,83 @@ void RunOnUIThreadAndWait(Shell* shell, const fml::closure& task) {
 // Shell with no isolate and a UI the user cannot escape. Settings carrying
 // no isolate configuration resolve a snapshot but fail to relaunch, which is
 // the shape of that run.
+// A patch that resolves to base code is a failed load the snapshot cannot
+// show, and it is reported before anything is torn down. The app must keep
+// running the code it has and the run must return, because falling through
+// to the terminating path would kill a healthy app.
+TEST_F(ShellTest, ShorebirdHotRestartKeepsARunningAppWhenThePatchFailsToLoad) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  auto* mock_ptr = mock.get();
+  // Empty: the attempt is already booting the base release, so there is
+  // nothing to roll back and the loop ends rather than retrying.
+  mock->set_next_boot_patch_path("");
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::SetPatchLoadFailedForTesting(true);
+
+  auto settings = CreateSettingsForFixture();
+  auto shell = CreateShell(settings);
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+
+  bool restarted = true;
+  bool running_after = false;
+  RunOnUIThreadAndWait(shell.get(), [&shell, &restarted, &running_after]() {
+    restarted =
+        shorebird::HotRestartEngine(*shell->GetEngine(), shell->GetSettings());
+    running_after =
+        shell->GetEngine()->GetRuntimeController()->IsRootIsolateRunning();
+  });
+
+  EXPECT_FALSE(restarted);
+  EXPECT_TRUE(running_after);
+  // One attempt, not two: an empty patch path ends the loop.
+  EXPECT_EQ(mock_ptr->launch_failure_count(), 1);
+
+  DestroyShell(std::move(shell));
+
+  shorebird::Updater::SetPatchLoadFailedForTesting(false);
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
+// The same failure against a named patch has something to roll back, so it
+// retries once and then returns, still without tearing the isolate down.
+TEST_F(ShellTest, ShorebirdHotRestartRetriesOnceWhenANamedPatchFailsToLoad) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  auto* mock_ptr = mock.get();
+  mock->set_next_boot_patch_path("/nonexistent/patch.vmcode");
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::SetPatchLoadFailedForTesting(true);
+
+  auto settings = CreateSettingsForFixture();
+  auto shell = CreateShell(settings);
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+
+  bool restarted = true;
+  bool running_after = false;
+  RunOnUIThreadAndWait(shell.get(), [&shell, &restarted, &running_after]() {
+    restarted =
+        shorebird::HotRestartEngine(*shell->GetEngine(), shell->GetSettings());
+    running_after =
+        shell->GetEngine()->GetRuntimeController()->IsRootIsolateRunning();
+  });
+
+  EXPECT_FALSE(restarted);
+  EXPECT_TRUE(running_after);
+  EXPECT_EQ(mock_ptr->launch_failure_count(), 2);
+
+  DestroyShell(std::move(shell));
+
+  shorebird::Updater::SetPatchLoadFailedForTesting(false);
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
 TEST_F(ShellTest, ShorebirdHotRestartTerminatesWhenEveryRelaunchFails) {
   GTEST_FLAG_SET(death_test_style, "threadsafe");
 
