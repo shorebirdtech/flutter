@@ -26,8 +26,18 @@ std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
     return nullptr;
   }
 
-  int elf_file_offset = Shorebird_ReadLinkHeader(elf_mapping->GetMapping(),
-                                                 elf_mapping->GetSize());
+  // The offset is read without installing anything, because a process can
+  // reach this a second time and the install-once entry point answers 0 on
+  // every call after the first, which would send Dart_LoadELF at the linker
+  // header as if it were an ELF.
+  int elf_file_offset = Shorebird_LinkHeaderOffset(elf_mapping->GetMapping(),
+                                                   elf_mapping->GetSize());
+
+  // Installed before the load, where the install-once call used to sit. The
+  // deserializer decides whether it is reading a linked snapshot by asking
+  // whether a table is installed, so installing afterwards is not equivalent.
+  Shorebird_InstallLinkTable(elf_mapping->GetMapping(),
+                             elf_mapping->GetSize());
 
   const char* error = nullptr;
   // One data blob and one text blob. The VM isolate folded into the isolate
