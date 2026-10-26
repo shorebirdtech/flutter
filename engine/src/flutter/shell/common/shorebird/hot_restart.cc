@@ -174,11 +174,23 @@ bool HotRestartEngine(Engine& engine, const Settings& settings) {
 // declared as Shell members in shell.h because they need the Shell's
 // settings, VM, and engine weak pointer.
 
+namespace {
+// Lets a test stand in for AOT, which it cannot otherwise satisfy. Atomic
+// because the registration it gates runs on the platform thread while a test
+// sets it from its own.
+std::atomic<bool> g_register_restart_host_for_testing{false};
+}  // namespace
+
+void Shell::ShorebirdSetRestartHostRegistrationForTesting(bool enabled) {
+  g_register_restart_host_for_testing.store(enabled);
+}
+
 void Shell::ShorebirdRegisterRestartHost() {
   // Hot restart is production-only (debug/JIT builds have the development
   // hot restart) and only supported for engines initialized through the
   // mobile ConfigureShorebird path — see Updater::SetHotRestartSupported.
-  if (!DartVM::IsRunningPrecompiledCode()) {
+  if (!DartVM::IsRunningPrecompiledCode() &&
+      !g_register_restart_host_for_testing.load()) {
     return;
   }
   if (!shorebird::Updater::HotRestartSupported()) {

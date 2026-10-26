@@ -5,6 +5,7 @@
 #define FML_USED_ON_EMBEDDER
 
 #include <algorithm>
+#include <chrono>
 #include <ctime>
 #include <future>
 #include <memory>
@@ -5251,6 +5252,56 @@ TEST_F(ShellTest, ShorebirdUpdaterReportsOnlyOnceForMultipleShells) {
 
   DestroyShell(std::move(shell2), task_runners2);
 
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
+// Unregistering the restart host cannot stop a request already posted to the
+// UI thread, whose weak engine pointer was taken while the engine was alive.
+// Such a task reaches Shell::OnPreEngineRestart, which blocks the UI thread
+// on the platform thread, while ~Shell blocks the platform thread on the UI
+// thread. Without the liveness flag the two deadlock and this test hangs
+// until the per-case timeout kills it.
+TEST_F(ShellTest, ShorebirdQueuedRestartIsRefusedOnceTheShellTearsDown) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::SetHotRestartSupported(true);
+  Shell::ShorebirdSetRestartHostRegistrationForTesting(true);
+
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+
+  // Occupy the UI thread so the restart lands in its queue rather than
+  // running while the shell is still alive.
+  fml::AutoResetWaitableEvent ui_occupied;
+  fml::AutoResetWaitableEvent release_ui;
+  task_runners.GetUITaskRunner()->PostTask([&ui_occupied, &release_ui]() {
+    ui_occupied.Signal();
+    release_ui.Wait();
+  });
+  ui_occupied.Wait();
+
+  // Accepted: the shell is alive and no other restart is in flight.
+  EXPECT_TRUE(shorebird::Updater::RequestRestart());
+
+  // Free the UI thread only after teardown has begun, so the queued restart
+  // runs inside the window that used to deadlock. ~Shell clears the liveness
+  // flag before its first latch wait, so the delay only has to outlast the
+  // call itself. Releasing too early leaves the shell alive and tests
+  // nothing; it cannot produce a false failure.
+  std::thread releaser([&release_ui]() {
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    release_ui.Signal();
+  });
+
+  DestroyShell(std::move(shell), task_runners);
+  releaser.join();
+
+  Shell::ShorebirdSetRestartHostRegistrationForTesting(false);
+  shorebird::Updater::SetHotRestartSupported(false);
   shorebird::Updater::ResetLaunchStateForTesting();
   shorebird::Updater::ResetInstanceForTesting();
 }

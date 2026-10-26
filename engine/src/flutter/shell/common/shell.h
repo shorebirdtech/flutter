@@ -447,6 +447,12 @@ class Shell final : public PlatformView::Delegate,
   static std::pair<DartVMRef, fml::RefPtr<const DartSnapshot>>
   InferVmInitDataFromSettings(Settings& settings);
 
+  // Shorebird: registers the hot restart host even outside AOT. Registration
+  // is normally gated on Dart_IsPrecompiledRuntime, which no JIT test binary
+  // satisfies, so without this the restart path is unreachable from a unit
+  // test and its guards can be removed with every test still green.
+  static void ShorebirdSetRestartHostRegistrationForTesting(bool enabled);
+
  private:
   // Shorebird: hot restart host registration. Declared here because the
   // implementations need this shell's settings, VM, and engine; defined in
