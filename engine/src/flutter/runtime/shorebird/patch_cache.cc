@@ -36,8 +36,8 @@ std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
   // The deserializer decides whether it is reading a linked snapshot by
   // asking whether a table is installed, so the install has to precede the
   // load rather than follow it.
-  Shorebird_InstallLinkTable(elf_mapping->GetMapping(),
-                             elf_mapping->GetSize());
+  const int installed_offset = Shorebird_InstallLinkTable(
+      elf_mapping->GetMapping(), elf_mapping->GetSize());
 
   const char* error = nullptr;
   // One data blob and one text blob. The VM isolate folded into the isolate
@@ -52,6 +52,12 @@ std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
 
   if (elf == nullptr) {
     FML_LOG(ERROR) << "Failed to load patch at " << path << " error: " << error;
+    if (installed_offset != 0) {
+      // The install above is still in place and names code that never
+      // loaded, so leaving it would dispatch this process through a patch it
+      // is not running.
+      Shorebird_RestoreLinkTable();
+    }
     return nullptr;
   }
 
