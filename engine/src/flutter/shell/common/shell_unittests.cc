@@ -5367,6 +5367,57 @@ void RunOnUIThreadAndWait(Shell* shell, const fml::closure& task) {
 }
 }  // namespace
 
+// The liveness flag only covers a restart that has not started. One already
+// inside Shell::OnPreEngineRestart is waiting on the platform thread, which
+// ~Shell is holding while it waits on the UI thread. Without a bound on that
+// wait neither side moves and this test hangs until the per-case timeout.
+TEST_F(ShellTest, ShorebirdTeardownDuringAnExecutingRestartDoesNotDeadlock) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::SetHotRestartSupported(true);
+  Shell::ShorebirdSetRestartHostRegistrationForTesting(true);
+
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+
+  // Hold the platform thread so the teardown and the restart's flush both
+  // queue behind it, teardown first.
+  fml::AutoResetWaitableEvent platform_held;
+  fml::AutoResetWaitableEvent release_platform;
+  task_runners.GetPlatformTaskRunner()->PostTask(
+      [&platform_held, &release_platform]() {
+        platform_held.Signal();
+        release_platform.Wait();
+      });
+  platform_held.Wait();
+
+  // Queues ~Shell on the platform thread behind the task above.
+  std::thread destroyer([this, &shell, &task_runners]() {
+    DestroyShell(std::move(shell), task_runners);
+  });
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+  // Accepted: ~Shell has not run yet, so the host is still registered. The
+  // restart then reaches OnPreEngineRestart and queues its flush behind the
+  // teardown, which is the interleaving that used to hang.
+  EXPECT_TRUE(shorebird::Updater::RequestRestart());
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+  release_platform.Signal();
+  destroyer.join();
+
+  Shell::ShorebirdSetRestartHostRegistrationForTesting(false);
+  shorebird::Updater::SetHotRestartSupported(false);
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
 // Once an attempt has torn the isolate down, a run where every attempt then
 // fails must terminate rather than return: returning would leave a live
 // Shell with no isolate and a UI the user cannot escape. Settings carrying

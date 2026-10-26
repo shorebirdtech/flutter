@@ -1627,18 +1627,32 @@ void Shell::OnPreEngineRestart() {
   FML_DCHECK(is_set_up_);
   FML_DCHECK(task_runners_.GetUITaskRunner()->RunsTasksOnCurrentThread());
 
-  fml::AutoResetWaitableEvent latch;
+  // Shorebird: shared rather than a stack local, because the wait below can
+  // give up while the task is still queued, and the task outlives this frame
+  // when it does.
+  auto latch = std::make_shared<fml::AutoResetWaitableEvent>();
   fml::TaskRunner::RunNowOrPostTask(
       task_runners_.GetPlatformTaskRunner(),
-      [view = platform_view_->GetWeakPtr(), &latch]() {
+      [view = platform_view_->GetWeakPtr(), latch]() {
         if (view) {
           view->OnPreEngineRestart();
         }
-        latch.Signal();
+        latch->Signal();
       });
   // This is blocking as any embedded platform views has to be flushed before
   // we re-run the Dart code.
-  latch.Wait();
+  //
+  // Shorebird: bounded, because ~Shell holds the platform thread and then
+  // waits on the UI thread, so an unbounded wait here deadlocks both once a
+  // restart and a teardown overlap. Giving up costs the flush, which orders
+  // platform views against re-running Dart, and the shell that owns those
+  // views is going away in the case that times out. A restart with no
+  // teardown against it signals in microseconds, so the bound is never
+  // reached.
+  if (latch->WaitWithTimeout(fml::TimeDelta::FromSeconds(5))) {
+    FML_LOG(WARNING) << "Shorebird hot restart: the platform thread did not "
+                        "flush platform views in time; continuing without it.";
+  }
 }
 
 // |Engine::Delegate|
