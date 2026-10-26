@@ -54,7 +54,10 @@ void Updater::ResetLaunchStateForTesting() {
 }
 
 bool Updater::Init(const AppConfig& config) {
-  app_config_ = config;
+  {
+    std::lock_guard<std::mutex> lock(app_config_mutex_);
+    app_config_ = config;
+  }
   bool result = DoInit(config);
   // Latch rather than assign: add-to-app calls Init once per engine, and a
   // later failure must not forget that the process already configured.
@@ -62,6 +65,11 @@ bool Updater::Init(const AppConfig& config) {
     initialized_.store(true);
   }
   return result;
+}
+
+AppConfig Updater::GetAppConfig() const {
+  std::lock_guard<std::mutex> lock(app_config_mutex_);
+  return app_config_;
 }
 
 // A hot restart re-runs the launch lifecycle, so only the per-cycle guards
@@ -128,9 +136,9 @@ void Updater::ReportLaunchStart() {
 
 void Updater::ReportLaunchSuccess() {
   // Guard: only report success once per launch cycle. Subsequent engines
-  // reuse
-  // the same patch and don't need to re-confirm the boot. A boot already
-  // reported as failed keeps that outcome, so the success is not forwarded.
+  // reuse the same patch and don't need to re-confirm the boot. A boot
+  // already reported as failed keeps that outcome, so the success is not
+  // forwarded.
   bool expected = false;
   if (launch_completed_.compare_exchange_strong(expected, true)) {
     DoReportLaunchSuccess();

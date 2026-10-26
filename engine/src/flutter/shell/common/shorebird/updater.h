@@ -117,10 +117,13 @@ class Updater {
   /// @return true if initialization succeeded
   bool Init(const AppConfig& config);
 
-  /// The configuration passed to the most recent `Init` call. Hot
+  /// A copy of the configuration passed to the most recent `Init` call. Hot
   /// restart uses `original_libapp_paths` to fall back to the base release
-  /// when the running patch has been rolled back.
-  const AppConfig& GetAppConfig() const { return app_config_; }
+  /// when the running patch has been rolled back. Returned by value rather
+  /// than by reference: add-to-app calls `Init` once per engine, so a second
+  /// engine can reassign the configuration on the platform thread while a
+  /// restart is reading it on the UI thread.
+  AppConfig GetAppConfig() const;
 
   /// Validate the next boot patch. If invalid, falls back to last good state.
   virtual void ValidateNextBootPatch() = 0;
@@ -216,6 +219,8 @@ class Updater {
   // configured and auto-update is on. Called from `ReportLaunchSuccess`.
   void MaybeStartUpdateThread();
 
+  // Guards `app_config_` against a concurrent `Init`. See `GetAppConfig`.
+  mutable std::mutex app_config_mutex_;
   AppConfig app_config_;
 
   static std::unique_ptr<Updater> instance_;

@@ -617,8 +617,9 @@ Shell::Shell(DartVMRef vm,
 }
 
 Shell::~Shell() {
-  // Shorebird: stop servicing hot restart requests. Blocks until any
-  // in-flight request against this shell has finished scheduling.
+  // Shorebird: stop servicing hot restart requests, and refuse any restart
+  // already queued on the UI thread. Must precede the latch waits below,
+  // which a restart running concurrently would deadlock against.
   ShorebirdUnregisterRestartHost();
 
 #if !SLIMPELLER

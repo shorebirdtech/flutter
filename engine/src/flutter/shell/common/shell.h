@@ -5,7 +5,9 @@
 #ifndef FLUTTER_SHELL_COMMON_SHELL_H_
 #define FLUTTER_SHELL_COMMON_SHELL_H_
 
+#include <atomic>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <string_view>
 #include <unordered_map>
@@ -452,6 +454,13 @@ class Shell final : public PlatformView::Delegate,
   // file.
   void ShorebirdRegisterRestartHost();
   void ShorebirdUnregisterRestartHost();
+
+  // Shorebird: cleared once this shell has begun tearing down. A hot restart
+  // blocks the UI thread on the platform thread, and teardown blocks the
+  // platform thread on the UI thread, so a restart that starts after
+  // teardown has begun deadlocks both. Shared with the posted restart task,
+  // which can outlive the shell. See hot_restart.cc.
+  std::shared_ptr<std::atomic<bool>> shorebird_restart_host_live_;
 
   using ServiceProtocolHandler =
       std::function<bool(const ServiceProtocol::Handler::ServiceProtocolMap&,
