@@ -33,9 +33,9 @@ std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
   int elf_file_offset = Shorebird_LinkHeaderOffset(elf_mapping->GetMapping(),
                                                    elf_mapping->GetSize());
 
-  // Installed before the load, where the install-once call used to sit. The
-  // deserializer decides whether it is reading a linked snapshot by asking
-  // whether a table is installed, so installing afterwards is not equivalent.
+  // The deserializer decides whether it is reading a linked snapshot by
+  // asking whether a table is installed, so the install has to precede the
+  // load rather than follow it.
   Shorebird_InstallLinkTable(elf_mapping->GetMapping(),
                              elf_mapping->GetSize());
 
