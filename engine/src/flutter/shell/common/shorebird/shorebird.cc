@@ -261,7 +261,14 @@ void ConfigureShorebird(std::string code_cache_path,
                         const std::string& shorebird_yaml,
                         const std::string& version,
                         const std::string& version_code) {
+  // The interpreter path hands this to SetBaseSnapshot below, which holds it
+  // for the life of the process. Everywhere else the resolve is only the
+  // scheme check, so the mapping is released as soon as it is checked.
+#if SHOREBIRD_USE_INTERPRETER
   auto base_vm_snapshot = ResolveBaseVMSnapshot(settings);
+#else
+  ResolveBaseVMSnapshot(settings);
+#endif
 
   auto shorebird_updater_dir_name = "shorebird_updater";
 
