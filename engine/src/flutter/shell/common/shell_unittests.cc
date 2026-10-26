@@ -34,6 +34,7 @@
 #include "flutter/fml/synchronization/count_down_latch.h"
 #include "flutter/fml/synchronization/waitable_event.h"
 #include "flutter/runtime/dart_vm.h"
+#include "flutter/runtime/isolate_configuration.h"
 #include "flutter/shell/common/platform_view.h"
 #include "flutter/shell/common/rasterizer.h"
 #include "flutter/shell/common/shell_test.h"
@@ -54,6 +55,7 @@
 #include "third_party/skia/include/gpu/ganesh/mock/GrMockTypes.h"
 #include "third_party/tonic/converter/dart_converter.h"
 
+#include "flutter/shell/common/shorebird/hot_restart.h"
 #include "flutter/shell/common/shorebird/updater.h"
 
 #ifdef SHELL_ENABLE_VULKAN
@@ -5306,6 +5308,51 @@ TEST_F(ShellTest, ShorebirdQueuedRestartIsRefusedOnceTheShellTearsDown) {
   shorebird::Updater::ResetInstanceForTesting();
 }
 
+// A second request while one is still in flight is rejected rather than
+// queued, so a burst of restartApp() calls cannot stack relaunches on the UI
+// thread. The flag clears once the relaunch finishes, so this is not a rate
+// limit on later calls.
+TEST_F(ShellTest, ShorebirdSecondRestartIsRefusedWhileOneIsInFlight) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::SetHotRestartSupported(true);
+  Shell::ShorebirdSetRestartHostRegistrationForTesting(true);
+
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+
+  // Hold the UI thread so the first request stays in flight across the
+  // second one.
+  fml::AutoResetWaitableEvent ui_occupied;
+  fml::AutoResetWaitableEvent release_ui;
+  task_runners.GetUITaskRunner()->PostTask([&ui_occupied, &release_ui]() {
+    ui_occupied.Signal();
+    release_ui.Wait();
+  });
+  ui_occupied.Wait();
+
+  EXPECT_TRUE(shorebird::Updater::RequestRestart());
+  EXPECT_FALSE(shorebird::Updater::RequestRestart());
+
+  // Let the queued restart be refused by teardown rather than run against a
+  // live shell, which would relaunch the isolate out from under the test.
+  std::thread releaser([&release_ui]() {
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    release_ui.Signal();
+  });
+
+  DestroyShell(std::move(shell), task_runners);
+  releaser.join();
+
+  Shell::ShorebirdSetRestartHostRegistrationForTesting(false);
+  shorebird::Updater::SetHotRestartSupported(false);
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
 namespace {
 // Runs |task| on the shell's UI thread, where the engine may be touched, and
 // blocks until it finishes.
@@ -5319,6 +5366,45 @@ void RunOnUIThreadAndWait(Shell* shell, const fml::closure& task) {
   latch.Wait();
 }
 }  // namespace
+
+// Once an attempt has torn the isolate down, a run where every attempt then
+// fails must terminate rather than return: returning would leave a live
+// Shell with no isolate and a UI the user cannot escape. Settings carrying
+// no isolate configuration resolve a snapshot but fail to relaunch, which is
+// the shape of that run.
+TEST_F(ShellTest, ShorebirdHotRestartTerminatesWhenEveryRelaunchFails) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
+
+  EXPECT_DEATH(
+      {
+        auto mock = std::make_unique<shorebird::MockUpdater>();
+        mock->set_next_boot_patch_path("/nonexistent/patch.vmcode");
+        shorebird::Updater::SetInstanceForTesting(std::move(mock));
+        shorebird::Updater::ResetLaunchStateForTesting();
+
+        auto settings = CreateSettingsForFixture();
+        auto shell = CreateShell(settings);
+        auto configuration = RunConfiguration::InferFromSettings(settings);
+        configuration.SetEntrypoint("emptyMain");
+        RunEngine(shell.get(), std::move(configuration));
+
+        RunOnUIThreadAndWait(shell.get(), [&shell]() {
+          shorebird::HotRestartEngine(*shell->GetEngine(), Settings());
+        });
+
+        // Only reached if the run returned instead of terminating. Tearing
+        // the shell down keeps the child's exit clean, so a return is
+        // reported as a failure to die rather than matching on a crash in
+        // cleanup.
+        DestroyShell(std::move(shell));
+      },
+      // The severity is part of the assertion: the same sentence is logged
+      // at ERROR by the path that returns instead of terminating.
+      "FATAL.*could not relaunch the app on either attempt");
+
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
 
 // A harness-built snapshot is the same JIT snapshot the shell booted with, so
 // these tests pin that the handed snapshot is the one carried, not that a
