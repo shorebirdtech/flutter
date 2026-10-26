@@ -1,6 +1,6 @@
 {
   "ios-framework": {
-    "requires": ["ios-release", "ios-sim-x64", "ios-sim-arm64"],
+    "requires": ["ios"],
     "script": "flutter/sky/tools/create_ios_framework.py",
     "flags": ["--dsym", "--strip", "--no-extension-safe-frameworks"],
     "path_args": {
