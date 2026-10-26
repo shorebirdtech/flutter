@@ -191,7 +191,11 @@ void Updater::ReportPatchLoadFailure() {
 }
 
 bool Updater::PatchLoadFailed() const {
-  return patch_load_failed_.load();
+  return patch_load_failed_.load() || patch_load_failed_for_testing_.load();
+}
+
+void Updater::SetPatchLoadFailedForTesting(bool failed) {
+  patch_load_failed_for_testing_.store(failed);
 }
 
 #if SHOREBIRD_PLATFORM_SUPPORTED
