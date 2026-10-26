@@ -190,26 +190,40 @@ void Shell::ShorebirdRegisterRestartHost() {
   // posted task can outlive it.
   auto restart_in_flight = std::make_shared<std::atomic<bool>>(false);
 
+  // Unregistering stops new requests but cannot stop one already queued on
+  // the UI thread: that task was posted while the engine was still alive, so
+  // its weak pointer is valid and it would run during teardown. A restart
+  // reaches Shell::OnPreEngineRestart, which blocks the UI thread on the
+  // platform thread, while ~Shell blocks the platform thread on the UI
+  // thread, so the two deadlock. The task checks this flag to stay out of
+  // that window.
+  shorebird_restart_host_live_ = std::make_shared<std::atomic<bool>>(true);
+
   shorebird::Updater::RegisterRestartHost(
       reinterpret_cast<uintptr_t>(this),
       [ui_task_runner = task_runners_.GetUITaskRunner(),
-       weak_engine = weak_engine_, settings = settings_, restart_in_flight]() {
+       weak_engine = weak_engine_, settings = settings_, restart_in_flight,
+       host_live = shorebird_restart_host_live_]() {
         // Invoked on an arbitrary thread (whichever thread ran the Dart FFI
         // call). Restart asynchronously on the UI thread — the same thread
         // the debug hot restart runs on — and report the request as
         // accepted. A restart already in flight refuses further requests, so
-        // a restartApp() call from the relaunched entrypoint cannot loop.
+        // a restartApp() call made while one is still running is rejected
+        // rather than queued. Once the relaunch finishes the flag clears, so
+        // a later call from the relaunched entrypoint is accepted like any
+        // other; nothing here rate-limits repeated restarts.
         if (restart_in_flight->exchange(true)) {
           FML_LOG(WARNING)
               << "Shorebird restart requested, but a hot restart is already "
                  "in progress.";
           return false;
         }
-        ui_task_runner->PostTask([weak_engine, settings, restart_in_flight]() {
-          if (!weak_engine) {
+        ui_task_runner->PostTask([weak_engine, settings, restart_in_flight,
+                                  host_live]() {
+          if (!weak_engine || !host_live->load()) {
             FML_LOG(WARNING)
-                << "Shorebird hot restart: engine was destroyed before the "
-                   "restart could run.";
+                << "Shorebird hot restart: the engine was torn down before "
+                   "the restart could run.";
             restart_in_flight->store(false);
             return;
           }
@@ -221,6 +235,11 @@ void Shell::ShorebirdRegisterRestartHost() {
 }
 
 void Shell::ShorebirdUnregisterRestartHost() {
+  // Refuse any queued restart before dropping the host, so a task already on
+  // the UI thread's queue cannot start once teardown has begun.
+  if (shorebird_restart_host_live_) {
+    shorebird_restart_host_live_->store(false);
+  }
   shorebird::Updater::UnregisterRestartHost(reinterpret_cast<uintptr_t>(this));
 }
 

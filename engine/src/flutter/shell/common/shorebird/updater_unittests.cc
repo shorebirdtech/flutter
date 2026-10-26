@@ -443,7 +443,7 @@ TEST_F(UpdaterTest, InitRetainsAppConfig) {
 
   EXPECT_TRUE(mock_.Init(config));
 
-  const AppConfig& stored = mock_.GetAppConfig();
+  const AppConfig stored = mock_.GetAppConfig();
   EXPECT_EQ(stored.release_version, "1.2.3+4");
   ASSERT_EQ(stored.original_libapp_paths.size(), 1u);
   EXPECT_EQ(stored.original_libapp_paths[0], "/data/app/libapp.so");
