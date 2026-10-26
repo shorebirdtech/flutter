@@ -58,22 +58,31 @@ extern "C" __attribute__((weak)) unsigned long getauxval(unsigned long type) {
 // snapshots, but I'm not aware of any use cases for that.
 static fml::RefPtr<const DartSnapshot> vm_snapshot;
 
+// Resolving walks settings.application_library_paths with dlopen, and
+// App.framework stays mapped only while a DartSnapshot holds it, so resolving
+// twice unmaps and re-opens it. Callers resolve once through here and pass the
+// result on.
+static fml::RefPtr<const DartSnapshot> ResolveBaseVMSnapshot(
+    Settings& settings) {
+  // If you are crashing here, you probably are running Shorebird in a Debug
+  // config, where the AOT snapshot won't be linked into the process, and thus
+  // lookups will fail.  Change your Scheme to Release to fix:
+  // https://github.com/flutter/flutter/wiki/Debugging-the-engine#debugging-ios-builds-with-xcode
+  auto snapshot = DartSnapshot::VMSnapshotFromSettings(settings);
+  FML_CHECK(snapshot) << "XCode Scheme must be set to Release to use Shorebird";
+  return snapshot;
+}
+
 #if SHOREBIRD_USE_INTERPRETER
 static fml::RefPtr<const DartSnapshot> isolate_snapshot;
 
 void SetBaseSnapshot(Settings& settings,
-                     fml::RefPtr<const DartSnapshot> resolved_vm_snapshot) {
+                     fml::RefPtr<const DartSnapshot> base_vm_snapshot) {
   // These mappings happen to be to static data in the App.framework, but
   // we still need to seem to hold onto the DartSnapshot objects to keep
-  // the mappings alive.
-  //
-  // The VM snapshot is resolved by the caller and moved in rather than
-  // resolved again here. Resolving walks settings.application_library_paths
-  // with dlopen, and the library stays mapped only while a DartSnapshot holds
-  // it, so a second resolution means closing App.framework and re-opening it.
-  // That re-open is not guaranteed to succeed, and a failure here is fatal:
-  // the patch machinery reads every base blob through these two objects.
-  vm_snapshot = std::move(resolved_vm_snapshot);
+  // the mappings alive. A failure here is fatal: the patch machinery reads
+  // every base blob through these two objects.
+  vm_snapshot = std::move(base_vm_snapshot);
   isolate_snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
   FML_CHECK(vm_snapshot && isolate_snapshot)
       << "Shorebird failed to resolve the base isolate snapshot";
@@ -252,13 +261,7 @@ void ConfigureShorebird(std::string code_cache_path,
                         const std::string& shorebird_yaml,
                         const std::string& version,
                         const std::string& version_code) {
-  // If you are crashing here, you probably are running Shorebird in a Debug
-  // config, where the AOT snapshot won't be linked into the process, and thus
-  // lookups will fail.  Change your Scheme to Release to fix:
-  // https://github.com/flutter/flutter/wiki/Debugging-the-engine#debugging-ios-builds-with-xcode
-  auto base_vm_snapshot = DartSnapshot::VMSnapshotFromSettings(settings);
-  FML_CHECK(base_vm_snapshot)
-      << "XCode Scheme must be set to Release to use Shorebird";
+  auto base_vm_snapshot = ResolveBaseVMSnapshot(settings);
 
   auto shorebird_updater_dir_name = "shorebird_updater";
 
