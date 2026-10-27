@@ -139,15 +139,34 @@ if (enable_unittests) {
     fixtures = []
   }
 
+  # A stand-in for App.framework. Reached only through dlopen, so it is a
+  # data_deps of the suite below rather than a dep: linking it would hold the
+  # image in the process for the life of the test binary, which is the one
+  # thing the ownership tests need it not to do.
+  shared_library("shorebird_fake_base_snapshot") {
+    testonly = true
+    visibility = [ ":*" ]
+
+    sources = [ "fake_base_snapshot.c" ]
+
+    # The default deps bring libc++ and the allocator shim, whose thread-local
+    # storage makes dyld refuse to unload the image. A released App.framework
+    # carries a snapshot and nothing else, so keep this as bare as it is.
+    no_default_deps = true
+  }
+
   executable("shorebird_unittests") {
     testonly = true
 
     sources = [
+      "base_snapshot_ownership_unittests.cc",
       "patch_cache_unittests.cc",
       "shorebird_unittests.cc",
       "snapshots_data_handle_unittests.cc",
       "updater_unittests.cc",
     ]
+
+    data_deps = [ ":shorebird_fake_base_snapshot" ]
 
     deps = [
       ":shorebird",
