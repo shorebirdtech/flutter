@@ -1,7 +1,3 @@
-https://api.shorebird.dev/
-https://cdn.shorebird.cloud/
-https://storage.googleapis.com/
-https://download.shorebird.dev/
 https://sha256.badssl.com/
 https://ecc256.badssl.com/
 https://ecc384.badssl.com/

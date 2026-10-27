@@ -47,3 +47,15 @@ elseif(WIN32)
     WIN32_LEAN_AND_MEAN)
   target_link_libraries(shorebird_http_probe PRIVATE ws2_32 crypt32)
 endif()
+
+# Serves the TLS table's cases on localhost; see tls_test_server.cc.
+add_executable(tls_test_server ${SHOREBIRD}/tls_test_server.cc)
+target_link_libraries(tls_test_server PRIVATE ssl crypto)
+if(WIN32)
+  target_compile_definitions(tls_test_server PRIVATE NOMINMAX
+    WIN32_LEAN_AND_MEAN)
+  target_link_libraries(tls_test_server PRIVATE ws2_32)
+else()
+  find_package(Threads REQUIRED)
+  target_link_libraries(tls_test_server PRIVATE Threads::Threads)
+endif()
