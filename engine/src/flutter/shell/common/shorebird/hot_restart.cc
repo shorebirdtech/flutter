@@ -230,18 +230,18 @@ void Shell::ShorebirdRegisterRestartHost() {
                  "in progress.";
           return false;
         }
-        ui_task_runner->PostTask([weak_engine, settings, restart_in_flight,
-                                  host_live]() {
-          if (!weak_engine || !host_live->load()) {
-            FML_LOG(WARNING)
-                << "Shorebird hot restart: the engine was torn down before "
-                   "the restart could run.";
-            restart_in_flight->store(false);
-            return;
-          }
-          shorebird::HotRestartEngine(*weak_engine.get(), settings);
-          restart_in_flight->store(false);
-        });
+        ui_task_runner->PostTask(
+            [weak_engine, settings, restart_in_flight, host_live]() {
+              if (!weak_engine || !host_live->load()) {
+                FML_LOG(WARNING)
+                    << "Shorebird hot restart: the engine was torn down before "
+                       "the restart could run.";
+                restart_in_flight->store(false);
+                return;
+              }
+              shorebird::HotRestartEngine(*weak_engine.get(), settings);
+              restart_in_flight->store(false);
+            });
         return true;
       });
 }
