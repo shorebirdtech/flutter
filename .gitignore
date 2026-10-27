@@ -171,3 +171,8 @@ app.*.symbols
 .agents/rules/personal-*
 .agents/skills/personal-*
 /.agent-shell/
+
+# Shorebird CLI writes these into the Flutter install it manages, which is a
+# checkout of this repo.
+.shorebird_last_used
+.shorebird_precache
