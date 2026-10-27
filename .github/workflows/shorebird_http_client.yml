@@ -76,9 +76,16 @@ jobs:
           probe=$(find out -name 'shorebird_http_probe' -o -name 'shorebird_http_probe.exe' | head -1)
           server=$(find out -name 'tls_test_server' -o -name 'tls_test_server.exe' | head -1)
           mkdir tls
+          # Exits non-zero if a case fails its own self-check.
           "$server" tls > /dev/null &
-          trap "kill $!" EXIT
-          for i in $(seq 300); do [ -s tls/cases.tsv ] && break; sleep 1; done
+          pid=$!
+          trap "kill $pid" EXIT
+          for i in $(seq 300); do
+            [ -s tls/cases.tsv ] && break
+            kill -0 $pid || { wait $pid; exit 1; }
+            sleep 1
+          done
+          [ -s tls/cases.tsv ]
           case "$RUNNER_OS" in
             Linux)
               sudo cp tls/root.pem /usr/local/share/ca-certificates/shorebird-tls-table.crt
@@ -93,15 +100,17 @@ jobs:
           urls=$(cut -f2 cases.tsv)
           "$probe" $urls | tr -d '\r' | cut -f2 > cpp.txt
           dart $dir/http_probe.dart $urls | tr -d '\r' | cut -f2 > dart.txt
-          # Each case: our result must equal dart:io's, and accept or
-          # reject as the case expects ("any": no expectation).
+          # Each case: our result must equal dart:io's, and accept, or
+          # reject at the TLS layer, as the case expects ("any": no
+          # expectation).
           paste cases.tsv cpp.txt dart.txt | awk -F'\t' '
-            { ok = $4 == $5 &&
-                   ($3 == "any" || ($3 == "accept") == ($4 == "accept"))
-              printf "%-18s %-7s %-10s %-10s %s\n", $1, $3, $4, $5,
+            { ok = $4 == $5 && ($3 == "any" ||
+                   ($3 == "accept" && $4 == "accept") ||
+                   ($3 == "reject" && $4 == "tls"))
+              printf "%-21s %-7s %-10s %-10s %s\n", $1, $3, $4, $5,
                      ok ? "" : "FAIL"
               if (!ok) failed = 1 }
-            BEGIN { printf "%-18s %-7s %-10s %-10s\n", "case", "expect",
+            BEGIN { printf "%-21s %-7s %-10s %-10s\n", "case", "expect",
                            "updater", "dart:io" }
             END { exit failed }'
 
@@ -111,12 +120,14 @@ jobs:
           "$probe" https://api.shorebird.dev/ https://cdn.shorebird.cloud/ \
             https://storage.googleapis.com/ https://download.shorebird.dev/ \
             | tr -d '\r' | cut -f1,2 | tee hosts.tsv
-          ! grep -v '	accept$' hosts.tsv
+          if grep -v '	accept$' hosts.tsv; then exit 1; fi
 
       # Doesn't fail the job: badssl.com is a third party and its hosts flake.
       # Differences show as warnings on the run.
       - name: 🌍 Compare with dart:io on badssl.com
-        if: always()
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        timeout-minutes: 10
         run: |
           dir=engine/src/flutter/shell/common/shorebird
           probe=$(find out -name 'shorebird_http_probe' -o -name 'shorebird_http_probe.exe' | head -1)
