@@ -141,7 +141,20 @@ HttpResult ResultForError(NSError* error, int redirects) {
     case NSURLErrorUnsupportedURL:
       // After a redirect, the bad URL came from the server.
       return redirects == 0 ? HttpResult::kInvalidRequest : HttpResult::kProtocolError;
-    case NSURLErrorSecureConnectionFailed:
+    case NSURLErrorSecureConnectionFailed: {
+      // The peer closing the connection mid-handshake is a dropped
+      // connection, not a TLS failure.
+      id stream_code = error.userInfo[@"_kCFStreamErrorCodeKey"];
+      if ([stream_code isKindOfClass:[NSNumber class]]) {
+        switch ([stream_code intValue]) {
+          case errSSLClosedGraceful:
+          case errSSLClosedAbort:
+          case errSSLClosedNoNotify:
+            return HttpResult::kTransportError;
+        }
+      }
+      return HttpResult::kTlsError;
+    }
     case NSURLErrorServerCertificateHasBadDate:
     case NSURLErrorServerCertificateUntrusted:
     case NSURLErrorServerCertificateHasUnknownRoot:
@@ -289,7 +302,10 @@ using flutter::shorebird::RequestState;
               dataTask:(NSURLSessionDataTask*)task
     didReceiveResponse:(NSURLResponse*)response
      completionHandler:(void (^)(NSURLSessionResponseDisposition))completionHandler {
-  if (_state->failure.has_value() || ![response isKindOfClass:[NSHTTPURLResponse class]]) {
+  // One response per request: a multipart/x-mixed-replace server could send
+  // several.
+  if (_state->failure.has_value() || _state->responded ||
+      ![response isKindOfClass:[NSHTTPURLResponse class]]) {
     if (!_state->failure.has_value()) {
       _state->failure = HttpResult::kProtocolError;
     }
@@ -300,8 +316,17 @@ using flutter::shorebird::RequestState;
   int status = static_cast<int>(http.statusCode);
   std::vector<HttpHeader> headers;
   NSDictionary* fields = http.allHeaderFields;
+  // NSURLSession decodes a content-encoded body but keeps the encoded
+  // Content-Length, which would then not count the bytes delivered.
+  NSString* encoding = [http valueForHTTPHeaderField:@"Content-Encoding"];
+  bool decoded =
+      encoding.length > 0 && [encoding caseInsensitiveCompare:@"identity"] != NSOrderedSame;
   for (id name in fields) {
     id value = fields[name];
+    if (decoded && [name isKindOfClass:[NSString class]] &&
+        [name caseInsensitiveCompare:@"Content-Length"] == NSOrderedSame) {
+      continue;
+    }
     if ([name isKindOfClass:[NSString class]] && [value isKindOfClass:[NSString class]]) {
       headers.push_back(
           {flutter::shorebird::ToStdString(name), flutter::shorebird::ToStdString(value)});
@@ -430,7 +455,12 @@ HttpResult SendHttpRequest(const HttpRequest& request,
     NSURLSession* session = [NSURLSession sessionWithConfiguration:configuration
                                                           delegate:delegate
                                                      delegateQueue:queue];
-    [[session dataTaskWithRequest:ns_request] resume];
+    NSURLSessionDataTask* task = [session dataTaskWithRequest:ns_request];
+    if (task == nil) {
+      [session invalidateAndCancel];
+      return HttpResult::kInvalidRequest;
+    }
+    [task resume];
     HttpResult result = state->caller.Wait();
     // The session holds its delegate until it is invalidated.
     [session invalidateAndCancel];
