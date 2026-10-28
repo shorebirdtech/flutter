@@ -67,6 +67,12 @@ void Updater::BeginNewLaunchCycle() {
   launch_started_.store(false);
   launch_completed_.store(false);
   patch_load_failed_.store(false);
+  restart_cycle_.store(false);
+}
+
+void Updater::BeginRestartLaunchCycle() {
+  BeginNewLaunchCycle();
+  restart_cycle_.store(true);
 }
 
 void Updater::RegisterRestartHost(uintptr_t host_id,
@@ -180,6 +186,10 @@ void Updater::ReportLaunchFailure() {
   if (!launch_completed_.compare_exchange_strong(expected, true)) {
     return;
   }
+  if (restart_cycle_.load()) {
+    DoReportRestartFailure();
+    return;
+  }
   DoReportLaunchFailure();
 }
 
@@ -272,6 +282,10 @@ void RealUpdater::DoReportLaunchFailure() {
   shorebird_report_launch_failure();
 }
 
+void RealUpdater::DoReportRestartFailure() {
+  shorebird_report_restart_failure();
+}
+
 bool RealUpdater::ShouldAutoUpdate() {
   return shorebird_should_auto_update();
 }
@@ -316,6 +330,11 @@ void MockUpdater::DoReportLaunchFailure() {
   call_log_.push_back("ReportLaunchFailure");
 }
 
+void MockUpdater::DoReportRestartFailure() {
+  restart_failure_count_++;
+  call_log_.push_back("ReportRestartFailure");
+}
+
 bool MockUpdater::ShouldAutoUpdate() {
   call_log_.push_back("ShouldAutoUpdate");
   return should_auto_update_;
@@ -333,6 +352,7 @@ void MockUpdater::Reset() {
   launch_start_count_ = 0;
   launch_success_count_ = 0;
   launch_failure_count_ = 0;
+  restart_failure_count_ = 0;
   start_update_thread_count_ = 0;
   init_result_ = true;
   should_auto_update_ = false;

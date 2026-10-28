@@ -172,6 +172,21 @@ class Updater {
   /// this, immediately before re-resolving the isolate snapshot.
   void BeginNewLaunchCycle();
 
+  /// `BeginNewLaunchCycle`, and marks the cycle as a hot restart's.
+  ///
+  /// A failure reported in a restart cycle does not condemn the patch:
+  /// `ReportLaunchFailure` routes to the Rust updater's restart-failure
+  /// path, which rolls the boot target back for this process but leaves
+  /// the patch installed. The restart mechanism can fail for reasons the
+  /// patch has no part in, and a cold boot onto the same patch is how we
+  /// find out; tombstoning here would delete the artifacts and make that
+  /// retry impossible.
+  ///
+  /// The routing is per cycle rather than per call site because the
+  /// snapshot loader reports its own failures (`ReportPatchLoadFailure`)
+  /// and has no way to know a restart is what asked it to load.
+  void BeginRestartLaunchCycle();
+
   // Hot restart hosts.
   //
   // A host is a Shell that can tear down and relaunch its Dart isolate from
@@ -216,6 +231,7 @@ class Updater {
   virtual void DoReportLaunchStart() = 0;
   virtual void DoReportLaunchSuccess() = 0;
   virtual void DoReportLaunchFailure() = 0;
+  virtual void DoReportRestartFailure() = 0;
 
   void ResetLaunchState();
 
@@ -231,6 +247,10 @@ class Updater {
   // Per-instance guards for launch lifecycle. See `BeginNewLaunchCycle`.
   std::atomic<bool> launch_started_{false};
   std::atomic<bool> launch_completed_{false};
+  // Whether this cycle is a hot restart's rather than a process boot's.
+  // Decides which failure a report becomes. See
+  // `BeginRestartLaunchCycle`.
+  std::atomic<bool> restart_cycle_{false};
   // Set when the loader reports a patch it could not load, and cleared with
   // the guards above. Read by the hot restart host, which cannot see that
   // failure in the snapshot it gets back. See `PatchLoadFailed`.
@@ -264,6 +284,7 @@ class NoOpUpdater : public Updater {
   void DoReportLaunchStart() override {}
   void DoReportLaunchSuccess() override {}
   void DoReportLaunchFailure() override {}
+  void DoReportRestartFailure() override {}
   bool ShouldAutoUpdate() override { return false; }
   void StartUpdateThread() override {}
 };
@@ -282,6 +303,7 @@ class RealUpdater : public Updater {
   void DoReportLaunchStart() override;
   void DoReportLaunchSuccess() override;
   void DoReportLaunchFailure() override;
+  void DoReportRestartFailure() override;
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
 };
@@ -300,6 +322,7 @@ class MockUpdater : public Updater {
   void DoReportLaunchStart() override;
   void DoReportLaunchSuccess() override;
   void DoReportLaunchFailure() override;
+  void DoReportRestartFailure() override;
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
 
@@ -309,6 +332,7 @@ class MockUpdater : public Updater {
   int launch_start_count() const { return launch_start_count_; }
   int launch_success_count() const { return launch_success_count_; }
   int launch_failure_count() const { return launch_failure_count_; }
+  int restart_failure_count() const { return restart_failure_count_; }
   int start_update_thread_count() const { return start_update_thread_count_; }
   const std::vector<std::string>& call_log() const { return call_log_; }
 
@@ -334,6 +358,7 @@ class MockUpdater : public Updater {
   int launch_start_count_ = 0;
   int launch_success_count_ = 0;
   int launch_failure_count_ = 0;
+  int restart_failure_count_ = 0;
   int start_update_thread_count_ = 0;
   bool init_result_ = true;
   bool should_auto_update_ = false;

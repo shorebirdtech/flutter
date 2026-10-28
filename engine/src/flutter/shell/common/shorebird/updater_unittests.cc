@@ -401,6 +401,55 @@ TEST_F(UpdaterTest, BeginNewLaunchCycleAllowsSecondLaunchCycle) {
   EXPECT_EQ(log[3], "ReportLaunchFailure");
 }
 
+// A restart's launch cycle reports its failures as restart failures, which
+// roll the boot target back without condemning the patch. The restart
+// mechanism can fail for reasons the patch has no part in, and a cold boot
+// onto the same patch is what decides.
+TEST_F(UpdaterTest, BeginRestartLaunchCycleRoutesFailureToTheRestartPath) {
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
+
+  mock_.BeginRestartLaunchCycle();
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchFailure();
+
+  EXPECT_EQ(mock_.launch_failure_count(), 0);
+  EXPECT_EQ(mock_.restart_failure_count(), 1);
+
+  const auto& log = mock_.call_log();
+  ASSERT_EQ(log.size(), 4u);
+  EXPECT_EQ(log[3], "ReportRestartFailure");
+}
+
+// The snapshot loader reports a patch it could not load without knowing
+// whether a cold boot or a restart asked it to, so the routing has to come
+// from the cycle rather than the call site.
+TEST_F(UpdaterTest, PatchLoadFailureInARestartCycleIsARestartFailure) {
+  mock_.BeginRestartLaunchCycle();
+  mock_.ReportLaunchStart();
+  mock_.ReportPatchLoadFailure();
+
+  EXPECT_EQ(mock_.launch_failure_count(), 0);
+  EXPECT_EQ(mock_.restart_failure_count(), 1);
+  EXPECT_TRUE(mock_.PatchLoadFailed());
+}
+
+// A cold boot still condemns the patch. Only the restart cycle spares it,
+// so the next process boot is an ordinary first cycle again.
+TEST_F(UpdaterTest, BeginNewLaunchCycleRoutesFailureBackToTheLaunchPath) {
+  mock_.BeginRestartLaunchCycle();
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchFailure();
+  ASSERT_EQ(mock_.restart_failure_count(), 1);
+
+  mock_.BeginNewLaunchCycle();
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchFailure();
+
+  EXPECT_EQ(mock_.launch_failure_count(), 1);
+  EXPECT_EQ(mock_.restart_failure_count(), 1);
+}
+
 // A hot restart re-runs the launch lifecycle but does not reconfigure the
 // process, so the update thread it already started must keep running.
 TEST_F(UpdaterTest, BeginNewLaunchCycleKeepsUpdateThreadGuard) {
