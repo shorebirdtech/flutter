@@ -5454,8 +5454,10 @@ TEST_F(ShellTest, ShorebirdHotRestartKeepsARunningAppWhenThePatchFailsToLoad) {
 
   EXPECT_FALSE(restarted);
   EXPECT_TRUE(running_after);
-  // One attempt, not two: an empty patch path ends the loop.
-  EXPECT_EQ(mock_ptr->launch_failure_count(), 1);
+  // One attempt, not two: an empty patch path ends the loop. Reported as a
+  // restart failure, so the patch keeps its place for the next cold boot.
+  EXPECT_EQ(mock_ptr->restart_failure_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_failure_count(), 0);
 
   DestroyShell(std::move(shell));
 
@@ -5491,7 +5493,8 @@ TEST_F(ShellTest, ShorebirdHotRestartRetriesOnceWhenANamedPatchFailsToLoad) {
 
   EXPECT_FALSE(restarted);
   EXPECT_TRUE(running_after);
-  EXPECT_EQ(mock_ptr->launch_failure_count(), 2);
+  EXPECT_EQ(mock_ptr->restart_failure_count(), 2);
+  EXPECT_EQ(mock_ptr->launch_failure_count(), 0);
 
   DestroyShell(std::move(shell));
 
