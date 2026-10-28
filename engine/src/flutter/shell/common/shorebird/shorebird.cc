@@ -58,12 +58,13 @@ extern "C" __attribute__((weak)) unsigned long getauxval(unsigned long type) {
 // snapshots, but I'm not aware of any use cases for that.
 static fml::RefPtr<const DartSnapshot> vm_snapshot;
 
-// Resolving walks settings.application_library_paths with dlopen, and
-// App.framework stays mapped only while a DartSnapshot holds it, so resolving
-// twice unmaps and re-opens it. Callers resolve once through here and pass the
-// result on.
+// Resolving walks settings.application_library_paths with dlopen, and the
+// returned DartSnapshot is the only thing holding App.framework open, since a
+// released app does not link it. Two resolves in a row therefore unmap the
+// image and re-map it from disk, because the first one's snapshot is destroyed
+// before the second runs. ShorebirdBaseSnapshotOwnership covers that.
 static fml::RefPtr<const DartSnapshot> ResolveBaseVMSnapshot(
-    Settings& settings) {
+    const Settings& settings) {
   // If you are crashing here, you probably are running Shorebird in a Debug
   // config, where the AOT snapshot won't be linked into the process, and thus
   // lookups will fail.  Change your Scheme to Release to fix:
@@ -80,12 +81,18 @@ void SetBaseSnapshot(Settings& settings,
                      fml::RefPtr<const DartSnapshot> base_vm_snapshot) {
   // These mappings happen to be to static data in the App.framework, but
   // we still need to seem to hold onto the DartSnapshot objects to keep
-  // the mappings alive. A failure here is fatal: the patch machinery reads
-  // every base blob through these two objects.
+  // the mappings alive.
   vm_snapshot = std::move(base_vm_snapshot);
   isolate_snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
-  FML_CHECK(vm_snapshot && isolate_snapshot)
+  FML_CHECK(isolate_snapshot)
       << "Shorebird failed to resolve the base isolate snapshot";
+  // Shorebird_SetBaseSnapshots below hands the interpreter all four blobs,
+  // while DartSnapshot::IsValid() checks only the data half, so a snapshot can
+  // be non-null with no instructions at all. Check what is read, not what is
+  // returned. vm_snapshot is already known non-null: ResolveBaseVMSnapshot
+  // checked it before handing it over.
+  FML_CHECK(vm_snapshot->IsValidForAOT() && isolate_snapshot->IsValidForAOT())
+      << "Shorebird base snapshot resolved without its instructions mapping";
 
   // Per-mapping observability for the base snapshot. Logged at every app boot
   // so customer syslogs include the exact sizes the on-device base reader
