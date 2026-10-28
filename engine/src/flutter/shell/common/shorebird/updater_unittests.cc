@@ -423,6 +423,55 @@ TEST_F(UpdaterTest, BeginNewLaunchCycleAllowsSecondLaunchCycle) {
   EXPECT_EQ(log[3], "ReportLaunchFailure");
 }
 
+// A restart's launch cycle reports its failures as restart failures, which
+// roll the boot target back without condemning the patch. The restart
+// mechanism can fail for reasons the patch has no part in, and a cold boot
+// onto the same patch is what decides.
+TEST_F(UpdaterTest, BeginRestartLaunchCycleRoutesFailureToTheRestartPath) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+
+  Updater::BeginRestartLaunchCycle();
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchFailure();
+
+  EXPECT_EQ(mock_->launch_failure_count(), 0);
+  EXPECT_EQ(mock_->restart_failure_count(), 1);
+
+  const auto& log = mock_->call_log();
+  ASSERT_EQ(log.size(), 4u);
+  EXPECT_EQ(log[3], "ReportRestartFailure");
+}
+
+// The snapshot loader reports a patch it could not load without knowing
+// whether a cold boot or a restart asked it to, so the routing has to come
+// from the cycle rather than the call site.
+TEST_F(UpdaterTest, PatchLoadFailureInARestartCycleIsARestartFailure) {
+  Updater::BeginRestartLaunchCycle();
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportPatchLoadFailure();
+
+  EXPECT_EQ(mock_->launch_failure_count(), 0);
+  EXPECT_EQ(mock_->restart_failure_count(), 1);
+  EXPECT_TRUE(Updater::PatchLoadFailed());
+}
+
+// A cold boot still condemns the patch. Only the restart cycle spares it,
+// so the next process boot is an ordinary first cycle again.
+TEST_F(UpdaterTest, BeginNewLaunchCycleRoutesFailureBackToTheLaunchPath) {
+  Updater::BeginRestartLaunchCycle();
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchFailure();
+  ASSERT_EQ(mock_->restart_failure_count(), 1);
+
+  Updater::BeginNewLaunchCycle();
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchFailure();
+
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  EXPECT_EQ(mock_->restart_failure_count(), 1);
+}
+
 // A hot restart re-runs the launch lifecycle but does not reconfigure the
 // process, so the update thread it already started must keep running.
 TEST_F(UpdaterTest, BeginNewLaunchCycleKeepsUpdateThreadGuard) {

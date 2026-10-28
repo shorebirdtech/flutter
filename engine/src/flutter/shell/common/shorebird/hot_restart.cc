@@ -63,10 +63,11 @@ bool HotRestartEngine(Engine& engine, const Settings& settings) {
   bool isolate_torn_down = false;
 
   // Two attempts: first the requested next-boot patch; if relaunching it
-  // fails, ReportLaunchFailure rolls the updater back, and the second
-  // attempt boots whatever it fell back to (the last good patch or the base
-  // release) so the app recovers. A failed base-release attempt has nothing
-  // to roll back, so it ends the loop rather than repeating itself.
+  // fails, the restart-failure report drops that patch from this process's
+  // boot target, and the second attempt boots whatever it fell back to (the
+  // last good patch or the base release) so the app recovers. A failed
+  // base-release attempt has nothing to fall back to, so it ends the loop
+  // rather than repeating itself.
   for (int attempt = 0; attempt < 2; ++attempt) {
     updater.ValidateNextBootPatch();
     const std::string patch_path = updater.NextBootPatchPath();
@@ -85,9 +86,12 @@ bool HotRestartEngine(Engine& engine, const Settings& settings) {
 
     // Begin a fresh launch cycle: ReportLaunchStart is re-armed and fires
     // during isolate snapshot resolution below (in ResolveIsolateData),
-    // exactly as it does on a cold boot. If the process dies mid-restart,
-    // the next cold boot's crash recovery rolls the patch back.
-    Updater::BeginNewLaunchCycle();
+    // exactly as it does on a cold boot. Flagged as a restart's cycle so a
+    // failure reported in it — including the snapshot loader's own report,
+    // which cannot know who asked it to load — rolls the boot target back
+    // without condemning the patch. If the process dies mid-restart, the
+    // next cold boot's crash recovery handles the breadcrumb instead.
+    Updater::BeginRestartLaunchCycle();
     auto isolate_snapshot =
         DartSnapshot::IsolateSnapshotFromSettings(restart_settings);
     // A patch that fails to load does not always resolve to null. On iOS the
@@ -146,24 +150,24 @@ bool HotRestartEngine(Engine& engine, const Settings& settings) {
   }
 
   if (!isolate_torn_down) {
-    // The app is still running the code it had, and the loader already
-    // reported the failure, so the updater's selection is rolled back for the
-    // next cold boot. There is nothing to recover from.
+    // The app is still running the code it had, and the failure is already
+    // reported. The patch keeps its place for the next cold boot, which is
+    // the attempt that decides whether it is actually broken. There is
+    // nothing to recover from here.
     FML_LOG(ERROR) << "Shorebird hot restart: no attempt could resolve an "
                       "isolate snapshot; the app keeps running its current "
-                      "code and the next launch boots the rolled-back "
-                      "selection.";
+                      "code and the patch is retried on the next launch.";
     return false;
   }
 
   // Every attempt tore the previous isolate down, so returning here would
   // leave a live Shell with no isolate and a frozen UI the user cannot
-  // escape. Dying is the recovery: the updater's crash handling rolls the
-  // patch back on the next cold boot, which is the same path a process that
-  // dies mid-restart already takes.
+  // escape. Dying is the recovery: the next cold boot starts the patch's
+  // first launch cycle from scratch, and the ordinary breadcrumb condemns
+  // it there if the patch rather than the restart is what failed.
   FML_LOG(FATAL) << "Shorebird hot restart could not relaunch the app on "
-                    "either attempt; terminating so the next launch boots the "
-                    "rolled-back selection.";
+                    "either attempt; terminating so the app comes back up on "
+                    "a fresh launch.";
   return false;
 }
 
