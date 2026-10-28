@@ -139,34 +139,48 @@ if (enable_unittests) {
     fixtures = []
   }
 
-  # A stand-in for App.framework. Reached only through dlopen, so it is a
-  # data_deps of the suite below rather than a dep: linking it would hold the
-  # image in the process for the life of the test binary, which is the one
-  # thing the ownership tests need it not to do.
-  shared_library("shorebird_fake_base_snapshot") {
-    testonly = true
-    visibility = [ ":*" ]
+  # The ownership tests need dlfcn and a library they can watch dyld or the
+  # dynamic loader unload, and no_default_deps below only exists where
+  # BUILDCONFIG.gn wraps shared_library, which is use_flutter_cxx. Both hold
+  # on the hosts this suite is built for and neither holds on Windows,
+  # Fuchsia or QNX, where passing it would fail generation for the whole
+  # build graph.
+  _supports_dlopen_ownership_tests = is_mac || is_linux
 
-    sources = [ "fake_base_snapshot.c" ]
+  if (_supports_dlopen_ownership_tests) {
+    # A stand-in for App.framework. Reached only through dlopen, so it is a
+    # data_deps of the suite below rather than a dep: linking it would hold the
+    # image in the process for the life of the test binary, which is the one
+    # thing the ownership tests need it not to do.
+    shared_library("shorebird_fake_base_snapshot") {
+      testonly = true
+      visibility = [ ":*" ]
 
-    # The default deps bring libc++ and the allocator shim, whose thread-local
-    # storage makes dyld refuse to unload the image. A released App.framework
-    # carries a snapshot and nothing else, so keep this as bare as it is.
-    no_default_deps = true
+      sources = [ "fake_base_snapshot.c" ]
+
+      # The one default dep is //flutter/third_party/libcxx, whose
+      # thread-local storage is enough for dyld to refuse to unload the image,
+      # which fails every assertion here. Observed on macOS; kept bare on
+      # every host because a released App.framework carries a snapshot and
+      # nothing else.
+      no_default_deps = true
+    }
   }
 
   executable("shorebird_unittests") {
     testonly = true
 
     sources = [
-      "base_snapshot_ownership_unittests.cc",
       "patch_cache_unittests.cc",
       "shorebird_unittests.cc",
       "snapshots_data_handle_unittests.cc",
       "updater_unittests.cc",
     ]
 
-    data_deps = [ ":shorebird_fake_base_snapshot" ]
+    if (_supports_dlopen_ownership_tests) {
+      sources += [ "base_snapshot_ownership_unittests.cc" ]
+      data_deps = [ ":shorebird_fake_base_snapshot" ]
+    }
 
     deps = [
       ":shorebird",
