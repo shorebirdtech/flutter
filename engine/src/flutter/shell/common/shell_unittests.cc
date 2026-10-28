@@ -5256,13 +5256,12 @@ TEST_F(ShellTest, ShorebirdUpdaterReportsOnlyOnceForMultipleShells) {
 // thread. Without the liveness flag the two deadlock and this test hangs
 // until the per-case timeout kills it.
 TEST_F(ShellTest, ShorebirdQueuedRestartIsRefusedOnceTheShellTearsDown) {
-  auto mock = std::make_unique<shorebird::MockUpdater>();
-  shorebird::Updater::SetInstanceForTesting(std::move(mock));
-  shorebird::Updater::ResetLaunchStateForTesting();
+  auto mock = std::make_shared<shorebird::MockUpdater>();
   shorebird::Updater::SetHotRestartSupported(true);
   Shell::ShorebirdSetRestartHostRegistrationForTesting(true);
 
   auto settings = CreateSettingsForFixture();
+  settings.shorebird_updater = mock;
   auto task_runners = GetTaskRunnersForFixture();
   auto shell = CreateShell(settings, task_runners);
   ASSERT_TRUE(shell);
@@ -5295,8 +5294,6 @@ TEST_F(ShellTest, ShorebirdQueuedRestartIsRefusedOnceTheShellTearsDown) {
 
   Shell::ShorebirdSetRestartHostRegistrationForTesting(false);
   shorebird::Updater::SetHotRestartSupported(false);
-  shorebird::Updater::ResetLaunchStateForTesting();
-  shorebird::Updater::ResetInstanceForTesting();
 }
 
 // A second request while one is still in flight is rejected rather than
@@ -5304,13 +5301,12 @@ TEST_F(ShellTest, ShorebirdQueuedRestartIsRefusedOnceTheShellTearsDown) {
 // thread. The flag clears once the relaunch finishes, so this is not a rate
 // limit on later calls.
 TEST_F(ShellTest, ShorebirdSecondRestartIsRefusedWhileOneIsInFlight) {
-  auto mock = std::make_unique<shorebird::MockUpdater>();
-  shorebird::Updater::SetInstanceForTesting(std::move(mock));
-  shorebird::Updater::ResetLaunchStateForTesting();
+  auto mock = std::make_shared<shorebird::MockUpdater>();
   shorebird::Updater::SetHotRestartSupported(true);
   Shell::ShorebirdSetRestartHostRegistrationForTesting(true);
 
   auto settings = CreateSettingsForFixture();
+  settings.shorebird_updater = mock;
   auto task_runners = GetTaskRunnersForFixture();
   auto shell = CreateShell(settings, task_runners);
   ASSERT_TRUE(shell);
@@ -5340,8 +5336,6 @@ TEST_F(ShellTest, ShorebirdSecondRestartIsRefusedWhileOneIsInFlight) {
 
   Shell::ShorebirdSetRestartHostRegistrationForTesting(false);
   shorebird::Updater::SetHotRestartSupported(false);
-  shorebird::Updater::ResetLaunchStateForTesting();
-  shorebird::Updater::ResetInstanceForTesting();
 }
 
 namespace {
@@ -5363,13 +5357,12 @@ void RunOnUIThreadAndWait(Shell* shell, const fml::closure& task) {
 // ~Shell is holding while it waits on the UI thread. Without a bound on that
 // wait neither side moves and this test hangs until the per-case timeout.
 TEST_F(ShellTest, ShorebirdTeardownDuringAnExecutingRestartDoesNotDeadlock) {
-  auto mock = std::make_unique<shorebird::MockUpdater>();
-  shorebird::Updater::SetInstanceForTesting(std::move(mock));
-  shorebird::Updater::ResetLaunchStateForTesting();
+  auto mock = std::make_shared<shorebird::MockUpdater>();
   shorebird::Updater::SetHotRestartSupported(true);
   Shell::ShorebirdSetRestartHostRegistrationForTesting(true);
 
   auto settings = CreateSettingsForFixture();
+  settings.shorebird_updater = mock;
   auto task_runners = GetTaskRunnersForFixture();
   auto shell = CreateShell(settings, task_runners);
   ASSERT_TRUE(shell);
@@ -5405,8 +5398,6 @@ TEST_F(ShellTest, ShorebirdTeardownDuringAnExecutingRestartDoesNotDeadlock) {
 
   Shell::ShorebirdSetRestartHostRegistrationForTesting(false);
   shorebird::Updater::SetHotRestartSupported(false);
-  shorebird::Updater::ResetLaunchStateForTesting();
-  shorebird::Updater::ResetInstanceForTesting();
 }
 
 // Once an attempt has torn the isolate down, a run where every attempt then
@@ -5419,16 +5410,14 @@ TEST_F(ShellTest, ShorebirdTeardownDuringAnExecutingRestartDoesNotDeadlock) {
 // running the code it has and the run must return, because falling through
 // to the terminating path would kill a healthy app.
 TEST_F(ShellTest, ShorebirdHotRestartKeepsARunningAppWhenThePatchFailsToLoad) {
-  auto mock = std::make_unique<shorebird::MockUpdater>();
-  auto* mock_ptr = mock.get();
+  auto mock = std::make_shared<shorebird::MockUpdater>();
   // Empty: the attempt is already booting the base release, so there is
   // nothing to roll back and the loop ends rather than retrying.
   mock->set_next_boot_patch_path("");
-  shorebird::Updater::SetInstanceForTesting(std::move(mock));
-  shorebird::Updater::ResetLaunchStateForTesting();
-  shorebird::Updater::SetPatchLoadFailedForTesting(true);
+  mock->SetPatchLoadFailedForTesting(true);
 
   auto settings = CreateSettingsForFixture();
+  settings.shorebird_updater = mock;
   auto shell = CreateShell(settings);
   auto configuration = RunConfiguration::InferFromSettings(settings);
   configuration.SetEntrypoint("emptyMain");
@@ -5445,27 +5434,23 @@ TEST_F(ShellTest, ShorebirdHotRestartKeepsARunningAppWhenThePatchFailsToLoad) {
 
   EXPECT_FALSE(restarted);
   EXPECT_TRUE(running_after);
-  // One attempt, not two: an empty patch path ends the loop.
-  EXPECT_EQ(mock_ptr->launch_failure_count(), 1);
+  // One attempt, not two: an empty patch path ends the loop. Reported as a
+  // restart failure, so the patch keeps its place for the next cold boot.
+  EXPECT_EQ(mock->restart_failure_count(), 1);
+  EXPECT_EQ(mock->launch_failure_count(), 0);
 
   DestroyShell(std::move(shell));
-
-  shorebird::Updater::SetPatchLoadFailedForTesting(false);
-  shorebird::Updater::ResetLaunchStateForTesting();
-  shorebird::Updater::ResetInstanceForTesting();
 }
 
 // The same failure against a named patch has something to roll back, so it
 // retries once and then returns, still without tearing the isolate down.
 TEST_F(ShellTest, ShorebirdHotRestartRetriesOnceWhenANamedPatchFailsToLoad) {
-  auto mock = std::make_unique<shorebird::MockUpdater>();
-  auto* mock_ptr = mock.get();
+  auto mock = std::make_shared<shorebird::MockUpdater>();
   mock->set_next_boot_patch_path("/nonexistent/patch.vmcode");
-  shorebird::Updater::SetInstanceForTesting(std::move(mock));
-  shorebird::Updater::ResetLaunchStateForTesting();
-  shorebird::Updater::SetPatchLoadFailedForTesting(true);
+  mock->SetPatchLoadFailedForTesting(true);
 
   auto settings = CreateSettingsForFixture();
+  settings.shorebird_updater = mock;
   auto shell = CreateShell(settings);
   auto configuration = RunConfiguration::InferFromSettings(settings);
   configuration.SetEntrypoint("emptyMain");
@@ -5482,13 +5467,10 @@ TEST_F(ShellTest, ShorebirdHotRestartRetriesOnceWhenANamedPatchFailsToLoad) {
 
   EXPECT_FALSE(restarted);
   EXPECT_TRUE(running_after);
-  EXPECT_EQ(mock_ptr->launch_failure_count(), 2);
+  EXPECT_EQ(mock->restart_failure_count(), 2);
+  EXPECT_EQ(mock->launch_failure_count(), 0);
 
   DestroyShell(std::move(shell));
-
-  shorebird::Updater::SetPatchLoadFailedForTesting(false);
-  shorebird::Updater::ResetLaunchStateForTesting();
-  shorebird::Updater::ResetInstanceForTesting();
 }
 
 TEST_F(ShellTest, ShorebirdHotRestartTerminatesWhenEveryRelaunchFails) {
@@ -5496,19 +5478,20 @@ TEST_F(ShellTest, ShorebirdHotRestartTerminatesWhenEveryRelaunchFails) {
 
   EXPECT_DEATH(
       {
-        auto mock = std::make_unique<shorebird::MockUpdater>();
-        mock->set_next_boot_patch_path("/nonexistent/patch.vmcode");
-        shorebird::Updater::SetInstanceForTesting(std::move(mock));
-        shorebird::Updater::ResetLaunchStateForTesting();
+        auto mock = std::make_shared<shorebird::MockUpdater>();
+        mock->set_next_boot_patch_path("/nonexistent/libapp.so");
 
         auto settings = CreateSettingsForFixture();
+        settings.shorebird_updater = mock;
         auto shell = CreateShell(settings);
         auto configuration = RunConfiguration::InferFromSettings(settings);
         configuration.SetEntrypoint("emptyMain");
         RunEngine(shell.get(), std::move(configuration));
 
-        RunOnUIThreadAndWait(shell.get(), [&shell]() {
-          shorebird::HotRestartEngine(*shell->GetEngine(), Settings());
+        RunOnUIThreadAndWait(shell.get(), [&shell, &mock]() {
+          Settings bad_settings;
+          bad_settings.shorebird_updater = mock;
+          shorebird::HotRestartEngine(*shell->GetEngine(), bad_settings);
         });
 
         // Only reached if the run returned instead of terminating. Tearing
@@ -5520,9 +5503,6 @@ TEST_F(ShellTest, ShorebirdHotRestartTerminatesWhenEveryRelaunchFails) {
       // The severity is part of the assertion: the same sentence is logged
       // at ERROR by the path that returns instead of terminating.
       "FATAL.*could not relaunch the app on either attempt");
-
-  shorebird::Updater::ResetLaunchStateForTesting();
-  shorebird::Updater::ResetInstanceForTesting();
 }
 
 // A harness-built snapshot is the same JIT snapshot the shell booted with, so
