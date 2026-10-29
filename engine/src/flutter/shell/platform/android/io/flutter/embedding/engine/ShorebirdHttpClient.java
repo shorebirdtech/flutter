@@ -136,6 +136,11 @@ final class ShorebirdHttpClient {
       invalid("The method is not GET or POST.");
       return;
     }
+    // HttpURLConnection would send a GET with a body as a POST.
+    if (method.equals("GET") && requestBody != null && requestBody.length > 0) {
+      invalid("A GET request has a body.");
+      return;
+    }
     // Replace a default whatever its case.
     Map<String, String> requestHeaders = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     requestHeaders.put("User-Agent", USER_AGENT);
@@ -192,7 +197,7 @@ final class ShorebirdHttpClient {
         for (Map.Entry<String, String> header : requestHeaders.entrySet()) {
           next.setRequestProperty(header.getKey(), header.getValue());
         }
-        if (!isGet || (requestBody != null && requestBody.length > 0)) {
+        if (!isGet) {
           byte[] bytes = requestBody == null ? new byte[0] : requestBody;
           next.setDoOutput(true);
           next.setFixedLengthStreamingMode(bytes.length);

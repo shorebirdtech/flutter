@@ -175,21 +175,28 @@ bool RegisterHttpClient(JNIEnv* env) {
     env->ExceptionClear();
     return false;
   }
-  g_open_method = env->GetStaticMethodID(
-      clazz.obj(), "open",
-      "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[BI)"
-      "Lio/flutter/embedding/engine/ShorebirdHttpClient;");
-  g_read_method = env->GetMethodID(clazz.obj(), "read", "([B)I");
-  g_close_method = env->GetMethodID(clazz.obj(), "close", "()V");
-  g_result_field = env->GetFieldID(clazz.obj(), "result", "I");
-  g_error_field = env->GetFieldID(clazz.obj(), "error", "Ljava/lang/String;");
-  g_status_field = env->GetFieldID(clazz.obj(), "status", "I");
-  g_headers_field =
-      env->GetFieldID(clazz.obj(), "headers", "[Ljava/lang/String;");
-  if (env->ExceptionCheck() || g_open_method == nullptr ||
-      g_read_method == nullptr || g_close_method == nullptr ||
-      g_result_field == nullptr || g_error_field == nullptr ||
-      g_status_field == nullptr || g_headers_field == nullptr) {
+  // Each lookup is checked before the next, as JNI must not be called with
+  // an exception pending (CheckJNI aborts the app).
+  auto method = [&](jmethodID* id, const char* name, const char* signature,
+                    bool is_static) {
+    *id = is_static ? env->GetStaticMethodID(clazz.obj(), name, signature)
+                    : env->GetMethodID(clazz.obj(), name, signature);
+    return !env->ExceptionCheck() && *id != nullptr;
+  };
+  auto field = [&](jfieldID* id, const char* name, const char* signature) {
+    *id = env->GetFieldID(clazz.obj(), name, signature);
+    return !env->ExceptionCheck() && *id != nullptr;
+  };
+  if (!method(&g_open_method, "open",
+              "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[BI)"
+              "Lio/flutter/embedding/engine/ShorebirdHttpClient;",
+              true) ||
+      !method(&g_read_method, "read", "([B)I", false) ||
+      !method(&g_close_method, "close", "()V", false) ||
+      !field(&g_result_field, "result", "I") ||
+      !field(&g_error_field, "error", "Ljava/lang/String;") ||
+      !field(&g_status_field, "status", "I") ||
+      !field(&g_headers_field, "headers", "[Ljava/lang/String;")) {
     env->ExceptionClear();
     return false;
   }
