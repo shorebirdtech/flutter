@@ -145,7 +145,7 @@ if (enable_unittests) {
   # on the hosts this suite is built for and neither holds on Windows,
   # Fuchsia or QNX, where passing it would fail generation for the whole
   # build graph.
-  _supports_dlopen_ownership_tests = is_mac || is_linux
+  _supports_dlopen_ownership_tests = use_flutter_cxx && (is_mac || is_linux)
 
   if (_supports_dlopen_ownership_tests) {
     # A stand-in for App.framework. Reached only through dlopen, so it is a
