@@ -24,22 +24,35 @@ class CallbackHandler : public HttpResponseHandler {
       : callbacks_(callbacks) {}
 
   bool OnResponse(int status, const std::vector<HttpHeader>& headers) override {
+    // HttpURLConnection reports -1 for a response with no valid status line.
+    if (status < 100 || status > 599) {
+      bad_status_ = true;
+      return false;
+    }
     std::vector<ShorebirdHttpHeader> c_headers;
     c_headers.reserve(headers.size());
     for (const auto& header : headers) {
       c_headers.push_back({header.name.c_str(), header.value.c_str()});
     }
-    return callbacks_.on_response(callbacks_.context,
-                                  static_cast<uint16_t>(status),
-                                  c_headers.data(), c_headers.size());
+    aborted_ = !callbacks_.on_response(callbacks_.context,
+                                       static_cast<uint16_t>(status),
+                                       c_headers.data(), c_headers.size());
+    return !aborted_;
   }
 
   bool OnBody(const uint8_t* data, size_t length) override {
-    return callbacks_.on_body(callbacks_.context, data, length);
+    aborted_ = !callbacks_.on_body(callbacks_.context, data, length);
+    return !aborted_;
   }
+
+  // The updater stopped the request, however the platform then reported it.
+  bool aborted() const { return aborted_; }
+  bool bad_status() const { return bad_status_; }
 
  private:
   const ShorebirdHttpResponseCallbacks& callbacks_;
+  bool aborted_ = false;
+  bool bad_status_ = false;
 };
 
 int32_t ToCode(HttpResult result) {
@@ -97,6 +110,12 @@ int32_t ForwardHttpRequest(const ShorebirdHttpRequest* request,
   CallbackHandler handler(*callbacks);
   std::string error;
   int32_t code = ToCode(send(http_request, handler, &error));
+  if (handler.aborted()) {
+    code = SHOREBIRD_HTTP_ABORTED;
+  } else if (handler.bad_status()) {
+    code = SHOREBIRD_HTTP_PROTOCOL_ERROR;
+    error = "The response had no valid HTTP status.";
+  }
   // The updater logs this and puts it in the failure event, so it says what
   // the platform said rather than just the code.
   if (code != SHOREBIRD_HTTP_OK && code != SHOREBIRD_HTTP_ABORTED &&

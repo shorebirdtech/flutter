@@ -61,14 +61,17 @@ void OnError(void* context, const char* message) {
 HttpRequest sent;
 HttpResult fake_result = HttpResult::kOk;
 std::string fake_error;
+int fake_status = 206;
 
 HttpResult FakeSend(const HttpRequest& request,
                     HttpResponseHandler& handler,
                     std::string* error) {
   sent = request;
   if (fake_result == HttpResult::kOk || fake_result == HttpResult::kAborted) {
-    if (!handler.OnResponse(206, {{"Content-Length", "5"}})) {
-      return HttpResult::kAborted;
+    if (!handler.OnResponse(fake_status, {{"Content-Length", "5"}})) {
+      // As NSURLSession does once cancelled: a transport error.
+      *error = "cancelled";
+      return HttpResult::kTransportError;
     }
     handler.OnBody(reinterpret_cast<const uint8_t*>("he"), 2);
     handler.OnBody(reinterpret_cast<const uint8_t*>("llo"), 3);
@@ -86,6 +89,7 @@ class ForwardHttpRequestTest : public ::testing::Test {
     sent = {};
     fake_result = HttpResult::kOk;
     fake_error.clear();
+    fake_status = 206;
     request_.method = "POST";
     request_.url = "https://example.com/api";
     request_.headers = headers_;
@@ -149,9 +153,18 @@ TEST_F(ForwardHttpRequestTest, ReportsEachFailureWithThePlatformsReason) {
 }
 
 TEST_F(ForwardHttpRequestTest, AbortIsNotAnError) {
+  // However the platform reports the cancelled request.
   received_.accept_response = false;
   EXPECT_EQ(Forward(), SHOREBIRD_HTTP_ABORTED);
   EXPECT_TRUE(received_.errors.empty());
+}
+
+TEST_F(ForwardHttpRequestTest, InvalidStatusIsAProtocolError) {
+  fake_status = -1;
+  EXPECT_EQ(Forward(), SHOREBIRD_HTTP_PROTOCOL_ERROR);
+  EXPECT_EQ(received_.responses, 0);
+  ASSERT_EQ(received_.errors.size(), 1u);
+  EXPECT_EQ(received_.errors[0], "The response had no valid HTTP status.");
 }
 
 TEST_F(ForwardHttpRequestTest, ToleratesNoErrorCallbackOrMessage) {

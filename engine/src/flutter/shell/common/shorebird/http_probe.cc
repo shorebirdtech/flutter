@@ -7,8 +7,8 @@
 // status, the body's size and SHA-256, and the platform's error, if any.
 // Used to build the TLS accept/reject table on each platform and compare it
 // with dart:io (http_probe.dart prints the first three columns the same
-// way). The platform's client must be one that runs outside an app, so this
-// doesn't cover Android, whose client needs the app's Java VM.
+// way). A plain executable runs on macOS and the iOS simulator, not on an
+// iOS device or with Android's client, which needs the app's Java VM.
 
 #include <cstdio>
 #include <string>

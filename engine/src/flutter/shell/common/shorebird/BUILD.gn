@@ -116,8 +116,9 @@ source_set("engine_callbacks") {
 }
 
 # Fetches URLs through the engine's HTTP callback and prints what happened,
-# to build the TLS accept/reject table on a device (see tls_matrix_urls.txt
-# and http_probe.dart). Outside enable_unittests so it builds for iOS too.
+# to build the TLS accept/reject table (see tls_matrix_urls.txt and
+# http_probe.dart). Outside enable_unittests so it builds for the iOS
+# simulator too.
 executable("shorebird_http_probe") {
   testonly = true
   sources = [ "http_probe.cc" ]
