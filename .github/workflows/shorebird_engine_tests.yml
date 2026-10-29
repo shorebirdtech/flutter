@@ -14,9 +14,9 @@ name: shorebird_engine_tests
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # Cancel superseded PR runs, but let every push to shorebird/dev finish so
-  # each engine merge gets a result.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Cancel superseded runs, PRs and pushes to shorebird/dev alike: these run
+  # on Namespace runners, and a newer push's result covers the older one.
+  cancel-in-progress: true
 
 on:
   pull_request:
