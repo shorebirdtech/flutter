@@ -19,9 +19,6 @@
 #include <mutex>
 #include <optional>
 
-#include "flutter/fml/logging.h"
-#include "flutter/shell/common/shorebird/http_parser.h"
-
 #if !__has_feature(objc_arc)
 #error ARC must be enabled!
 #endif
@@ -31,6 +28,10 @@ namespace shorebird {
 namespace {
 
 constexpr char kUserAgent[] = "Shorebird-Updater";
+constexpr int kMaxRedirects = 10;
+// The longest the connection may sit idle, whatever the request's overall
+// limit.
+constexpr NSTimeInterval kIdleTimeout = 60;
 
 // Runs handler calls on the thread that called `SendHttpRequest`, as
 // `HttpResponseHandler` promises. NSURLSession calls its delegate on the
@@ -85,16 +86,14 @@ class CallerThread {
 
 struct RequestState {
   HttpResponseHandler* handler = nullptr;
-  HttpClientOptions options;
   bool is_get = false;
   NSDictionary<NSString*, NSString*>* headers = nil;
-  // Set when `trusted_roots_pem` is.
-  NSArray* anchors = nil;
-  std::string host;
   int redirects = 0;
   bool responded = false;
   // Why the delegate ended the request early, when it did.
   std::optional<HttpResult> failure;
+  // Why the request failed, for the caller to log.
+  std::string error;
   CallerThread caller;
 };
 
@@ -107,29 +106,28 @@ std::string ToStdString(NSString* s) {
   return utf8 == nullptr ? std::string() : std::string(utf8);
 }
 
-// The certificates in a PEM bundle, or nil if it holds none.
-NSArray* CertificatesFromPem(const std::string& pem) {
-  NSMutableArray* certificates = [NSMutableArray array];
-  const std::string begin = "-----BEGIN CERTIFICATE-----";
-  const std::string end = "-----END CERTIFICATE-----";
-  size_t at = 0;
-  while ((at = pem.find(begin, at)) != std::string::npos) {
-    size_t body = at + begin.size();
-    size_t stop = pem.find(end, body);
-    if (stop == std::string::npos) {
-      break;
-    }
-    NSData* der =
-        [[NSData alloc] initWithBase64EncodedString:ToNSString(pem.substr(body, stop - body))
-                                            options:NSDataBase64DecodingIgnoreUnknownCharacters];
-    SecCertificateRef certificate =
-        der ? SecCertificateCreateWithData(nullptr, (__bridge CFDataRef)der) : nullptr;
-    if (certificate != nullptr) {
-      [certificates addObject:(__bridge_transfer id)certificate];
-    }
-    at = stop + end.size();
+// Whether `s` can be a header name or value: nonempty (for a name), with no
+// control characters, so it cannot end the header or smuggle another.
+bool IsHeaderText(const std::string& s, bool allow_empty) {
+  if (s.empty()) {
+    return allow_empty;
   }
-  return certificates.count > 0 ? certificates : nil;
+  for (unsigned char c : s) {
+    if (c == '\r' || c == '\n' || c == '\0') {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Headers the client sets itself.
+bool IsReservedHeader(const std::string& name) {
+  for (const char* reserved : {"Host", "Content-Length", "Transfer-Encoding", "Connection"}) {
+    if ([ToNSString(name) caseInsensitiveCompare:@(reserved)] == NSOrderedSame) {
+      return true;
+    }
+  }
+  return false;
 }
 
 HttpResult ResultForError(NSError* error, int redirects) {
@@ -228,9 +226,10 @@ using flutter::shorebird::RequestState;
   return self;
 }
 
-- (void)failTask:(NSURLSessionTask*)task with:(HttpResult)result {
+- (void)failTask:(NSURLSessionTask*)task with:(HttpResult)result because:(const char*)reason {
   if (!_state->failure.has_value()) {
     _state->failure = result;
+    _state->error = reason;
   }
   [task cancel];
 }
@@ -247,15 +246,17 @@ using flutter::shorebird::RequestState;
     completionHandler(nil);
     return;
   }
-  std::optional<flutter::shorebird::http_internal::Url> next =
-      flutter::shorebird::http_internal::ParseUrl(
-          flutter::shorebird::ToStdString(request.URL.absoluteString));
+  NSString* next_scheme = request.URL.scheme;
+  bool to_https = [next_scheme caseInsensitiveCompare:@"https"] == NSOrderedSame;
+  bool to_http = [next_scheme caseInsensitiveCompare:@"http"] == NSOrderedSame;
   bool from_https = [response.URL.scheme caseInsensitiveCompare:@"https"] == NSOrderedSame;
   // Never from https to plain http: the request (and the headers it carries)
   // would leave TLS.
-  if (_state->redirects >= _state->options.max_redirects || !next.has_value() ||
-      (from_https && !next->https)) {
-    [self failTask:task with:HttpResult::kProtocolError];
+  if (_state->redirects >= flutter::shorebird::kMaxRedirects || !(to_https || to_http) ||
+      (from_https && !to_https)) {
+    [self failTask:task
+              with:HttpResult::kProtocolError
+           because:"Too many redirects, or a redirect to an unsupported or less secure URL."];
     completionHandler(nil);
     return;
   }
@@ -269,36 +270,6 @@ using flutter::shorebird::RequestState;
 }
 
 - (void)URLSession:(NSURLSession*)session
-                   task:(NSURLSessionTask*)task
-    didReceiveChallenge:(NSURLAuthenticationChallenge*)challenge
-      completionHandler:
-          (void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential*))completionHandler {
-  SecTrustRef trust = challenge.protectionSpace.serverTrust;
-  if (_state->anchors == nil ||
-      ![challenge.protectionSpace.authenticationMethod
-          isEqualToString:NSURLAuthenticationMethodServerTrust] ||
-      trust == nullptr) {
-    completionHandler(NSURLSessionAuthChallengePerformDefaultHandling, nil);
-    return;
-  }
-  // Tests: trust only the given roots. The trust object already carries
-  // NSURLSession's SSL policy for the host.
-  SecTrustSetAnchorCertificates(trust, (__bridge CFArrayRef)_state->anchors);
-  SecTrustSetAnchorCertificatesOnly(trust, true);
-  CFErrorRef error = nullptr;
-  if (SecTrustEvaluateWithError(trust, &error)) {
-    completionHandler(NSURLSessionAuthChallengeUseCredential,
-                      [NSURLCredential credentialForTrust:trust]);
-    return;
-  }
-  NSError* reason = (__bridge_transfer NSError*)error;
-  FML_LOG(ERROR) << "Shorebird updater could not verify " << _state->host << ": "
-                 << flutter::shorebird::Describe(reason);
-  _state->failure = HttpResult::kTlsError;
-  completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge, nil);
-}
-
-- (void)URLSession:(NSURLSession*)session
               dataTask:(NSURLSessionDataTask*)task
     didReceiveResponse:(NSURLResponse*)response
      completionHandler:(void (^)(NSURLSessionResponseDisposition))completionHandler {
@@ -308,6 +279,7 @@ using flutter::shorebird::RequestState;
       ![response isKindOfClass:[NSHTTPURLResponse class]]) {
     if (!_state->failure.has_value()) {
       _state->failure = HttpResult::kProtocolError;
+      _state->error = "The server sent more than one response, or one that was not HTTP.";
     }
     completionHandler(NSURLSessionResponseCancel);
     return;
@@ -356,7 +328,7 @@ using flutter::shorebird::RequestState;
     *stop = !keep_going;
   }];
   if (!keep_going) {
-    [self failTask:task with:HttpResult::kAborted];
+    [self failTask:task with:HttpResult::kAborted because:""];
   }
 }
 
@@ -368,10 +340,12 @@ using flutter::shorebird::RequestState;
     result = *_state->failure;
   } else if (error != nil) {
     result = flutter::shorebird::ResultForError(error, _state->redirects);
-    FML_LOG(ERROR) << "Shorebird updater request to " << _state->host
-                   << " failed: " << flutter::shorebird::Describe(error);
+    _state->error = flutter::shorebird::Describe(error);
+  } else if (_state->responded) {
+    result = HttpResult::kOk;
   } else {
-    result = _state->responded ? HttpResult::kOk : HttpResult::kProtocolError;
+    result = HttpResult::kProtocolError;
+    _state->error = "The server sent no response.";
   }
   _state->caller.Finish(result);
 }
@@ -383,28 +357,24 @@ namespace shorebird {
 
 HttpResult SendHttpRequest(const HttpRequest& request,
                            HttpResponseHandler& handler,
-                           const HttpClientOptions& options) {
+                           std::string* error) {
   @autoreleasepool {
     if (request.method != "GET" && request.method != "POST") {
+      *error = "The method is not GET or POST.";
       return HttpResult::kInvalidRequest;
     }
-    std::optional<http_internal::Url> url = http_internal::ParseUrl(request.url);
-    NSURL* ns_url = [NSURL URLWithString:ToNSString(request.url)];
-    if (!url.has_value() || ns_url == nil) {
+    NSString* url_string = ToNSString(request.url);
+    NSURL* ns_url = url_string == nil ? nil : [NSURL URLWithString:url_string];
+    if (ns_url == nil || ns_url.host.length == 0 ||
+        !([ns_url.scheme caseInsensitiveCompare:@"https"] == NSOrderedSame ||
+          [ns_url.scheme caseInsensitiveCompare:@"http"] == NSOrderedSame)) {
+      *error = "The URL is not an absolute http or https URL.";
       return HttpResult::kInvalidRequest;
     }
 
     auto state = std::make_shared<RequestState>();
     state->handler = &handler;
-    state->options = options;
     state->is_get = request.method == "GET";
-    state->host = url->host;
-    if (options.trusted_roots_pem.has_value()) {
-      state->anchors = CertificatesFromPem(*options.trusted_roots_pem);
-      if (state->anchors == nil) {
-        return HttpResult::kInvalidRequest;
-      }
-    }
 
     NSMutableDictionary<NSString*, NSString*>* headers = [NSMutableDictionary dictionary];
     headers[@"User-Agent"] = @(kUserAgent);
@@ -412,13 +382,15 @@ HttpResult SendHttpRequest(const HttpRequest& request,
     // Bodies arrive as sent, so Content-Length counts the bytes delivered.
     headers[@"Accept-Encoding"] = @"identity";
     for (const auto& header : request.headers) {
-      if (!http_internal::IsToken(header.name) || !http_internal::IsFieldValue(header.value) ||
-          http_internal::IsReservedHeader(header.name)) {
+      if (!IsHeaderText(header.name, false) || !IsHeaderText(header.value, true) ||
+          header.name.find(':') != std::string::npos || IsReservedHeader(header.name)) {
+        *error = "A request header is not valid.";
         return HttpResult::kInvalidRequest;
       }
       NSString* name = ToNSString(header.name);
       NSString* value = ToNSString(header.value);
       if (name == nil || value == nil) {
+        *error = "A request header is not valid UTF-8.";
         return HttpResult::kInvalidRequest;
       }
       // Replace a default whatever its case.
@@ -431,11 +403,10 @@ HttpResult SendHttpRequest(const HttpRequest& request,
     }
     state->headers = headers;
 
-    NSTimeInterval timeout = std::chrono::duration<double>(options.io_timeout).count();
     NSMutableURLRequest* ns_request =
         [NSMutableURLRequest requestWithURL:ns_url
                                 cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
-                            timeoutInterval:timeout];
+                            timeoutInterval:kIdleTimeout];
     ns_request.HTTPMethod = ToNSString(request.method);
     ns_request.allHTTPHeaderFields = headers;
     ns_request.HTTPShouldHandleCookies = NO;
@@ -447,7 +418,11 @@ HttpResult SendHttpRequest(const HttpRequest& request,
         [NSURLSessionConfiguration ephemeralSessionConfiguration];
     configuration.URLCache = nil;
     configuration.HTTPCookieStorage = nil;
-    configuration.timeoutIntervalForRequest = timeout;
+    configuration.timeoutIntervalForRequest = kIdleTimeout;
+    if (request.timeout_ms > 0) {
+      // The whole request, redirects included.
+      configuration.timeoutIntervalForResource = request.timeout_ms / 1000.0;
+    }
 
     NSOperationQueue* queue = [[NSOperationQueue alloc] init];
     queue.maxConcurrentOperationCount = 1;
@@ -458,10 +433,12 @@ HttpResult SendHttpRequest(const HttpRequest& request,
     NSURLSessionDataTask* task = [session dataTaskWithRequest:ns_request];
     if (task == nil) {
       [session invalidateAndCancel];
+      *error = "NSURLSession could not make a task for the request.";
       return HttpResult::kInvalidRequest;
     }
     [task resume];
     HttpResult result = state->caller.Wait();
+    *error = state->error;
     // The session holds its delegate until it is invalidated.
     [session invalidateAndCancel];
     return result;
