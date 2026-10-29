@@ -58,11 +58,16 @@ extern "C" __attribute__((weak)) unsigned long getauxval(unsigned long type) {
 // snapshots, but I'm not aware of any use cases for that.
 static fml::RefPtr<const DartSnapshot> vm_snapshot;
 
-// Resolving walks settings.application_library_paths with dlopen, and the
-// returned DartSnapshot is the only thing holding App.framework open, since a
-// released app does not link it. Two resolves in a row therefore unmap the
-// image and re-map it from disk, because the first one's snapshot is destroyed
-// before the second runs. ShorebirdBaseSnapshotOwnership covers that.
+// Resolving walks settings.application_library_paths with dlopen, so the
+// returned DartSnapshot owns a reference to App.framework. Where nothing else
+// holds the image, that reference is the only one: a standalone Runner carries
+// no LC_LOAD_DYLIB on App.framework, unlike an add-to-app host. Resolving
+// twice in a row then unmaps the image and re-maps it from disk, because the
+// first snapshot is destroyed before the second resolve runs.
+//
+// That is also why the crash is the first engine's only. Once vm_snapshot
+// below is set it holds the image for the process, so a later resolve-and-drop
+// has nothing left to unmap.
 static fml::RefPtr<const DartSnapshot> ResolveBaseVMSnapshot(
     const Settings& settings) {
   // If you are crashing here, you probably are running Shorebird in a Debug
@@ -269,8 +274,10 @@ void ConfigureShorebird(std::string code_cache_path,
                         const std::string& version,
                         const std::string& version_code) {
   // The interpreter path hands this to SetBaseSnapshot below, which holds it
-  // for the life of the process. Everywhere else the resolve is only the
-  // scheme check, so the mapping is released as soon as it is checked.
+  // for the life of the process, because a linked patch executes out of the
+  // base image and needs it resolvable. Everywhere else a patch replaces
+  // application_library_paths outright, so nothing reads the base again and
+  // the resolve is only the scheme check.
 #if SHOREBIRD_USE_INTERPRETER
   auto base_vm_snapshot = ResolveBaseVMSnapshot(settings);
 #else
