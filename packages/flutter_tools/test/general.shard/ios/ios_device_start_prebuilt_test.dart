@@ -942,13 +942,13 @@ void main() {
           device.portForwarder = const NoOpDevicePortForwarder();
           device.setLogReader(iosApp, deviceLogReader);
 
-          // Start writing messages to the log reader.
-          Timer(const Duration(milliseconds: 50), () {
-            fakeLauncher.coreDeviceLogForwarder.addLog('Foo');
-            fakeLauncher.coreDeviceLogForwarder.addLog(
-              'The Dart VM service is listening on http://127.0.0.1:456',
-            );
-          });
+          // Write messages to the log reader once the app launches, after the
+          // log reader is listening. A timer races prepareDeviceSupport and
+          // drops the VM service line when it fires first.
+          fakeLauncher.logLinesOnLaunch = <String>[
+            'Foo',
+            'The Dart VM service is listening on http://127.0.0.1:456',
+          ];
 
           final LaunchResult launchResult = await device.startApp(
             iosApp,
@@ -1959,13 +1959,13 @@ void main() {
           device.portForwarder = const NoOpDevicePortForwarder();
           device.setLogReader(iosApp, deviceLogReader);
 
-          // Start writing messages to the log reader.
-          Timer(const Duration(milliseconds: 50), () {
-            fakeLauncher.coreDeviceLogForwarder.addLog('Foo');
-            fakeLauncher.coreDeviceLogForwarder.addLog(
-              'The Dart VM service is listening on http://127.0.0.1:456',
-            );
-          });
+          // Write messages to the log reader once the app launches, after the
+          // log reader is listening. A timer races prepareDeviceSupport and
+          // drops the VM service line when it fires first.
+          fakeLauncher.logLinesOnLaunch = <String>[
+            'Foo',
+            'The Dart VM service is listening on http://127.0.0.1:456',
+          ];
 
           final LaunchResult launchResult = await device.startApp(
             iosApp,
@@ -2256,6 +2256,9 @@ class FakeIOSCoreDeviceLauncher extends Fake implements IOSCoreDeviceLauncher {
 
   Completer<void>? xcodeCompleter;
 
+  /// Lines written to [coreDeviceLogForwarder] when the app is launched with LLDB.
+  List<String> logLinesOnLaunch = <String>[];
+
   @override
   final coreDeviceLogForwarder = IOSCoreDeviceLogForwarder();
 
@@ -2273,6 +2276,7 @@ class FakeIOSCoreDeviceLauncher extends Fake implements IOSCoreDeviceLauncher {
     required ShutdownHooks shutdownHooks,
   }) async {
     launchedWithLLDB = true;
+    logLinesOnLaunch.forEach(coreDeviceLogForwarder.addLog);
     return lldbLaunchResult;
   }
 
