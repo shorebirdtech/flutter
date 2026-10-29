@@ -270,7 +270,16 @@ void ConfigureShorebird(std::string code_cache_path,
   config.file_callbacks = ShorebirdFileCallbacks();
   config.yaml_config = shorebird_yaml;
 
-  shorebird::Updater::Instance().Init(config);
+  bool init_result = shorebird::Updater::Instance().Init(config);
+
+  // On the mobile path, snapshots resolve through
+  // Settings::application_library_paths, which hot restart can re-resolve to
+  // pick up a newly installed patch. Desktop embedders (the other
+  // ConfigureShorebird overload) wire AOT data through the embedder API,
+  // which a restart would not refresh, so they don't enable this.
+  if (init_result) {
+    shorebird::Updater::SetHotRestartSupported(true);
+  }
 
   // We only set the base snapshot on iOS for now.
 #if SHOREBIRD_USE_INTERPRETER

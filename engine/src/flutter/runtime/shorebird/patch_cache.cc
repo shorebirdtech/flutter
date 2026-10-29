@@ -134,8 +134,10 @@ std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
     // ReportLaunchStart already promoted this patch to current_boot, so
     // without a failure report it stays "running" in the updater's books
     // while base code executes, and the next launch retries the same patch.
-    // Guarded once per process, so the second symbol lookup is a no-op.
-    shorebird::Updater::Instance().ReportLaunchFailure();
+    // The report is guarded once per launch cycle, so the second symbol
+    // lookup drops it; the load-failure flag it also sets is not, and that
+    // is what a hot restart reads back.
+    shorebird::Updater::Instance().ReportPatchLoadFailure();
     return nullptr;
   }
 

@@ -5,7 +5,9 @@
 #ifndef FLUTTER_SHELL_COMMON_SHELL_H_
 #define FLUTTER_SHELL_COMMON_SHELL_H_
 
+#include <atomic>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <string_view>
 #include <unordered_map>
@@ -445,7 +447,27 @@ class Shell final : public PlatformView::Delegate,
   static std::pair<DartVMRef, fml::RefPtr<const DartSnapshot>>
   InferVmInitDataFromSettings(Settings& settings);
 
+  // Shorebird: registers the hot restart host even outside AOT. Registration
+  // is normally gated on Dart_IsPrecompiledRuntime, which no JIT test binary
+  // satisfies, so without this the restart path is unreachable from a unit
+  // test and its guards can be removed with every test still green.
+  static void ShorebirdSetRestartHostRegistrationForTesting(bool enabled);
+
  private:
+  // Shorebird: hot restart host registration. Declared here because the
+  // implementations need this shell's settings, VM, and engine; defined in
+  // shell/common/shorebird/hot_restart.cc to keep the logic out of this
+  // file.
+  void ShorebirdRegisterRestartHost();
+  void ShorebirdUnregisterRestartHost();
+
+  // Shorebird: cleared once this shell has begun tearing down. A hot restart
+  // blocks the UI thread on the platform thread, and teardown blocks the
+  // platform thread on the UI thread, so a restart that starts after
+  // teardown has begun deadlocks both. Shared with the posted restart task,
+  // which can outlive the shell. See hot_restart.cc.
+  std::shared_ptr<std::atomic<bool>> shorebird_restart_host_live_;
+
   using ServiceProtocolHandler =
       std::function<bool(const ServiceProtocol::Handler::ServiceProtocolMap&,
                          rapidjson::Document*)>;

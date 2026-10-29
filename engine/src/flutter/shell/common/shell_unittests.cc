@@ -5,6 +5,7 @@
 #define FML_USED_ON_EMBEDDER
 
 #include <algorithm>
+#include <chrono>
 #include <ctime>
 #include <future>
 #include <memory>
@@ -33,6 +34,7 @@
 #include "flutter/fml/synchronization/count_down_latch.h"
 #include "flutter/fml/synchronization/waitable_event.h"
 #include "flutter/runtime/dart_vm.h"
+#include "flutter/runtime/isolate_configuration.h"
 #include "flutter/shell/common/platform_view.h"
 #include "flutter/shell/common/rasterizer.h"
 #include "flutter/shell/common/shell_test.h"
@@ -53,6 +55,7 @@
 #include "third_party/skia/include/gpu/ganesh/mock/GrMockTypes.h"
 #include "third_party/tonic/converter/dart_converter.h"
 
+#include "flutter/shell/common/shorebird/hot_restart.h"
 #include "flutter/shell/common/shorebird/updater.h"
 
 #ifdef SHELL_ENABLE_VULKAN
@@ -5253,6 +5256,413 @@ TEST_F(ShellTest, ShorebirdUpdaterReportsOnlyOnceForMultipleShells) {
 
   shorebird::Updater::ResetLaunchStateForTesting();
   shorebird::Updater::ResetInstanceForTesting();
+}
+
+// Unregistering the restart host cannot stop a request already posted to the
+// UI thread, whose weak engine pointer was taken while the engine was alive.
+// Such a task reaches Shell::OnPreEngineRestart, which blocks the UI thread
+// on the platform thread, while ~Shell blocks the platform thread on the UI
+// thread. Without the liveness flag the two deadlock and this test hangs
+// until the per-case timeout kills it.
+TEST_F(ShellTest, ShorebirdQueuedRestartIsRefusedOnceTheShellTearsDown) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::SetHotRestartSupported(true);
+  Shell::ShorebirdSetRestartHostRegistrationForTesting(true);
+
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+
+  // Occupy the UI thread so the restart lands in its queue rather than
+  // running while the shell is still alive.
+  fml::AutoResetWaitableEvent ui_occupied;
+  fml::AutoResetWaitableEvent release_ui;
+  task_runners.GetUITaskRunner()->PostTask([&ui_occupied, &release_ui]() {
+    ui_occupied.Signal();
+    release_ui.Wait();
+  });
+  ui_occupied.Wait();
+
+  // Accepted: the shell is alive and no other restart is in flight.
+  EXPECT_TRUE(shorebird::Updater::RequestRestart());
+
+  // Free the UI thread only after teardown has begun, so the queued restart
+  // runs inside the window that used to deadlock. ~Shell clears the liveness
+  // flag before its first latch wait, so the delay only has to outlast the
+  // call itself. Releasing too early leaves the shell alive and tests
+  // nothing; it cannot produce a false failure.
+  std::thread releaser([&release_ui]() {
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    release_ui.Signal();
+  });
+
+  DestroyShell(std::move(shell), task_runners);
+  releaser.join();
+
+  Shell::ShorebirdSetRestartHostRegistrationForTesting(false);
+  shorebird::Updater::SetHotRestartSupported(false);
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
+// A second request while one is still in flight is rejected rather than
+// queued, so a burst of restartApp() calls cannot stack relaunches on the UI
+// thread. The flag clears once the relaunch finishes, so this is not a rate
+// limit on later calls.
+TEST_F(ShellTest, ShorebirdSecondRestartIsRefusedWhileOneIsInFlight) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::SetHotRestartSupported(true);
+  Shell::ShorebirdSetRestartHostRegistrationForTesting(true);
+
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+
+  // Hold the UI thread so the first request stays in flight across the
+  // second one.
+  fml::AutoResetWaitableEvent ui_occupied;
+  fml::AutoResetWaitableEvent release_ui;
+  task_runners.GetUITaskRunner()->PostTask([&ui_occupied, &release_ui]() {
+    ui_occupied.Signal();
+    release_ui.Wait();
+  });
+  ui_occupied.Wait();
+
+  EXPECT_TRUE(shorebird::Updater::RequestRestart());
+  EXPECT_FALSE(shorebird::Updater::RequestRestart());
+
+  // Let the queued restart be refused by teardown rather than run against a
+  // live shell, which would relaunch the isolate out from under the test.
+  std::thread releaser([&release_ui]() {
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    release_ui.Signal();
+  });
+
+  DestroyShell(std::move(shell), task_runners);
+  releaser.join();
+
+  Shell::ShorebirdSetRestartHostRegistrationForTesting(false);
+  shorebird::Updater::SetHotRestartSupported(false);
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
+namespace {
+// Runs |task| on the shell's UI thread, where the engine may be touched, and
+// blocks until it finishes.
+void RunOnUIThreadAndWait(Shell* shell, const fml::closure& task) {
+  fml::AutoResetWaitableEvent latch;
+  fml::TaskRunner::RunNowOrPostTask(shell->GetTaskRunners().GetUITaskRunner(),
+                                    [&]() {
+                                      task();
+                                      latch.Signal();
+                                    });
+  latch.Wait();
+}
+}  // namespace
+
+// The liveness flag only covers a restart that has not started. One already
+// inside Shell::OnPreEngineRestart is waiting on the platform thread, which
+// ~Shell is holding while it waits on the UI thread. Without a bound on that
+// wait neither side moves and this test hangs until the per-case timeout.
+TEST_F(ShellTest, ShorebirdTeardownDuringAnExecutingRestartDoesNotDeadlock) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::SetHotRestartSupported(true);
+  Shell::ShorebirdSetRestartHostRegistrationForTesting(true);
+
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+
+  // Hold the platform thread so the teardown and the restart's flush both
+  // queue behind it, teardown first.
+  fml::AutoResetWaitableEvent platform_held;
+  fml::AutoResetWaitableEvent release_platform;
+  task_runners.GetPlatformTaskRunner()->PostTask(
+      [&platform_held, &release_platform]() {
+        platform_held.Signal();
+        release_platform.Wait();
+      });
+  platform_held.Wait();
+
+  // Queues ~Shell on the platform thread behind the task above.
+  std::thread destroyer([this, &shell, &task_runners]() {
+    DestroyShell(std::move(shell), task_runners);
+  });
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+  // Accepted: ~Shell has not run yet, so the host is still registered. The
+  // restart then reaches OnPreEngineRestart and queues its flush behind the
+  // teardown, which is the interleaving that used to hang.
+  EXPECT_TRUE(shorebird::Updater::RequestRestart());
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+  release_platform.Signal();
+  destroyer.join();
+
+  Shell::ShorebirdSetRestartHostRegistrationForTesting(false);
+  shorebird::Updater::SetHotRestartSupported(false);
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
+// Once an attempt has torn the isolate down, a run where every attempt then
+// fails must terminate rather than return: returning would leave a live
+// Shell with no isolate and a UI the user cannot escape. Settings carrying
+// no isolate configuration resolve a snapshot but fail to relaunch, which is
+// the shape of that run.
+// A patch that resolves to base code is a failed load the snapshot cannot
+// show, and it is reported before anything is torn down. The app must keep
+// running the code it has and the run must return, because falling through
+// to the terminating path would kill a healthy app.
+TEST_F(ShellTest, ShorebirdHotRestartKeepsARunningAppWhenThePatchFailsToLoad) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  auto* mock_ptr = mock.get();
+  // Empty: the attempt is already booting the base release, so there is
+  // nothing to roll back and the loop ends rather than retrying.
+  mock->set_next_boot_patch_path("");
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::SetPatchLoadFailedForTesting(true);
+
+  auto settings = CreateSettingsForFixture();
+  auto shell = CreateShell(settings);
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+
+  bool restarted = true;
+  bool running_after = false;
+  RunOnUIThreadAndWait(shell.get(), [&shell, &restarted, &running_after]() {
+    restarted =
+        shorebird::HotRestartEngine(*shell->GetEngine(), shell->GetSettings());
+    running_after =
+        shell->GetEngine()->GetRuntimeController()->IsRootIsolateRunning();
+  });
+
+  EXPECT_FALSE(restarted);
+  EXPECT_TRUE(running_after);
+  // One attempt, not two: an empty patch path ends the loop. Reported as a
+  // restart failure, so the patch keeps its place for the next cold boot.
+  EXPECT_EQ(mock_ptr->restart_failure_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_failure_count(), 0);
+
+  DestroyShell(std::move(shell));
+
+  shorebird::Updater::SetPatchLoadFailedForTesting(false);
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
+// The same failure against a named patch has something to roll back, so it
+// retries once and then returns, still without tearing the isolate down.
+TEST_F(ShellTest, ShorebirdHotRestartRetriesOnceWhenANamedPatchFailsToLoad) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  auto* mock_ptr = mock.get();
+  mock->set_next_boot_patch_path("/nonexistent/patch.vmcode");
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::SetPatchLoadFailedForTesting(true);
+
+  auto settings = CreateSettingsForFixture();
+  auto shell = CreateShell(settings);
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+
+  bool restarted = true;
+  bool running_after = false;
+  RunOnUIThreadAndWait(shell.get(), [&shell, &restarted, &running_after]() {
+    restarted =
+        shorebird::HotRestartEngine(*shell->GetEngine(), shell->GetSettings());
+    running_after =
+        shell->GetEngine()->GetRuntimeController()->IsRootIsolateRunning();
+  });
+
+  EXPECT_FALSE(restarted);
+  EXPECT_TRUE(running_after);
+  EXPECT_EQ(mock_ptr->restart_failure_count(), 2);
+  EXPECT_EQ(mock_ptr->launch_failure_count(), 0);
+
+  DestroyShell(std::move(shell));
+
+  shorebird::Updater::SetPatchLoadFailedForTesting(false);
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
+TEST_F(ShellTest, ShorebirdHotRestartTerminatesWhenEveryRelaunchFails) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
+
+  EXPECT_DEATH(
+      {
+        auto mock = std::make_unique<shorebird::MockUpdater>();
+        mock->set_next_boot_patch_path("/nonexistent/patch.vmcode");
+        shorebird::Updater::SetInstanceForTesting(std::move(mock));
+        shorebird::Updater::ResetLaunchStateForTesting();
+
+        auto settings = CreateSettingsForFixture();
+        auto shell = CreateShell(settings);
+        auto configuration = RunConfiguration::InferFromSettings(settings);
+        configuration.SetEntrypoint("emptyMain");
+        RunEngine(shell.get(), std::move(configuration));
+
+        RunOnUIThreadAndWait(shell.get(), [&shell]() {
+          shorebird::HotRestartEngine(*shell->GetEngine(), Settings());
+        });
+
+        // Only reached if the run returned instead of terminating. Tearing
+        // the shell down keeps the child's exit clean, so a return is
+        // reported as a failure to die rather than matching on a crash in
+        // cleanup.
+        DestroyShell(std::move(shell));
+      },
+      // The severity is part of the assertion: the same sentence is logged
+      // at ERROR by the path that returns instead of terminating.
+      "FATAL.*could not relaunch the app on either attempt");
+
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
+// A harness-built snapshot is the same JIT snapshot the shell booted with, so
+// these tests pin that the handed snapshot is the one carried, not that a
+// different program boots.
+TEST_F(ShellTest, RestartWithSnapshotInvalidConfigurationLeavesIsolateAlone) {
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
+  auto settings = CreateSettingsForFixture();
+  auto shell = CreateShell(settings);
+  ASSERT_TRUE(ValidateShell(shell.get()));
+
+  fml::AutoResetWaitableEvent main_latch;
+  AddNativeCallback(
+      "NotifyNative",
+      CREATE_NATIVE_ENTRY([&main_latch](auto args) { main_latch.Signal(); }));
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("mainNotifyNative");
+  RunEngine(shell.get(), std::move(configuration));
+  main_latch.Wait();
+
+  bool restarted = true;
+  bool running_after = false;
+  const RuntimeController* controller_before = nullptr;
+  const RuntimeController* controller_after = nullptr;
+  fml::RefPtr<const DartSnapshot> snapshot_before;
+  fml::RefPtr<const DartSnapshot> snapshot_after;
+  RunOnUIThreadAndWait(shell.get(), [&]() {
+    auto engine = shell->GetEngine();
+    controller_before = engine->GetRuntimeController();
+    snapshot_before = controller_before->GetIsolateSnapshot();
+    restarted = engine->RestartWithSnapshot(
+        RunConfiguration(nullptr),
+        DartSnapshot::IsolateSnapshotFromSettings(settings));
+    controller_after = engine->GetRuntimeController();
+    snapshot_after = controller_after->GetIsolateSnapshot();
+    running_after = controller_after->IsRootIsolateRunning();
+  });
+
+  EXPECT_FALSE(restarted);
+  EXPECT_TRUE(running_after);
+  EXPECT_EQ(controller_before, controller_after);
+  EXPECT_EQ(snapshot_before, snapshot_after);
+
+  DestroyShell(std::move(shell));
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
+}
+
+TEST_F(ShellTest, RestartWithSnapshotRelaunchesRootIsolateWithGivenSnapshot) {
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
+  auto settings = CreateSettingsForFixture();
+  auto shell = CreateShell(settings);
+  ASSERT_TRUE(ValidateShell(shell.get()));
+
+  fml::AutoResetWaitableEvent first_latch;
+  fml::AutoResetWaitableEvent second_latch;
+  AddNativeCallback(
+      "NotifyNative",
+      CREATE_NATIVE_ENTRY([&first_latch](auto args) { first_latch.Signal(); }));
+  AddNativeCallback("SayHiFromFixturesAreFunctionalMain",
+                    CREATE_NATIVE_ENTRY(
+                        [&second_latch](auto args) { second_latch.Signal(); }));
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("mainNotifyNative");
+  RunEngine(shell.get(), std::move(configuration));
+  first_latch.Wait();
+
+  auto snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
+  ASSERT_TRUE(snapshot);
+
+  DartVM* vm_before = shell->GetDartVM();
+  const RuntimeController* controller_before = nullptr;
+  bool restarted = false;
+  const RuntimeController* controller_after = nullptr;
+  fml::RefPtr<const DartSnapshot> snapshot_after;
+  DartVM* vm_after = nullptr;
+  std::string last_entry_point;
+  RunOnUIThreadAndWait(shell.get(), [&]() {
+    auto engine = shell->GetEngine();
+    controller_before = engine->GetRuntimeController();
+    auto restart_configuration = RunConfiguration::InferFromSettings(settings);
+    restart_configuration.SetEntrypoint("fixturesAreFunctionalMain");
+    restarted =
+        engine->RestartWithSnapshot(std::move(restart_configuration), snapshot);
+    controller_after = engine->GetRuntimeController();
+    snapshot_after = controller_after->GetIsolateSnapshot();
+    vm_after = controller_after->GetDartVM();
+    last_entry_point = engine->GetLastEntrypoint();
+  });
+
+  ASSERT_TRUE(restarted);
+  // The relaunched isolate ran the new entrypoint.
+  second_latch.Wait();
+  EXPECT_EQ(last_entry_point, "fixturesAreFunctionalMain");
+  EXPECT_NE(controller_before, controller_after);
+  EXPECT_EQ(snapshot_after.get(), snapshot.get());
+  EXPECT_EQ(vm_after, vm_before);
+
+  DestroyShell(std::move(shell));
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
+}
+
+TEST_F(ShellTest, CloneWithSnapshotCarriesSnapshotAndReusesVM) {
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
+  auto settings = CreateSettingsForFixture();
+  auto shell = CreateShell(settings);
+  ASSERT_TRUE(ValidateShell(shell.get()));
+
+  auto snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
+  ASSERT_TRUE(snapshot);
+
+  DartVM* vm = shell->GetDartVM();
+  RunOnUIThreadAndWait(shell.get(), [&]() {
+    const RuntimeController* original =
+        shell->GetEngine()->GetRuntimeController();
+    auto clone = original->CloneWithSnapshot(snapshot);
+    ASSERT_TRUE(clone);
+    EXPECT_NE(clone.get(), original);
+    EXPECT_EQ(clone->GetIsolateSnapshot().get(), snapshot.get());
+    EXPECT_NE(clone->GetIsolateSnapshot().get(),
+              original->GetIsolateSnapshot().get());
+    EXPECT_EQ(clone->GetDartVM(), vm);
+    EXPECT_EQ(clone->GetDartVM(), original->GetDartVM());
+    EXPECT_FALSE(clone->IsRootIsolateRunning());
+  });
+
+  DestroyShell(std::move(shell));
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
 }
 
 }  // namespace testing

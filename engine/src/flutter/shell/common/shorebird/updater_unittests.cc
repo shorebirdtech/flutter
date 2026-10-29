@@ -15,8 +15,8 @@ namespace testing {
 class UpdaterTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    // Install a mock for each test and reset the once-per-process guards
-    // so each test starts with a clean slate.
+    // Install a mock for each test and reset the launch-cycle guards so
+    // each test starts with a clean slate.
     auto mock = std::make_unique<MockUpdater>();
     mock_ = mock.get();
     Updater::SetInstanceForTesting(std::move(mock));
@@ -65,6 +65,54 @@ TEST_F(UpdaterTest, ReportLaunchFailureOnlyCallsOnce) {
   // Second call is a no-op.
   Updater::Instance().ReportLaunchFailure();
   EXPECT_EQ(mock_->launch_failure_count(), 1);
+}
+
+// A patch that fails to load is a failed launch plus a fact the hot restart
+// host needs: the snapshot it is about to get back is base code. The report
+// and the flag are separate because the report is dropped on the second
+// symbol lookup of the same cycle.
+
+TEST_F(UpdaterTest, ReportPatchLoadFailureRecordsAndReportsTheFailure) {
+  EXPECT_FALSE(Updater::PatchLoadFailed());
+
+  Updater::Instance().ReportPatchLoadFailure();
+  EXPECT_TRUE(Updater::PatchLoadFailed());
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+
+  // The loader asks for two symbols, so it reports twice in one cycle.
+  Updater::Instance().ReportPatchLoadFailure();
+  EXPECT_TRUE(Updater::PatchLoadFailed());
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+}
+
+// The flag means "the patch could not be loaded", not "the launch failed".
+// A relaunch that fails for any other reason must not look like a base-code
+// boot to the next attempt.
+TEST_F(UpdaterTest, ReportLaunchFailureDoesNotRecordAPatchLoadFailure) {
+  Updater::Instance().ReportLaunchFailure();
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  EXPECT_FALSE(Updater::PatchLoadFailed());
+}
+
+// The hot restart retry depends on this: attempt two re-arms the cycle and
+// must not inherit attempt one's failed load, or the app never recovers.
+TEST_F(UpdaterTest, BeginNewLaunchCycleClearsThePatchLoadFailure) {
+  Updater::Instance().ReportPatchLoadFailure();
+  ASSERT_TRUE(Updater::PatchLoadFailed());
+
+  Updater::BeginNewLaunchCycle();
+  EXPECT_FALSE(Updater::PatchLoadFailed());
+}
+
+// The flag is stored outside ReportLaunchFailure's once-per-cycle guard, so
+// a report that is dropped still records the load failure.
+TEST_F(UpdaterTest, PatchLoadFailureSurvivesADroppedReport) {
+  Updater::Instance().ReportLaunchFailure();
+  ASSERT_EQ(mock_->launch_failure_count(), 1);
+
+  Updater::Instance().ReportPatchLoadFailure();
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  EXPECT_TRUE(Updater::PatchLoadFailed());
 }
 
 TEST_F(UpdaterTest, MockUpdaterTracksShouldAutoUpdate) {
@@ -346,6 +394,198 @@ TEST_F(UpdaterTest, ResetLaunchStateForgetsInit) {
   Updater::Instance().ReportLaunchSuccess();
 
   EXPECT_EQ(mock_->start_update_thread_count(), 0);
+}
+
+// BeginNewLaunchCycle re-arms the launch guards so a hot restart can report
+// a full second launch cycle (start, then success/failure) — exactly like a
+// fresh process boot. This is the engine-side half of the hot restart
+// launch-cycle contract (the Rust half is covered by hot_restart_tests in
+// the updater repo).
+TEST_F(UpdaterTest, BeginNewLaunchCycleAllowsSecondLaunchCycle) {
+  // Cold boot.
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+
+  // Hot restart begins a new launch cycle.
+  Updater::BeginNewLaunchCycle();
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchFailure();
+
+  EXPECT_EQ(mock_->launch_start_count(), 2);
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+
+  const auto& log = mock_->call_log();
+  ASSERT_EQ(log.size(), 4u);
+  EXPECT_EQ(log[0], "ReportLaunchStart");
+  EXPECT_EQ(log[1], "ReportLaunchSuccess");
+  EXPECT_EQ(log[2], "ReportLaunchStart");
+  EXPECT_EQ(log[3], "ReportLaunchFailure");
+}
+
+// A restart's launch cycle reports its failures as restart failures, which
+// roll the boot target back without condemning the patch. The restart
+// mechanism can fail for reasons the patch has no part in, and a cold boot
+// onto the same patch is what decides.
+TEST_F(UpdaterTest, BeginRestartLaunchCycleRoutesFailureToTheRestartPath) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+
+  Updater::BeginRestartLaunchCycle();
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchFailure();
+
+  EXPECT_EQ(mock_->launch_failure_count(), 0);
+  EXPECT_EQ(mock_->restart_failure_count(), 1);
+
+  const auto& log = mock_->call_log();
+  ASSERT_EQ(log.size(), 4u);
+  EXPECT_EQ(log[3], "ReportRestartFailure");
+}
+
+// The snapshot loader reports a patch it could not load without knowing
+// whether a cold boot or a restart asked it to, so the routing has to come
+// from the cycle rather than the call site.
+TEST_F(UpdaterTest, PatchLoadFailureInARestartCycleIsARestartFailure) {
+  Updater::BeginRestartLaunchCycle();
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportPatchLoadFailure();
+
+  EXPECT_EQ(mock_->launch_failure_count(), 0);
+  EXPECT_EQ(mock_->restart_failure_count(), 1);
+  EXPECT_TRUE(Updater::PatchLoadFailed());
+}
+
+// A cold boot still condemns the patch. Only the restart cycle spares it,
+// so the next process boot is an ordinary first cycle again.
+TEST_F(UpdaterTest, BeginNewLaunchCycleRoutesFailureBackToTheLaunchPath) {
+  Updater::BeginRestartLaunchCycle();
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchFailure();
+  ASSERT_EQ(mock_->restart_failure_count(), 1);
+
+  Updater::BeginNewLaunchCycle();
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchFailure();
+
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  EXPECT_EQ(mock_->restart_failure_count(), 1);
+}
+
+// A hot restart re-runs the launch lifecycle but does not reconfigure the
+// process, so the update thread it already started must keep running.
+TEST_F(UpdaterTest, BeginNewLaunchCycleKeepsUpdateThreadGuard) {
+  mock_->set_should_auto_update(true);
+  ASSERT_TRUE(Updater::Instance().Init(AppConfig{}));
+
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+  ASSERT_EQ(mock_->start_update_thread_count(), 1);
+
+  Updater::BeginNewLaunchCycle();
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+}
+
+// The Init latch records that the process is configured, which outlives any
+// one launch cycle. Reporting no launch before the new cycle leaves the
+// update-thread guard unclaimed, so the latch is the only thing that can
+// gate the thread start and a cleared one is observable.
+TEST_F(UpdaterTest, BeginNewLaunchCycleKeepsInitLatch) {
+  mock_->set_should_auto_update(true);
+  ASSERT_TRUE(Updater::Instance().Init(AppConfig{}));
+
+  Updater::BeginNewLaunchCycle();
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+}
+
+// Init retains the configuration so the hot restart can fall back to the
+// original libapp paths when no patch is installed.
+TEST_F(UpdaterTest, InitRetainsAppConfig) {
+  AppConfig config;
+  config.release_version = "1.2.3+4";
+  config.original_libapp_paths = {"/data/app/libapp.so"};
+  config.yaml_config = "app_id: foo";
+
+  EXPECT_TRUE(Updater::Instance().Init(config));
+
+  const AppConfig stored = Updater::Instance().GetAppConfig();
+  EXPECT_EQ(stored.release_version, "1.2.3+4");
+  ASSERT_EQ(stored.original_libapp_paths.size(), 1u);
+  EXPECT_EQ(stored.original_libapp_paths[0], "/data/app/libapp.so");
+  EXPECT_EQ(mock_->init_count(), 1);
+}
+
+class RestartHostTest : public ::testing::Test {
+ protected:
+  void TearDown() override {
+    // The registry is process-global; leave it empty for other tests.
+    Updater::UnregisterRestartHost(1);
+    Updater::UnregisterRestartHost(2);
+    Updater::SetHotRestartSupported(false);
+  }
+};
+
+// With no registered host (no shell capable of restarting), a restart
+// request is rejected.
+TEST_F(RestartHostTest, RequestRestartWithoutHostIsRejected) {
+  EXPECT_FALSE(Updater::RequestRestart());
+}
+
+// With exactly one host, the request is forwarded and its result relayed.
+TEST_F(RestartHostTest, RequestRestartForwardsToSingleHost) {
+  int requests = 0;
+  Updater::RegisterRestartHost(1, [&requests]() {
+    requests++;
+    return true;
+  });
+  EXPECT_TRUE(Updater::RequestRestart());
+  EXPECT_EQ(requests, 1);
+
+  Updater::RegisterRestartHost(1, []() { return false; });
+  EXPECT_FALSE(Updater::RequestRestart());
+  EXPECT_EQ(requests, 1);
+}
+
+// With more than one live host (add-to-app / FlutterEngineGroup), restart
+// is unsupported and the request is rejected without invoking any host.
+TEST_F(RestartHostTest, RequestRestartWithMultipleHostsIsRejected) {
+  int requests = 0;
+  auto host = [&requests]() {
+    requests++;
+    return true;
+  };
+  Updater::RegisterRestartHost(1, host);
+  Updater::RegisterRestartHost(2, host);
+  EXPECT_FALSE(Updater::RequestRestart());
+  EXPECT_EQ(requests, 0);
+
+  // Back to one host (e.g. the other engine was destroyed): supported again.
+  Updater::UnregisterRestartHost(2);
+  EXPECT_TRUE(Updater::RequestRestart());
+  EXPECT_EQ(requests, 1);
+}
+
+// Unregistering an unknown host is a no-op (a shell that never registered
+// still unregisters in its destructor).
+TEST_F(RestartHostTest, UnregisterUnknownHostIsNoOp) {
+  Updater::UnregisterRestartHost(42);
+  EXPECT_FALSE(Updater::RequestRestart());
+}
+
+// The hot-restart-supported flag is process-global, set only by the mobile
+// ConfigureShorebird path.
+TEST_F(RestartHostTest, HotRestartSupportedFlag) {
+  EXPECT_FALSE(Updater::HotRestartSupported());
+  Updater::SetHotRestartSupported(true);
+  EXPECT_TRUE(Updater::HotRestartSupported());
+  Updater::SetHotRestartSupported(false);
+  EXPECT_FALSE(Updater::HotRestartSupported());
 }
 
 }  // namespace testing
