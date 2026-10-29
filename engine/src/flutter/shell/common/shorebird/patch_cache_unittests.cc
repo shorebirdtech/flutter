@@ -89,7 +89,7 @@ TEST(PatchCache, GetOrLoadRestoresTheTableWhenTheElfFailsToLoad) {
   EXPECT_EQ(PatchCache::Instance().GetOrLoad(path), nullptr);
 
   // Leave no table installed for whatever runs next in this process.
-  Shorebird_InstallLinkTable(nullptr, 0);
+  Shorebird_UninstallLinkTable();
 }
 
 }  // namespace testing

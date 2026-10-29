@@ -39,6 +39,19 @@ std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
   const int installed_offset = Shorebird_InstallLinkTable(
       elf_mapping->GetMapping(), elf_mapping->GetSize());
 
+  if (elf_file_offset == 0) {
+    // No linker header, so there are no mappings to dispatch through and the
+    // reader has to see an unlinked snapshot. A table a previous patch in
+    // this process installed would make it abort instead of reading one.
+    Shorebird_UninstallLinkTable();
+  } else if (installed_offset == 0) {
+    // The header is there but will not parse. Loading anyway would read this
+    // patch's code against whatever table is installed, which on a second
+    // patch is the first patch's mappings.
+    FML_LOG(ERROR) << "Failed to install the link table for patch at " << path;
+    return nullptr;
+  }
+
   const char* error = nullptr;
   // One data blob and one text blob. The VM isolate folded into the isolate
   // group, so the VM and isolate symbols now name the same buffers and
@@ -52,12 +65,10 @@ std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
 
   if (elf == nullptr) {
     FML_LOG(ERROR) << "Failed to load patch at " << path << " error: " << error;
-    if (installed_offset != 0) {
-      // The install above is still in place and names code that never
-      // loaded, so leaving it would dispatch this process through a patch it
-      // is not running.
-      Shorebird_RestoreLinkTable();
-    }
+    // The install above is still in place and names code that never loaded,
+    // so leaving it would dispatch this process through a patch it is not
+    // running. A no-op when the install above was refused.
+    Shorebird_RestoreLinkTable();
     return nullptr;
   }
 
