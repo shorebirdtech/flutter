@@ -80,52 +80,44 @@ static fml::RefPtr<const DartSnapshot> ResolveBaseVMSnapshot(
 }
 
 #if SHOREBIRD_USE_INTERPRETER
-static fml::RefPtr<const DartSnapshot> isolate_snapshot;
-
-void SetBaseSnapshot(Settings& settings,
-                     fml::RefPtr<const DartSnapshot> base_vm_snapshot) {
-  // These mappings happen to be to static data in the App.framework, but
-  // we still need to seem to hold onto the DartSnapshot objects to keep
-  // the mappings alive.
+void SetBaseSnapshot(fml::RefPtr<const DartSnapshot> base_vm_snapshot) {
+  // Only the VM snapshot, which reports nothing to the updater. Resolving the
+  // isolate snapshot (IsolateSnapshotFromSettings) reports the launch start,
+  // and this runs whenever a FlutterDartProject is created: before the next
+  // boot patch is validated, and whether or not an engine ever runs. A start
+  // reported here would mark the patch as booting for an engine that may never
+  // run, so the next launch would mark a good patch bad, and it would name a
+  // patch that validation may go on to reject. The start belongs to the Shell
+  // (ResolveIsolateData), as on Android. The VM and isolate symbols resolve
+  // the same buffer, so the VM snapshot is the base app snapshot. Holding it
+  // here keeps App.framework mapped; see ResolveBaseVMSnapshot.
   vm_snapshot = std::move(base_vm_snapshot);
-  isolate_snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
-  FML_CHECK(isolate_snapshot)
-      << "Shorebird failed to resolve the base isolate snapshot";
-  // Shorebird_SetBaseSnapshots below hands the interpreter all four blobs,
-  // while DartSnapshot::IsValid() checks only the data half, so a snapshot can
-  // be non-null with no instructions at all. Check what is read, not what is
+  // Shorebird_SetBaseSnapshots below hands the interpreter both blobs, while
+  // DartSnapshot::IsValid() checks only the data half, so a snapshot can be
+  // non-null with no instructions at all. Check what is read, not what is
   // returned. vm_snapshot is already known non-null: ResolveBaseVMSnapshot
   // checked it before handing it over.
-  FML_CHECK(vm_snapshot->IsValidForAOT() && isolate_snapshot->IsValidForAOT())
+  FML_CHECK(vm_snapshot->IsValidForAOT())
       << "Shorebird base snapshot resolved without its instructions mapping";
 
   // Per-mapping observability for the base snapshot. Logged at every app boot
   // so customer syslogs include the exact sizes the on-device base reader
   // exposes — directly comparable to the host's `aot_tools dump_blobs`
   // extraction the patch was generated against.
-  const uint8_t* vm_data_ptr = vm_snapshot->GetDataMapping();
-  const uint8_t* iso_data_ptr = isolate_snapshot->GetDataMapping();
-  const uint8_t* vm_insns_ptr = vm_snapshot->GetInstructionsMapping();
-  const uint8_t* iso_insns_ptr = isolate_snapshot->GetInstructionsMapping();
-  intptr_t vm_data_size = vm_data_ptr ? Dart_SnapshotDataSize(vm_data_ptr) : -1;
-  intptr_t iso_data_size =
-      iso_data_ptr ? Dart_SnapshotDataSize(iso_data_ptr) : -1;
-  intptr_t vm_insns_size =
-      vm_insns_ptr ? Dart_SnapshotInstrSize(vm_insns_ptr) : -1;
-  intptr_t iso_insns_size =
-      iso_insns_ptr ? Dart_SnapshotInstrSize(iso_insns_ptr) : -1;
+  const uint8_t* data_ptr = vm_snapshot->GetDataMapping();
+  const uint8_t* insns_ptr = vm_snapshot->GetInstructionsMapping();
+  intptr_t data_size = data_ptr ? Dart_SnapshotDataSize(data_ptr) : -1;
+  intptr_t insns_size = insns_ptr ? Dart_SnapshotInstrSize(insns_ptr) : -1;
   FML_LOG(INFO) << "[shorebird] SetBaseSnapshot mappings: "
-                << "vm_data_size=" << vm_data_size
-                << " iso_data_size=" << iso_data_size
-                << " vm_insns_size=" << vm_insns_size
-                << " iso_insns_size=" << iso_insns_size << " total="
-                << (vm_data_size + iso_data_size + vm_insns_size +
-                    iso_insns_size);
+                << "data_size=" << data_size << " insns_size=" << insns_size
+                << " total=" << (data_size + insns_size);
 
-  Shorebird_SetBaseSnapshots(isolate_snapshot->GetDataMapping(),
-                             isolate_snapshot->GetInstructionsMapping(),
-                             vm_snapshot->GetDataMapping(),
-                             vm_snapshot->GetInstructionsMapping());
+  // The VM isolate snapshot is gone, so there are no separate VM buffers to
+  // hand over. Shorebird_SetBaseSnapshots ignores them, as the Dart
+  // embedder's own call in runtime/bin/main_impl.cc does.
+  Shorebird_SetBaseSnapshots(data_ptr, insns_ptr,
+                             /*base_vm_snapshot_data=*/nullptr,
+                             /*base_vm_snapshot_instructions=*/nullptr);
 }
 #endif  // SHOREBIRD_USE_INTERPRETER
 
@@ -309,7 +301,7 @@ void ConfigureShorebird(std::string code_cache_path,
 
   // We only set the base snapshot on iOS for now.
 #if SHOREBIRD_USE_INTERPRETER
-  SetBaseSnapshot(settings, std::move(base_vm_snapshot));
+  SetBaseSnapshot(std::move(base_vm_snapshot));
 #endif
 
   shorebird::Updater::Instance().ValidateNextBootPatch();
@@ -348,9 +340,7 @@ void* FileCallbacksImpl::Open() {
   if (!vm_snapshot) {
     return nullptr;
   }
-  // vm_snapshot, not isolate_snapshot: both resolve the same symbol now, but
-  // only the VM path is patch-blind, and this stream must be the unpatched
-  // base.
+  // The VM path is patch-blind, and this stream must be the unpatched base.
   return SnapshotsDataHandle::createForSnapshots(*vm_snapshot).release();
 }
 
