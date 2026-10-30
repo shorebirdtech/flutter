@@ -50,14 +50,14 @@ jobs:
 
     steps:
       - name: 📚 Git Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # The PR merge commit and its first parent (the base), for the
           # format check below.
           fetch-depth: 2
 
       - name: 📦 Setup namespace cache
-        uses: namespacelabs/nscloud-cache-action@v1
+        uses: namespacelabs/nscloud-cache-action@1124a6f3ce44e5cf84cc22111530961f4d2a15f9 # v1.7.0
         with:
           path: |
             ~/git_cache
@@ -71,19 +71,19 @@ jobs:
           echo "CIPD_CACHE_DIR=$HOME/cipd_cache" >> "$GITHUB_ENV"
 
       - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11.8"
 
       # build_rust_updater.py builds the updater with cargo for the host.
       - name: 🦀 Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: x86_64-unknown-linux-gnu
 
       # DEPS pulls shorebirdtech/dart-sdk (private) over SSH.
       - name: 🔑 Setup SSH
-        uses: webfactory/ssh-agent@v0.10.0
+        uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
         with:
           ssh-private-key: ${{ secrets.DART_SDK_DEPLOY_KEY }}
 
