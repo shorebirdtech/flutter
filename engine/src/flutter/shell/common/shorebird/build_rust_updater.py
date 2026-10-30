@@ -45,7 +45,6 @@ def main():
   is_android = 'android' in args.rust_target
   is_apple_ios = 'apple-ios' in args.rust_target
   is_apple_darwin = 'apple-darwin' in args.rust_target
-  is_msvc = 'pc-windows-msvc' in args.rust_target
 
   if is_android:
     if not args.ndk_path or not args.android_api_level:
@@ -79,9 +78,6 @@ def main():
       return 1
     env['MACOSX_DEPLOYMENT_TARGET'] = args.mac_deployment_target
 
-  if is_msvc:
-    _configure_msvc_env(env, args.rust_target)
-
   # GN passes paths relative to the build output dir (which is cwd when
   # Ninja runs the action). Resolve them to absolute paths so they work
   # regardless of cargo's working directory.
@@ -106,8 +102,16 @@ def main():
       'updater',
   ]
 
-  print(f'Running: {" ".join(cmd)}', flush=True)
-  result = subprocess.run(cmd, env=env)
+  # Run cargo from the updater's library crate so it reads
+  # library/.cargo/config.toml (cargo looks for config from its cwd upward,
+  # not from --manifest-path). On Windows that config sets
+  # `-C target-feature=+crt-static`, matching the engine's static CRT (/MT);
+  # cargo also passes it to build scripts as CARGO_CFG_TARGET_FEATURE, so the
+  # cc crate compiles C deps like zstd-sys with /MT too.
+  cargo_cwd = os.path.abspath(os.path.join(args.manifest_dir, 'library'))
+
+  print(f'Running (in {cargo_cwd}): {" ".join(cmd)}', flush=True)
+  result = subprocess.run(cmd, env=env, cwd=cargo_cwd)
   if result.returncode != 0:
     print(f'ERROR: cargo build failed with exit code {result.returncode}', file=sys.stderr)
     return result.returncode
@@ -121,31 +125,6 @@ def main():
     f.write('')
 
   return 0
-
-
-def _configure_msvc_env(env, rust_target):
-  """Build the updater, and the C deps it compiles, against the static CRT.
-
-  The engine's Windows build uses the static CRT (/MT), so the updater must
-  too. The updater's library/.cargo/config.toml sets
-  `-C target-feature=+crt-static`, but cargo reads .cargo/config.toml from
-  its working directory upward, not from the manifest's directory, and this
-  script runs with cwd = the GN out dir. Without the flag, rustc asks for the
-  dynamic CRT (msvcrt) and cargo's link of the updater's cdylib warns
-  LNK4098 "defaultlib 'LIBCMT' conflicts with use of other libs". Pass it
-  through the per-target rustflags env instead (the same setting as
-  `[target.<triple>] rustflags`). Cargo also puts it in
-  CARGO_CFG_TARGET_FEATURE, so the cc crate builds transitive *-sys C deps
-  (zstd-sys, ...) with /MT.
-
-  CFLAGS /MT predates this (#125): it forced /MT on those C deps when the
-  rustflag wasn't reaching cargo. It is redundant now and kept so this change
-  can't regress the C deps if the rustflag is ever dropped again.
-  """
-  triple_env = rust_target.replace('-', '_')
-  env[f'CARGO_TARGET_{triple_env.upper()}_RUSTFLAGS'] = '-C target-feature=+crt-static'
-  env[f'CFLAGS_{triple_env}'] = '/MT'
-  env[f'CXXFLAGS_{triple_env}'] = '/MT'
 
 
 def _configure_android_env(env, rust_target, ndk_path, api_level):
