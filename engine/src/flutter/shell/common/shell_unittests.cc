@@ -5186,49 +5186,232 @@ TEST_F(ShellTest, ShoulDiscardLayerTreeIfFrameIsSizedIncorrectly) {
   DestroyShell(std::move(shell), task_runners);
 }
 
-// Test the full boot flow: ReportLaunchStart is called from
-// ResolveIsolateData, then ReportLaunchSuccess from the Shell constructor.
-// Both are guarded to run at most once per process.
-TEST_F(ShellTest, ShorebirdBootFlowCallsLaunchStartThenSuccess) {
-  auto mock = std::make_unique<shorebird::MockUpdater>();
-  auto* mock_ptr = mock.get();
-  shorebird::Updater::SetInstanceForTesting(std::move(mock));
-  shorebird::Updater::ResetLaunchStateForTesting();
+// Runs every task already posted to the platform task runner, including a
+// launch window posted with a zero delay.
+static void FlushPlatformTaskRunner(Shell* shell) {
+  fml::AutoResetWaitableEvent latch;
+  shell->GetTaskRunners().GetPlatformTaskRunner()->PostTask(
+      [&latch]() { latch.Signal(); });
+  latch.Wait();
+}
 
+class ShorebirdLaunchTest : public ShellTest {
+ protected:
+  void SetUp() override {
+    ShellTest::SetUp();
+    auto mock = std::make_unique<shorebird::MockUpdater>();
+    mock_ = mock.get();
+    shorebird::Updater::SetInstanceForTesting(std::move(mock));
+    shorebird::Updater::ResetLaunchStateForTesting();
+  }
+
+  void TearDown() override {
+    mock_ = nullptr;
+    shorebird::Updater::ResetLaunchStateForTesting();
+    shorebird::Updater::ResetInstanceForTesting();
+    ShellTest::TearDown();
+  }
+
+  // Sends a lifecycle message from the platform thread, as an embedder does,
+  // and waits for the engine to handle it on the UI thread and for the close it
+  // posts to the platform thread.
+  void SendLifecycleState(Shell* shell, const std::string& state) {
+    fml::AutoResetWaitableEvent sent;
+    fml::TaskRunner::RunNowOrPostTask(
+        shell->GetTaskRunners().GetPlatformTaskRunner(), [&]() {
+          SendPlatformMessage(shell, std::make_unique<PlatformMessage>(
+                                         "flutter/lifecycle",
+                                         fml::MallocMapping::Copy(
+                                             state.c_str(), state.length()),
+                                         nullptr));
+          sent.Signal();
+        });
+    sent.Wait();
+    fml::AutoResetWaitableEvent ui_latch;
+    shell->GetTaskRunners().GetUITaskRunner()->PostTask(
+        [&ui_latch]() { ui_latch.Signal(); });
+    ui_latch.Wait();
+    FlushPlatformTaskRunner(shell);
+  }
+
+  shorebird::MockUpdater* mock_ = nullptr;
+};
+
+// Building a Shell arms the boot at snapshot resolution and pauses it: an
+// engine that is built and never run leaves nothing armed and reports no
+// success.
+TEST_F(ShorebirdLaunchTest, BuiltShellStartsAndPausesTheLaunch) {
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+  FlushPlatformTaskRunner(shell.get());
+
+  EXPECT_EQ(mock_->call_log(), (std::vector<std::string>{
+                                   "ReportLaunchStart", "ReportLaunchPaused"}));
+
+  DestroyShell(std::move(shell), task_runners);
+}
+
+// Running the engine resumes the launch, and success waits for the launch
+// window to close.
+TEST_F(ShorebirdLaunchTest, RunningEngineResumesAndSucceedsAfterTheWindow) {
+  shorebird::Updater::SetLaunchWindowForTesting(fml::TimeDelta::Zero());
   auto settings = CreateSettingsForFixture();
   auto task_runners = GetTaskRunnersForFixture();
   auto shell = CreateShell(settings, task_runners);
   ASSERT_TRUE(shell);
 
-  const auto& log = mock_ptr->call_log();
-  ASSERT_EQ(log.size(), 2u);
-  EXPECT_EQ(log[0], "ReportLaunchStart");
-  EXPECT_EQ(log[1], "ReportLaunchSuccess");
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+  FlushPlatformTaskRunner(shell.get());
+
+  EXPECT_EQ(
+      mock_->call_log(),
+      (std::vector<std::string>{"ReportLaunchStart", "ReportLaunchPaused",
+                                "ReportLaunchResumed", "ReportLaunchSuccess"}));
 
   DestroyShell(std::move(shell), task_runners);
-  shorebird::Updater::ResetLaunchStateForTesting();
-  shorebird::Updater::ResetInstanceForTesting();
 }
 
-// In add-to-app, multiple engines may be created within a single process.
-// Only the first engine should report launch start/success to the Rust
-// updater. This prevents the updater from promoting a newly-downloaded patch
-// to "current_boot" when subsequent engines are still running the original
-// snapshot that was selected at process init time.
-TEST_F(ShellTest, ShorebirdUpdaterReportsOnlyOnceForMultipleShells) {
-  auto mock = std::make_unique<shorebird::MockUpdater>();
-  auto* mock_ptr = mock.get();
-  shorebird::Updater::SetInstanceForTesting(std::move(mock));
-  shorebird::Updater::ResetLaunchStateForTesting();
-
+// While the window is open nothing is reported, so a death then rolls the
+// patch back. Leaving the foreground closes it early.
+TEST_F(ShorebirdLaunchTest, LeavingTheForegroundClosesTheWindow) {
+  shorebird::Updater::SetLaunchWindowForTesting(
+      fml::TimeDelta::FromSeconds(60 * 60));
   auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
 
-  // Create first shell — gets Start + Success
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+  FlushPlatformTaskRunner(shell.get());
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  // Hidden alone doesn't: desktop sends it before the first frame.
+  SendLifecycleState(shell.get(), "AppLifecycleState.hidden");
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  SendLifecycleState(shell.get(), "AppLifecycleState.paused");
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+
+  DestroyShell(std::move(shell), task_runners);
+}
+
+// An app that left the foreground before its engine ran (a slow cold start,
+// a pre-warmed engine run after its activity stopped) closes the window as
+// soon as the root isolate launches.
+TEST_F(ShorebirdLaunchTest, LeavingTheForegroundBeforeRunClosesTheWindow) {
+  shorebird::Updater::SetLaunchWindowForTesting(
+      fml::TimeDelta::FromSeconds(60 * 60));
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+
+  SendLifecycleState(shell.get(), "AppLifecycleState.paused");
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+
+  DestroyShell(std::move(shell), task_runners);
+}
+
+// An app launched in, or sent to, the background closes the window: iOS
+// suspends it without running the window's timer and may terminate it later,
+// which isn't the patch crashing.
+TEST_F(ShorebirdLaunchTest, LaunchInTheBackgroundClosesTheWindow) {
+  shorebird::Updater::SetLaunchWindowForTesting(
+      fml::TimeDelta::FromSeconds(60 * 60));
+  shorebird::Updater::Instance().SetAppInBackground(true);
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+
+  DestroyShell(std::move(shell), task_runners);
+}
+
+// Shutting an engine down is a clean exit, not a crash: a desktop app quit
+// inside the window keeps its patch.
+TEST_F(ShorebirdLaunchTest, DestroyingTheShellClosesTheWindow) {
+  shorebird::Updater::SetLaunchWindowForTesting(
+      fml::TimeDelta::FromSeconds(60 * 60));
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  DestroyShell(std::move(shell), task_runners);
+
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+}
+
+// Only the engine that owns the window closes it by shutting down: another
+// engine built and torn down meanwhile (a pre-warmed engine discarded, a
+// plugin's short-lived engine) says nothing about the owner's launch.
+TEST_F(ShorebirdLaunchTest, AnotherShellsTeardownKeepsTheWindowOpen) {
+  shorebird::Updater::SetLaunchWindowForTesting(
+      fml::TimeDelta::FromSeconds(60 * 60));
+  auto settings = CreateSettingsForFixture();
   auto task_runners1 = GetTaskRunnersForFixture();
   auto shell1 = CreateShell(settings, task_runners1);
   ASSERT_TRUE(shell1);
-  EXPECT_EQ(mock_ptr->launch_start_count(), 1);
-  EXPECT_EQ(mock_ptr->launch_success_count(), 1);
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell1.get(), std::move(configuration));
+
+  // The second shell gets a platform view with no rendering surface: on Linux
+  // two GL test surfaces share one EGL display, and the second one's teardown
+  // terminates it under the first.
+  auto task_runners2 = GetTaskRunnersForFixture();
+  auto shell2 = CreateShell({
+      .settings = settings,
+      .task_runners = task_runners2,
+      .platform_view_create_callback =
+          [task_runners2](Shell& shell) {
+            return std::make_unique<PlatformView>(shell, task_runners2);
+          },
+  });
+  ASSERT_TRUE(shell2);
+  DestroyShell(std::move(shell2), task_runners2);
+  FlushPlatformTaskRunner(shell1.get());
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  DestroyShell(std::move(shell1), task_runners1);
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+}
+
+// In add-to-app, multiple engines may be created within a single process.
+// Only the first engine should report the launch to the Rust updater. This
+// prevents the updater from promoting a newly-downloaded patch to
+// "current_boot" when subsequent engines are still running the original
+// snapshot that was selected at process init time.
+TEST_F(ShorebirdLaunchTest, ReportsOnlyOnceForMultipleShells) {
+  auto settings = CreateSettingsForFixture();
+
+  auto task_runners1 = GetTaskRunnersForFixture();
+  auto shell1 = CreateShell(settings, task_runners1);
+  ASSERT_TRUE(shell1);
+  EXPECT_EQ(mock_->launch_start_count(), 1);
 
   // The guard is per process, so the second shell need not overlap the
   // first. Destroying the first shell before creating the second keeps the
@@ -5236,23 +5419,14 @@ TEST_F(ShellTest, ShorebirdUpdaterReportsOnlyOnceForMultipleShells) {
   // EGL display, and the first one's teardown terminates it under the second.
   DestroyShell(std::move(shell1), task_runners1);
 
-  // Create second shell — guarded, no additional Start or Success calls.
   auto task_runners2 = GetTaskRunnersForFixture();
   auto shell2 = CreateShell(settings, task_runners2);
   ASSERT_TRUE(shell2);
-  EXPECT_EQ(mock_ptr->launch_start_count(), 1);
-  EXPECT_EQ(mock_ptr->launch_success_count(), 1);
 
-  // Only one Start+Success pair in the call log.
-  const auto& log = mock_ptr->call_log();
-  ASSERT_EQ(log.size(), 2u);
-  EXPECT_EQ(log[0], "ReportLaunchStart");
-  EXPECT_EQ(log[1], "ReportLaunchSuccess");
+  EXPECT_EQ(mock_->call_log(), (std::vector<std::string>{
+                                   "ReportLaunchStart", "ReportLaunchPaused"}));
 
   DestroyShell(std::move(shell2), task_runners2);
-
-  shorebird::Updater::ResetLaunchStateForTesting();
-  shorebird::Updater::ResetInstanceForTesting();
 }
 
 }  // namespace testing
