@@ -39,16 +39,21 @@ std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
   const int installed_offset = Shorebird_InstallLinkTable(
       elf_mapping->GetMapping(), elf_mapping->GetSize());
 
+  // Every way out of here without an entry ends with no table installed,
+  // because the caller answers a null entry by booting the base image and
+  // the reader aborts rather than falling back if a table is still installed.
+  // A table a previous patch installed in this process is the live hazard:
+  // on a first load there is nothing to leave behind.
   if (elf_file_offset == 0) {
     // No linker header, so there are no mappings to dispatch through and the
-    // reader has to see an unlinked snapshot. A table a previous patch in
-    // this process installed would make it abort instead of reading one.
+    // reader has to see an unlinked snapshot.
     Shorebird_UninstallLinkTable();
   } else if (installed_offset == 0) {
     // The header is there but will not parse. Loading anyway would read this
     // patch's code against whatever table is installed, which on a second
     // patch is the first patch's mappings.
     FML_LOG(ERROR) << "Failed to install the link table for patch at " << path;
+    Shorebird_UninstallLinkTable();
     return nullptr;
   }
 
@@ -65,10 +70,12 @@ std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
 
   if (elf == nullptr) {
     FML_LOG(ERROR) << "Failed to load patch at " << path << " error: " << error;
-    // The install above is still in place and names code that never loaded,
-    // so leaving it would dispatch this process through a patch it is not
-    // running. A no-op when the install above was refused.
-    Shorebird_RestoreLinkTable();
+    // Uninstall rather than restore. Restoring puts back the table the
+    // install replaced, which on a second patch is the first patch's, and
+    // the caller is about to boot base code that no table describes. Nothing
+    // is dispatching through the earlier patch either: its isolate group is
+    // gone before a second load can be reached.
+    Shorebird_UninstallLinkTable();
     return nullptr;
   }
 
