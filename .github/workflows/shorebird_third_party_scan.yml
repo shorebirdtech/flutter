@@ -1,0 +1,70 @@
+name: shorebird_third_party_scan
+
+# Scans the engine's third-party deps in DEPS against osv.dev and uploads the
+# results to Security > Code scanning.
+#
+# Upstream's copy (engine/src/flutter/.github/workflows/third_party_scan.yml)
+# no longer runs: GitHub only reads workflows from the root .github/workflows,
+# it is gated on the archived flutter/engine repo, and it reads DEPS from
+# engine/src/flutter, where it no longer lives. This runs the same
+# ci/scan_deps.py against the root DEPS.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - shorebird/dev
+    paths:
+      - DEPS
+      - engine/src/flutter/ci/scan_deps.py
+      - .github/workflows/shorebird_third_party_scan.yml
+  pull_request:
+    paths:
+      - DEPS
+      - engine/src/flutter/ci/scan_deps.py
+      - .github/workflows/shorebird_third_party_scan.yml
+  # New advisories are published without DEPS changing.
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract-deps:
+    name: Extract Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: 🔎 Extract deps and find upstream commits
+        run: python3 engine/src/flutter/ci/scan_deps.py --deps DEPS --output osv-lockfile.json
+
+      - name: 📦 Upload deps lockfile
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: osv-lockfile-${{ github.sha }}
+          path: osv-lockfile.json
+          retention-days: 2
+
+  vuln-scan:
+    name: Vulnerability scanning
+    needs: extract-deps
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+    with:
+      download-artifact: osv-lockfile-${{ github.sha }}
+      scan-args: |-
+        --lockfile=osv-scanner:osv-lockfile.json
+      fail-on-vuln: false
+    permissions:
+      # Needed to upload the SARIF results to the code scanning dashboard.
+      security-events: write
+      actions: read
+      contents: read
