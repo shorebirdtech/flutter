@@ -18,6 +18,7 @@
 #include "flutter/shell/common/engine.h"
 #include "flutter/shell/common/platform_view.h"
 #include "flutter/shell/common/shell.h"
+#include "flutter/shell/common/shorebird/updater.h"
 #include "flutter/shell/common/switches.h"
 #include "flutter/shell/common/thread_host.h"
 #include "flutter/shell/common/variable_refresh_rate_display.h"
@@ -944,6 +945,10 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
                            : FlutterSharedApplication.application &&
                                  FlutterSharedApplication.application.applicationState ==
                                      UIApplicationStateBackground;
+  // Shorebird: a launch in the background ends the launch window at once.
+  // Lifecycle messages only come from a view controller in a window, so an
+  // engine without one (background launch, add-to-app) would never close it.
+  flutter::shorebird::Updater::Instance().SetAppInBackground(_isGpuDisabled);
 
   // Create the shell. This is a blocking operation.
   std::unique_ptr<flutter::Shell> shell = flutter::Shell::Create(
@@ -1472,10 +1477,12 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
 
 - (void)flutterWillEnterForeground:(NSNotification*)notification {
   [self setIsGpuDisabled:NO];
+  flutter::shorebird::Updater::Instance().SetAppInBackground(false);
 }
 
 - (void)flutterDidEnterBackground:(NSNotification*)notification {
   [self setIsGpuDisabled:YES];
+  flutter::shorebird::Updater::Instance().SetAppInBackground(true);
   [self notifyLowMemory];
 }
 

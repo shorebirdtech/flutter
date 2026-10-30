@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 
+#include "flutter/fml/time/time_delta.h"
+
 namespace flutter {
 namespace shorebird {
 
@@ -98,6 +100,22 @@ struct AppConfig {
 /// boot is still in progress at that point, which the bullets above rule
 /// out.
 ///
+/// ## Launch window
+///
+/// A launch is reported in phases, so that a patch is blamed only for deaths
+/// while it runs:
+/// - `ReportLaunchStart` where the patch's snapshot is first resolved arms
+///   the updater's boot breadcrumb.
+/// - `ReportLaunchPaused` when the Shell is built clears it without
+///   promoting the patch: an engine that is built and never run must not
+///   leave the patch armed.
+/// - `ReportLaunchResumed` when the first engine launches its root isolate
+///   arms it again. That engine owns the launch window.
+/// - `CloseLaunchWindow` reports success `kLaunchWindow` after the root
+///   isolate launches, or earlier when the app leaves the foreground. A
+///   death before then, a crash in building the isolate, in main or in the
+///   first frames, rolls the patch back on the next launch.
+///
 /// Tests can call `ResetLaunchStateForTesting()` to re-enable the guards.
 class Updater {
  public:
@@ -127,6 +145,33 @@ class Updater {
   void ReportLaunchSuccess();
   void ReportLaunchFailure();
 
+  /// The Shell is built. Clears the boot breadcrumb without promoting the
+  /// patch. Once per process.
+  void ReportLaunchPaused();
+
+  /// An engine is launching its root isolate. Arms the boot breadcrumb again
+  /// for the patch this process loaded. Returns true for the first caller in
+  /// the process, which owns the launch window: it reports a failed isolate
+  /// launch and schedules `CloseLaunchWindow`.
+  bool ReportLaunchResumed();
+
+  /// Ends the launch window: reports success if a launch was resumed and
+  /// nothing has been reported yet, and starts the update thread. Safe to
+  /// call any number of times, from any thread.
+  void CloseLaunchWindow();
+
+  /// Whether the app is in the background, from embedders that know it
+  /// independently of any view (iOS). Going to the background, or a launch
+  /// that resumes while in it, closes the launch window: iOS suspends a
+  /// background app without running the window's timer and may terminate it
+  /// later, and that isn't the patch crashing.
+  void SetAppInBackground(bool in_background);
+
+  /// How long after the root isolate launches a death still counts against
+  /// the patch.
+  static fml::TimeDelta LaunchWindow();
+  static void SetLaunchWindowForTesting(fml::TimeDelta window);
+
   // Update checking
   virtual bool ShouldAutoUpdate() = 0;
   virtual void StartUpdateThread() = 0;
@@ -151,6 +196,8 @@ class Updater {
   virtual void DoReportLaunchStart() = 0;
   virtual void DoReportLaunchSuccess() = 0;
   virtual void DoReportLaunchFailure() = 0;
+  virtual void DoReportLaunchPaused() = 0;
+  virtual void DoReportLaunchResumed() = 0;
 
  private:
   // Starts the update thread at most once per process, if the updater is
@@ -163,6 +210,13 @@ class Updater {
   // Once-per-process guards for launch lifecycle.
   static std::atomic<bool> launch_started_;
   static std::atomic<bool> launch_completed_;
+  static std::atomic<bool> launch_paused_;
+  static std::atomic<bool> launch_resumed_;
+  // Set once resumed has reached the updater, so a close racing the resume
+  // can't report success before the breadcrumb is armed again.
+  static std::atomic<bool> launch_window_open_;
+  static std::atomic<bool> app_in_background_;
+  static std::atomic<int64_t> launch_window_micros_;
   // Whether any `Init` succeeded; the update thread needs a configured
   // updater. Latched, never cleared outside tests.
   static std::atomic<bool> initialized_;
@@ -184,6 +238,8 @@ class NoOpUpdater : public Updater {
   void DoReportLaunchStart() override {}
   void DoReportLaunchSuccess() override {}
   void DoReportLaunchFailure() override {}
+  void DoReportLaunchPaused() override {}
+  void DoReportLaunchResumed() override {}
   bool ShouldAutoUpdate() override { return false; }
   void StartUpdateThread() override {}
 };
@@ -202,6 +258,8 @@ class RealUpdater : public Updater {
   void DoReportLaunchStart() override;
   void DoReportLaunchSuccess() override;
   void DoReportLaunchFailure() override;
+  void DoReportLaunchPaused() override;
+  void DoReportLaunchResumed() override;
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
 };
@@ -220,6 +278,8 @@ class MockUpdater : public Updater {
   void DoReportLaunchStart() override;
   void DoReportLaunchSuccess() override;
   void DoReportLaunchFailure() override;
+  void DoReportLaunchPaused() override;
+  void DoReportLaunchResumed() override;
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
 

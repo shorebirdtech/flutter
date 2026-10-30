@@ -216,6 +216,7 @@ source_set("flutter_framework_source") {
     "//flutter/runtime",
     "//flutter/shell/common",
     "//flutter/shell/common/shorebird",
+    "//flutter/shell/common/shorebird:updater",
     "//flutter/shell/platform/common:common_cpp_input",
     "//flutter/shell/platform/darwin/common",
     "//flutter/shell/platform/darwin/common:framework_common",

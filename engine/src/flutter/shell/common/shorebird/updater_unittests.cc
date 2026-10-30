@@ -5,6 +5,8 @@
 #include "flutter/shell/common/shorebird/updater.h"
 
 #include <algorithm>
+#include <string>
+#include <vector>
 
 #include "gtest/gtest.h"
 
@@ -65,6 +67,88 @@ TEST_F(UpdaterTest, ReportLaunchFailureOnlyCallsOnce) {
   // Second call is a no-op.
   Updater::Instance().ReportLaunchFailure();
   EXPECT_EQ(mock_->launch_failure_count(), 1);
+}
+
+// Paused and resumed run at most once per process; only the first resume
+// owns the launch window.
+TEST_F(UpdaterTest, PausedAndResumedReportOnce) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchPaused();
+  EXPECT_TRUE(Updater::Instance().ReportLaunchResumed());
+  EXPECT_FALSE(Updater::Instance().ReportLaunchResumed());
+
+  EXPECT_EQ(mock_->call_log(),
+            (std::vector<std::string>{"ReportLaunchStart", "ReportLaunchPaused",
+                                      "ReportLaunchResumed"}));
+}
+
+// No engine launched, so there is no window to close: an engine built and
+// never run reports no success.
+TEST_F(UpdaterTest, CloseLaunchWindowBeforeResumeDoesNothing) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().CloseLaunchWindow();
+
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+}
+
+// The window's timer and a lifecycle change can both close it; success is
+// reported once.
+TEST_F(UpdaterTest, CloseLaunchWindowReportsSuccessOnce) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().CloseLaunchWindow();
+  Updater::Instance().CloseLaunchWindow();
+
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+}
+
+// A patch that failed to load has already been reported. The base-code
+// launch that follows still owns the window, so the update thread starts
+// when it closes, but nothing more reaches the updater.
+TEST_F(UpdaterTest, LaunchAfterLoadFailureOwnsTheWindowAndReportsNothing) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchFailure();
+  Updater::Instance().ReportLaunchPaused();
+  EXPECT_TRUE(Updater::Instance().ReportLaunchResumed());
+  Updater::Instance().CloseLaunchWindow();
+
+  EXPECT_EQ(
+      mock_->call_log(),
+      (std::vector<std::string>{"ReportLaunchStart", "ReportLaunchFailure"}));
+}
+
+// A root isolate that fails to launch after resume is a failed launch.
+TEST_F(UpdaterTest, FailureAfterResumeIsReported) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().ReportLaunchFailure();
+  Updater::Instance().CloseLaunchWindow();
+
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+}
+
+// Going to the background closes an open window; one already in the
+// background closes it as soon as the launch resumes.
+TEST_F(UpdaterTest, BackgroundClosesTheWindow) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().SetAppInBackground(true);
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+}
+
+TEST_F(UpdaterTest, ResumingInTheBackgroundClosesTheWindow) {
+  Updater::Instance().SetAppInBackground(true);
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+  Updater::Instance().ReportLaunchResumed();
+  EXPECT_EQ(mock_->launch_success_count(), 1);
 }
 
 TEST_F(UpdaterTest, MockUpdaterTracksShouldAutoUpdate) {
