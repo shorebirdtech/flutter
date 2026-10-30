@@ -13,6 +13,9 @@
 if (is_android) {
   import("//build/config/android/config.gni")
 }
+if (is_ios) {
+  import("//build/config/darwin/darwin_sdk.gni")
+}
 
 shorebird_updater_dir = "//flutter/third_party/updater"
 
@@ -36,7 +39,12 @@ if (is_android) {
     shorebird_updater_rust_target = "i686-linux-android"
   }
 } else if (is_ios) {
-  if (target_cpu == "arm64") {
+  # arm64 simulator builds need the -sim target: aarch64-apple-ios objects
+  # are tagged for the device platform. x86_64-apple-ios is already the
+  # simulator (there is no x86_64 iOS device).
+  if (target_cpu == "arm64" && use_ios_simulator) {
+    shorebird_updater_rust_target = "aarch64-apple-ios-sim"
+  } else if (target_cpu == "arm64") {
     shorebird_updater_rust_target = "aarch64-apple-ios"
   } else if (target_cpu == "x64") {
     shorebird_updater_rust_target = "x86_64-apple-ios"
