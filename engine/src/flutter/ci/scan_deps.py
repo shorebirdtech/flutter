@@ -126,7 +126,7 @@ def upstream_has_commit(upstream, commit):
   GitHub serves any commit in a repo's fork network, so this catches a
   mistyped or missing commit but doesn't prove the commit is on upstream.
   """
-  probe_dir = DEP_CLONE_DIR + '/probe'
+  probe_dir = DEP_CLONE_DIR + '/.osv-probe'
   shutil.rmtree(probe_dir, ignore_errors=True)
   subprocess.check_output(['git', 'init', '--quiet', probe_dir])
   result = subprocess.run(
@@ -168,11 +168,12 @@ def get_recorded_upstream_commit(dep_dir, pinned, upstream):
       r'^([0-9a-f]{40})\s*$', git_output(dep_dir, ['show', pinned + ':GIT_REVISION'])
   )
   for version in re.findall(r'^Version: ([0-9][0-9.-]*)\s*$', readme, re.M):
-    tag = 'refs/tags/release-' + version.replace('-', '.')
-    refs = git_output(dep_dir, ['ls-remote', upstream, tag, tag + '^{}']).splitlines()
-    if refs:
-      # An annotated tag's peeled ref (^{}), the commit, is listed last.
-      candidates.append(refs[-1].split()[0])
+    # ICU tags 78 and later as release-78.2, earlier ones as release-77-1.
+    for tag in {'refs/tags/release-' + version.replace(a, b) for a, b in (('-', '.'), ('.', '-'))}:
+      refs = git_output(dep_dir, ['ls-remote', upstream, tag, tag + '^{}']).splitlines()
+      if refs:
+        # An annotated tag's peeled ref (^{}), the commit, is listed last.
+        candidates.append(refs[-1].split()[0])
   for commit in candidates:
     if upstream_has_commit(upstream, commit):
       return commit
