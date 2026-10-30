@@ -337,8 +337,11 @@ final class ShorebirdHttpClient {
   private static String[] responseHeaders(HttpURLConnection connection) {
     List<String> pairs = new ArrayList<>();
     for (Map.Entry<String, List<String>> field : connection.getHeaderFields().entrySet()) {
-      // The null key is the status line.
-      if (field.getKey() == null || field.getValue() == null) {
+      // The null key is the status line; X-Android-* are Android's own notes (timings, protocol),
+      // not from the server.
+      if (field.getKey() == null
+          || field.getValue() == null
+          || field.getKey().regionMatches(true, 0, "X-Android-", 0, 10)) {
         continue;
       }
       for (String value : field.getValue()) {
@@ -402,6 +405,9 @@ final class ShorebirdHttpClient {
               return thread;
             });
     executor.setRemoveOnCancelPolicy(true);
+    // No thread left behind between update checks.
+    executor.setKeepAliveTime(30, TimeUnit.SECONDS);
+    executor.allowCoreThreadTimeOut(true);
     return executor;
   }
 }

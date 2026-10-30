@@ -43,10 +43,12 @@ bool Threw(JNIEnv* env, std::string* error) {
   if (!env->ExceptionCheck()) {
     return false;
   }
-  fml::jni::ScopedJavaLocalRef<jthrowable> exception(env,
-                                                     env->ExceptionOccurred());
+  // Cleared before anything else touches JNI, which CheckJNI forbids with
+  // an exception pending.
+  jthrowable exception = env->ExceptionOccurred();
   env->ExceptionClear();
-  *error = fml::jni::GetJavaExceptionInfo(env, exception.obj());
+  *error = fml::jni::GetJavaExceptionInfo(env, exception);
+  env->DeleteLocalRef(exception);
   return true;
 }
 
@@ -89,9 +91,10 @@ HttpResult Send(JNIEnv* env,
       fml::jni::StringToJavaString(env, request.url);
   fml::jni::ScopedJavaLocalRef<jobjectArray> headers =
       fml::jni::VectorToStringArray(env, header_pairs);
-  fml::jni::ScopedJavaLocalRef<jbyteArray> body;
+  fml::jni::ScopedJavaLocalRef<jbyteArray> body(
+      env,
+      request.body.empty() ? nullptr : env->NewByteArray(request.body.size()));
   if (!request.body.empty()) {
-    body.Reset(env, env->NewByteArray(request.body.size()));
     if (body.is_null()) {
       Threw(env, error);
       return HttpResult::kInvalidRequest;
