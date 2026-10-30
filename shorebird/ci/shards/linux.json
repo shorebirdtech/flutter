@@ -98,7 +98,7 @@
       }
     ],
     "artifacts": [
-      {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-linux-x64.zip", "zip": true, "content_hash": true},
+      {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-linux-x64.zip", "zip": true},
       {"src": "host_release/zip_archives/flutter_patched_sdk_product.zip", "dst": "flutter_infra_release/flutter/$engine/flutter_patched_sdk_product.zip"},
       {"src": "host_release/zip_archives/linux-x64-release/linux-x64-flutter-gtk.zip", "dst": "flutter_infra_release/flutter/$engine/linux-x64-release/linux-x64-flutter-gtk.zip"},
       {"src": "host_debug/zip_archives/linux-x64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/linux-x64/artifacts.zip"},

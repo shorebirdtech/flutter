@@ -52,7 +52,7 @@
       }
     ],
     "artifacts": [
-      {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-windows-x64.zip", "zip": true, "content_hash": true},
+      {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-windows-x64.zip", "zip": true},
       {"src": "host_release/zip_archives/windows-x64-release/windows-x64-flutter.zip", "dst": "flutter_infra_release/flutter/$engine/windows-x64-release/windows-x64-flutter.zip"}
     ]
   },
