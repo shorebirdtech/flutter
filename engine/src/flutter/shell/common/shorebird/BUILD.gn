@@ -123,6 +123,17 @@ source_set("engine_callbacks") {
       "Security.framework",
     ]
   }
+
+  if (is_android) {
+    # The Java half is io/flutter/embedding/engine/ShorebirdHttpClient.java;
+    # JNI_OnLoad calls RegisterHttpClient.
+    sources += [
+      "http_client_android.cc",
+      "http_client_android.h",
+    ]
+    defines = [ "SHOREBIRD_PLATFORM_HTTP_CLIENT" ]
+    deps = [ "//flutter/fml" ]
+  }
 }
 
 # Fetches URLs through the engine's HTTP callback and prints what happened,
