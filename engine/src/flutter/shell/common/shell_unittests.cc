@@ -5379,8 +5379,18 @@ TEST_F(ShorebirdLaunchTest, AnotherShellsTeardownKeepsTheWindowOpen) {
   configuration.SetEntrypoint("emptyMain");
   RunEngine(shell1.get(), std::move(configuration));
 
+  // The second shell gets a platform view with no rendering surface: on Linux
+  // two GL test surfaces share one EGL display, and the second one's teardown
+  // terminates it under the first.
   auto task_runners2 = GetTaskRunnersForFixture();
-  auto shell2 = CreateShell(settings, task_runners2);
+  auto shell2 = CreateShell({
+      .settings = settings,
+      .task_runners = task_runners2,
+      .platform_view_create_callback =
+          [task_runners2](Shell& shell) {
+            return std::make_unique<PlatformView>(shell, task_runners2);
+          },
+  });
   ASSERT_TRUE(shell2);
   DestroyShell(std::move(shell2), task_runners2);
   FlushPlatformTaskRunner(shell1.get());
