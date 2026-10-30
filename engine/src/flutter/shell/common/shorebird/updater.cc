@@ -154,11 +154,14 @@ bool Updater::ReportLaunchResumed() {
   if (!launch_completed_.load()) {
     DoReportLaunchResumed();
   }
+  return true;
+}
+
+void Updater::OpenLaunchWindow(bool in_background) {
   launch_window_open_.store(true);
-  if (app_in_background_.load()) {
+  if (in_background || app_in_background_.load()) {
     CloseLaunchWindow();
   }
-  return true;
 }
 
 void Updater::CloseLaunchWindow() {

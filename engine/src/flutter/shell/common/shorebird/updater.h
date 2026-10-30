@@ -110,11 +110,13 @@ struct AppConfig {
 ///   promoting the patch: an engine that is built and never run must not
 ///   leave the patch armed.
 /// - `ReportLaunchResumed` when the first engine launches its root isolate
-///   arms it again. That engine owns the launch window.
-/// - `CloseLaunchWindow` reports success `kLaunchWindow` after the root
-///   isolate launches, or earlier when the app leaves the foreground. A
-///   death before then, a crash in building the isolate, in main or in the
-///   first frames, rolls the patch back on the next launch.
+///   arms it again. That engine owns the launch window, and opens it with
+///   `OpenLaunchWindow` once the root isolate has launched.
+/// - `CloseLaunchWindow` reports success `LaunchWindow()` after the root
+///   isolate launches, or earlier when the app leaves the foreground or the
+///   owning engine shuts down. A death before then, a crash in building the
+///   isolate, in main or in the first frames, rolls the patch back on the
+///   next launch.
 ///
 /// Tests can call `ResetLaunchStateForTesting()` to re-enable the guards.
 class Updater {
@@ -152,8 +154,13 @@ class Updater {
   /// An engine is launching its root isolate. Arms the boot breadcrumb again
   /// for the patch this process loaded. Returns true for the first caller in
   /// the process, which owns the launch window: it reports a failed isolate
-  /// launch and schedules `CloseLaunchWindow`.
+  /// launch, or opens the window and schedules `CloseLaunchWindow`.
   bool ReportLaunchResumed();
+
+  /// The owner's root isolate launched. Opens the launch window, closing it
+  /// at once if the app is already in the background (`in_background` is
+  /// what the owning engine's lifecycle messages said).
+  void OpenLaunchWindow(bool in_background);
 
   /// Ends the launch window: reports success if a launch was resumed and
   /// nothing has been reported yet, and starts the update thread. Safe to
@@ -161,8 +168,8 @@ class Updater {
   void CloseLaunchWindow();
 
   /// Whether the app is in the background, from embedders that know it
-  /// independently of any view (iOS). Going to the background, or a launch
-  /// that resumes while in it, closes the launch window: iOS suspends a
+  /// independently of any view (iOS). Going to the background, or a window
+  /// opened while in it, closes the launch window: iOS suspends a
   /// background app without running the window's timer and may terminate it
   /// later, and that isn't the patch crashing.
   void SetAppInBackground(bool in_background);
@@ -212,8 +219,9 @@ class Updater {
   static std::atomic<bool> launch_completed_;
   static std::atomic<bool> launch_paused_;
   static std::atomic<bool> launch_resumed_;
-  // Set once resumed has reached the updater, so a close racing the resume
-  // can't report success before the breadcrumb is armed again.
+  // Set once the owner's root isolate launched, so a close racing the launch
+  // can't report success before the breadcrumb is armed again, or before a
+  // failed isolate launch is reported.
   static std::atomic<bool> launch_window_open_;
   static std::atomic<bool> app_in_background_;
   static std::atomic<int64_t> launch_window_micros_;

@@ -5212,6 +5212,28 @@ class ShorebirdLaunchTest : public ShellTest {
     ShellTest::TearDown();
   }
 
+  // Sends a lifecycle message from the platform thread, as an embedder does,
+  // and waits for the engine to handle it on the UI thread and for the close it
+  // posts to the platform thread.
+  void SendLifecycleState(Shell* shell, const std::string& state) {
+    fml::AutoResetWaitableEvent sent;
+    fml::TaskRunner::RunNowOrPostTask(
+        shell->GetTaskRunners().GetPlatformTaskRunner(), [&]() {
+          SendPlatformMessage(shell, std::make_unique<PlatformMessage>(
+                                         "flutter/lifecycle",
+                                         fml::MallocMapping::Copy(
+                                             state.c_str(), state.length()),
+                                         nullptr));
+          sent.Signal();
+        });
+    sent.Wait();
+    fml::AutoResetWaitableEvent ui_latch;
+    shell->GetTaskRunners().GetUITaskRunner()->PostTask(
+        [&ui_latch]() { ui_latch.Signal(); });
+    ui_latch.Wait();
+    FlushPlatformTaskRunner(shell);
+  }
+
   shorebird::MockUpdater* mock_ = nullptr;
 };
 
@@ -5269,26 +5291,33 @@ TEST_F(ShorebirdLaunchTest, LeavingTheForegroundClosesTheWindow) {
   FlushPlatformTaskRunner(shell.get());
   EXPECT_EQ(mock_->launch_success_count(), 0);
 
-  // From the platform, as an embedder sends it.
-  std::string state = "AppLifecycleState.paused";
-  fml::AutoResetWaitableEvent sent;
-  fml::TaskRunner::RunNowOrPostTask(
-      shell->GetTaskRunners().GetPlatformTaskRunner(), [&]() {
-        SendPlatformMessage(shell.get(), std::make_unique<PlatformMessage>(
-                                             "flutter/lifecycle",
-                                             fml::MallocMapping::Copy(
-                                                 state.c_str(), state.length()),
-                                             nullptr));
-        sent.Signal();
-      });
-  sent.Wait();
-  // The engine handles the message on the UI thread and posts the window's
-  // close to the platform thread.
-  fml::AutoResetWaitableEvent ui_latch;
-  shell->GetTaskRunners().GetUITaskRunner()->PostTask(
-      [&ui_latch]() { ui_latch.Signal(); });
-  ui_latch.Wait();
-  FlushPlatformTaskRunner(shell.get());
+  // Hidden alone doesn't: desktop sends it before the first frame.
+  SendLifecycleState(shell.get(), "AppLifecycleState.hidden");
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  SendLifecycleState(shell.get(), "AppLifecycleState.paused");
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+
+  DestroyShell(std::move(shell), task_runners);
+}
+
+// An app that left the foreground before its engine ran (a slow cold start,
+// a pre-warmed engine run after its activity stopped) closes the window as
+// soon as the root isolate launches.
+TEST_F(ShorebirdLaunchTest, LeavingTheForegroundBeforeRunClosesTheWindow) {
+  shorebird::Updater::SetLaunchWindowForTesting(
+      fml::TimeDelta::FromSeconds(60 * 60));
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+
+  SendLifecycleState(shell.get(), "AppLifecycleState.paused");
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
 
   EXPECT_EQ(mock_->launch_success_count(), 1);
 
@@ -5333,6 +5362,31 @@ TEST_F(ShorebirdLaunchTest, DestroyingTheShellClosesTheWindow) {
 
   DestroyShell(std::move(shell), task_runners);
 
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+}
+
+// Only the engine that owns the window closes it by shutting down: another
+// engine built and torn down meanwhile (a pre-warmed engine discarded, a
+// plugin's short-lived engine) says nothing about the owner's launch.
+TEST_F(ShorebirdLaunchTest, AnotherShellsTeardownKeepsTheWindowOpen) {
+  shorebird::Updater::SetLaunchWindowForTesting(
+      fml::TimeDelta::FromSeconds(60 * 60));
+  auto settings = CreateSettingsForFixture();
+  auto task_runners1 = GetTaskRunnersForFixture();
+  auto shell1 = CreateShell(settings, task_runners1);
+  ASSERT_TRUE(shell1);
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell1.get(), std::move(configuration));
+
+  auto task_runners2 = GetTaskRunnersForFixture();
+  auto shell2 = CreateShell(settings, task_runners2);
+  ASSERT_TRUE(shell2);
+  DestroyShell(std::move(shell2), task_runners2);
+  FlushPlatformTaskRunner(shell1.get());
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  DestroyShell(std::move(shell1), task_runners1);
   EXPECT_EQ(mock_->launch_success_count(), 1);
 }
 

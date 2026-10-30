@@ -149,7 +149,14 @@ std::unique_ptr<Engine> Engine::Spawn(
   return result;
 }
 
-Engine::~Engine() = default;
+Engine::~Engine() {
+  // Shorebird: this engine shutting down inside its launch window is a clean
+  // exit (a desktop app quit, an engine destroyed), not the patch crashing.
+  // Only the owner: another engine's teardown says nothing about this launch.
+  if (shorebird_owns_launch_window_) {
+    shorebird::Updater::Instance().CloseLaunchWindow();
+  }
+}
 
 fml::TaskRunnerAffineWeakPtr<Engine> Engine::GetWeakPtr() const {
   return weak_factory_.GetWeakPtr();
@@ -282,6 +289,12 @@ Engine::RunStatus Engine::Run(RunConfiguration configuration) {
   }
 
   if (owns_launch_window) {
+    shorebird_owns_launch_window_ = true;
+    // Opened only now that the root isolate launched, so a failure to launch
+    // it is reported above rather than after an early success. A lifecycle
+    // message that arrived before Run already left the foreground, and closes
+    // the window at once.
+    shorebird::Updater::Instance().OpenLaunchWindow(shorebird_in_background_);
     // On the platform task runner rather than the UI one: it outlives this
     // engine, and the success report writes to disk.
     task_runners_.GetPlatformTaskRunner()->PostDelayedTask(
@@ -410,12 +423,18 @@ bool Engine::HandleLifecyclePlatformMessage(PlatformMessage* message) {
   }
   // Shorebird: leaving the foreground ends the launch window early. A
   // backgrounded app is suspended or killed at the OS's will, and that death
-  // isn't the patch crashing on launch.
+  // isn't the patch crashing on launch. Not hidden: desktop embedders send it
+  // while the first window waits for its first frame and when it is
+  // minimized, and the OS doesn't kill a desktop app for either. On mobile
+  // paused follows hidden.
   if (state == "AppLifecycleState.paused" ||
-      state == "AppLifecycleState.hidden" ||
       state == "AppLifecycleState.detached") {
+    shorebird_in_background_ = true;
     task_runners_.GetPlatformTaskRunner()->PostTask(
         [] { shorebird::Updater::Instance().CloseLaunchWindow(); });
+  } else if (state == "AppLifecycleState.resumed" ||
+             state == "AppLifecycleState.inactive") {
+    shorebird_in_background_ = false;
   }
   runtime_controller_->SetInitialLifecycleState(state);
   // Always forward these messages to the framework by returning false.
