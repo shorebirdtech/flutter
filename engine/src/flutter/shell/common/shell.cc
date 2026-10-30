@@ -621,10 +621,6 @@ Shell::Shell(DartVMRef vm,
 }
 
 Shell::~Shell() {
-  // A shell torn down inside the launch window is a clean exit (a desktop app
-  // quit, an engine destroyed), not the patch crashing. See the "Launch
-  // window" section of the Updater class comment.
-  shorebird::Updater::Instance().CloseLaunchWindow();
 #if !SLIMPELLER
   PersistentCache::GetCacheForProcess()->RemoveWorkerTaskRunner(
       task_runners_.GetIOTaskRunner());
