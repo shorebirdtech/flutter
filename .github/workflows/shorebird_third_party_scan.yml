@@ -52,11 +52,11 @@ jobs:
       # scan_deps.py logs and skips any dep whose clone or merge-base fails,
       # and still exits 0. Fail when too few deps reach the lockfile, so a
       # broken extraction can't pass and mark existing alerts fixed.
-      # 43 of DEPS' git deps resolved on 2026-10-30; lower this if DEPS drops
+      # 51 of DEPS' git deps resolved on 2026-10-30; lower this if DEPS drops
       # deps.
       - name: ✅ Check enough deps were extracted
         env:
-          MIN_DEPS: 40
+          MIN_DEPS: 48
         run: |
           count=$(python3 -c 'import json; print(len(json.load(open("osv-lockfile.json"))["results"][0]["packages"]))')
           echo "Extracted ${count} deps from DEPS (minimum ${MIN_DEPS})."
