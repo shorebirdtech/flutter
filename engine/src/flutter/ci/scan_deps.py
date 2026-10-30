@@ -118,6 +118,68 @@ def parse_readme():
     return osv_result
 
 
+def upstream_has_commit(upstream, commit):
+  """
+  Whether upstream serves commit. Fetches into an empty repo, because git
+  skips the fetch of a commit it already has locally.
+
+  GitHub serves any commit in a repo's fork network, so this catches a
+  mistyped or missing commit but doesn't prove the commit is on upstream.
+  """
+  probe_dir = DEP_CLONE_DIR + '/.osv-probe'
+  shutil.rmtree(probe_dir, ignore_errors=True)
+  subprocess.check_output(['git', 'init', '--quiet', probe_dir])
+  result = subprocess.run(
+      ['git', 'fetch', '--quiet', '--depth=1', '--filter=blob:none', upstream, commit],
+      cwd=probe_dir,
+      stdout=subprocess.DEVNULL,
+      stderr=subprocess.DEVNULL,
+  )
+  shutil.rmtree(probe_dir, ignore_errors=True)
+  return result.returncode == 0
+
+
+def git_output(dep_dir, args):
+  result = subprocess.run(['git'] + args,
+                          cwd=dep_dir,
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.DEVNULL)
+  return byte_str_decode(result.stdout) if result.returncode == 0 else ''
+
+
+def get_recorded_upstream_commit(dep_dir, pinned, upstream):
+  """
+  Returns the upstream commit the mirror's pinned commit records it was
+  built from, or None.
+
+  Forks that share no history with upstream, so merge-base can't place them,
+  record their upstream commit: llvm-project subtree splits (libcxx) in a
+  GitOrigin-RevId trailer, Chromium's copies (zlib, abseil-cpp) as Revision:
+  in README.chromium, Flutter's sqlite amalgamation in GIT_REVISION, and
+  Chromium's icu only as Version: in README.chromium, which names a release
+  tag upstream.
+  """
+  candidates = []
+  message = git_output(dep_dir, ['log', '-1', '--format=%B', pinned])
+  candidates += re.findall(r'^GitOrigin-RevId: ([0-9a-f]{40})\s*$', message, re.M)
+  readme = git_output(dep_dir, ['show', pinned + ':README.chromium'])
+  candidates += re.findall(r'^Revision: ([0-9a-f]{40})\s*$', readme, re.M)
+  candidates += re.findall(
+      r'^([0-9a-f]{40})\s*$', git_output(dep_dir, ['show', pinned + ':GIT_REVISION'])
+  )
+  for version in re.findall(r'^Version: ([0-9][0-9.-]*)\s*$', readme, re.M):
+    # ICU tags 78 and later as release-78.2, earlier ones as release-77-1.
+    for tag in {'refs/tags/release-' + version.replace(a, b) for a, b in (('-', '.'), ('.', '-'))}:
+      refs = git_output(dep_dir, ['ls-remote', upstream, tag, tag + '^{}']).splitlines()
+      if refs:
+        # An annotated tag's peeled ref (^{}), the commit, is listed last.
+        candidates.append(refs[-1].split()[0])
+  for commit in candidates:
+    if upstream_has_commit(upstream, commit):
+      return commit
+  return None
+
+
 def get_common_ancestor(dep, deps_list):
   """
   Given an input of a mirrored dep,
@@ -145,8 +207,13 @@ def get_common_ancestor(dep, deps_list):
     # Clone dependency from mirror.
     subprocess.check_output(['git', 'clone', '--quiet', '--', dep[0], dep_name], cwd=DEP_CLONE_DIR)
 
-    # Create branch that will track the upstream dep.
     print('attempting to add upstream remote from: {upstream}'.format(upstream=upstream))
+    recorded_commit = get_recorded_upstream_commit(temp_dep_dir, dep[1], upstream)
+    if recorded_commit:
+      print('Upstream commit: ' + recorded_commit)
+      return recorded_commit, upstream
+
+    # Fetch the upstream dep as a remote.
     subprocess.check_output(['git', 'remote', 'add', 'upstream', upstream], cwd=temp_dep_dir)
     subprocess.check_output(['git', 'fetch', '--quiet', 'upstream'], cwd=temp_dep_dir)
     # Get name of the default branch for upstream (e.g. main/master/etc.).
@@ -158,16 +225,12 @@ def get_common_ancestor(dep, deps_list):
     default_branch = byte_str_decode(default_branch)
     default_branch = default_branch.strip()
 
-    # Make upstream branch track the upstream dep.
-    subprocess.check_output([
-        'git', 'checkout', '--force', '-b', 'upstream', '--track', 'upstream/' + default_branch
-    ],
-                            cwd=temp_dep_dir)
-    # Get the most recent commit from default branch of upstream.
+    # Get the most recent commit from default branch of upstream. Use the full
+    # ref: some mirrors have their own upstream/* branches (libexpat's default
+    # branch is upstream/master), which make a short name ambiguous.
     commit = subprocess.check_output(
-        'git for-each-ref ' + "--format=\'%(objectname:short)\' refs/heads/upstream",
+        ['git', 'rev-parse', 'refs/remotes/upstream/' + default_branch],
         cwd=temp_dep_dir,
-        shell=True
     )
     commit = byte_str_decode(commit)
     commit = commit.strip()
