@@ -99,6 +99,7 @@ TEST_F(UpdaterTest, CloseLaunchWindowReportsSuccessOnce) {
   Updater::Instance().ReportLaunchStart();
   Updater::Instance().ReportLaunchPaused();
   Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().OpenLaunchWindow(false);
   Updater::Instance().CloseLaunchWindow();
   Updater::Instance().CloseLaunchWindow();
 
@@ -113,6 +114,7 @@ TEST_F(UpdaterTest, LaunchAfterLoadFailureOwnsTheWindowAndReportsNothing) {
   Updater::Instance().ReportLaunchFailure();
   Updater::Instance().ReportLaunchPaused();
   EXPECT_TRUE(Updater::Instance().ReportLaunchResumed());
+  Updater::Instance().OpenLaunchWindow(false);
   Updater::Instance().CloseLaunchWindow();
 
   EXPECT_EQ(
@@ -133,22 +135,47 @@ TEST_F(UpdaterTest, FailureAfterResumeIsReported) {
 }
 
 // Going to the background closes an open window; one already in the
-// background closes it as soon as the launch resumes.
+// background closes it as soon as it opens, and not before: the root isolate
+// may still fail to launch.
 TEST_F(UpdaterTest, BackgroundClosesTheWindow) {
   Updater::Instance().ReportLaunchStart();
   Updater::Instance().ReportLaunchPaused();
   Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().OpenLaunchWindow(false);
   Updater::Instance().SetAppInBackground(true);
   EXPECT_EQ(mock_->launch_success_count(), 1);
 }
 
-TEST_F(UpdaterTest, ResumingInTheBackgroundClosesTheWindow) {
+TEST_F(UpdaterTest, OpeningInTheBackgroundClosesTheWindow) {
   Updater::Instance().SetAppInBackground(true);
   Updater::Instance().ReportLaunchStart();
   Updater::Instance().ReportLaunchPaused();
-  EXPECT_EQ(mock_->launch_success_count(), 0);
   Updater::Instance().ReportLaunchResumed();
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+  Updater::Instance().OpenLaunchWindow(false);
   EXPECT_EQ(mock_->launch_success_count(), 1);
+}
+
+// The owning engine's lifecycle messages said it left the foreground before
+// its root isolate launched.
+TEST_F(UpdaterTest, OpeningAfterTheEngineLeftTheForegroundClosesTheWindow) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().OpenLaunchWindow(true);
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+}
+
+// A root isolate that fails to launch in the background is reported as a
+// failure, not preceded by a success.
+TEST_F(UpdaterTest, FailureInTheBackgroundIsReported) {
+  Updater::Instance().SetAppInBackground(true);
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().ReportLaunchFailure();
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  EXPECT_EQ(mock_->launch_success_count(), 0);
 }
 
 TEST_F(UpdaterTest, MockUpdaterTracksShouldAutoUpdate) {
