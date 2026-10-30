@@ -41,10 +41,6 @@
   "host-release": {
     "steps": [
       {
-        "type": "rust",
-        "targets": ["x86_64-pc-windows-msvc"]
-      },
-      {
         "type": "gn_ninja",
         "gn_args": ["--runtime-mode=release", "--no-prebuilt-dart-sdk"],
         "ninja_targets": ["dart_sdk", "flutter/build/archives:windows_flutter", "gen_snapshot", "windows", "flutter/build/archives:artifacts"],
@@ -58,10 +54,6 @@
   },
   "host-debug": {
     "steps": [
-      {
-        "type": "rust",
-        "targets": ["x86_64-pc-windows-msvc"]
-      },
       {
         "type": "gn_ninja",
         "gn_args": ["--no-prebuilt-dart-sdk"],
