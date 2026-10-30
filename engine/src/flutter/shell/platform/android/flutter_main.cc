@@ -97,6 +97,9 @@ void FlutterMain::Init(JNIEnv* env,
                        jstring shorebirdYaml,
                        jstring version,
                        jstring versionCode,
+                       jstring processToken,
+                       jstring previousExitProcessToken,
+                       jint previousExitReason,
                        jlong initTimeMillis,
                        jint api_level) {
   std::vector<std::string> args;
@@ -164,8 +167,16 @@ void FlutterMain::Init(JNIEnv* env,
   std::string version_string = fml::jni::JavaStringToString(env, version);
   std::string version_code_string =
       fml::jni::JavaStringToString(env, versionCode);
+  std::string process_token =
+      processToken ? fml::jni::JavaStringToString(env, processToken) : "";
+  std::string previous_exit_process_token =
+      previousExitProcessToken
+          ? fml::jni::JavaStringToString(env, previousExitProcessToken)
+          : "";
   ConfigureShorebird(code_cache_path, app_storage_path, settings,
-                     shorebird_yaml, version_string, version_code_string);
+                     shorebird_yaml, version_string, version_code_string,
+                     process_token, previous_exit_process_token,
+                     previousExitReason);
 #endif
 
   flutter::DartCallbackCache::LoadCacheFromDisk();
@@ -260,7 +271,8 @@ bool FlutterMain::Register(JNIEnv* env) {
           .name = "nativeInit",
           .signature = "(Landroid/content/Context;[Ljava/lang/String;Ljava/"
                        "lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/"
-                       "lang/String;Ljava/lang/String;Ljava/lang/String;JI)V",
+                       "lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/"
+                       "lang/String;Ljava/lang/String;IJI)V",
           .fnPtr = reinterpret_cast<void*>(&Init),
       },
       {

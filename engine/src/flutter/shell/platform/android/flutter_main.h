@@ -47,6 +47,9 @@ class FlutterMain {
                    jstring shorebirdYaml,
                    jstring version,
                    jstring versionCode,
+                   jstring processToken,
+                   jstring previousExitProcessToken,
+                   jint previousExitReason,
                    jlong initTimeMillis,
                    jint api_level);
 

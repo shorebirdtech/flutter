@@ -264,7 +264,10 @@ void ConfigureShorebird(std::string code_cache_path,
                         Settings& settings,
                         const std::string& shorebird_yaml,
                         const std::string& version,
-                        const std::string& version_code) {
+                        const std::string& version_code,
+                        const std::string& process_token,
+                        const std::string& previous_exit_process_token,
+                        int previous_exit_reason) {
   // The interpreter path hands this to SetBaseSnapshot below, which holds it
   // for the life of the process, because a linked patch executes out of the
   // base image and needs it resolvable. Everywhere else a patch replaces
@@ -296,6 +299,9 @@ void ConfigureShorebird(std::string code_cache_path,
   config.code_cache_dir = code_cache_dir;
   config.file_callbacks = ShorebirdFileCallbacks();
   config.yaml_config = shorebird_yaml;
+  config.process_token = process_token;
+  config.previous_exit_process_token = previous_exit_process_token;
+  config.previous_exit_reason = previous_exit_reason;
 
   shorebird::Updater::Instance().Init(config);
 
