@@ -7,6 +7,7 @@
 #include "flutter/fml/logging.h"
 
 #if SHOREBIRD_PLATFORM_SUPPORTED
+#include "flutter/shell/common/shorebird/engine_callbacks.h"
 #include "third_party/updater/library/include/updater_engine.h"
 #endif
 
@@ -154,6 +155,10 @@ bool RealUpdater::DoInit(const AppConfig& config) {
   rust_callbacks.seek = config.file_callbacks.seek;
   rust_callbacks.close = config.file_callbacks.close;
 
+  // The updater has no signature verifier of its own, and on iOS, macOS and
+  // Android no HTTP client: it uses the engine's, so they must be in place
+  // before init.
+  shorebird_set_engine_callbacks(&UpdaterEngineCallbacks());
   return shorebird_init(&params, rust_callbacks, config.yaml_config.c_str());
 }
 
