@@ -124,24 +124,26 @@ def main():
 
 
 def _configure_msvc_env(env, rust_target):
-  """Force the cc crate to compile transitive C deps with the static CRT.
+  """Build the updater, and the C deps it compiles, against the static CRT.
 
-  The engine's Windows build uses the static CRT (/MT). The updater's
-  .cargo/config.toml sets `-C target-feature=+crt-static` so the rlib is
-  compiled to expect static-CRT linkage. However, cargo populates
-  CARGO_CFG_TARGET_FEATURE from the rustc target spec's default features,
-  not from user rustflags, so +crt-static is invisible to build scripts.
-  The cc crate (used by transitive *-sys deps like zstd-sys to compile
-  their C sources) therefore falls back to /MD, producing .obj files
-  full of __imp_* references that the engine's /MT link cannot resolve
-  (e.g. __imp_clock, __imp__wassert, __imp_qsort_s).
+  The engine's Windows build uses the static CRT (/MT), so the updater must
+  too. The updater's library/.cargo/config.toml sets
+  `-C target-feature=+crt-static`, but cargo reads .cargo/config.toml from
+  its working directory upward, not from the manifest's directory, and this
+  script runs with cwd = the GN out dir. Without the flag, rustc asks for the
+  dynamic CRT (msvcrt) and cargo's link of the updater's cdylib warns
+  LNK4098 "defaultlib 'LIBCMT' conflicts with use of other libs". Pass it
+  through the per-target rustflags env instead (the same setting as
+  `[target.<triple>] rustflags`). Cargo also puts it in
+  CARGO_CFG_TARGET_FEATURE, so the cc crate builds transitive *-sys C deps
+  (zstd-sys, ...) with /MT.
 
-  Force /MT via the per-target CFLAGS env that the cc crate honors. cc
-  appends these flags at the end of its command line, so cl.exe sees
-  `/MD ... /MT` and emits warning D9025 ("overriding '/MD' with '/MT'")
-  and uses the last one -- /MT wins.
+  CFLAGS /MT predates this (#125): it forced /MT on those C deps when the
+  rustflag wasn't reaching cargo. It is redundant now and kept so this change
+  can't regress the C deps if the rustflag is ever dropped again.
   """
   triple_env = rust_target.replace('-', '_')
+  env[f'CARGO_TARGET_{triple_env.upper()}_RUSTFLAGS'] = '-C target-feature=+crt-static'
   env[f'CFLAGS_{triple_env}'] = '/MT'
   env[f'CXXFLAGS_{triple_env}'] = '/MT'
 
