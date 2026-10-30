@@ -94,6 +94,37 @@ if (shorebird_updater_supported) {
   }
 }
 
+# For the Rust updater's C API header,
+# third_party/updater/library/include/updater_engine.h.
+config("updater_c_api") {
+  include_dirs = [ "//flutter" ]
+}
+
+# What the engine gives the Rust updater: patch signature checks on the
+# engine's BoringSSL, and on iOS, macOS and Android HTTP on the platform's
+# client (see http_client.h). A platform's client adds its sources here and
+# defines SHOREBIRD_PLATFORM_HTTP_CLIENT; without one, `http_request` is null.
+source_set("engine_callbacks") {
+  sources = [
+    "engine_callbacks.cc",
+    "engine_callbacks.h",
+    "http_client.h",
+  ]
+
+  public_configs = [ ":updater_c_api" ]
+  public_deps = [ "//flutter/third_party/boringssl" ]
+}
+
+# Fetches URLs through the engine's HTTP callback and prints what happened,
+# to build the TLS accept/reject table (see tls_matrix_urls.txt and
+# http_probe.dart). Outside enable_unittests so it builds for the iOS
+# simulator too.
+executable("shorebird_http_probe") {
+  testonly = true
+  sources = [ "http_probe.cc" ]
+  deps = [ ":engine_callbacks" ]
+}
+
 # C++ wrapper around the Rust updater C API.
 # This provides a testable abstraction layer that can be mocked for testing.
 source_set("updater") {
@@ -102,7 +133,10 @@ source_set("updater") {
     "updater.h",
   ]
 
-  deps = [ "//flutter/fml" ]
+  deps = [
+    ":engine_callbacks",
+    "//flutter/fml",
+  ]
 
   # For the Rust updater C API (shorebird_report_launch_start, etc.)
   include_dirs = [ "//flutter" ]
@@ -171,6 +205,7 @@ if (enable_unittests) {
     testonly = true
 
     sources = [
+      "engine_callbacks_unittests.cc",
       "patch_cache_unittests.cc",
       "shorebird_unittests.cc",
       "snapshots_data_handle_unittests.cc",
@@ -183,6 +218,7 @@ if (enable_unittests) {
     }
 
     deps = [
+      ":engine_callbacks",
       ":shorebird",
       ":shorebird_fixtures",
       ":snapshots_data_handle",
