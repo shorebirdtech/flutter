@@ -113,6 +113,16 @@ source_set("engine_callbacks") {
 
   public_configs = [ ":updater_c_api" ]
   public_deps = [ "//flutter/third_party/boringssl" ]
+
+  if (is_ios || is_mac) {
+    sources += [ "http_client_apple.mm" ]
+    defines = [ "SHOREBIRD_PLATFORM_HTTP_CLIENT" ]
+    cflags_objcc = flutter_cflags_objcc
+    frameworks = [
+      "Foundation.framework",
+      "Security.framework",
+    ]
+  }
 }
 
 # Fetches URLs through the engine's HTTP callback and prints what happened,
