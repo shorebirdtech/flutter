@@ -93,6 +93,9 @@ def main():
       'cargo',
       'build',
       '--release',
+      # Build exactly the crate versions in the updater's Cargo.lock; fail
+      # rather than resolve new ones if it's out of date with Cargo.toml.
+      '--locked',
       '--target',
       args.rust_target,
       '--manifest-path',
