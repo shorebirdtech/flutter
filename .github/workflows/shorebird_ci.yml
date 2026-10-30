@@ -150,7 +150,11 @@ jobs:
   # Aggregator required by branch protection on shorebird/dev so the rule can
   # list a single context ("ci") instead of every matrix-expanded job above.
   ci:
-    if: always()
+    # Run even when an upstream job fails, but not when the run itself was
+    # cancelled (e.g. superseded by a newer push via `concurrency`): the
+    # newer run reports `ci` for the branch, and failing here would mark the
+    # PR red for a run nobody is waiting on.
+    if: ${{ !cancelled() }}
     needs:
       - flutter-tools-tests
       - shorebird-android-tests
