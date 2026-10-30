@@ -7,6 +7,9 @@ package io.flutter.embedding.engine;
 import static io.flutter.Build.API_LEVELS;
 
 import android.annotation.SuppressLint;
+import android.app.ActivityManager;
+import android.app.Application;
+import android.app.ApplicationExitInfo;
 import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -50,10 +53,12 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -187,6 +192,9 @@ public class FlutterJNI {
       @Nullable String shorebirdYaml,
       @Nullable String version,
       @Nullable String versionCode,
+      @Nullable String processToken,
+      @Nullable String previousExitProcessToken,
+      int previousExitReason,
       long initTimeMillis,
       int apiLevel);
 
@@ -245,6 +253,8 @@ public class FlutterJNI {
       Log.e(TAG, "Did you remember to include shorebird.yaml in your pubspec.yaml's assets?");
     }
 
+    ShorebirdProcessExit processExit = ShorebirdProcessExit.recordAndRead(context);
+
     FlutterJNI.nativeInit(
         context,
         args,
@@ -254,12 +264,84 @@ public class FlutterJNI {
         shorebirdYaml,
         version,
         versionCode,
+        processExit.processToken,
+        processExit.previousExitProcessToken,
+        processExit.previousExitReason,
         initTimeMillis,
         apiLevel);
     FlutterJNI.initCalled = true;
   }
 
   private static boolean initCalled = false;
+
+  /**
+   * Shorebird: tells a kill from a crash for the updater. On Android 11+ this process gives the OS
+   * a token as its state summary, and reads back what the OS recorded about how the previous
+   * process ended. The updater writes the token into its boot breadcrumb; if the next launch finds
+   * the breadcrumb still set, the record's token and reason say whether the patch crashed or the
+   * process was killed. Nothing here leaves the device.
+   */
+  @VisibleForTesting
+  static final class ShorebirdProcessExit {
+    @Nullable final String processToken;
+    @Nullable final String previousExitProcessToken;
+    final int previousExitReason;
+
+    ShorebirdProcessExit(
+        @Nullable String processToken,
+        @Nullable String previousExitProcessToken,
+        int previousExitReason) {
+      this.processToken = processToken;
+      this.previousExitProcessToken = previousExitProcessToken;
+      this.previousExitReason = previousExitReason;
+    }
+
+    @NonNull
+    static ShorebirdProcessExit recordAndRead(@NonNull Context context) {
+      if (Build.VERSION.SDK_INT < API_LEVELS.API_30) {
+        return new ShorebirdProcessExit(null, null, 0);
+      }
+      return recordAndReadApi30(context);
+    }
+
+    @SuppressLint("NewApi")
+    @NonNull
+    private static ShorebirdProcessExit recordAndReadApi30(@NonNull Context context) {
+      try {
+        ActivityManager activityManager =
+            (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        if (activityManager == null) {
+          return new ShorebirdProcessExit(null, null, 0);
+        }
+        String processName = Application.getProcessName();
+        String previousToken = null;
+        int previousReason = 0;
+        // Newest first. The newest record of this process name is the
+        // previous run of this process; another process of the app (a
+        // service) has its own name.
+        for (ApplicationExitInfo info :
+            activityManager.getHistoricalProcessExitReasons(null, 0, 0)) {
+          if (!processName.equals(info.getProcessName())) {
+            continue;
+          }
+          byte[] summary = info.getProcessStateSummary();
+          if (summary != null) {
+            previousToken = new String(summary, StandardCharsets.UTF_8);
+            previousReason = info.getReason();
+          }
+          break;
+        }
+        String token = UUID.randomUUID().toString();
+        activityManager.setProcessStateSummary(token.getBytes(StandardCharsets.UTF_8));
+        return new ShorebirdProcessExit(token, previousToken, previousReason);
+      } catch (RuntimeException e) {
+        // Without a token the updater treats any death while booting as a
+        // crash, as it does on older Android.
+        Log.w(TAG, "Shorebird: could not read or record process exit info", e);
+        return new ShorebirdProcessExit(null, null, 0);
+      }
+    }
+  }
   // END methods related to FlutterLoader
 
   @Nullable private static AsyncWaitForVsyncDelegate asyncWaitForVsyncDelegate;
