@@ -2,13 +2,6 @@
   "android": {
     "steps": [
       {
-        "type": "rust",
-        "targets": [
-          "aarch64-apple-darwin",
-          "x86_64-apple-darwin"
-        ]
-      },
-      {
         "type": "gn_ninja",
         "gn_args": ["--android", "--android-cpu=arm64", "--runtime-mode=release", "--gn-args=host_cpu=\"x64\""],
         "ninja_targets": ["flutter/shell/platform/android:gen_snapshot"],
@@ -36,10 +29,6 @@
   "ios": {
     "steps": [
       {
-        "type": "rust",
-        "targets": ["aarch64-apple-ios", "x86_64-apple-ios"]
-      },
-      {
         "type": "gn_ninja",
         "gn_args": ["--ios", "--runtime-mode=release", "--gn-arg=shorebird_runtime=true"],
         "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
@@ -63,10 +52,6 @@
   "mac-arm64": {
     "steps": [
       {
-        "type": "rust",
-        "targets": ["aarch64-apple-darwin"]
-      },
-      {
         "type": "gn_ninja",
         "gn_args": ["--runtime-mode=release", "--mac-cpu=arm64", "--no-prebuilt-dart-sdk"],
         "ninja_targets": ["dart_sdk"],
@@ -88,10 +73,6 @@
   },
   "mac-x64": {
     "steps": [
-      {
-        "type": "rust",
-        "targets": ["x86_64-apple-darwin"]
-      },
       {
         "type": "gn_ninja",
         "gn_args": ["--runtime-mode=release", "--mac-cpu=x64", "--no-prebuilt-dart-sdk"],
