@@ -10,7 +10,7 @@ name: shorebird_third_party_scan
 # ci/scan_deps.py against the root DEPS.
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 on:
@@ -20,11 +20,13 @@ on:
     paths:
       - DEPS
       - engine/src/flutter/ci/scan_deps.py
+      - engine/src/flutter/ci/compatibility_helper.py
       - .github/workflows/shorebird_third_party_scan.yml
   pull_request:
     paths:
       - DEPS
       - engine/src/flutter/ci/scan_deps.py
+      - engine/src/flutter/ci/compatibility_helper.py
       - .github/workflows/shorebird_third_party_scan.yml
   # New advisories are published without DEPS changing.
   schedule:
@@ -46,6 +48,22 @@ jobs:
 
       - name: 🔎 Extract deps and find upstream commits
         run: python3 engine/src/flutter/ci/scan_deps.py --deps DEPS --output osv-lockfile.json
+
+      # scan_deps.py logs and skips any dep whose clone or merge-base fails,
+      # and still exits 0. Fail when too few deps reach the lockfile, so a
+      # broken extraction can't pass and mark existing alerts fixed.
+      # 43 of DEPS' git deps resolved on 2026-10-30; lower this if DEPS drops
+      # deps.
+      - name: ✅ Check enough deps were extracted
+        env:
+          MIN_DEPS: 40
+        run: |
+          count=$(python3 -c 'import json; print(len(json.load(open("osv-lockfile.json"))["results"][0]["packages"]))')
+          echo "Extracted ${count} deps from DEPS (minimum ${MIN_DEPS})."
+          if [ "${count}" -lt "${MIN_DEPS}" ]; then
+            echo "::error::Only ${count} deps reached the OSV lockfile; expected at least ${MIN_DEPS}. See the extract step for clone or merge-base failures."
+            exit 1
+          fi
 
       - name: 📦 Upload deps lockfile
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
