@@ -16,6 +16,56 @@ namespace flutter {
 
 // PatchCacheEntry implementation
 
+// Stages the link table for the patch at `path` and reports the offset its
+// elf snapshot starts at, or -1 when the patch cannot be dispatched through
+// and the caller must boot base code instead.
+//
+// Separate from Create because the group that is about to read a snapshot
+// needs this patch's table staged on every boot, and Create runs only on a
+// cache miss. A cached entry survives for the life of the VM, so a boot that
+// returns to an earlier patch hits the cache and would otherwise read that
+// patch's code against whatever was staged last.
+//
+// Leaves nothing staged on every failure path, because the caller answers a
+// failure by booting the base image and the reader aborts rather than falling
+// back if a table is still staged.
+int PatchCacheEntry::StageLinkTable(const std::string& path) {
+  auto elf_mapping = fml::FileMapping::CreateReadOnly(path);
+  if (!elf_mapping) {
+    FML_LOG(ERROR) << "Failed to map file: " << path;
+    Shorebird_UninstallLinkTable();
+    return -1;
+  }
+
+  // The offset is read without staging anything, because the install-once
+  // entry point answers 0 on every call after the first, which would send
+  // Dart_LoadELF at the linker header as if it were an ELF.
+  const int elf_file_offset = Shorebird_LinkHeaderOffset(
+      elf_mapping->GetMapping(), elf_mapping->GetSize());
+
+  // The deserializer decides whether it is reading a linked snapshot by
+  // asking whether a table is staged, so this has to precede the load rather
+  // than follow it.
+  const int installed_offset = Shorebird_InstallLinkTable(
+      elf_mapping->GetMapping(), elf_mapping->GetSize());
+
+  if (elf_file_offset == 0) {
+    // No linker header, so there are no mappings to dispatch through and the
+    // reader has to see an unlinked snapshot.
+    Shorebird_UninstallLinkTable();
+    return 0;
+  }
+  if (installed_offset == 0) {
+    // The header is there but will not parse. Loading anyway would read this
+    // patch's code against whatever is staged, which on a second patch is the
+    // first patch's mappings.
+    FML_LOG(ERROR) << "Failed to stage the link table for patch at " << path;
+    Shorebird_UninstallLinkTable();
+    return -1;
+  }
+  return elf_file_offset;
+}
+
 std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
     const std::string& path) {
   // vmcode files currently use ELF internally after a prefix of a Shorebird
@@ -26,34 +76,8 @@ std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
     return nullptr;
   }
 
-  // The offset is read without installing anything, because a process can
-  // reach this a second time and the install-once entry point answers 0 on
-  // every call after the first, which would send Dart_LoadELF at the linker
-  // header as if it were an ELF.
-  int elf_file_offset = Shorebird_LinkHeaderOffset(elf_mapping->GetMapping(),
-                                                   elf_mapping->GetSize());
-
-  // The deserializer decides whether it is reading a linked snapshot by
-  // asking whether a table is installed, so the install has to precede the
-  // load rather than follow it.
-  const int installed_offset = Shorebird_InstallLinkTable(
-      elf_mapping->GetMapping(), elf_mapping->GetSize());
-
-  // Every way out of here without an entry ends with no table installed,
-  // because the caller answers a null entry by booting the base image and
-  // the reader aborts rather than falling back if a table is still installed.
-  // A table a previous patch installed in this process is the live hazard:
-  // on a first load there is nothing to leave behind.
-  if (elf_file_offset == 0) {
-    // No linker header, so there are no mappings to dispatch through and the
-    // reader has to see an unlinked snapshot.
-    Shorebird_UninstallLinkTable();
-  } else if (installed_offset == 0) {
-    // The header is there but will not parse. Loading anyway would read this
-    // patch's code against whatever table is installed, which on a second
-    // patch is the first patch's mappings.
-    FML_LOG(ERROR) << "Failed to install the link table for patch at " << path;
-    Shorebird_UninstallLinkTable();
+  const int elf_file_offset = StageLinkTable(path);
+  if (elf_file_offset < 0) {
     return nullptr;
   }
 
@@ -116,6 +140,13 @@ std::shared_ptr<PatchCacheEntry> PatchCache::GetOrLoad(
   if (it != cache_.end()) {
     if (auto entry = it->second.lock()) {
       FML_LOG(INFO) << "PatchCache hit for " << path;
+      // The elf is already loaded, but the table is not staged: a cached
+      // entry outlives the install that created it, so a boot that returns to
+      // an earlier patch would read its code against whatever was staged for
+      // the patch in between.
+      if (PatchCacheEntry::StageLinkTable(path) < 0) {
+        return nullptr;
+      }
       return entry;
     }
     // Entry expired, remove it
@@ -146,7 +177,13 @@ void PatchCache::PruneExpired() {
 std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
     const std::vector<std::string>& native_library_paths,
     PatchSymbol symbol) {
+  // A boot whose target is not a patch has to leave nothing staged. A restart
+  // that falls back to the base release, after a patch failed or because the
+  // patch was rolled back, reaches here with an earlier patch's table still
+  // staged, and the reader would then take the base image for a linked
+  // snapshot and dispatch it through mappings that describe a different one.
   if (native_library_paths.empty()) {
+    Shorebird_UninstallLinkTable();
     return nullptr;
   }
 
@@ -154,6 +191,7 @@ std::shared_ptr<const fml::Mapping> TryLoadFromPatch(
   const auto& patch_path = native_library_paths.front();
   bool is_patch = patch_path.find(".vmcode") != std::string::npos;
   if (!is_patch) {
+    Shorebird_UninstallLinkTable();
     return nullptr;
   }
 

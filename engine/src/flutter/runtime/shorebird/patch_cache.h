@@ -38,6 +38,13 @@ class PatchCacheEntry {
   /// Returns the path this entry was loaded from.
   const std::string& path() const { return path_; }
 
+  // Stages the link table for the patch at `path`, returning the offset its
+  // elf snapshot starts at, 0 when the file carries no linker header, or -1
+  // when the patch cannot be dispatched through. Leaves nothing staged on
+  // every non-positive result. Public because a cache hit has to stage the
+  // table without going through Create.
+  static int StageLinkTable(const std::string& path);
+
  private:
   PatchCacheEntry(const std::string& path,
                   Dart_LoadedElf* elf,
