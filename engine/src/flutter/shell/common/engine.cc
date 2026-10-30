@@ -16,6 +16,7 @@
 #include "flutter/impeller/core/runtime_types.h"
 #include "flutter/lib/ui/text/font_collection.h"
 #include "flutter/shell/common/animator.h"
+#include "flutter/shell/common/shorebird/updater.h"
 #include "rapidjson/document.h"
 
 namespace flutter {
@@ -257,6 +258,13 @@ Engine::RunStatus Engine::Run(RunConfiguration configuration) {
     });
   }
 
+  // Shorebird: building the root isolate deserializes the patch's snapshot,
+  // and main and the first frames run the patch's code, so the first engine
+  // to launch arms the boot breadcrumb again here and owns the launch window.
+  // See the "Launch window" section of the Updater class comment.
+  const bool owns_launch_window =
+      shorebird::Updater::Instance().ReportLaunchResumed();
+
   if (!runtime_controller_->LaunchRootIsolate(
           settings_,                                 //
           root_isolate_create_callback,              //
@@ -267,7 +275,18 @@ Engine::RunStatus Engine::Run(RunConfiguration configuration) {
           native_assets_manager_,                    //
           configuration.GetEngineId()))              //
   {
+    if (owns_launch_window) {
+      shorebird::Updater::Instance().ReportLaunchFailure();
+    }
     return RunStatus::Failure;
+  }
+
+  if (owns_launch_window) {
+    // On the platform task runner rather than the UI one: it outlives this
+    // engine, and the success report writes to disk.
+    task_runners_.GetPlatformTaskRunner()->PostDelayedTask(
+        [] { shorebird::Updater::Instance().CloseLaunchWindow(); },
+        shorebird::Updater::LaunchWindow());
   }
 
   auto service_id = runtime_controller_->GetRootIsolateServiceID();
@@ -388,6 +407,15 @@ bool Engine::HandleLifecyclePlatformMessage(PlatformMessage* message) {
   if (state == "AppLifecycleState.resumed" ||
       state == "AppLifecycleState.inactive") {
     ScheduleFrame();
+  }
+  // Shorebird: leaving the foreground ends the launch window early. A
+  // backgrounded app is suspended or killed at the OS's will, and that death
+  // isn't the patch crashing on launch.
+  if (state == "AppLifecycleState.paused" ||
+      state == "AppLifecycleState.hidden" ||
+      state == "AppLifecycleState.detached") {
+    task_runners_.GetPlatformTaskRunner()->PostTask(
+        [] { shorebird::Updater::Instance().CloseLaunchWindow(); });
   }
   runtime_controller_->SetInitialLifecycleState(state);
   // Always forward these messages to the framework by returning false.

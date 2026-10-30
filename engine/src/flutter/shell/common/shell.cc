@@ -531,10 +531,14 @@ Shell::Shell(DartVMRef vm,
   // In add-to-app, subsequent engines are silently ignored since they
   // boot from the same snapshot that was already reported on.
   // On unsupported platforms, NoOpUpdater handles these calls gracefully.
+  // A built Shell isn't a launch: an engine can be created and never run.
+  // So the breadcrumb is paused here and armed again when the root isolate
+  // launches (Engine::Run), and success waits for the launch window to close.
+  // See the "Launch window" section of the Updater class comment.
   if (!vm_) {
     shorebird::Updater::Instance().ReportLaunchFailure();
   } else {
-    shorebird::Updater::Instance().ReportLaunchSuccess();
+    shorebird::Updater::Instance().ReportLaunchPaused();
   }
   FML_CHECK(!settings.enable_software_rendering || !settings.enable_impeller)
       << "Software rendering is incompatible with Impeller.";
@@ -617,6 +621,10 @@ Shell::Shell(DartVMRef vm,
 }
 
 Shell::~Shell() {
+  // A shell torn down inside the launch window is a clean exit (a desktop app
+  // quit, an engine destroyed), not the patch crashing. See the "Launch
+  // window" section of the Updater class comment.
+  shorebird::Updater::Instance().CloseLaunchWindow();
 #if !SLIMPELLER
   PersistentCache::GetCacheForProcess()->RemoveWorkerTaskRunner(
       task_runners_.GetIOTaskRunner());

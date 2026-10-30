@@ -19,6 +19,12 @@ std::unique_ptr<Updater> Updater::instance_;
 std::mutex Updater::instance_mutex_;
 std::atomic<bool> Updater::launch_started_{false};
 std::atomic<bool> Updater::launch_completed_{false};
+std::atomic<bool> Updater::launch_paused_{false};
+std::atomic<bool> Updater::launch_resumed_{false};
+std::atomic<bool> Updater::launch_window_open_{false};
+std::atomic<bool> Updater::app_in_background_{false};
+// See the "Launch window" section of the class comment for why 5 s.
+std::atomic<int64_t> Updater::launch_window_micros_{5'000'000};
 std::atomic<bool> Updater::initialized_{false};
 std::atomic<bool> Updater::update_thread_started_{false};
 
@@ -47,6 +53,11 @@ void Updater::ResetInstanceForTesting() {
 void Updater::ResetLaunchStateForTesting() {
   launch_started_.store(false);
   launch_completed_.store(false);
+  launch_paused_.store(false);
+  launch_resumed_.store(false);
+  launch_window_open_.store(false);
+  app_in_background_.store(false);
+  launch_window_micros_.store(5'000'000);
   initialized_.store(false);
   update_thread_started_.store(false);
 }
@@ -121,6 +132,57 @@ void Updater::MaybeStartUpdateThread() {
   }
 }
 
+void Updater::ReportLaunchPaused() {
+  bool expected = false;
+  if (!launch_paused_.compare_exchange_strong(expected, true)) {
+    return;
+  }
+  // A launch that already failed (the patch didn't load) has nothing armed.
+  if (launch_completed_.load()) {
+    return;
+  }
+  DoReportLaunchPaused();
+}
+
+bool Updater::ReportLaunchResumed() {
+  bool expected = false;
+  if (!launch_resumed_.compare_exchange_strong(expected, true)) {
+    return false;
+  }
+  // Still the owner after a failed patch load: the base-code launch that
+  // follows needs its window closed so the update thread starts.
+  if (!launch_completed_.load()) {
+    DoReportLaunchResumed();
+  }
+  launch_window_open_.store(true);
+  if (app_in_background_.load()) {
+    CloseLaunchWindow();
+  }
+  return true;
+}
+
+void Updater::CloseLaunchWindow() {
+  if (!launch_window_open_.load()) {
+    return;
+  }
+  ReportLaunchSuccess();
+}
+
+void Updater::SetAppInBackground(bool in_background) {
+  app_in_background_.store(in_background);
+  if (in_background) {
+    CloseLaunchWindow();
+  }
+}
+
+fml::TimeDelta Updater::LaunchWindow() {
+  return fml::TimeDelta::FromMicroseconds(launch_window_micros_.load());
+}
+
+void Updater::SetLaunchWindowForTesting(fml::TimeDelta window) {
+  launch_window_micros_.store(window.ToMicroseconds());
+}
+
 void Updater::ReportLaunchFailure() {
   // Guard: only report failure once per process.
   bool expected = false;
@@ -141,7 +203,8 @@ bool RealUpdater::DoInit(const AppConfig& config) {
     c_paths.push_back(path.c_str());
   }
 
-  AppParameters params;
+  // Zeroed, so a field this code doesn't set is NULL rather than garbage.
+  AppParameters params = {};
   params.release_version = config.release_version.c_str();
   params.original_libapp_paths = c_paths.data();
   params.original_libapp_paths_size = static_cast<int>(c_paths.size());
@@ -188,6 +251,14 @@ void RealUpdater::DoReportLaunchFailure() {
   shorebird_report_launch_failure();
 }
 
+void RealUpdater::DoReportLaunchPaused() {
+  shorebird_report_launch_paused();
+}
+
+void RealUpdater::DoReportLaunchResumed() {
+  shorebird_report_launch_resumed();
+}
+
 bool RealUpdater::ShouldAutoUpdate() {
   return shorebird_should_auto_update();
 }
@@ -230,6 +301,14 @@ void MockUpdater::DoReportLaunchSuccess() {
 void MockUpdater::DoReportLaunchFailure() {
   launch_failure_count_++;
   call_log_.push_back("ReportLaunchFailure");
+}
+
+void MockUpdater::DoReportLaunchPaused() {
+  call_log_.push_back("ReportLaunchPaused");
+}
+
+void MockUpdater::DoReportLaunchResumed() {
+  call_log_.push_back("ReportLaunchResumed");
 }
 
 bool MockUpdater::ShouldAutoUpdate() {
