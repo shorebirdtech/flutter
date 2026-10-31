@@ -9,7 +9,7 @@
 namespace flutter {
 
 std::shared_ptr<PatchMapping> PatchMapping::CreateIsolateData(
-    std::shared_ptr<PatchCacheEntry> entry) {
+    const std::shared_ptr<PatchCacheEntry>& entry) {
   if (!entry) {
     return nullptr;
   }
@@ -19,7 +19,7 @@ std::shared_ptr<PatchMapping> PatchMapping::CreateIsolateData(
 }
 
 std::shared_ptr<PatchMapping> PatchMapping::CreateIsolateInstructions(
-    std::shared_ptr<PatchCacheEntry> entry) {
+    const std::shared_ptr<PatchCacheEntry>& entry) {
   if (!entry) {
     return nullptr;
   }

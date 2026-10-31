@@ -815,7 +815,9 @@ abstract class FlutterCommand extends Command<void> {
   void usesWebResourcesCdnFlag() {
     argParser.addFlag(
       FlutterOptions.kWebResourcesCdnFlag,
-      defaultsTo: true,
+      // Shorebird: off by default (upstream: defaultsTo: true). Flutter's CDN
+      // (gstatic.com/flutter-canvaskit) has no CanvasKit for Shorebird's
+      // engine revisions, so load the copy built into build/web/canvaskit/.
       help: 'Use Web static resources hosted on a CDN.',
     );
   }
@@ -1538,6 +1540,13 @@ abstract class FlutterCommand extends Command<void> {
     _addFlutterVersionToDartDefines(globals.flutterVersion, dartDefines);
     _addFeatureFlagsToDartDefines(dartDefines);
 
+    // Shorebird-specific: the shorebird CLI sets these two environment
+    // variables on `flutter build`. They are the only ones read here, and
+    // BuildInfo passes them to `flutter assemble` as defines.
+    final String? shorebirdPublicKey = globals.platform.environment['SHOREBIRD_PUBLIC_KEY'];
+    final int shorebirdDdMaxBytes =
+        int.tryParse(globals.platform.environment['SHOREBIRD_DD_MAX_BYTES'] ?? '') ?? 0;
+
     return BuildInfo(
       buildMode,
       flavor,
@@ -1559,6 +1568,8 @@ abstract class FlutterCommand extends Command<void> {
       dartExperiments: experiments,
       performanceMeasurementFile: performanceMeasurementFile,
       shorebirdTraceFilePath: shorebirdTraceFilePath,
+      shorebirdPublicKey: shorebirdPublicKey == '' ? null : shorebirdPublicKey,
+      shorebirdDdMaxBytes: shorebirdDdMaxBytes > 0 ? shorebirdDdMaxBytes : null,
       packageConfigPath: packagesPath ?? packageConfigFile.path,
       codeSizeDirectory: codeSizeDirectory,
       androidGradleDaemon: androidGradleDaemon,

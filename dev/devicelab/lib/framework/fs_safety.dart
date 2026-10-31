@@ -43,8 +43,8 @@ bool _isDangerousDirectory(String dirPath) {
 /// throws on a missing path, so this resolves the nearest existing ancestor and
 /// re-appends the rest. Returns null when no ancestor resolves.
 String? _resolveExistingPrefix(String entityPath) {
-  final List<String> tail = <String>[];
-  String current = entityPath;
+  final tail = <String>[];
+  var current = entityPath;
   while (true) {
     try {
       final String resolved = io.Directory(current).resolveSymbolicLinksSync();
@@ -77,7 +77,7 @@ bool _isAllowedPath(String entityPath) {
     canonicalTemps = <String>[path.canonicalize(io.Directory.systemTemp.path)];
   }
 
-  for (final String canonicalTemp in canonicalTemps) {
+  for (final canonicalTemp in canonicalTemps) {
     if (path.isWithin(canonicalTemp, canonicalEntity) || canonicalEntity == canonicalTemp) {
       return true;
     }
@@ -88,7 +88,7 @@ bool _isAllowedPath(String entityPath) {
   // runs only on paths the string comparison above already rejected.
   final String? resolvedEntity = _resolveExistingPrefix(canonicalEntity);
   if (resolvedEntity != null) {
-    for (final String canonicalTemp in canonicalTemps) {
+    for (final canonicalTemp in canonicalTemps) {
       if (path.isWithin(canonicalTemp, resolvedEntity) || resolvedEntity == canonicalTemp) {
         return true;
       }

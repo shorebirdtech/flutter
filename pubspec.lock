@@ -954,6 +954,15 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.0"
+  shorebird_build_trace:
+    dependency: transitive
+    description:
+      path: "packages/shorebird_build_trace"
+      ref: cff436f66534e14618cddcaf93f0d0e9862c937a
+      resolved-ref: cff436f66534e14618cddcaf93f0d0e9862c937a
+      url: "https://github.com/shorebirdtech/shorebird.git"
+    source: git
+    version: "0.1.0"
   shrine_images:
     dependency: "direct main"
     description:

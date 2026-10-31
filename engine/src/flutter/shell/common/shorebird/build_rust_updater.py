@@ -38,6 +38,16 @@ def main():
       '--mac-deployment-target',
       help='macOS deployment target (e.g. 10.15); required for *-apple-darwin targets',
   )
+  parser.add_argument(
+      '--linux-clang-dir',
+      help='Directory holding the engine\'s clang; given for a cross build to a Linux target',
+  )
+  parser.add_argument(
+      '--linux-sysroot', help='Sysroot of the Linux target; given with --linux-clang-dir'
+  )
+  parser.add_argument(
+      '--windows-clang', help='The engine\'s clang.exe; given for a Windows arm64 target'
+  )
   args = parser.parse_args()
 
   env = os.environ.copy()
@@ -77,6 +87,12 @@ def main():
       )
       return 1
     env['MACOSX_DEPLOYMENT_TARGET'] = args.mac_deployment_target
+
+  if args.linux_clang_dir:
+    _configure_linux_cross_env(env, args.rust_target, args.linux_clang_dir, args.linux_sysroot)
+
+  if args.windows_clang:
+    env[f'CC_{args.rust_target.replace("-", "_")}'] = os.path.abspath(args.windows_clang)
 
   # GN passes paths relative to the build output dir (which is cwd when
   # Ninja runs the action). Resolve them to absolute paths so they work
@@ -161,6 +177,35 @@ def _configure_android_env(env, rust_target, ndk_path, api_level):
   env[f'CARGO_TARGET_{triple_env}_LINKER'] = clang
   env['CC'] = clang
   env['AR'] = ar
+
+
+def _configure_linux_cross_env(env, rust_target, clang_dir, sysroot):
+  """Point cargo and the cc crate at the engine's clang for a cross build to Linux.
+
+  The C dependencies (compiled by the cc crate in build scripts) need a
+  target compiler, and the updater crate also builds a cdylib, which needs a
+  target linker. The cc crate reads CC_<target>, AR_<target> and
+  CFLAGS_<target>; cargo reads CARGO_TARGET_<TARGET>_LINKER and _RUSTFLAGS.
+  All are keyed on the target, so build scripts, compiled for the host, stay
+  on the host compiler.
+  """
+  clang_dir = os.path.abspath(clang_dir)
+  flags = [f'--target={rust_target}']
+  if sysroot:
+    flags.append(f'--sysroot={os.path.abspath(sysroot)}')
+  triple = rust_target.replace('-', '_')
+  env[f'CC_{triple}'] = os.path.join(clang_dir, 'clang')
+  env[f'AR_{triple}'] = os.path.join(clang_dir, 'llvm-ar')
+  env[f'CFLAGS_{triple}'] = ' '.join(flags)
+  # Cargo ignores target rustflags whenever RUSTFLAGS is set, which would
+  # drop the link flags below.
+  env.pop('RUSTFLAGS', None)
+  env.pop('CARGO_ENCODED_RUSTFLAGS', None)
+  cargo_triple = triple.upper()
+  env[f'CARGO_TARGET_{cargo_triple}_LINKER'] = os.path.join(clang_dir, 'clang')
+  env[f'CARGO_TARGET_{cargo_triple}_RUSTFLAGS'] = ' '.join(
+      f'-C link-arg={flag}' for flag in flags + ['-fuse-ld=lld']
+  )
 
 
 if __name__ == '__main__':

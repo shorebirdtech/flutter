@@ -184,6 +184,16 @@ int _checkAndroid(String outPath, String nmPath, Iterable<String> builds) {
       'JNI_OnLoad': 'T',
       '_binary_icudtl_dat_size': 'R',
       '_binary_icudtl_dat_start': 'R',
+      // Shorebird: the updater's C API, which package:shorebird_code_push
+      // looks up at runtime (shell/platform/android/android_exports.lst).
+      'shorebird_init': 'T',
+      'shorebird_free_string': 'T',
+      'shorebird_free_update_result': 'T',
+      'shorebird_check_for_downloadable_update': 'T',
+      'shorebird_update_with_result': 'T',
+      'shorebird_next_boot_patch_number': 'T',
+      'shorebird_current_boot_patch_number': 'T',
+      'shorebird_validate_next_boot_patch': 'T',
     };
     final badSymbols = <String, String>{};
     for (final String key in entryMap.keys) {
