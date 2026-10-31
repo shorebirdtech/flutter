@@ -5187,8 +5187,10 @@ TEST_F(ShellTest, ShoulDiscardLayerTreeIfFrameIsSizedIncorrectly) {
 }
 
 // Test the full boot flow: ReportLaunchStart is called from
-// IsolateSnapshotFromSettings, then ReportLaunchSuccess from the Shell
-// constructor. Both are guarded to run at most once per process.
+// IsolateSnapshotFromSettings when the Shell is created and ReportLaunchPaused
+// once it is built; ReportLaunchResumed just before the engine runs the root
+// isolate, and ReportLaunchSuccess once it has. All are guarded to run at
+// most once per process.
 TEST_F(ShellTest, ShorebirdBootFlowCallsLaunchStartThenSuccess) {
   auto mock = std::make_unique<shorebird::MockUpdater>();
   auto* mock_ptr = mock.get();
@@ -5203,9 +5205,72 @@ TEST_F(ShellTest, ShorebirdBootFlowCallsLaunchStartThenSuccess) {
   const auto& log = mock_ptr->call_log();
   ASSERT_EQ(log.size(), 2u);
   EXPECT_EQ(log[0], "ReportLaunchStart");
-  EXPECT_EQ(log[1], "ReportLaunchSuccess");
+  EXPECT_EQ(log[1], "ReportLaunchPaused");
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+
+  ASSERT_EQ(log.size(), 4u);
+  EXPECT_EQ(log[0], "ReportLaunchStart");
+  EXPECT_EQ(log[1], "ReportLaunchPaused");
+  EXPECT_EQ(log[2], "ReportLaunchResumed");
+  EXPECT_EQ(log[3], "ReportLaunchSuccess");
 
   DestroyShell(std::move(shell), task_runners);
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
+// A patch whose snapshot aborts the process while the root isolate group is
+// created must not already be recorded as booted, or every later launch
+// boots it again (shorebirdtech/shorebird#4407). Creating the Shell is not
+// enough to report success, and a run that fails to launch the root isolate
+// (here, after the snapshot loads, at the entrypoint lookup) reports the
+// failure, so the updater rolls the patch back, and still starts the update
+// thread so a fixed patch can arrive.
+TEST_F(ShellTest, ShorebirdLaunchSuccessWaitsForRootIsolate) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  auto* mock_ptr = mock.get();
+  mock_ptr->set_should_auto_update(true);
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
+  ASSERT_TRUE(shorebird::Updater::Instance().Init(shorebird::AppConfig{}));
+
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+  EXPECT_EQ(mock_ptr->launch_start_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_success_count(), 0);
+
+  // An entrypoint the fixture doesn't define: the engine fails to run the
+  // root isolate.
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("shorebirdEntrypointThatDoesNotExist");
+  fml::AutoResetWaitableEvent latch;
+  Engine::RunStatus run_status = Engine::RunStatus::Success;
+  fml::TaskRunner::RunNowOrPostTask(
+      task_runners.GetPlatformTaskRunner(),
+      [&shell, &configuration, &latch, &run_status]() {
+        shell->RunEngine(std::move(configuration),
+                         [&latch, &run_status](Engine::RunStatus status) {
+                           run_status = status;
+                           latch.Signal();
+                         });
+      });
+  latch.Wait();
+  EXPECT_EQ(run_status, Engine::RunStatus::Failure);
+
+  EXPECT_EQ(mock_ptr->launch_start_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_resumed_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_success_count(), 0);
+  EXPECT_EQ(mock_ptr->launch_failure_count(), 1);
+  EXPECT_EQ(mock_ptr->start_update_thread_count(), 1);
+
+  DestroyShell(std::move(shell), task_runners);
+  EXPECT_EQ(mock_ptr->launch_success_count(), 0);
+
   shorebird::Updater::ResetLaunchStateForTesting();
   shorebird::Updater::ResetInstanceForTesting();
 }
@@ -5223,10 +5288,13 @@ TEST_F(ShellTest, ShorebirdUpdaterReportsOnlyOnceForMultipleShells) {
 
   auto settings = CreateSettingsForFixture();
 
-  // Create first shell — gets Start + Success
+  // Create and run the first shell — gets Start + Success
   auto task_runners1 = GetTaskRunnersForFixture();
   auto shell1 = CreateShell(settings, task_runners1);
   ASSERT_TRUE(shell1);
+  auto configuration1 = RunConfiguration::InferFromSettings(settings);
+  configuration1.SetEntrypoint("emptyMain");
+  RunEngine(shell1.get(), std::move(configuration1));
   EXPECT_EQ(mock_ptr->launch_start_count(), 1);
   EXPECT_EQ(mock_ptr->launch_success_count(), 1);
 
@@ -5236,18 +5304,115 @@ TEST_F(ShellTest, ShorebirdUpdaterReportsOnlyOnceForMultipleShells) {
   // EGL display, and the first one's teardown terminates it under the second.
   DestroyShell(std::move(shell1), task_runners1);
 
-  // Create second shell — guarded, no additional Start or Success calls.
+  // Create and run a second shell — guarded, no additional Start or Success
+  // calls.
   auto task_runners2 = GetTaskRunnersForFixture();
   auto shell2 = CreateShell(settings, task_runners2);
   ASSERT_TRUE(shell2);
+  auto configuration2 = RunConfiguration::InferFromSettings(settings);
+  configuration2.SetEntrypoint("emptyMain");
+  RunEngine(shell2.get(), std::move(configuration2));
   EXPECT_EQ(mock_ptr->launch_start_count(), 1);
   EXPECT_EQ(mock_ptr->launch_success_count(), 1);
 
-  // Only one Start+Success pair in the call log.
+  // One launch in the call log.
   const auto& log = mock_ptr->call_log();
-  ASSERT_EQ(log.size(), 2u);
+  ASSERT_EQ(log.size(), 4u);
   EXPECT_EQ(log[0], "ReportLaunchStart");
-  EXPECT_EQ(log[1], "ReportLaunchSuccess");
+  EXPECT_EQ(log[1], "ReportLaunchPaused");
+  EXPECT_EQ(log[2], "ReportLaunchResumed");
+  EXPECT_EQ(log[3], "ReportLaunchSuccess");
+
+  DestroyShell(std::move(shell2), task_runners2);
+
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
+// An add-to-app host may create an engine it never runs before running
+// another. The first engine pauses the launch, so a process that ends there
+// doesn't blame the patch; the engine that runs resumes it and reports
+// success, still exactly once.
+TEST_F(ShellTest, ShorebirdLaunchSuccessFromLaterShellWhenFirstNeverRuns) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  auto* mock_ptr = mock.get();
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
+
+  auto settings = CreateSettingsForFixture();
+
+  // Create the first shell and destroy it without running it.
+  auto task_runners1 = GetTaskRunnersForFixture();
+  auto shell1 = CreateShell(settings, task_runners1);
+  ASSERT_TRUE(shell1);
+  DestroyShell(std::move(shell1), task_runners1);
+  EXPECT_EQ(mock_ptr->launch_start_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_paused_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_resumed_count(), 0);
+  EXPECT_EQ(mock_ptr->launch_success_count(), 0);
+
+  // Create and run a second shell: it resumes and reports the success.
+  auto task_runners2 = GetTaskRunnersForFixture();
+  auto shell2 = CreateShell(settings, task_runners2);
+  ASSERT_TRUE(shell2);
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell2.get(), std::move(configuration));
+  EXPECT_EQ(mock_ptr->launch_start_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_paused_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_resumed_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_success_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_failure_count(), 0);
+
+  DestroyShell(std::move(shell2), task_runners2);
+
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
+// The first engine's run fails and a later engine runs: the failure is the
+// launch's outcome, and the update thread starts once, from the failure, so
+// the process can still get a fixed patch.
+TEST_F(ShellTest, ShorebirdLaterShellRunsAfterFirstRunFails) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  auto* mock_ptr = mock.get();
+  mock_ptr->set_should_auto_update(true);
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
+  ASSERT_TRUE(shorebird::Updater::Instance().Init(shorebird::AppConfig{}));
+
+  auto settings = CreateSettingsForFixture();
+
+  auto task_runners1 = GetTaskRunnersForFixture();
+  auto shell1 = CreateShell(settings, task_runners1);
+  ASSERT_TRUE(shell1);
+  auto configuration1 = RunConfiguration::InferFromSettings(settings);
+  configuration1.SetEntrypoint("shorebirdEntrypointThatDoesNotExist");
+  fml::AutoResetWaitableEvent latch;
+  fml::TaskRunner::RunNowOrPostTask(
+      task_runners1.GetPlatformTaskRunner(),
+      [&shell1, &configuration1, &latch]() {
+        shell1->RunEngine(std::move(configuration1),
+                          [&latch](Engine::RunStatus status) {
+                            EXPECT_EQ(status, Engine::RunStatus::Failure);
+                            latch.Signal();
+                          });
+      });
+  latch.Wait();
+  EXPECT_EQ(mock_ptr->launch_failure_count(), 1);
+  EXPECT_EQ(mock_ptr->start_update_thread_count(), 1);
+  DestroyShell(std::move(shell1), task_runners1);
+
+  auto task_runners2 = GetTaskRunnersForFixture();
+  auto shell2 = CreateShell(settings, task_runners2);
+  ASSERT_TRUE(shell2);
+  auto configuration2 = RunConfiguration::InferFromSettings(settings);
+  configuration2.SetEntrypoint("emptyMain");
+  RunEngine(shell2.get(), std::move(configuration2));
+  EXPECT_EQ(mock_ptr->launch_resumed_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_success_count(), 0);
+  EXPECT_EQ(mock_ptr->launch_failure_count(), 1);
+  EXPECT_EQ(mock_ptr->start_update_thread_count(), 1);
 
   DestroyShell(std::move(shell2), task_runners2);
 

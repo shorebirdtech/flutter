@@ -143,6 +143,7 @@ TEST_F(ConfigureShorebirdTest, InitializesTheUpdaterAndReturnsThePatch) {
   EXPECT_EQ(config.original_libapp_paths,
             std::vector<std::string>({"base.so"}));
   EXPECT_EQ(config.yaml_config, "app_id: abc\n");
+  EXPECT_EQ(config.host_bundle_id, "");
   // This host binary is a desktop build, whose directories every app of the
   // user shares, so the updater's are the app's own.
   EXPECT_EQ(config.code_cache_dir,
@@ -152,6 +153,15 @@ TEST_F(ConfigureShorebirdTest, InitializesTheUpdaterAndReturnsThePatch) {
   EXPECT_EQ(mock_->validate_count(), 1);
   // The Shell reports the boot once it exists.
   EXPECT_EQ(mock_->launch_start_count(), 0);
+}
+
+TEST_F(ConfigureShorebirdTest, PassesTheHostBundleId) {
+  std::string patch_path;
+  ConfigureShorebird(
+      ShorebirdConfigArgs("cache", "storage", {"base.so"}, "app_id: abc\n",
+                          {"1.0.0", "3"}, "com.example.host"),
+      patch_path);
+  EXPECT_EQ(mock_->last_config().host_bundle_id, "com.example.host");
 }
 
 TEST_F(ConfigureShorebirdTest, OmitsAnEmptyBuildNumber) {

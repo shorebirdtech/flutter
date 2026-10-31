@@ -654,6 +654,8 @@ class FlutterPlugin : Plugin<Project> {
             // Shorebird-specific.
             val shorebirdPublicKeyValue: String? =
                 project.findProperty("shorebird-public-key")?.toString()
+            val shorebirdReleaseVersionValue: String? =
+                project.findProperty("shorebird-release-version")?.toString()
             val deferredComponentsValue: Boolean =
                 project.findProperty("deferred-components")?.toString()?.toBoolean() ?: false
             val validateDeferredComponentsValue: Boolean =
@@ -745,6 +747,7 @@ class FlutterPlugin : Plugin<Project> {
                     shorebirdTraceFile = shorebirdTraceFileValue
                     codeSizeDirectory = codeSizeDirectoryValue
                     shorebirdPublicKey = shorebirdPublicKeyValue
+                    shorebirdReleaseVersion = shorebirdReleaseVersionValue
                     deferredComponents = deferredComponentsValue
                     validateDeferredComponents = validateDeferredComponentsValue
                     flavor = flavorValue

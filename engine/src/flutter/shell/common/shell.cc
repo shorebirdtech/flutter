@@ -524,17 +524,16 @@ Shell::Shell(DartVMRef vm,
       is_gpu_disabled_sync_switch_(new fml::SyncSwitch(is_gpu_disabled)),
       weak_factory_gpu_(nullptr),
       weak_factory_(this) {
-  // Report launch outcome to the Shorebird updater for crash recovery.
-  // If the VM failed to start, we report failure so the updater can roll
-  // back the patch. These calls are guarded inside Updater to execute at
-  // most once per process — only the first Shell's outcome is reported.
-  // In add-to-app, subsequent engines are silently ignored since they
-  // boot from the same snapshot that was already reported on.
-  // On unsupported platforms, NoOpUpdater handles these calls gracefully.
+  // Shorebird: if the VM failed to start, report the launch as failed so the
+  // updater rolls back the patch. Otherwise report the launch paused: an
+  // engine can be built and never run, and that must not leave the patch
+  // armed. RunEngine resumes it and reports the outcome once the root
+  // isolate launches: the isolate snapshot is not deserialized until then.
+  // Guarded inside Updater to run at most once per process.
   if (!vm_) {
     shorebird::Updater::Instance().ReportLaunchFailure();
   } else {
-    shorebird::Updater::Instance().ReportLaunchSuccess();
+    shorebird::Updater::Instance().ReportLaunchPaused();
   }
   FML_CHECK(!settings.enable_software_rendering || !settings.enable_impeller)
       << "Software rendering is incompatible with Impeller.";
@@ -808,9 +807,24 @@ void Shell::RunEngine(
               result(Engine::RunStatus::Failure);
               return;
             }
+            // Shorebird: arm the patch again for the root isolate launch.
+            // A crash in Run (the patch's snapshot aborting as it loads)
+            // leaves it armed, and the updater rolls the patch back on the
+            // next launch. Guarded inside Updater to run at most once per
+            // process.
+            shorebird::Updater::Instance().ReportLaunchResumed();
             auto run_result = weak_engine->Run(std::move(run_configuration));
             if (run_result == flutter::Engine::RunStatus::Failure) {
               FML_LOG(ERROR) << "Could not launch engine with configuration.";
+              // Shorebird: the root isolate didn't launch, so the patch is
+              // rolled back; the update thread still starts.
+              shorebird::Updater::Instance().ReportRunFailure();
+            } else {
+              // Shorebird: the root isolate group was created from the
+              // (possibly patched) snapshot and its entrypoint invoked, so
+              // the snapshot loaded (FailureAlreadyRunning: it had already).
+              // Starts the update thread.
+              shorebird::Updater::Instance().ReportLaunchSuccess();
             }
 
             result(run_result);

@@ -8,7 +8,12 @@ import 'package:yaml_edit/yaml_edit.dart';
 import '../base/file_system.dart';
 import '../globals.dart' as globals;
 
-void updateShorebirdYaml(String? flavor, String shorebirdYamlPath, {required String? publicKey}) {
+void updateShorebirdYaml(
+  String? flavor,
+  String shorebirdYamlPath, {
+  required String? publicKey,
+  String? releaseVersion,
+}) {
   final File shorebirdYaml = globals.fs.file(shorebirdYamlPath);
   if (!shorebirdYaml.existsSync()) {
     throw Exception('shorebird.yaml not found at $shorebirdYamlPath');
@@ -19,6 +24,7 @@ void updateShorebirdYaml(String? flavor, String shorebirdYamlPath, {required Str
     yamlMap,
     flavor: flavor,
     publicKey: publicKey,
+    releaseVersion: releaseVersion,
   );
   // Currently we write out over the same yaml file, we should fix this to
   // write to a new .json file instead and avoid naming confusion between the
@@ -52,6 +58,7 @@ Map<String, dynamic> compileShorebirdYaml(
   YamlMap yamlMap, {
   required String? flavor,
   required String? publicKey,
+  String? releaseVersion,
 }) {
   final String appId = appIdForFlavor(yamlMap, flavor: flavor);
   final compiled = <String, dynamic>{'app_id': appId};
@@ -66,6 +73,11 @@ Map<String, dynamic> compileShorebirdYaml(
   copyIfSet('patch_verification');
   if (publicKey != null) {
     compiled['patch_public_key'] = publicKey;
+  }
+  // An add-to-app module's own version, which the updater sends as
+  // release_version in place of the host app's version.
+  if (releaseVersion != null) {
+    compiled['release_version'] = releaseVersion;
   }
   return compiled;
 }
