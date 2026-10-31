@@ -32,18 +32,26 @@ struct ShorebirdConfigArgs {
   /// pass every candidate path in Settings::application_library_paths.
   std::vector<std::string> release_app_library_paths;
   std::string shorebird_yaml;
+  /// The host app's version, as the platform reads it. An add-to-app module
+  /// whose shorebird.yaml carries its own release_version reports that one
+  /// instead, and the updater sends this as the host's version.
   ReleaseVersion release_version;
+  /// The host app's bundle identifier (Android package name, iOS bundle ID),
+  /// or empty where the platform doesn't pass one.
+  std::string host_bundle_id;
 
   ShorebirdConfigArgs(std::string code_cache_path,
                       std::string app_storage_path,
                       std::vector<std::string> release_app_library_paths,
                       std::string shorebird_yaml,
-                      ReleaseVersion release_version)
+                      ReleaseVersion release_version,
+                      std::string host_bundle_id = "")
       : code_cache_path(std::move(code_cache_path)),
         app_storage_path(std::move(app_storage_path)),
         release_app_library_paths(std::move(release_app_library_paths)),
         shorebird_yaml(std::move(shorebird_yaml)),
-        release_version(std::move(release_version)) {}
+        release_version(std::move(release_version)),
+        host_bundle_id(std::move(host_bundle_id)) {}
 };
 
 /// Initializes the updater and picks the patch to boot. Every platform calls

@@ -97,6 +97,7 @@ void FlutterMain::Init(JNIEnv* env,
                        jstring shorebirdYaml,
                        jstring version,
                        jstring versionCode,
+                       jstring packageName,
                        jlong initTimeMillis,
                        jint api_level) {
   std::vector<std::string> args;
@@ -164,9 +165,10 @@ void FlutterMain::Init(JNIEnv* env,
   std::string version_string = fml::jni::JavaStringToString(env, version);
   std::string version_code_string =
       fml::jni::JavaStringToString(env, versionCode);
+  std::string package_name = fml::jni::JavaStringToString(env, packageName);
   ShorebirdConfigArgs shorebird_args(
       code_cache_path, app_storage_path, settings.application_library_paths,
-      shorebird_yaml, {version_string, version_code_string});
+      shorebird_yaml, {version_string, version_code_string}, package_name);
   std::string patch_path;
   ConfigureShorebird(shorebird_args, patch_path);
   ApplyPatchToSettings(patch_path, settings);
@@ -264,7 +266,8 @@ bool FlutterMain::Register(JNIEnv* env) {
           .name = "nativeInit",
           .signature = "(Landroid/content/Context;[Ljava/lang/String;Ljava/"
                        "lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/"
-                       "lang/String;Ljava/lang/String;Ljava/lang/String;JI)V",
+                       "lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/"
+                       "lang/String;JI)V",
           .fnPtr = reinterpret_cast<void*>(&Init),
       },
       {
