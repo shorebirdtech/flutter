@@ -92,7 +92,8 @@ Settings SettingsForLibrary(const std::string& path) {
 
 // IsValid() is only `data_ != nullptr` (dart_snapshot.cc), so a snapshot can be
 // valid with no instructions at all. Both halves come from the library, and
-// both are what Shorebird_SetBaseSnapshots passes on, so both get asserted.
+// both are what a patch snapshot hands the VM as its base, so both get
+// asserted.
 void ExpectResolvedFromLibrary(const DartSnapshot& snapshot,
                                const std::string& path) {
   ASSERT_NE(snapshot.GetDataMapping(), nullptr);

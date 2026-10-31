@@ -33,6 +33,7 @@ import '../flutter_manifest.dart';
 import '../globals.dart' as globals;
 import '../project.dart';
 import '../shorebird/android_build_trace_session.dart';
+import '../shorebird/shorebird_pinned_dependencies.dart';
 import 'android_builder.dart';
 import 'android_sdk.dart';
 import 'android_studio.dart';
@@ -623,6 +624,13 @@ To fix this, you can either:
     }
     options.addAll(androidBuildInfo.buildInfo.toGradleConfig());
     options.addAll(traceSession?.extraGradleOptions(assembleTask) ?? const <String>[]);
+    options.addAll(
+      shorebirdPinnedDependenciesGradleOptions(
+        androidProjectArgs: buildInfo.androidProjectArgs,
+        fileSystem: _fileSystem,
+        flutterRoot: Cache.flutterRoot,
+      ),
+    );
     if (buildInfo.fileSystemRoots.isNotEmpty) {
       options.add('-Pfilesystem-roots=${buildInfo.fileSystemRoots.join('|')}');
     }
