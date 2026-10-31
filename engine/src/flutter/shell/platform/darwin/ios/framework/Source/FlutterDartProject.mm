@@ -227,7 +227,8 @@ flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* p
     //   between releases and data that does not. iOS does not make this distinction.
     flutter::ShorebirdConfigArgs shorebird_args(
         cache_path, cache_path, settings.application_library_paths,
-        shorebirdYamlContents.UTF8String, {appVersion.UTF8String, appBuildNumber.UTF8String});
+        shorebirdYamlContents.UTF8String, {appVersion.UTF8String, appBuildNumber.UTF8String},
+        mainBundle.bundleIdentifier != nil ? mainBundle.bundleIdentifier.UTF8String : "");
     std::string patch_path;
     flutter::ConfigureShorebird(shorebird_args, patch_path);
     flutter::ApplyPatchToSettings(patch_path, settings);

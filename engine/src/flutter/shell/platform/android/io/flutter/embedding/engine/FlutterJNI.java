@@ -187,6 +187,7 @@ public class FlutterJNI {
       @Nullable String shorebirdYaml,
       @Nullable String version,
       @Nullable String versionCode,
+      @Nullable String packageName,
       long initTimeMillis,
       int apiLevel);
 
@@ -254,6 +255,7 @@ public class FlutterJNI {
         shorebirdYaml,
         version,
         versionCode,
+        context.getPackageName(),
         initTimeMillis,
         apiLevel);
     FlutterJNI.initCalled = true;

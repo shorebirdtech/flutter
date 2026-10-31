@@ -140,6 +140,9 @@ object BaseFlutterTaskHelper {
             baseFlutterTask.shorebirdPublicKey?.let {
                 args("-dShorebirdPublicKey=$it")
             }
+            baseFlutterTask.shorebirdReleaseVersion?.let {
+                args("-dShorebirdReleaseVersion=$it")
+            }
             baseFlutterTask.flavor?.let {
                 args("-dFlavor=$it")
             }

@@ -47,6 +47,7 @@ class BuildInfo {
     this.performanceMeasurementFile,
     this.shorebirdTraceFilePath,
     this.shorebirdPublicKey,
+    this.shorebirdReleaseVersion,
     required this.packageConfigPath,
     this.codeSizeDirectory,
     this.androidGradleDaemon = true,
@@ -93,6 +94,7 @@ class BuildInfo {
       dartExperiments: dartExperiments,
       performanceMeasurementFile: performanceMeasurementFile,
       shorebirdPublicKey: shorebirdPublicKey,
+      shorebirdReleaseVersion: shorebirdReleaseVersion,
       packageConfigPath: packageConfigPath ?? this.packageConfigPath,
       codeSizeDirectory: codeSizeDirectory,
       androidGradleDaemon: androidGradleDaemon,
@@ -192,6 +194,12 @@ class BuildInfo {
   /// Shorebird: the patch public key written into the generated shorebird.yaml,
   /// read from the `SHOREBIRD_PUBLIC_KEY` environment variable.
   final String? shorebirdPublicKey;
+
+  /// Shorebird: an add-to-app module's release version, written into the
+  /// generated shorebird.yaml as `release_version`, read from the
+  /// `SHOREBIRD_RELEASE_VERSION` environment variable. The shorebird CLI sets
+  /// it only for aar and ios-framework builds.
+  final String? shorebirdReleaseVersion;
 
   /// If provided, an output directory where one or more v8-style heap snapshots
   /// will be written for code size profiling.
@@ -393,6 +401,7 @@ class BuildInfo {
       if (useLocalCanvasKit) kUseLocalCanvasKitFlag: useLocalCanvasKit.toString(),
       if (shorebirdPublicKey != null)
         kShorebirdPublicKey: encodeShorebirdPublicKey(shorebirdPublicKey!),
+      kShorebirdReleaseVersion: ?shorebirdReleaseVersion,
     };
   }
 
@@ -424,6 +433,14 @@ class BuildInfo {
         'SHOREBIRD_ENCODED_PUBLIC_KEY': encodeShorebirdPublicKey(shorebirdPublicKey!),
     };
   }
+
+  /// Shorebird: the Gradle argument that bakes [shorebirdReleaseVersion]. Only
+  /// `flutter build aar` adds it, so an app build (apk, appbundle) never
+  /// reports a module's version even if the environment variable leaks into
+  /// it.
+  List<String> toShorebirdAarGradleConfig() => <String>[
+    if (shorebirdReleaseVersion != null) '-Pshorebird-release-version=$shorebirdReleaseVersion',
+  ];
 
   /// Convert this config to a series of project level arguments to be passed
   /// on the command line to gradle.

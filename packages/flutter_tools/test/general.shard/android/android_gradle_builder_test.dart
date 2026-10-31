@@ -2022,6 +2022,76 @@ Gradle Crashed
     );
 
     testUsingContext(
+      'build aar passes the Shorebird release version to gradle',
+      () async {
+        final builder = AndroidGradleBuilder(
+          java: FakeJava(),
+          logger: logger,
+          processManager: processManager,
+          fileSystem: fileSystem,
+          artifacts: Artifacts.test(),
+          analytics: fakeAnalytics,
+          gradleUtils: FakeGradleUtils(),
+          platform: FakePlatform(),
+          androidStudio: FakeAndroidStudio(),
+        );
+        processManager.addCommand(
+          const FakeCommand(
+            command: <String>[
+              'gradlew',
+              '-I=/packages/flutter_tools/gradle/aar_init_script.gradle',
+              '-Pflutter-root=/',
+              '-Poutput-dir=build/',
+              '-Pis-plugin=false',
+              '-PbuildNumber=1.0',
+              '-q',
+              '-Pdart-obfuscation=false',
+              '-Ptrack-widget-creation=false',
+              '-Ptree-shake-icons=false',
+              '-Pshorebird-release-version=2.0.0',
+              '-Ptarget-platform=android-arm,android-arm64,android-x64',
+              'assembleAarRelease',
+            ],
+          ),
+        );
+
+        fileSystem.file('pubspec.yaml')
+          ..createSync(recursive: true)
+          ..writeAsStringSync('''
+        flutter:
+          module:
+            androidPackage: com.example.test
+        ''');
+        fileSystem.file('.android/gradlew').createSync(recursive: true);
+        fileSystem.file('.android/gradle.properties').writeAsStringSync('irrelevant');
+        fileSystem.file('.android/build.gradle').createSync(recursive: true);
+        fileSystem.directory('build/outputs/repo').createSync(recursive: true);
+
+        await builder.buildGradleAar(
+          androidBuildInfo: const AndroidBuildInfo(
+            BuildInfo(
+              BuildMode.release,
+              null,
+              treeShakeIcons: false,
+              packageConfigPath: '.dart_tool/package_config.json',
+              shorebirdReleaseVersion: '2.0.0',
+            ),
+          ),
+          project: FlutterProject.fromDirectoryTest(fileSystem.currentDirectory),
+          outputDirectory: fileSystem.directory('build/'),
+          target: '',
+          buildNumber: '1.0',
+        );
+
+        expect(processManager, hasNoRemainingExpectations);
+      },
+      overrides: <Type, Generator>{
+        AndroidStudio: () => FakeAndroidStudio(),
+        Analytics: () => fakeAnalytics,
+      },
+    );
+
+    testUsingContext(
       'build aar passes sdkmanager path, sdk root, and validated installed ndk versions to gradle',
       () async {
         final builder = AndroidGradleBuilder(
@@ -3150,7 +3220,7 @@ Gradle Crashed
                 'The Java version used for the build is 21.0.0, which is incompatible with Gradle 8.0.\n'
                 'To fix this, you can either:\n'
                 "  1. Upgrade your project's Gradle version (typically in gradle-wrapper.properties to a version matching the range: compatible Gradle versions for Java 21.0.0 are 8.4 or newer).\n"
-                '  2. Use a different Java version for Flutter by running `flutter config --jdk-dir=<path>`.'
+                '  2. Use a different Java version for Flutter by running `flutter config --jdk-dir=<path>`.',
           ),
         );
         expect(processManager, hasNoRemainingExpectations);
