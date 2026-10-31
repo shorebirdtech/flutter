@@ -90,6 +90,7 @@ class BuildInfo {
       dartDefines: dartDefines ?? this.dartDefines,
       dartExperiments: dartExperiments,
       performanceMeasurementFile: performanceMeasurementFile,
+      shorebirdTraceFilePath: shorebirdTraceFilePath,
       packageConfigPath: packageConfigPath ?? this.packageConfigPath,
       codeSizeDirectory: codeSizeDirectory,
       androidGradleDaemon: androidGradleDaemon,

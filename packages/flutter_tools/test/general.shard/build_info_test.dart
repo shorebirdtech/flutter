@@ -218,6 +218,18 @@ void main() {
     expect(BuildInfo.release.trackWidgetCreation, false);
   });
 
+  testWithoutContext('copyWith preserves shorebirdTraceFilePath', () {
+    const buildInfo = BuildInfo(
+      BuildMode.release,
+      null,
+      treeShakeIcons: false,
+      packageConfigPath: '.dart_tool/package_config.json',
+      shorebirdTraceFilePath: 'trace.json',
+    );
+
+    expect(buildInfo.copyWith(dartDefines: <String>['a=b']).shorebirdTraceFilePath, 'trace.json');
+  });
+
   testWithoutContext('toBuildSystemEnvironment encoding of standard values', () {
     const buildInfo = BuildInfo(
       BuildMode.debug,
