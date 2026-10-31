@@ -98,14 +98,13 @@ artifact_overrides:
   # Web artifacts
   - flutter_infra_release/flutter/$engine/flutter-web-sdk.zip
 
-  # iOS profile artifacts. ios/artifacts.zip (debug) is built and staged but
-  # still served from upstream. The fork's debug engine has no simulator
-  # (dart_force_simulator=false), so on iOS 26+ it can JIT only with
-  # Flutter's lldb helper attached (flutter run); an Xcode run without it
-  # aborts with "Unable to JIT", where upstream's engine falls back to its
-  # simulator. Serve it once the fork's ios_debug builds with
-  # dart_force_simulator=true, as upstream's tools/gn does, and a debug run
-  # with FFI callbacks passes on an iOS 26+ device.
+  # iOS debug artifacts. ios_debug builds with dart_force_simulator=true, as
+  # upstream's tools/gn does, so on iOS 26+ a run without Flutter's lldb
+  # helper (Xcode) falls back to the Dart simulator instead of aborting with
+  # "Unable to JIT".
+  - flutter_infra_release/flutter/$engine/ios/artifacts.zip
+
+  # iOS profile artifacts
   - flutter_infra_release/flutter/$engine/ios-profile/artifacts.zip
 
   # iOS release artifacts

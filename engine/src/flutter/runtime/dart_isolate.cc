@@ -58,6 +58,32 @@ class DartErrorString {
   char* str_ = nullptr;
 };
 
+// Creates an isolate group from the group's isolate snapshot. A Shorebird
+// patch snapshot also carries the base snapshot it links against and its link
+// header, which the VM takes per isolate group in Dart_IsolateFlags.
+Dart_Isolate CreateIsolateGroupFromSnapshot(
+    std::shared_ptr<DartIsolateGroupData>* isolate_group_data,
+    std::shared_ptr<DartIsolate>* isolate_data,
+    Dart_IsolateFlags* flags,
+    char** error) {
+  const auto& snapshot = (*isolate_group_data)->GetIsolateSnapshot();
+  Dart_IsolateFlags default_flags;
+  if (flags == nullptr) {
+    Dart_IsolateFlagsInitialize(&default_flags);
+    flags = &default_flags;
+  }
+  flags->base_snapshot_data = snapshot->GetBaseDataMapping();
+  flags->base_snapshot_instructions = snapshot->GetBaseInstructionsMapping();
+  flags->link_header = snapshot->GetLinkHeaderMapping();
+  flags->link_header_size =
+      static_cast<intptr_t>(snapshot->GetLinkHeaderSize());
+  return Dart_CreateIsolateGroup(
+      (*isolate_group_data)->GetAdvisoryScriptURI().c_str(),
+      (*isolate_group_data)->GetAdvisoryScriptEntrypoint().c_str(),
+      snapshot->GetDataMapping(), snapshot->GetInstructionsMapping(), flags,
+      isolate_group_data, isolate_data, error);
+}
+
 }  // anonymous namespace
 
 DartIsolate::Flags::Flags() : Flags(nullptr) {}
@@ -257,17 +283,7 @@ std::weak_ptr<DartIsolate> DartIsolate::CreateRootIsolate(
                 isolate_shutdown_callback,        // isolate shutdown callback
                 std::move(native_assets_manager)  //
                 )));
-    isolate_maker = [](std::shared_ptr<DartIsolateGroupData>*
-                           isolate_group_data,
-                       std::shared_ptr<DartIsolate>* isolate_data,
-                       Dart_IsolateFlags* flags, char** error) {
-      return Dart_CreateIsolateGroup(
-          (*isolate_group_data)->GetAdvisoryScriptURI().c_str(),
-          (*isolate_group_data)->GetAdvisoryScriptEntrypoint().c_str(),
-          (*isolate_group_data)->GetIsolateSnapshot()->GetDataMapping(),
-          (*isolate_group_data)->GetIsolateSnapshot()->GetInstructionsMapping(),
-          flags, isolate_group_data, isolate_data, error);
-    };
+    isolate_maker = CreateIsolateGroupFromSnapshot;
   }
 
   vm_isolate = CreateDartIsolateGroup(std::move(isolate_group_data),
@@ -1130,18 +1146,7 @@ Dart_Isolate DartIsolate::DartIsolateGroupCreateCallback(
 
   Dart_Isolate vm_isolate = CreateDartIsolateGroup(
       std::move(isolate_group_data), std::move(isolate_data), flags, error,
-      [](std::shared_ptr<DartIsolateGroupData>* isolate_group_data,
-         std::shared_ptr<DartIsolate>* isolate_data, Dart_IsolateFlags* flags,
-         char** error) {
-        return Dart_CreateIsolateGroup(
-            (*isolate_group_data)->GetAdvisoryScriptURI().c_str(),
-            (*isolate_group_data)->GetAdvisoryScriptEntrypoint().c_str(),
-            (*isolate_group_data)->GetIsolateSnapshot()->GetDataMapping(),
-            (*isolate_group_data)
-                ->GetIsolateSnapshot()
-                ->GetInstructionsMapping(),
-            flags, isolate_group_data, isolate_data, error);
-      });
+      CreateIsolateGroupFromSnapshot);
 
   if (*error) {
     FML_LOG(ERROR) << "CreateDartIsolateGroup failed: " << *error;
