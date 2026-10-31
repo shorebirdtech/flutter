@@ -347,19 +347,3 @@ if (host_os == "win") {
     outputs = [ "$root_build_dir/gen_snapshot/gen_snapshot.exe" ]
   }
 }
-
-# A top-level target for analyze_snapshot, modeled after the gen_snapshot
-# target above.
-if (host_os == "win") {
-  _analyze_snapshot_target =
-      "$dart_src/runtime/bin:analyze_snapshot($host_toolchain)"
-
-  copy("analyze_snapshot") {
-    deps = [ _analyze_snapshot_target ]
-
-    analyze_snapshot_out_dir =
-        get_label_info(_analyze_snapshot_target, "root_out_dir")
-    sources = [ "$analyze_snapshot_out_dir/analyze_snapshot.exe" ]
-    outputs = [ "$root_build_dir/analyze_snapshot/analyze_snapshot.exe" ]
-  }
-}

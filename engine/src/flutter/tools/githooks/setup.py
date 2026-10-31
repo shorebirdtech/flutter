@@ -46,10 +46,12 @@ def Main(argv):
     ]
     print('Uninstalling Git Hooks')
   else:
-    githooks = os.path.join(FLUTTER_DIR, 'tools', 'githooks')
+    # Relative, so that git resolves it against the root of each worktree and
+    # a worktree runs its own hooks. An absolute path would be shared by every
+    # worktree of the repository and tie them to one checkout's copy.
     command += [
         'core.hooksPath',
-        githooks,
+        'engine/src/flutter/tools/githooks',
     ]
     print('Installing Git Hooks')
 

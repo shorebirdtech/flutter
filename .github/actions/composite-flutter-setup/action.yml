@@ -16,7 +16,7 @@ runs:
   steps:
       # Real checkout on github actions for pull requests
       - name: Checkout code (non-act pull_request)
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         if: github.event_name == 'pull_request' && !env.ACT
         with:
           fetch-depth: 0
@@ -26,7 +26,7 @@ runs:
 
       # Real checkout on github actions for post submit
       - name: Checkout code (non-act push)
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         if: github.event_name == 'push' && !env.ACT
         with:
           fetch-depth: 0
@@ -36,7 +36,7 @@ runs:
 
       # Fake checkout if running locally
       - name: Checkout code (act local)
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         if: env.ACT
 
       # If this is a branch / pr NOT on fluter/flutter, set the remote upstream
