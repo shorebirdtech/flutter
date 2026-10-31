@@ -61,6 +61,10 @@ bool Updater::Init(const AppConfig& config) {
   return result;
 }
 
+bool Updater::IsInitialized() {
+  return initialized_.load();
+}
+
 void Updater::ReportLaunchStart() {
   // Guard: only the first engine in a process should promote next_boot →
   // current_boot in the Rust updater. See class-level comment for rationale.

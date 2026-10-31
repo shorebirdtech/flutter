@@ -228,7 +228,13 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
 #endif  // SHOREBIRD_USE_INTERPRETER
 #endif  // FML_OS_MACOSX
 
-  bool init_result = shorebird::Updater::Instance().Init(config);
+  // A second engine in the same process (desktop multi-window) gets
+  // AlreadyInitialized here, which the updater documents as safe to ignore:
+  // the process is still configured, and the patch path below is the one to
+  // boot. Fail only when no Init in this process has succeeded.
+  // https://github.com/shorebirdtech/shorebird/issues/3888
+  bool init_result = shorebird::Updater::Instance().Init(config) ||
+                     shorebird::Updater::IsInitialized();
 
   FML_LOG(INFO) << "Checking for active patch";
   shorebird::Updater::Instance().ValidateNextBootPatch();
