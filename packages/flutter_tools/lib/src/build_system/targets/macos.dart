@@ -15,7 +15,6 @@ import '../../devfs.dart';
 import '../../globals.dart' as globals show xcode;
 import '../../isolated/native_assets/dart_hook_result.dart';
 import '../../project.dart';
-import '../../shorebird/shorebird_build_key.dart';
 import '../build_system.dart';
 import '../depfile.dart';
 import '../exceptions.dart';
@@ -385,7 +384,7 @@ class CompileMacOSFramework extends Target {
 ///
 /// See https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPFrameworks/Concepts/FrameworkAnatomy.html
 /// for more information on Framework structure.
-abstract class MacOSBundleFlutterAssets extends Target with ShorebirdPublicKeyBuildKey {
+abstract class MacOSBundleFlutterAssets extends Target {
   const MacOSBundleFlutterAssets();
 
   @override
