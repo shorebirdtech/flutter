@@ -408,10 +408,11 @@ class Context {
     // when they sign embedded frameworks. Notarization needs a secure
     // timestamp on every binary, which a build only gets from
     // OTHER_CODE_SIGN_FLAGS=--timestamp.
-    final List<String> otherCodeSignFlags = (environment['OTHER_CODE_SIGN_FLAGS'] ?? '')
-        .split(RegExp(r'\s+'))
-        .where((String flag) => flag.isNotEmpty)
-        .toList();
+    // The add-to-app FlutterAssembleToolHelper.swift.tmpl doesn't do this, on
+    // purpose: Shorebird doesn't support macOS add-to-app.
+    final List<String> otherCodeSignFlags = _splitBuildSettingWords(
+      environment['OTHER_CODE_SIGN_FLAGS'] ?? '',
+    );
     runSync('codesign', <String>[
       '--force',
       '--verbose',
@@ -421,6 +422,46 @@ class Context {
       '--',
       frameworkPath,
     ]);
+  }
+
+  /// Splits a string-list build setting into words as the shell does, since
+  /// Xcode exports a word containing spaces in quotes (`"My Dir/x"`).
+  List<String> _splitBuildSettingWords(String value) {
+    final words = <String>[];
+    final word = StringBuffer();
+    var inWord = false;
+    String? quote;
+    for (var i = 0; i < value.length; i++) {
+      final String char = value[i];
+      if (quote != null) {
+        if (char == quote) {
+          quote = null;
+        } else if (char == r'\' && quote == '"' && i + 1 < value.length) {
+          word.write(value[++i]);
+        } else {
+          word.write(char);
+        }
+      } else if (char == '"' || char == "'") {
+        quote = char;
+        inWord = true;
+      } else if (char == r'\' && i + 1 < value.length) {
+        word.write(value[++i]);
+        inWord = true;
+      } else if (char.trim().isEmpty) {
+        if (inWord) {
+          words.add(word.toString());
+          word.clear();
+          inWord = false;
+        }
+      } else {
+        word.write(char);
+        inWord = true;
+      }
+    }
+    if (inWord) {
+      words.add(word.toString());
+    }
+    return words;
   }
 
   /// Add the vmService publisher Bonjour service to the produced app bundle Info.plist.
