@@ -36,6 +36,18 @@ on a future upstream merge.
   runs or what it outputs). Follow precedents such as `shorebirdTraceFile` in
   `BaseFlutterTask`. Call out the future-conflict cost in the PR description.
 
+## Shorebird is a guest in the app
+
+The engine and updater run inside every customer's app, beside code and plugins
+we can't see. Shorebird never claims a resource that has one slot per process or
+app where the last writer wins, such as Android's process state summary
+(`setProcessStateSummary`): we'd overwrite the app's or a plugin's, or they
+ours, and neither would know. A design that needs one finds another way or drops
+the feature, and says so in the design. Signal handlers and uncaught-exception
+or crash handlers have one slot too, but by convention they're chained, as crash
+reporters do: keep the previous handler and call it, never replace it. Any we
+add must chain.
+
 ## Test engine changes on the shards they touch
 
 Don't run a full engine build to test a change unless the change touches every
@@ -73,6 +85,17 @@ Check that the flavor reached `assemble` (on iOS, `-dFlavor` comes from
 `FLAVOR` in `Flutter/Generated.xcconfig`, written by the last `flutter` CLI
 run, so an Xcode build can pick up a stale or missing one), that the build
 wasn't a stale cached one, and what the bundled `shorebird.yaml` actually says.
+
+## Shaping a PR
+
+Keep PRs reviewable. A small PR can carry a little cleanup next to its change;
+once a PR gets large, split it along its seams: a refactor with no behavior
+change, general improvements (fixes, cleanups, tests of existing code,
+simplifications), and each separate behavior change. Improvements land first: we
+always want them, and may not want the feature. A change keeps its own tests and
+fixture updates in its PR; a feature that needs an improvement builds on that
+PR's branch. This holds for Shorebird-owned files; an improvement to an upstream
+file goes to `flutter/flutter`, not here (see above).
 
 ## Landing a PR
 

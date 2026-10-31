@@ -1609,6 +1609,60 @@ void main() {
     expect(processManager, hasNoRemainingExpectations);
   });
 
+  testUsingContext('parse keeps a shorebird side version from flutter.version.json', () {
+    final GitTagVersion version = GitTagVersion.parse('3.47.9-sb.1');
+    expect(version.frameworkVersionFor('abcd1234'), '3.47.9-sb.1');
+    expect(version.x, 3);
+    expect(version.y, 47);
+    expect(version.z, 9);
+  });
+
+  for (final (String why, String branches, String expected) in <(String, String, String)>[
+    ('only the side branch holds HEAD', 'origin/flutter_release/3.47.9-sb.12', '3.47.9-sb.12'),
+    (
+      'the stable and side branches hold HEAD',
+      'origin/flutter_release/3.47.9\norigin/flutter_release/3.47.9-sb.12',
+      '3.47.9',
+    ),
+    (
+      'an rc and the side branch hold HEAD',
+      'origin/flutter_release/3.47.9-rc1\norigin/flutter_release/3.47.9-sb.1',
+      '3.47.9-sb.1',
+    ),
+  ]) {
+    testUsingContext('determine reports a shorebird side version by its name: $why', () {
+      processManager.addCommands(<FakeCommand>[
+        const FakeCommand(
+          command: <String>['git', 'tag', '--points-at', 'HEAD'],
+          // No tag at HEAD.
+        ),
+        FakeCommand(
+          command: const <String>[
+            'git',
+            'for-each-ref',
+            '--contains',
+            'HEAD',
+            '--format',
+            '%(refname:short)',
+            'refs/remotes/origin/flutter_release/*',
+          ],
+          stdout: branches,
+        ),
+      ]);
+      final platform = FakePlatform();
+
+      final GitTagVersion gitTagVersion = GitTagVersion.determine(
+        platform,
+        git: git,
+        workingDirectory: '.',
+      );
+      expect(gitTagVersion.frameworkVersionFor('abcd1234'), expected);
+      expect(gitTagVersion.x, 3);
+      expect(gitTagVersion.z, 9);
+      expect(processManager, hasNoRemainingExpectations);
+    });
+  }
+
   testUsingContext(
     'determine picks stable branch over rc branch from shorebird flutter_release',
     () {

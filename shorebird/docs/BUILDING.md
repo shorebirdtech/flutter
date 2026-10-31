@@ -14,7 +14,7 @@ All commands assume you are running from the `engine/src` directory.
 ### iOS (arm64)
 
 ```bash
-./flutter/tools/gn --no-rbe --no-enable-unittests --runtime-mode=release --ios --gn-arg='shorebird_runtime=true'
+./flutter/tools/gn --no-rbe --no-enable-unittests --runtime-mode=release --ios --gn-arg='shorebird_include_mixed_mode=true'
 ninja -C out/ios_release flutter/shell/platform/darwin/ios:flutter_framework flutter/lib/snapshot:generate_snapshot_bins
 ```
 

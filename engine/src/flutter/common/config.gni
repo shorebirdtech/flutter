@@ -67,7 +67,12 @@ if (slimpeller) {
   feature_defines_list += [ "SLIMPELLER=1" ]
 }
 
-if (is_android || is_ios || is_linux || is_mac || is_win) {
+# Debug engines leave the updater out, as stock Flutter does, so
+# package:shorebird_code_push finds no updater symbols and reports itself
+# unavailable. Must match shorebird_updater_supported in
+# shell/common/shorebird/build_rust_updater.gni.
+if ((is_android || is_ios || is_linux || is_mac || is_win) &&
+    flutter_runtime_mode != "debug") {
   feature_defines_list += [ "SHOREBIRD_PLATFORM_SUPPORTED=1" ]
 }
 

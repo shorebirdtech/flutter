@@ -85,7 +85,7 @@ void Updater::ReportLaunchSuccess() {
   }
 
   // Outside the guard above: a patch that failed to load already claimed it
-  // from TryLoadFromPatch, and the base-code boot reaching here is the launch
+  // from TryLoadPatch, and the base-code boot reaching here is the launch
   // that most needs a replacement patch. See the class comment.
   MaybeStartUpdateThread();
 }

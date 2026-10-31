@@ -32,7 +32,6 @@ Future<void> main(List<String> arguments) async {
   final treeShakeIcons = Platform.environment['TREE_SHAKE_ICONS'] == 'true';
   // Shorebird-specific.
   final String? shorebirdPublicKey = Platform.environment['SHOREBIRD_ENCODED_PUBLIC_KEY'];
-  final String? shorebirdDdMaxBytes = Platform.environment['SHOREBIRD_BUILD_DD_MAX_BYTES'];
   final verbose = Platform.environment['VERBOSE_SCRIPT_LOGGING'] == 'true';
   final prefixedErrors = Platform.environment['PREFIXED_ERROR_LOGGING'] == 'true';
 
@@ -111,8 +110,6 @@ or
     if (extraFrontEndOptions != null) '--ExtraFrontEndOptions=$extraFrontEndOptions',
     if (shorebirdPublicKey != null && shorebirdPublicKey.isNotEmpty)
       '-dShorebirdPublicKey=$shorebirdPublicKey',
-    if (shorebirdDdMaxBytes != null && shorebirdDdMaxBytes.isNotEmpty)
-      '-dShorebirdDdMaxBytes=$shorebirdDdMaxBytes',
     target,
   ]);
   assembleProcess.stdout
