@@ -43,7 +43,18 @@ jobs:
 
       - name: 🔩 Check download.shorebird.dev serves the pinned engine
         run: |
-          engine="$(tr -d '[:space:]' < bin/internal/engine.version)"
+          file=bin/internal/engine.version
+          if [ ! -f "$file" ]; then
+            echo "::error file=$file::$file is missing, so bin/flutter would fall back to a content-aware hash Shorebird never built. Restore the pin."
+            exit 1
+          fi
+          # Read it as bin/internal/update_engine_version.sh does, so a pin
+          # with stray whitespace fails here as it would there.
+          engine="$(< "$file")"
+          if [[ ! "$engine" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error file=$file::'$engine' is not a full 40-hex engine SHA."
+            exit 1
+          fi
           missing=0
           # The two Dart SDKs shorebird_ci's runners download first.
           for zip in dart-sdk-linux-x64.zip dart-sdk-darwin-arm64.zip; do
