@@ -8,6 +8,12 @@ import '../convert.dart';
 /// [encodeShorebirdPublicKey].
 const kShorebirdPublicKey = 'ShorebirdPublicKey';
 
+/// The define for the release version baked into the generated (bundled)
+/// shorebird.yaml as `release_version`. Set only for add-to-app module builds
+/// (aar, ios-framework), where the module's version, not the host app's,
+/// names the release.
+const kShorebirdReleaseVersion = 'ShorebirdReleaseVersion';
+
 /// Encodes the patch public key for [kShorebirdPublicKey].
 ///
 /// The key is base64, and an xcconfig reads `//` as the start of a comment,
@@ -22,4 +28,13 @@ String? decodeShorebirdPublicKey(Map<String, String> environmentDefines) {
     return null;
   }
   return utf8.decode(base64Url.decode(encoded));
+}
+
+/// The release version in [environmentDefines], or null if it is unset.
+String? shorebirdReleaseVersion(Map<String, String> environmentDefines) {
+  final String? version = environmentDefines[kShorebirdReleaseVersion];
+  if (version == null || version.isEmpty) {
+    return null;
+  }
+  return version;
 }

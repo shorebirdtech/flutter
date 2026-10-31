@@ -47,6 +47,7 @@ class FlutterMain {
                    jstring shorebirdYaml,
                    jstring version,
                    jstring versionCode,
+                   jstring packageName,
                    jlong initTimeMillis,
                    jint api_level);
 
