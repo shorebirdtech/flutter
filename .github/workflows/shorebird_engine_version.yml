@@ -1,0 +1,60 @@
+name: shorebird_engine_version
+
+# Fails when bin/internal/engine.version names an engine Shorebird never
+# built. bin/flutter downloads its Dart SDK and engine artifacts from
+# download.shorebird.dev keyed by that hash, so an unbuilt pin (most often
+# upstream's value, carried in by a rebase onto a new upstream tag) turns
+# every other job in shorebird_ci red at the download, before a test runs.
+# This says so in seconds, by name, instead.
+#
+# The fix is a `chore: bump engine to <sha>` commit pinning an engine
+# _build_engine built: after the post-ship rebase of shorebird/dev, the
+# shipped flutter_release/<version>'s engine.version; otherwise the engine
+# built from this branch's tip.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+  push:
+    branches:
+      - shorebird/dev
+      - flutter_release/**
+      - flutter_release_ex/**
+
+permissions:
+  contents: read
+
+jobs:
+  engine-version:
+    name: 🔩 engine.version has Shorebird artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          sparse-checkout: bin/internal/engine.version
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: 🔩 Check download.shorebird.dev serves the pinned engine
+        run: |
+          engine="$(tr -d '[:space:]' < bin/internal/engine.version)"
+          missing=0
+          # The two Dart SDKs shorebird_ci's runners download first.
+          for zip in dart-sdk-linux-x64.zip dart-sdk-darwin-arm64.zip; do
+            url="https://download.shorebird.dev/flutter_infra_release/flutter/$engine/$zip"
+            status="$(curl -sS -o /dev/null -w '%{http_code}' --head --location --retry 3 "$url")"
+            echo "$status $url"
+            if [ "$status" != 200 ]; then
+              missing=1
+            fi
+          done
+          if [ "$missing" != 0 ]; then
+            echo "::error file=bin/internal/engine.version::Engine $engine has no Shorebird artifacts on download.shorebird.dev, so bin/flutter cannot download its Dart SDK. Pin an engine _build_engine built (a 'chore: bump engine to <sha>' commit); git log -p -- bin/internal/engine.version shows the previous pins."
+            exit 1
+          fi
