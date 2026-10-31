@@ -1316,6 +1316,86 @@ void main() {
 
       expect(testContext.processManager.hasRemainingExpectations, isFalse);
     });
+
+    test('macos codesigns frameworks with OTHER_CODE_SIGN_FLAGS', () {
+      final Directory buildDir = fileSystem.directory('/path/to/Build/Products/Release')
+        ..createSync(recursive: true);
+      const frameworksFolderPath = 'Runner.app/Contents/Frameworks';
+      final Directory frameworksDir = buildDir.childDirectory(frameworksFolderPath);
+      const codesignIdentity = '12312313';
+      final testContext = TestContext(
+        <String>['embed', 'macos'],
+        <String, String>{
+          'BUILT_PRODUCTS_DIR': buildDir.path,
+          'CONFIGURATION': 'Release',
+          'SOURCE_ROOT': '/path/to/my_flutter_app/macos',
+          'TARGET_BUILD_DIR': buildDir.path,
+          'FRAMEWORKS_FOLDER_PATH': frameworksFolderPath,
+          'EXPANDED_CODE_SIGN_IDENTITY': codesignIdentity,
+          'OTHER_CODE_SIGN_FLAGS': ' --timestamp  --options=runtime ',
+        },
+        commands: <FakeCommand>[
+          FakeCommand(command: <String>['mkdir', '-p', '--', frameworksDir.path]),
+          FakeCommand(
+            command: <String>[
+              'rsync',
+              '-8',
+              '-av',
+              '--delete',
+              '--filter',
+              '- .DS_Store',
+              buildDir.childDirectory('App.framework').path,
+              frameworksDir.path,
+            ],
+          ),
+          FakeCommand(
+            command: <String>[
+              'codesign',
+              '--force',
+              '--verbose',
+              '--sign',
+              codesignIdentity,
+              '--timestamp',
+              '--options=runtime',
+              '--',
+              frameworksDir.childFile('App.framework/App').path,
+            ],
+          ),
+          FakeCommand(
+            command: <String>[
+              'rsync',
+              '-8',
+              '-av',
+              '--delete',
+              '--filter',
+              '- .DS_Store',
+              '--filter',
+              '- Headers',
+              '--filter',
+              '- Modules',
+              buildDir.childDirectory('FlutterMacOS.framework').path,
+              '${frameworksDir.path}/',
+            ],
+          ),
+          FakeCommand(
+            command: <String>[
+              'codesign',
+              '--force',
+              '--verbose',
+              '--sign',
+              codesignIdentity,
+              '--timestamp',
+              '--options=runtime',
+              '--',
+              frameworksDir.childFile('FlutterMacOS.framework/FlutterMacOS').path,
+            ],
+          ),
+        ],
+        fileSystem: fileSystem,
+      )..run();
+
+      expect(testContext.processManager.hasRemainingExpectations, isFalse);
+    });
   });
 }
 

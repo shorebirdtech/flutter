@@ -404,11 +404,20 @@ class Context {
   void _codesignFramework(String expandedCodeSignIdentity, String frameworkPath) {
     // NOTE: If you modify this function, you should likely also update the equivalent implementation in
     // packages/flutter_tools/templates/add_to_app/darwin/Tools/FlutterToolHelper/FlutterAssembleToolHelper.swift.tmpl
+    // Pass the target's Other Code Signing Flags, as Xcode and CocoaPods do
+    // when they sign embedded frameworks. Notarization needs a secure
+    // timestamp on every binary, which a build only gets from
+    // OTHER_CODE_SIGN_FLAGS=--timestamp.
+    final List<String> otherCodeSignFlags = (environment['OTHER_CODE_SIGN_FLAGS'] ?? '')
+        .split(RegExp(r'\s+'))
+        .where((String flag) => flag.isNotEmpty)
+        .toList();
     runSync('codesign', <String>[
       '--force',
       '--verbose',
       '--sign',
       expandedCodeSignIdentity,
+      ...otherCodeSignFlags,
       '--',
       frameworkPath,
     ]);
