@@ -255,6 +255,72 @@ TEST_F(UpdaterTest, LaunchFailureDoesNotStartUpdateThread) {
   EXPECT_EQ(mock_->start_update_thread_count(), 0);
 }
 
+// A failed Engine::Run reports the failure and still starts the update
+// thread: the process may run another engine, and must get a fixed patch.
+TEST_F(UpdaterTest, RunFailureReportsFailureAndStartsUpdateThread) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+
+  Updater::Instance().ReportRunFailure();
+
+  const auto& log = mock_->call_log();
+  ASSERT_EQ(log.size(), 7u);
+  EXPECT_EQ(log[0], "Init");
+  EXPECT_EQ(log[1], "ReportLaunchStart");
+  EXPECT_EQ(log[2], "ReportLaunchPaused");
+  EXPECT_EQ(log[3], "ReportLaunchResumed");
+  EXPECT_EQ(log[4], "ReportLaunchFailure");
+  EXPECT_EQ(log[5], "ShouldAutoUpdate");
+  EXPECT_EQ(log[6], "StartUpdateThread");
+
+  // A later engine runs: no second outcome, no second thread.
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().ReportLaunchSuccess();
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+  EXPECT_EQ(mock_->launch_resumed_count(), 1);
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+}
+
+// Paused and resumed are forwarded once each per process: later engines are
+// built and run without re-arming the patch.
+TEST_F(UpdaterTest, PausedAndResumedOnlyCallOnce) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().ReportLaunchSuccess();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+
+  EXPECT_EQ(mock_->launch_paused_count(), 1);
+  EXPECT_EQ(mock_->launch_resumed_count(), 1);
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+}
+
+// After a patch fails to load (TryLoadPatch reports the failure before any
+// Shell exists), the process runs the release: paused and resumed must not
+// arm anything that no success would clear, and the base boot's success
+// still starts the update thread.
+TEST_F(UpdaterTest, PausedAndResumedAfterFailedPatchLoadForwardNothing) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchFailure();
+
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->launch_paused_count(), 0);
+  EXPECT_EQ(mock_->launch_resumed_count(), 0);
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+}
+
 // Add-to-app: every engine reports success, but the process gets one update
 // thread, not one per engine.
 TEST_F(UpdaterTest, MultipleEnginesStartOneUpdateThread) {

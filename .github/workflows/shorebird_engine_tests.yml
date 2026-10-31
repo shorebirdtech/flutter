@@ -36,16 +36,46 @@ permissions:
   contents: read
 
 jobs:
+  # Looks for an earlier pass on this job's inputs (DEPS, engine/, this
+  # workflow): see shorebird/ci/engine_pass.sh. A push of a PR's squash
+  # usually has the inputs its PR run passed on.
+  reuse:
+    name: ♻️ Look for an earlier pass
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      artifact: ${{ steps.find.outputs.artifact }}
+      run: ${{ steps.find.outputs.run }}
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          sparse-checkout: shorebird/ci
+
+      - name: ♻️ Look for an earlier pass
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: shorebird/ci/engine_pass.sh engine_tests
+
   shorebird-unittests:
-    name: 🧪 Shorebird Engine Unit Tests
+    name: 🧪 Build and run the Shorebird engine unit tests
     # Fork PRs get no secrets (the sync needs the dart-sdk deploy key) and
     # must not run on our Namespace runners.
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: reuse
+    # !cancelled(): a failed lookup leaves the job to run, not skipped.
+    if: ${{ !cancelled() && needs.reuse.outputs.run == '' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) }}
     # A release PR's run (release/<version>, a check the release waits on)
     # starts ahead of queued Namespace jobs without a priority: on 3.47.9-rc7
     # it queued over an hour behind the release's own Dart SDK full CI.
+    # Other PRs' runs are tier 2 (a person waits); pushes to shorebird/dev
+    # have none.
+    # Namespace priority tiers: https://handbook.shorebird.dev/departments/engineering/#ci-runner-priority
     runs-on:
-      - nscloud-ubuntu-22.04-amd64-16x64-with-cache${{ startsWith(github.head_ref, 'release/') && ';job.priority=1' || '' }}
+      - nscloud-ubuntu-22.04-amd64-16x64-with-cache${{ startsWith(github.head_ref, 'release/') && ';job.priority=1' || github.event_name == 'pull_request' && ';job.priority=2' || '' }}
       - nscloud-cache-tag-shorebird-engine-tests
       - nscloud-cache-size-100gb
     # 16 vCPU: the build is the job's critical path (8.5 min on 8 vCPU).
@@ -79,10 +109,15 @@ jobs:
           python-version: "3.11.8"
 
       # build_rust_updater.py builds the updater with cargo for the host.
+      # Pinned to the release build's toolchain (_build_engine
+      # shard-build.yaml).
       - name: 🦀 Setup Rust
-        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
-        with:
-          targets: x86_64-unknown-linux-gnu
+        shell: bash
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal --no-self-update
+          rustup default 1.99.1
+          rustup target add --toolchain 1.99.1 x86_64-unknown-linux-gnu
+          echo CARGO_INCREMENTAL=0 >> "$GITHUB_ENV"
 
       # DEPS pulls shorebirdtech/dart-sdk (private) over SSH.
       - name: 🔑 Setup SSH
@@ -199,3 +234,49 @@ jobs:
           git branch -f main HEAD^1
           git remote add upstream "$GITHUB_WORKSPACE"
           engine/src/flutter/ci/format.sh
+
+  # Lets a later run on the same inputs skip shorebird-unittests
+  # (shorebird/ci/engine_pass.sh). Its own job, after shorebird-unittests has
+  # concluded, so a failure in its post steps or a timeout records nothing.
+  # Best effort: a failure here costs a rerun later, never the check.
+  record-pass:
+    name: 📝 Record the pass
+    needs: [reuse, shorebird-unittests]
+    if: needs.shorebird-unittests.result == 'success' && needs.reuse.outputs.artifact != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - name: 📝 Write the pass
+        run: echo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > "$RUNNER_TEMP/pass.txt"
+
+      - name: 📝 Upload the pass
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ needs.reuse.outputs.artifact }}
+          path: ${{ runner.temp }}/pass.txt
+          retention-days: 30
+          # A re-run attempt of a run uploads the same name again.
+          overwrite: true
+
+  # The check _build_engine's release gate reads on the newest shorebird/dev
+  # commit that changed DEPS or engine/ (release_flutter/release.yaml
+  # required_checks), by this name: green when the tests passed in this run,
+  # or in an earlier run on the same inputs.
+  shorebird-unittests-result:
+    name: 🧪 Shorebird Engine Unit Tests
+    needs: [reuse, shorebird-unittests]
+    if: ${{ !cancelled() && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🧪 Passed here or earlier
+        env:
+          REUSED: ${{ needs.reuse.outputs.run }}
+          RESULT: ${{ needs.shorebird-unittests.result }}
+        run: |
+          if [[ -n "$REUSED" ]]; then
+            echo "Passed on these inputs in $REUSED." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "Build and run: $RESULT"
+          [[ "$RESULT" == success ]]
