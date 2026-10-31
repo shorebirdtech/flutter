@@ -664,6 +664,11 @@ static void SetThreadPriority(FlutterThreadPriority priority) {
   NSString* bundlePath =
       [[NSBundle bundleWithURL:[NSBundle.mainBundle.privateFrameworksURL
                                    URLByAppendingPathComponent:@"App.framework"]] bundlePath];
+  if (bundlePath == nil) {
+    // Passing a null UTF8String into ShorebirdConfigArgs' std::string crashes.
+    NSLog(@"[shorebird] Failed to find App.framework, not starting updater.");
+    return NO;
+  }
   bundlePath = [bundlePath stringByAppendingString:@"/App"];
   NSString* assetsPath = _project.assetsPath;
   NSURL* shorebirdYamlPath = [NSURL URLWithString:@"shorebird.yaml"
