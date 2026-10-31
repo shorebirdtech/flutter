@@ -112,6 +112,11 @@ class Updater {
   /// @return true if initialization succeeded
   bool Init(const AppConfig& config);
 
+  /// Whether any `Init` in this process has succeeded. A later `Init` (one
+  /// per engine) fails with AlreadyInitialized while the updater is still
+  /// configured, so callers ask this rather than trusting that result alone.
+  static bool IsInitialized();
+
   /// Validate the next boot patch. If invalid, falls back to last good state.
   virtual void ValidateNextBootPatch() = 0;
 
@@ -130,6 +135,13 @@ class Updater {
   // Update checking
   virtual bool ShouldAutoUpdate() = 0;
   virtual void StartUpdateThread() = 0;
+
+  /// Tells the updater the app's protected files are readable (iOS posted
+  /// UIApplicationProtectedDataDidBecomeAvailable, or the app entered the
+  /// foreground). If it couldn't read its state earlier in this process, as
+  /// on a launch before the device's first unlock, it reports that now.
+  /// Cheap when there is nothing to report.
+  virtual void ProtectedDataAvailable() {}
 
   // Singleton access
   static Updater& Instance();
@@ -204,6 +216,7 @@ class RealUpdater : public Updater {
   void DoReportLaunchFailure() override;
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
+  void ProtectedDataAvailable() override;
 };
 #endif  // SHOREBIRD_PLATFORM_SUPPORTED
 
@@ -237,6 +250,7 @@ class MockUpdater : public Updater {
     return last_release_version_;
   }
   const std::string& last_yaml_config() const { return last_yaml_config_; }
+  const AppConfig& last_config() const { return last_config_; }
 
   // Test configuration
   void set_init_result(bool value) { init_result_ = value; }
@@ -260,6 +274,7 @@ class MockUpdater : public Updater {
   std::string next_boot_patch_path_;
   std::string last_release_version_;
   std::string last_yaml_config_;
+  AppConfig last_config_;
   std::vector<std::string> call_log_;
 };
 

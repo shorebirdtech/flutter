@@ -13,8 +13,6 @@ import org.gradle.api.GradleException
 import org.gradle.api.Project
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.logging.LoggingManager
-import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.Optional
 import org.gradle.kotlin.dsl.support.serviceOf
 import org.gradle.process.ExecOperations
 import org.gradle.process.ExecSpec
@@ -24,9 +22,6 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNotEquals
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class BaseFlutterTaskHelperTest {
     object BaseFlutterTaskPropertiesTest {
@@ -37,6 +32,8 @@ class BaseFlutterTaskHelperTest {
         internal const val EXTRA_FRONTEND_OPTIONS_TEST = "--enable-asserts"
         internal const val EXTRA_GEN_SNAPSHOT_OPTIONS_TEST = "--debugger"
         internal const val TARGET_PLATFORM_VALUES_JOINED_LIST = "android linux"
+        internal const val SHOREBIRD_PUBLIC_KEY_TEST = "a2V5Ly9h"
+        internal const val SHOREBIRD_DD_MAX_BYTES_TEST = "100000"
         val MIN_SDK_VERSION_TEST = DependencyVersionChecker.warnMinSdkVersion
 
         // Using File.separator to ensure all paths use platform-specific separators
@@ -44,6 +41,7 @@ class BaseFlutterTaskHelperTest {
         internal val FLUTTER_EXECUTABLE_ABSOLUTE_PATH_TEST = "/path/to/flutter/bin/flutter".replace("/", File.separator)
         internal val LOCAL_ENGINE_SRC_PATH_TEST = "/path/to/flutter/engine/src".replace("/", File.separator)
         internal val PERFORMANCE_MEASUREMENT_FILE_TEST = "/path/to/build/performance_file".replace("/", File.separator)
+        internal val SHOREBIRD_TRACE_FILE_TEST = "/path/to/build/shorebird_trace.json".replace("/", File.separator)
         internal val FRONTEND_SERVER_STARTER_PATH_TEST = "/path/to/starter/script_file".replace("/", File.separator)
         internal val SPLIT_DEBUG_INFO_TEST = "/path/to/build/debug_info_directory".replace("/", File.separator)
         internal val CODE_SIZE_DIRECTORY_TEST = "/path/to/build/code_size_directory".replace("/", File.separator)
@@ -191,6 +189,7 @@ class BaseFlutterTaskHelperTest {
         every { baseFlutterTask.verbose } returns true
         every { baseFlutterTask.intermediateDir } returns BaseFlutterTaskPropertiesTest.intermediateDirFileTest
         every { baseFlutterTask.performanceMeasurementFile } returns BaseFlutterTaskPropertiesTest.PERFORMANCE_MEASUREMENT_FILE_TEST
+        every { baseFlutterTask.shorebirdTraceFile } returns BaseFlutterTaskPropertiesTest.SHOREBIRD_TRACE_FILE_TEST
 
         every { baseFlutterTask.buildMode } returns buildModeString
         every { baseFlutterTask.flutterRoot } returns BaseFlutterTaskPropertiesTest.flutterRootTest
@@ -205,6 +204,8 @@ class BaseFlutterTaskHelperTest {
         every { baseFlutterTask.bundleSkSLPath } returns BaseFlutterTaskPropertiesTest.BUNDLE_SK_SL_PATH_TEST
 
         every { baseFlutterTask.codeSizeDirectory } returns BaseFlutterTaskPropertiesTest.CODE_SIZE_DIRECTORY_TEST
+        every { baseFlutterTask.shorebirdPublicKey } returns BaseFlutterTaskPropertiesTest.SHOREBIRD_PUBLIC_KEY_TEST
+        every { baseFlutterTask.shorebirdDdMaxBytes } returns BaseFlutterTaskPropertiesTest.SHOREBIRD_DD_MAX_BYTES_TEST
         every { baseFlutterTask.flavor } returns BaseFlutterTaskPropertiesTest.FLAVOR_TEST
         every { baseFlutterTask.extraGenSnapshotOptions } returns BaseFlutterTaskPropertiesTest.EXTRA_GEN_SNAPSHOT_OPTIONS_TEST
 
@@ -244,6 +245,7 @@ class BaseFlutterTaskHelperTest {
         verify { mockExecSpec.args("--depfile", "${BaseFlutterTaskPropertiesTest.intermediateDirFileTest}/flutter_build.d") }
         verify { mockExecSpec.args("--output", "${BaseFlutterTaskPropertiesTest.intermediateDirFileTest}") }
         verify { mockExecSpec.args("--performance-measurement-file=${BaseFlutterTaskPropertiesTest.PERFORMANCE_MEASUREMENT_FILE_TEST}") }
+        verify { mockExecSpec.args("--shorebird-trace-file=${BaseFlutterTaskPropertiesTest.SHOREBIRD_TRACE_FILE_TEST}") }
         verify { mockExecSpec.args("-dTargetFile=${BaseFlutterTaskPropertiesTest.FLUTTER_TARGET_FILE_PATH}") }
         verify { mockExecSpec.args("-dTargetPlatform=android") }
         verify { mockExecSpec.args("-dBuildMode=$buildModeString") }
@@ -254,6 +256,8 @@ class BaseFlutterTaskHelperTest {
         verify { mockExecSpec.args("--DartDefines=${BaseFlutterTaskPropertiesTest.DART_DEFINES_TEST}") }
         verify { mockExecSpec.args("-dBundleSkSLPath=${BaseFlutterTaskPropertiesTest.BUNDLE_SK_SL_PATH_TEST}") }
         verify { mockExecSpec.args("-dCodeSizeDirectory=${BaseFlutterTaskPropertiesTest.CODE_SIZE_DIRECTORY_TEST}") }
+        verify { mockExecSpec.args("-dShorebirdPublicKey=${BaseFlutterTaskPropertiesTest.SHOREBIRD_PUBLIC_KEY_TEST}") }
+        verify { mockExecSpec.args("-dShorebirdDdMaxBytes=${BaseFlutterTaskPropertiesTest.SHOREBIRD_DD_MAX_BYTES_TEST}") }
         verify { mockExecSpec.args("-dFlavor=${BaseFlutterTaskPropertiesTest.FLAVOR_TEST}") }
         verify { mockExecSpec.args("--ExtraGenSnapshotOptions=${BaseFlutterTaskPropertiesTest.EXTRA_GEN_SNAPSHOT_OPTIONS_TEST}") }
         verify { mockExecSpec.args("-dFrontendServerStarterPath=${BaseFlutterTaskPropertiesTest.FRONTEND_SERVER_STARTER_PATH_TEST}") }
@@ -292,6 +296,7 @@ class BaseFlutterTaskHelperTest {
         every { baseFlutterTask.verbose } returns true
         every { baseFlutterTask.intermediateDir } returns BaseFlutterTaskPropertiesTest.intermediateDirFileTest
         every { baseFlutterTask.performanceMeasurementFile } returns null
+        every { baseFlutterTask.shorebirdTraceFile } returns null
 
         every { baseFlutterTask.buildMode } returns buildModeString
         every { baseFlutterTask.flutterRoot } returns BaseFlutterTaskPropertiesTest.flutterRootTest
@@ -306,6 +311,8 @@ class BaseFlutterTaskHelperTest {
         every { baseFlutterTask.bundleSkSLPath } returns null
 
         every { baseFlutterTask.codeSizeDirectory } returns null
+        every { baseFlutterTask.shorebirdPublicKey } returns null
+        every { baseFlutterTask.shorebirdDdMaxBytes } returns null
         every { baseFlutterTask.flavor } returns null
         every { baseFlutterTask.extraGenSnapshotOptions } returns null
 
@@ -347,6 +354,7 @@ class BaseFlutterTaskHelperTest {
         verify { mockExecSpec.args("-dAndroidArchs=${BaseFlutterTaskPropertiesTest.TARGET_PLATFORM_VALUES_JOINED_LIST}") }
         verify { mockExecSpec.args("-dMinSdkVersion=${BaseFlutterTaskPropertiesTest.MIN_SDK_VERSION_TEST}") }
         verify { mockExecSpec.args(ruleNamesList) }
+        verify(exactly = 0) { mockExecSpec.args(match<String> { it.startsWith("--shorebird-trace-file") }) }
     }
 
     @Test
@@ -395,25 +403,5 @@ class BaseFlutterTaskHelperTest {
         BaseFlutterTaskHelper.getDependenciesFiles(baseFlutterTask)
         verify { projectIntermediary.files() }
         verify { projectIntermediary.files("${BaseFlutterTaskPropertiesTest.intermediateDirFileTest}/flutter_build.d") }
-    }
-
-    @Test
-    fun `getShorebirdPublicKeyDigest returns null when SHOREBIRD_PUBLIC_KEY is unset`() {
-        assertNull(BaseFlutterTaskHelper.getShorebirdPublicKeyDigest(mapOf("SHOREBIRD_TOKEN" to "secret")))
-    }
-
-    @Test
-    fun `getShorebirdPublicKeyDigest returns the SHA-256 of SHOREBIRD_PUBLIC_KEY`() {
-        val digest = BaseFlutterTaskHelper.getShorebirdPublicKeyDigest(mapOf("SHOREBIRD_PUBLIC_KEY" to "key-a"))
-        // printf 'key-a' | shasum -a 256
-        assertEquals("f10f781241e2246678b6b45c857069208152a53863e47fac33f607ab405006f4", digest)
-        assertNotEquals(digest, BaseFlutterTaskHelper.getShorebirdPublicKeyDigest(mapOf("SHOREBIRD_PUBLIC_KEY" to "key-b")))
-    }
-
-    @Test
-    fun `shorebirdPublicKeyDigest is an optional task input`() {
-        val getter = BaseFlutterTask::class.java.getMethod("getShorebirdPublicKeyDigest")
-        assertTrue(getter.isAnnotationPresent(Input::class.java))
-        assertTrue(getter.isAnnotationPresent(Optional::class.java))
     }
 }

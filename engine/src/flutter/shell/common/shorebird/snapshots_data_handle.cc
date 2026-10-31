@@ -41,7 +41,7 @@ BlobsIndex SnapshotsDataHandle::IndexForAbsoluteOffset(int64_t offset,
                                                        BlobsIndex start_index) {
   size_t start_offset = AbsoluteOffsetForIndex(start_index);
   if (offset < 0) {
-    if ((size_t)abs(offset) > start_offset) {
+    if (static_cast<size_t>(abs(offset)) > start_offset) {
       FML_LOG(WARNING)
           << "Offset is before the beginning of SnapshotsData. Returning 0, 0";
       return {0, 0};

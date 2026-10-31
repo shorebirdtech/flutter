@@ -3,6 +3,8 @@
 
 #include <functional>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "flutter/common/settings.h"
 #include "flutter/fml/memory/ref_ptr.h"
@@ -20,30 +22,36 @@ struct ReleaseVersion {
 };
 
 /// Arguments for ConfigureShorebird.
-/// Used by Desktop implementations.
 struct ShorebirdConfigArgs {
+  /// Where the updater caches downloaded patches.
   std::string code_cache_path;
+  /// Where the updater keeps state that outlives a release, such as its
+  /// client id.
   std::string app_storage_path;
-  std::string release_app_library_path;
+  /// The release's own AOT library, as the platform finds it. Android and iOS
+  /// pass every candidate path in Settings::application_library_paths.
+  std::vector<std::string> release_app_library_paths;
   std::string shorebird_yaml;
   ReleaseVersion release_version;
 
   ShorebirdConfigArgs(std::string code_cache_path,
                       std::string app_storage_path,
-                      std::string release_app_library_path,
+                      std::vector<std::string> release_app_library_paths,
                       std::string shorebird_yaml,
                       ReleaseVersion release_version)
-      : code_cache_path(code_cache_path),
-        app_storage_path(app_storage_path),
-        release_app_library_path(release_app_library_path),
-        shorebird_yaml(shorebird_yaml),
-        release_version(release_version) {}
+      : code_cache_path(std::move(code_cache_path)),
+        app_storage_path(std::move(app_storage_path)),
+        release_app_library_paths(std::move(release_app_library_paths)),
+        shorebird_yaml(std::move(shorebird_yaml)),
+        release_version(std::move(release_version)) {}
 };
 
-/// Newer api, used by Desktop implementations.
-/// Does not directly manipulate Settings.
-/// Sets |patch_path| to the patch to boot, or clears it when there is none.
-/// Load it with LoadPatchOrBase.
+/// Initializes the updater and picks the patch to boot. Every platform calls
+/// this. Sets |patch_path| to that patch, or clears it when there is none.
+/// Returns whether the updater initialized in this call.
+///
+/// Desktop embedders load |patch_path| with LoadPatchOrBase. Android and iOS
+/// hand it to the Shell with ApplyPatchToSettings.
 bool ConfigureShorebird(const ShorebirdConfigArgs& args,
                         std::string& patch_path);
 
@@ -58,13 +66,10 @@ bool LoadPatchOrBase(const std::string& patch_path,
                      const std::string& base_path,
                      const std::function<bool(const std::string&)>& load);
 
-/// Older api used by iOS and Android, directly manipulates Settings.
-void ConfigureShorebird(std::string code_cache_path,
-                        std::string app_storage_path,
-                        Settings& settings,
-                        const std::string& shorebird_yaml,
-                        const std::string& version,
-                        const std::string& version_code);
+/// Points |settings| at |patch_path|, unless it is empty, so the Shell boots
+/// the patch. Used by Android and iOS, whose Shell resolves the AOT code from
+/// Settings::application_library_paths.
+void ApplyPatchToSettings(const std::string& patch_path, Settings& settings);
 
 /// Used for reading app_id from shorebird.yaml.
 /// Exposed for testing.
