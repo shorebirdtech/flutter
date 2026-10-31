@@ -17,10 +17,10 @@ vars = {
   'llvm_git': 'https://llvm.googlesource.com',
   'dart_ai_rev': '9c96bfe5f091c9451eff5b59c9bffeb2e806b875',
   'skia_revision': '8df24be66531469e576a806749a0202ae26b8d08',
-  "dart_sdk_revision": "d1b37f9ffefcfea5c851d6a38b395a852490c949",
+  "dart_sdk_revision": "9b3d44926018e4141fdab274259cec3bec231250",
   "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
   "updater_git": "https://github.com/shorebirdtech/updater.git",
-  "updater_rev": "b3e2b63b87767741aaa7a4aa14ab54bb2d1a0f84",
+  "updater_rev": "a78ec66c76c9631641cb03e42ae66a7bb6ce981e",
 
   # Do not download the Emscripten SDK by default.
   # This prevents us from downloading the Emscripten toolchain for builds
@@ -367,39 +367,48 @@ deps = {
 
   # Prebuilt Dart SDK of the same revision as the Dart SDK source checkout
   'engine/src/flutter/prebuilts/linux-x64/dart-sdk': {
-    'packages': [
+    'bucket': 'shorebird-dart-sdk-prebuilt',
+    'objects': [
       {
-        'package': 'flutter/dart-sdk/linux-amd64',
-        'version': 'git_revision:'+Var('dart_revision')
+        'object_name': Var('dart_sdk_revision') + '/dart-sdk-linux-x64.tar.gz',
+        'sha256sum': '636bf51574d52487abc148733f33388b3b14e4b05c53c6fca32dd8ed6e0e9574',
+        'size_bytes': 236358097,
+        'generation': 1793823932947849,
       }
     ],
-    'dep_type': 'cipd',
+    'dep_type': 'gcs',
     'condition': 'host_os == "linux" and download_dart_sdk'
   },
   'engine/src/flutter/prebuilts/linux-arm64/dart-sdk': {
-    'packages': [
+    'bucket': 'shorebird-dart-sdk-prebuilt',
+    'objects': [
       {
-        'package': 'flutter/dart-sdk/linux-arm64',
-        'version': 'git_revision:'+Var('dart_revision')
+        'object_name': Var('dart_sdk_revision') + '/dart-sdk-linux-arm64.tar.gz',
+        'sha256sum': 'b12c40f8c1059a2a721daffd89847d1cd622a15d8944ce44b4be263be7b2ee75',
+        'size_bytes': 233727766,
+        'generation': 1793823402614692,
       }
     ],
-    'dep_type': 'cipd',
+    'dep_type': 'gcs',
     'condition': 'host_os == "linux" and download_dart_sdk'
   },
   'engine/src/flutter/prebuilts/macos-x64/dart-sdk': {
-    'packages': [
+    'bucket': 'shorebird-dart-sdk-prebuilt',
+    'objects': [
       {
-        'package': 'flutter/dart-sdk/mac-amd64',
-        'version': 'git_revision:'+Var('dart_revision')
+        'object_name': Var('dart_sdk_revision') + '/dart-sdk-darwin-x64.tar.gz',
+        'sha256sum': '897513e7cb465cc8e3ffec483fa9424d653e7f4468754489452a4853e36aeb9f',
+        'size_bytes': 225533540,
+        'generation': 1793824033166029,
       }
     ],
-    'dep_type': 'cipd',
+    'dep_type': 'gcs',
     'condition': 'host_os == "mac" and download_dart_sdk'
   },
   # Consume Shorebird's own published Dart SDK (built from
   # shorebirdtech/dart-sdk) from GCS instead of Google's CIPD prebuilt, so
   # the engine builds against our Dart fork and skips rebuilding it from
-  # source (see shards/macos.json: mac-arm64 drops --no-prebuilt-dart-sdk).
+  # source (no engine shard passes --no-prebuilt-dart-sdk).
   # The object is keyed by Var('dart_sdk_revision') so it tracks the same
   # fork revision as the source clone above; sha256sum/size_bytes pin the
   # specific artifact's content and must be updated whenever that revision
@@ -411,32 +420,38 @@ deps = {
     'objects': [
       {
         'object_name': Var('dart_sdk_revision') + '/dart-sdk-darwin-arm64.tar.gz',
-        'sha256sum': 'b032ce0430426268dd2fbfb3962f24711dca6c90065b2d32f79373d76900f889',
-        'size_bytes': 215270125,
-        'generation': 1793049601435556,
+        'sha256sum': '19e92168376fa54473b32dff6cf42d713a0cb49e66eb453ce44b4d551d4a30ab',
+        'size_bytes': 222633595,
+        'generation': 1793810773853379,
       }
     ],
     'dep_type': 'gcs',
     'condition': 'host_os == "mac" and download_dart_sdk'
   },
   'engine/src/flutter/prebuilts/windows-x64/dart-sdk': {
-    'packages': [
+    'bucket': 'shorebird-dart-sdk-prebuilt',
+    'objects': [
       {
-        'package': 'flutter/dart-sdk/windows-amd64',
-        'version': 'git_revision:'+Var('dart_revision')
+        'object_name': Var('dart_sdk_revision') + '/dart-sdk-windows-x64.tar.gz',
+        'sha256sum': 'f59a947d40c3741a5ac459362cb79017d90b7e2b480ed8c42d8ced75b0d737f6',
+        'size_bytes': 219250245,
+        'generation': 1793823863246002,
       }
     ],
-    'dep_type': 'cipd',
+    'dep_type': 'gcs',
     'condition': 'host_os == "win" and download_dart_sdk'
   },
   'engine/src/flutter/prebuilts/windows-arm64/dart-sdk': {
-    'packages': [
+    'bucket': 'shorebird-dart-sdk-prebuilt',
+    'objects': [
       {
-        'package': 'flutter/dart-sdk/windows-arm64',
-        'version': 'git_revision:'+Var('dart_revision')
+        'object_name': Var('dart_sdk_revision') + '/dart-sdk-windows-arm64.tar.gz',
+        'sha256sum': '66fe3d602469ae7478e6337bc919cdf7405a0f6ad48552572552f103269367b5',
+        'size_bytes': 161053466,
+        'generation': 1793822932927316,
       }
     ],
-    'dep_type': 'cipd',
+    'dep_type': 'gcs',
     'condition': 'host_os == "win" and download_dart_sdk'
   },
 

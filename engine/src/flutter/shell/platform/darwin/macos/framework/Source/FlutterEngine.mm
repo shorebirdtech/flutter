@@ -664,20 +664,32 @@ static void SetThreadPriority(FlutterThreadPriority priority) {
   NSString* bundlePath =
       [[NSBundle bundleWithURL:[NSBundle.mainBundle.privateFrameworksURL
                                    URLByAppendingPathComponent:@"App.framework"]] bundlePath];
+  if (bundlePath == nil) {
+    // Passing a null UTF8String into ShorebirdConfigArgs' std::string crashes.
+    NSLog(@"[shorebird] Failed to find App.framework, not starting updater.");
+    return NO;
+  }
   bundlePath = [bundlePath stringByAppendingString:@"/App"];
   NSString* assetsPath = _project.assetsPath;
   NSURL* shorebirdYamlPath = [NSURL URLWithString:@"shorebird.yaml"
                                     relativeToURL:[NSURL fileURLWithPath:assetsPath]];
+  NSError* shorebirdYamlError = nil;
   NSString* shorebirdYamlContents = [NSString stringWithContentsOfURL:shorebirdYamlPath
                                                              encoding:NSUTF8StringEncoding
-                                                                error:nil];
+                                                                error:&shorebirdYamlError];
+  if (shorebirdYamlContents == nil) {
+    // Passing a null UTF8String into ShorebirdConfigArgs' std::string crashes.
+    NSLog(@"[shorebird] Failed to read %@, not starting updater: %@", shorebirdYamlPath.path,
+          shorebirdYamlError);
+    return NO;
+  }
   NSString* appVersion =
       [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
   NSString* appBuildNumber = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleVersion"];
   std::string cache_path =
       fml::paths::JoinPaths({getenv("HOME"), "Library", "Application Support", "shorebird"});
   flutter::ReleaseVersion release_version = {appVersion.UTF8String, appBuildNumber.UTF8String};
-  flutter::ShorebirdConfigArgs shorebird_args(cache_path, cache_path, bundlePath.UTF8String,
+  flutter::ShorebirdConfigArgs shorebird_args(cache_path, cache_path, {bundlePath.UTF8String},
                                               shorebirdYamlContents.UTF8String, release_version);
   NSLog(@"[shorebird] calling ConfigureShorebird");
   std::string patch_path;

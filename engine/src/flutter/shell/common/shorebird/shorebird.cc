@@ -58,6 +58,7 @@ extern "C" __attribute__((weak)) unsigned long getauxval(unsigned long type) {
 // snapshots, but I'm not aware of any use cases for that.
 static fml::RefPtr<const DartSnapshot> vm_snapshot;
 
+#if SHOREBIRD_USE_INTERPRETER
 // Resolving walks settings.application_library_paths with dlopen, so the
 // returned DartSnapshot owns a reference to App.framework. Where nothing else
 // holds the image, that reference is the only one: a standalone Runner carries
@@ -79,7 +80,6 @@ static fml::RefPtr<const DartSnapshot> ResolveBaseVMSnapshot(
   return snapshot;
 }
 
-#if SHOREBIRD_USE_INTERPRETER
 void SetBaseSnapshot(fml::RefPtr<const DartSnapshot> base_vm_snapshot) {
   // Only the VM snapshot, which reports nothing to the updater. Resolving the
   // isolate snapshot (IsolateSnapshotFromSettings) reports the launch start,
@@ -162,9 +162,6 @@ std::string GetValueFromYaml(const std::string& yaml, const std::string& key) {
   return "";
 }
 
-/// Newer api, used by Desktop implementations.
-/// Does not directly manipulate Settings.
-// TODO(eseidel): Consolidate this with the other ConfigureShorebird() API.
 bool ConfigureShorebird(const ShorebirdConfigArgs& args,
                         std::string& patch_path) {
   patch_path.clear();
@@ -177,10 +174,19 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
     return false;
   }
 
-  auto code_cache_dir = fml::paths::JoinPaths(
-      {std::move(args.code_cache_path), shorebird_updater_dir_name, app_id});
+#if FML_OS_ANDROID || FML_OS_IOS
+  // The app's own sandbox, so nothing else writes here.
+  auto code_cache_dir =
+      fml::paths::JoinPaths({args.code_cache_path, shorebird_updater_dir_name});
   auto app_storage_dir = fml::paths::JoinPaths(
-      {std::move(args.app_storage_path), shorebird_updater_dir_name, app_id});
+      {args.app_storage_path, shorebird_updater_dir_name});
+#else
+  // Desktop directories are the user's, shared by every app they run.
+  auto code_cache_dir = fml::paths::JoinPaths(
+      {args.code_cache_path, shorebird_updater_dir_name, app_id});
+  auto app_storage_dir = fml::paths::JoinPaths(
+      {args.app_storage_path, shorebird_updater_dir_name, app_id});
+#endif
 
   fml::CreateDirectory(fml::paths::GetCachesDirectory(),
                        {shorebird_updater_dir_name},
@@ -195,27 +201,46 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
 
   shorebird::AppConfig config;
   config.release_version = release_version;
-  config.original_libapp_paths = {args.release_app_library_path};
+  config.original_libapp_paths = args.release_app_library_paths;
   config.app_storage_dir = app_storage_dir;
   config.code_cache_dir = code_cache_dir;
   config.file_callbacks = ShorebirdFileCallbacks();
   config.yaml_config = args.shorebird_yaml;
 
-#if FML_OS_MACOSX && !FML_OS_IOS
-  // macOS patches are diffed against the Dart snapshot regions of
+  // iOS and macOS patches are diffed against the Dart snapshot regions of
   // App.framework/App rather than the whole file, so re-signing the app after
-  // release (notarization, Mac App Store) doesn't invalidate them.
+  // release (notarization, the App Store) doesn't invalidate them.
+  // FileCallbacksImpl serves those regions to the updater from vm_snapshot,
+  // which the updater reads only when it installs a patch, never in Init.
   // Resolved through the VM path, which never returns a patch.
+#if FML_OS_MACOSX
   Settings base_settings;
-  base_settings.application_library_paths = {args.release_app_library_path};
-  vm_snapshot = DartSnapshot::VMSnapshotFromSettings(base_settings);
+  base_settings.application_library_paths = args.release_app_library_paths;
+#if SHOREBIRD_USE_INTERPRETER
+  // The interpreter also executes a linked patch out of the base image, so
+  // there is no booting without it.
+  SetBaseSnapshot(ResolveBaseVMSnapshot(base_settings));
+#else
+  // Resolved once per process. The base image doesn't change, and the first
+  // engine's update thread reads vm_snapshot (FileCallbacksImpl::Open) while a
+  // second engine (desktop multi-window) configures, so replacing it here
+  // would race that read.
   if (!vm_snapshot) {
-    FML_LOG(ERROR) << "Shorebird updater: failed to resolve base snapshot from "
-                   << args.release_app_library_path;
+    vm_snapshot = DartSnapshot::VMSnapshotFromSettings(base_settings);
   }
-#endif  // FML_OS_MACOSX && !FML_OS_IOS
+  if (!vm_snapshot) {
+    FML_LOG(ERROR) << "Shorebird updater: failed to resolve the base snapshot";
+  }
+#endif  // SHOREBIRD_USE_INTERPRETER
+#endif  // FML_OS_MACOSX
 
-  bool init_result = shorebird::Updater::Instance().Init(config);
+  // A second engine in the same process (desktop multi-window) gets
+  // AlreadyInitialized here, which the updater documents as safe to ignore:
+  // the process is still configured, and the patch path below is the one to
+  // boot. Fail only when no Init in this process has succeeded.
+  // https://github.com/shorebirdtech/shorebird/issues/3888
+  bool init_result = shorebird::Updater::Instance().Init(config) ||
+                     shorebird::Updater::IsInitialized();
 
   FML_LOG(INFO) << "Checking for active patch";
   shorebird::Updater::Instance().ValidateNextBootPatch();
@@ -257,80 +282,22 @@ bool LoadPatchOrBase(const std::string& patch_path,
   return load(base_path);
 }
 
-/// Older api used by iOS and Android, directly manipulates Settings.
-// TODO(eseidel): Consolidate this with the other ConfigureShorebird() API.
-void ConfigureShorebird(std::string code_cache_path,
-                        std::string app_storage_path,
-                        Settings& settings,
-                        const std::string& shorebird_yaml,
-                        const std::string& version,
-                        const std::string& version_code) {
-  // The interpreter path hands this to SetBaseSnapshot below, which holds it
-  // for the life of the process, because a linked patch executes out of the
-  // base image and needs it resolvable. Everywhere else a patch replaces
-  // application_library_paths outright, so nothing reads the base again and
-  // the resolve is only the scheme check.
-#if SHOREBIRD_USE_INTERPRETER
-  auto base_vm_snapshot = ResolveBaseVMSnapshot(settings);
-#else
-  ResolveBaseVMSnapshot(settings);
-#endif
-
-  auto shorebird_updater_dir_name = "shorebird_updater";
-
-  auto code_cache_dir = fml::paths::JoinPaths(
-      {std::move(code_cache_path), shorebird_updater_dir_name});
-  auto app_storage_dir = fml::paths::JoinPaths(
-      {std::move(app_storage_path), shorebird_updater_dir_name});
-
-  fml::CreateDirectory(fml::paths::GetCachesDirectory(),
-                       {shorebird_updater_dir_name},
-                       fml::FilePermission::kReadWrite);
-
-  // Combine version and version_code into a single string.
-  // We could also pass these separately through to the updater if needed.
-  shorebird::AppConfig config;
-  config.release_version = version + "+" + version_code;
-  config.original_libapp_paths = settings.application_library_paths;
-  config.app_storage_dir = app_storage_dir;
-  config.code_cache_dir = code_cache_dir;
-  config.file_callbacks = ShorebirdFileCallbacks();
-  config.yaml_config = shorebird_yaml;
-
-  shorebird::Updater::Instance().Init(config);
-
-  // We only set the base snapshot on iOS for now.
-#if SHOREBIRD_USE_INTERPRETER
-  SetBaseSnapshot(std::move(base_vm_snapshot));
-#endif
-
-  shorebird::Updater::Instance().ValidateNextBootPatch();
-  std::string active_path = shorebird::Updater::Instance().NextBootPatchPath();
-  if (!active_path.empty()) {
-    FML_LOG(INFO) << "Shorebird updater: active path: " << active_path;
-
-#if SHOREBIRD_USE_INTERPRETER
-    // Front-insert rather than clear. A linked patch carries only the code it
-    // rewrote, and everything it linked against still executes out of the base
-    // image, so the base has to stay resolvable for the life of the process.
-    // SearchMapping takes the first path that resolves a symbol, so the patch
-    // still wins the lookup without evicting the base.
-    settings.application_library_paths.insert(
-        settings.application_library_paths.begin(), active_path);
-#else
-    settings.application_library_paths.clear();
-    settings.application_library_paths.emplace_back(active_path);
-#endif
-  } else {
-    FML_LOG(INFO) << "Shorebird updater: no active patch.";
+void ApplyPatchToSettings(const std::string& patch_path, Settings& settings) {
+  if (patch_path.empty()) {
+    return;
   }
-
-  // Launch reporting does not happen here. ResolveIsolateData in
-  // runtime/dart_snapshot.cc reports the start, so a FlutterEngineGroup or
-  // add-to-app host that calls ConfigureShorebird() without ever creating a
-  // Shell does not record a boot that never happened. The update thread
-  // starts from the Shell's launch-success report, after the boot is
-  // recorded; see the Updater class comment.
+#if SHOREBIRD_USE_INTERPRETER
+  // Front-insert rather than clear. A linked patch carries only the code it
+  // rewrote, and everything it linked against still executes out of the base
+  // image, so the base has to stay resolvable for the life of the process.
+  // SearchMapping takes the first path that resolves a symbol, so the patch
+  // still wins the lookup without evicting the base.
+  settings.application_library_paths.insert(
+      settings.application_library_paths.begin(), patch_path);
+#else
+  settings.application_library_paths.clear();
+  settings.application_library_paths.emplace_back(patch_path);
+#endif
 }
 
 void* FileCallbacksImpl::Open() {

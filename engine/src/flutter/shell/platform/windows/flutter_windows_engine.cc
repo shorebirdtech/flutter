@@ -406,8 +406,9 @@ bool SetUpShorebird(std::string assets_path_string, std::string& patch_path) {
     return false;
   }
 
-  ShorebirdConfigArgs shorebird_args(code_cache_path, code_cache_path, app_path,
-                                     shorebird_yaml_contents, release_version);
+  ShorebirdConfigArgs shorebird_args(code_cache_path, code_cache_path,
+                                     {app_path}, shorebird_yaml_contents,
+                                     release_version);
   return ConfigureShorebird(shorebird_args, patch_path);
 }
 

@@ -486,14 +486,21 @@ config("compiler") {
 # C++ modules (available and enabled by default in C++20 and above) are
 # prohibited by the style guide.
 config("cxx_disable_modules") {
-  disable_modules_flags = [
-    "-fno-modules",
+  disable_modules_flags = [ "-fno-modules" ]
 
-    # Some Clang versions do not disable ObjC modules (as tested by
-    # __has_feature(objc_modules)) when just -fno-modules is present.
-    "-Xclang",
-    "-fno-cxx-modules",
-  ]
+  # -fno-modules leaves C++20 named modules on; -fno-cxx-modules turns them
+  # off. clang's driver passes it on to cc1 as -Xclang would, and spelled
+  # that way sccache can cache the compile. clang-cl ignores it, and
+  # emscripten's clang leaves it unused (an error under -Werror), so Windows
+  # and wasm keep -Xclang.
+  if (is_win || is_wasm) {
+    disable_modules_flags += [
+      "-Xclang",
+      "-fno-cxx-modules",
+    ]
+  } else {
+    disable_modules_flags += [ "-fno-cxx-modules" ]
+  }
   cflags_c = disable_modules_flags
   cflags_cc = disable_modules_flags
   cflags_objc = disable_modules_flags

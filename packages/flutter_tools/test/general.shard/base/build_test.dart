@@ -14,10 +14,6 @@ import 'package:flutter_tools/src/macos/xcode.dart';
 import '../../src/common.dart';
 import '../../src/fake_process_manager.dart';
 
-const kWhichSysctlCommand = FakeCommand(command: <String>['which', 'sysctl']);
-
-const kARMCheckCommand = FakeCommand(command: <String>['sysctl', 'hw.optional.arm64'], exitCode: 1);
-
 const kDefaultClang = <String>[
   '-miphoneos-version-min=15.0',
   '-isysroot',
@@ -243,7 +239,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -319,7 +315,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -390,7 +386,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -443,8 +439,44 @@ void main() {
       expect(processManager, hasNoRemainingExpectations);
     });
 
+    testWithoutContext('iOS build with ddMaxBytes runs the DD analysis pass first', () async {
+      final String genSnapshotPath = artifacts.getArtifactPath(
+        Artifact.genSnapshotArm64,
+        platform: TargetPlatform.ios,
+        mode: BuildMode.release,
+      );
+      processManager.addCommand(
+        FakeCommand(
+          command: <String>[
+            genSnapshotPath,
+            '--deterministic',
+            ...kLinkInfoArgs,
+            '--snapshot_kind=app-aot-elf',
+            '--elf=${fileSystem.path.join('build', 'App_dd_analysis.so')}',
+            '--print_dd_function_identity_to=${fileSystem.path.join('build', 'App.dd_identity.link')}',
+            'main.dill',
+          ],
+          exitCode: 1,
+        ),
+      );
+
+      final int genSnapshotExitCode = await snapshotter.build(
+        platform: TargetPlatform.ios,
+        buildMode: BuildMode.release,
+        mainPath: 'main.dill',
+        outputPath: fileSystem.path.join('build', 'foo'),
+        darwinArch: DarwinArch.arm64,
+        sdkRoot: 'path/to/sdk',
+        dartObfuscation: false,
+        ddMaxBytes: 100000,
+      );
+
+      expect(genSnapshotExitCode, 1);
+      expect(processManager, hasNoRemainingExpectations);
+    });
+
     testWithoutContext('iOS build without DD deletes tables from an earlier DD pass', () async {
-      // An earlier build with SHOREBIRD_DD_MAX_BYTES left these next to the
+      // An earlier build with a DD max bytes left these next to the
       // output directory, where LinkSupplement would ship them.
       const ddFiles = <String>[
         'App.dd_identity.link',
@@ -475,7 +507,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -559,7 +591,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -639,7 +671,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -739,7 +771,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -819,7 +851,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -896,7 +928,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -968,7 +1000,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -1025,7 +1057,6 @@ void main() {
             '--deterministic',
             '--snapshot_kind=app-aot-elf',
             '--elf=build/foo/app.so',
-            '--strip',
             '--no-sim-use-hardfp',
             '--no-use-integer-division',
             'main.dill',
@@ -1059,7 +1090,6 @@ void main() {
             '--deterministic',
             '--snapshot_kind=app-aot-elf',
             '--elf=build/foo/app.so',
-            '--strip',
             '--no-sim-use-hardfp',
             '--no-use-integer-division',
             '--dwarf-stack-traces',
@@ -1096,7 +1126,6 @@ void main() {
             '--deterministic',
             '--snapshot_kind=app-aot-elf',
             '--elf=build/foo/app.so',
-            '--strip',
             '--no-sim-use-hardfp',
             '--no-use-integer-division',
             '--obfuscate',
@@ -1132,7 +1161,6 @@ void main() {
               '--deterministic',
               '--snapshot_kind=app-aot-elf',
               '--elf=build/foo/app.so',
-              '--strip',
               '--no-sim-use-hardfp',
               '--no-use-integer-division',
               'main.dill',
@@ -1167,7 +1195,6 @@ void main() {
             '--deterministic',
             '--snapshot_kind=app-aot-elf',
             '--elf=build/foo/app.so',
-            '--strip',
             'main.dill',
           ],
         ),
@@ -1175,6 +1202,37 @@ void main() {
 
       final int genSnapshotExitCode = await snapshotter.build(
         platform: TargetPlatform.android_arm64,
+        buildMode: BuildMode.release,
+        mainPath: 'main.dill',
+        outputPath: outputPath,
+        dartObfuscation: false,
+      );
+
+      expect(genSnapshotExitCode, 0);
+      expect(processManager, hasNoRemainingExpectations);
+    });
+
+    testWithoutContext('strips during build for linux-x64 by default', () async {
+      final String outputPath = fileSystem.path.join('build', 'foo');
+      processManager.addCommand(
+        FakeCommand(
+          command: <String>[
+            artifacts.getArtifactPath(
+              Artifact.genSnapshot,
+              platform: TargetPlatform.linux_x64,
+              mode: BuildMode.release,
+            ),
+            '--deterministic',
+            '--snapshot_kind=app-aot-elf',
+            '--elf=build/foo/app.so',
+            '--strip',
+            'main.dill',
+          ],
+        ),
+      );
+
+      final int genSnapshotExitCode = await snapshotter.build(
+        platform: TargetPlatform.linux_x64,
         buildMode: BuildMode.release,
         mainPath: 'main.dill',
         outputPath: outputPath,

@@ -36,6 +36,20 @@ on a future upstream merge.
   runs or what it outputs). Follow precedents such as `shorebirdTraceFile` in
   `BaseFlutterTask`. Call out the future-conflict cost in the PR description.
 
+## Test engine changes on the shards they touch
+
+Don't run a full engine build to test a change unless the change touches every
+shard; a full build costs about 5,000 vCPU-min. Name the shards the change
+touches, with `<platform>/<shard>` names from `shorebird/ci/shards/*.json`:
+
+```bash
+gh workflow run --repo shorebirdtech/_build_engine build_engine.yaml \
+  -f engine_revision=<sha> -f shards=macos/ios,linux/host
+```
+
+A build with `shards` publishes nothing. See "Test a change on the shards it
+touches" in `_build_engine`'s `AGENTS.md`.
+
 ## There are two `shorebird.yaml` files
 
 - **Source** (in the app's repo, listed as an asset): `app_id`, an optional
@@ -43,8 +57,11 @@ on a future upstream merge.
   `auto_update`, `patch_verification`.
 - **Compiled** (bundled into the app, what the engine and updater read): a flat
   `app_id` for the active flavor, `base_url`/`auto_update`/`patch_verification`
-  copied through when set, `patch_public_key` from the `SHOREBIRD_PUBLIC_KEY`
-  environment variable when set, and no `flavors:` map. It is written over the
+  copied through when set, `patch_public_key` when set (read from the
+  `SHOREBIRD_PUBLIC_KEY` environment variable by `flutter build`, which passes
+  it to `flutter assemble` as the `ShorebirdPublicKey` define and records it
+  in the generated Xcode and CMake configs; `flutter assemble` itself
+  ignores the variable), and no `flavors:` map. It is written over the
   copied asset under the same name, `shorebird.yaml`.
 
 The engine and the Rust updater have no concept of flavors; flavor resolution

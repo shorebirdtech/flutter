@@ -1638,9 +1638,61 @@ STDERR STUFF
   );
 
   testUsingContext(
+    'Prints warning when building a release app for macOS that contains an x86_64 slice and Xcode version is 27 or greater',
+    () async {
+      createMinimalMockProjectFiles();
+
+      final command = BuildCommand(
+        androidSdk: FakeAndroidSdk(),
+        buildSystem: TestBuildSystem.all(BuildResult(success: true)),
+        fileSystem: fileSystem,
+        logger: testLogger,
+        osUtils: FakeOperatingSystemUtils(),
+        config: FakeConfig(),
+        platform: FakePlatform(),
+        fileSystemUtils: FakeFileSystemUtils(),
+        terminal: FakeTerminal(),
+        plistParser: FakePlistParser(),
+        processUtils: FakeProcessUtils(),
+        processManager: FakeProcessManager.any(),
+        templateRenderer: FakeTemplateRenderer(),
+        xcode: FakeXcode(),
+        artifacts: FakeArtifacts(),
+        cache: FakeCache(),
+        flutterVersion: FakeFlutterVersion(),
+      );
+
+      await createTestCommandRunner(
+        command,
+      ).run(<String>['build', 'macos', '--release', '--no-pub']);
+
+      expect(
+        testLogger.warningText,
+        contains(
+          'Xcode 27 no longer requires macOS binaries to support the x86_64 architecture. '
+          'To build ARM-only macOS apps now, run: "flutter config --enable-macos-arm64-only". '
+          'This will become the default behavior in a future Flutter release.',
+        ),
+      );
+      expect(fakeProcessManager, hasNoRemainingExpectations);
+    },
+    overrides: <Type, Generator>{
+      Platform: () => macosPlatform,
+      FileSystem: () => fileSystem,
+      ProcessManager: () =>
+          FakeProcessManager.list(<FakeCommand>[setUpFakeXcodeBuildHandler('Release')]),
+      Pub: ThrowingPub.new,
+      FeatureFlags: () => TestFeatureFlags(isMacOSEnabled: true),
+      XcodeProjectInterpreter: () =>
+          FakeXcodeProjectInterpreterWithVersion(version: Version(27, 0, 0)),
+      OperatingSystemUtils: () => FakeOperatingSystemUtils(hostPlatform: HostPlatform.darwin_x64),
+    },
+  );
+
+  testUsingContext(
     'macOS build outputs path and size when successful',
     () async {
-      final BuildCommand command = BuildCommand(
+      final command = BuildCommand(
         androidSdk: FakeAndroidSdk(),
         buildSystem: TestBuildSystem.all(BuildResult(success: true)),
         fileSystem: MemoryFileSystem.test(),
