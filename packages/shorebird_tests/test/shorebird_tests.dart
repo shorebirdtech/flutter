@@ -361,6 +361,11 @@ $flavors
         'build',
         'ipa',
         '--no-codesign',
+        // When an unsigned build fails without an issue flutter_tools
+        // recognizes, it reports a missing Development Team and drops
+        // xcodebuild's output. Verbose keeps that output in stdout, which
+        // is printed only when the build fails.
+        '--verbose',
         if (flavor != null) '--flavor=$flavor',
         ...extraArgs,
       ],
