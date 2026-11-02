@@ -1,0 +1,96 @@
+[package]
+name = "updater"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# "lib" is used by the "cli" target for testing from Rust
+# "cdylib" is used by the "dart_cli" target for testing from Dart
+# "staticlib" is used by the engine build for linking into libflutter.so
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[features]
+# Exposes a small set of internal Rust items (e.g. `testing_reset_config`)
+# to sibling crates that need to drive the updater from a test harness.
+# Production builds (the cdylib/staticlib that ships in the engine) do not
+# enable this feature; only `library_test_hooks` does.
+test-hooks = ["dep:ring", "dep:ureq"]
+
+[dependencies]
+# Used for error handling for now.
+anyhow = "1.0.103"
+base64 = "0.23.0"
+# For inflating compressed patch files.
+bipatch = "1.0.0"
+libc = "0.2.98"
+# For error!(), info!(), etc macros. `print` will not show up on Android.
+log = { version = "0.4.14", features = ["std"] }
+# For mmap'ing libapp.so out of the APK without buffering it in RAM. This
+# matters on memory-constrained devices: reading the whole library into a
+# Vec<u8> can cost tens of MB and trigger OOM kills mid-patch.
+memmap2 = "0.9.11"
+# Engine callbacks for the Dart integration tests (`test-hooks` only; see
+# src/test_engine_callbacks.rs). Production builds get signature checks, and
+# on iOS, macOS and Android HTTP, from the engine.
+ring = { version = "0.17.8", optional = true }
+ureq = { version = "3", default-features = false, optional = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.93"
+# For computing hashes of patch files for validation.
+sha2 = "0.11.0"
+uuid = { version = "1.18.1", features = ["v4"] }
+# For decompressing patch files.
+zstd = { version = "0.14.3", default-features = false }
+# For reading libapp.so out of .apk files. Inflate only: zip's `deflate`
+# feature also pulls in zopfli, a compressor we never use.
+zip = { version = "9.1", default-features = false, features = [
+    "deflate-flate2-zlib-rs",
+] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+# For logging to Android logcat.
+android_logger = "0.15.0"
+# Send panics to log (instead of stderr), thus logcat on Android.
+log-panics = "2"
+
+[target.'cfg(any(target_os = "ios", target_os = "macos"))'.dependencies]
+# Send panics to syslog (instead of stderr).
+log-panics = "2"
+# Support for logging on iOS (https://developer.apple.com/documentation/oslog).
+# Without its `logger` feature (and dashmap); logging.rs has the log::Log impl.
+oslog = { version = "0.2.0", default-features = false }
+
+[target.'cfg(any(target_os = "linux", target_os = "windows"))'.dependencies]
+simple_logger = "5.0.0"
+
+# HTTP where the engine's client isn't used (see `engine_http` in build.rs):
+# ureq, a synchronous client with no async runtime, on rustls, checking
+# certificates with the platform's verifier. No gzip: the updater checks
+# downloads against Content-Length.
+[target.'cfg(not(any(target_os = "ios", target_os = "macos", target_os = "android")))'.dependencies]
+ureq = { version = "3", default-features = false, features = [
+    "rustls",
+    "platform-verifier",
+] }
+
+[dev-dependencies]
+# Engine callbacks for unit tests (see src/test_engine_callbacks.rs), and
+# `http::ureq_send`, which the unit tests run on every host.
+ring = "0.17.8"
+ureq = { version = "3", default-features = false, features = [
+    "rustls",
+    "platform-verifier",
+] }
+mockall = "0.15.0"
+mockito = "1.2.0"
+mock_instant = "0.6.0"
+# Gives #[serial] attribute for locking all of our shorebird_init
+# tests to a single thread so they don't conflict with each other.
+serial_test = "4.0.1"
+tempfile = "3"
+
+# <https://github.com/eqrion/cbindgen/blob/master/docs.md#buildrs>
+[build-dependencies]
+cbindgen = "0.29.2"

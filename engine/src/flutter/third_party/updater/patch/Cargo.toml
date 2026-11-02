@@ -1,0 +1,18 @@
+[package]
+name = "patch"
+version = "0.2.1"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# Compression and decompression of patch files.
+bidiff = "1.0.0"
+zstd = { version = "0.14.3", default-features = false }
+
+# Only used by string_patch tool:
+# I don't know how to make them per-target dependencies.
+
+# For computing hashes of patch files for validation.
+# Only used by the string_patch tool for now.
+sha2 = "0.11.0"
