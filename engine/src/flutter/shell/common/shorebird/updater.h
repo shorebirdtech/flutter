@@ -336,11 +336,6 @@ class MockUpdater : public Updater {
     return last_release_version_;
   }
   const std::string& last_yaml_config() const { return last_yaml_config_; }
-  const std::string& last_process_token() const { return last_process_token_; }
-  const std::string& last_previous_exit_process_token() const {
-    return last_previous_exit_process_token_;
-  }
-  int last_previous_exit_reason() const { return last_previous_exit_reason_; }
 
   // Test configuration
   void set_init_result(bool value) { init_result_ = value; }
@@ -364,9 +359,6 @@ class MockUpdater : public Updater {
   std::string next_boot_patch_path_;
   std::string last_release_version_;
   std::string last_yaml_config_;
-  std::string last_process_token_;
-  std::string last_previous_exit_process_token_;
-  int last_previous_exit_reason_ = 0;
   std::vector<std::string> call_log_;
 };
 

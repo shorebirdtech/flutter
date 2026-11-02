@@ -318,9 +318,6 @@ bool MockUpdater::DoInit(const AppConfig& config) {
   init_count_++;
   last_release_version_ = config.release_version;
   last_yaml_config_ = config.yaml_config;
-  last_process_token_ = config.process_token;
-  last_previous_exit_process_token_ = config.previous_exit_process_token;
-  last_previous_exit_reason_ = config.previous_exit_reason;
   call_log_.push_back("Init");
   return init_result_;
 }
@@ -380,9 +377,6 @@ void MockUpdater::Reset() {
   next_boot_patch_path_.clear();
   last_release_version_.clear();
   last_yaml_config_.clear();
-  last_process_token_.clear();
-  last_previous_exit_process_token_.clear();
-  last_previous_exit_reason_ = 0;
   call_log_.clear();
 }
 
