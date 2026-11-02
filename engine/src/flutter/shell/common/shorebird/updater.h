@@ -150,7 +150,12 @@ class Updater {
   // own guard. See the class comment.
   void ReportLaunchStart();
   void ReportLaunchSuccess();
+  /// A patch failed to load, or the first Shell got no VM. Ignored once a
+  /// Shell has been built: a later engine's failure says nothing about the
+  /// patch this process is running.
   void ReportLaunchFailure();
+  /// The owner's root isolate failed to launch.
+  void ReportRootIsolateLaunchFailure();
 
   /// The Shell is built. Clears the boot breadcrumb without promoting the
   /// patch. Once per process.
@@ -178,6 +183,17 @@ class Updater {
   /// background app without running the window's timer and may terminate it
   /// later, and that isn't the patch crashing.
   void SetAppInBackground(bool in_background);
+
+  /// Records what an engine's lifecycle message said about the foreground,
+  /// for a window opened later, without closing it. Lifecycle is app-wide,
+  /// so any engine's message counts. The engine posts the close itself.
+  void NoteAppInBackground(bool in_background);
+
+  /// Runs at a clean process exit (`exit()`, a return from `main`), which
+  /// runs `atexit` handlers where a crash or a kill doesn't. Ends the window
+  /// with a success report and starts no update thread. Registered by
+  /// `OpenLaunchWindow`.
+  static void OnProcessExit();
 
   /// How long after the root isolate launches a death still counts against
   /// the patch.
@@ -236,6 +252,7 @@ class Updater {
   // failed isolate launch is reported.
   static std::atomic<bool> launch_window_open_;
   static std::atomic<bool> app_in_background_;
+  static std::atomic<bool> exit_handler_registered_;
   static std::atomic<int64_t> launch_window_micros_;
   // Whether any `Init` succeeded; the update thread needs a configured
   // updater. Latched, never cleared outside tests.

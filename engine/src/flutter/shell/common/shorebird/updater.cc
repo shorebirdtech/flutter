@@ -4,6 +4,8 @@
 
 #include "flutter/shell/common/shorebird/updater.h"
 
+#include <cstdlib>
+
 #include "flutter/fml/logging.h"
 
 #if SHOREBIRD_PLATFORM_SUPPORTED
@@ -23,6 +25,7 @@ std::atomic<bool> Updater::launch_paused_{false};
 std::atomic<bool> Updater::launch_resumed_{false};
 std::atomic<bool> Updater::launch_window_open_{false};
 std::atomic<bool> Updater::app_in_background_{false};
+std::atomic<bool> Updater::exit_handler_registered_{false};
 // See the "Launch window" section of the class comment for why 5 s.
 std::atomic<int64_t> Updater::launch_window_micros_{5'000'000};
 std::atomic<bool> Updater::initialized_{false};
@@ -163,6 +166,10 @@ bool Updater::ReportLaunchResumed() {
 
 void Updater::OpenLaunchWindow(bool in_background) {
   launch_window_open_.store(true);
+  bool expected = false;
+  if (exit_handler_registered_.compare_exchange_strong(expected, true)) {
+    std::atexit(&Updater::OnProcessExit);
+  }
   if (in_background || app_in_background_.load()) {
     CloseLaunchWindow();
   }
@@ -182,6 +189,21 @@ void Updater::SetAppInBackground(bool in_background) {
   }
 }
 
+void Updater::NoteAppInBackground(bool in_background) {
+  app_in_background_.store(in_background);
+}
+
+void Updater::OnProcessExit() {
+  if (!launch_window_open_.load()) {
+    return;
+  }
+  // No update thread: the process is exiting.
+  bool expected = false;
+  if (launch_completed_.compare_exchange_strong(expected, true)) {
+    Instance().DoReportLaunchSuccess();
+  }
+}
+
 fml::TimeDelta Updater::LaunchWindow() {
   return fml::TimeDelta::FromMicroseconds(launch_window_micros_.load());
 }
@@ -191,6 +213,18 @@ void Updater::SetLaunchWindowForTesting(fml::TimeDelta window) {
 }
 
 void Updater::ReportLaunchFailure() {
+  // Every caller (a patch that failed to load, a Shell with no VM) runs
+  // before the first Shell is built for the launch that matters. Later, it is
+  // another engine's: on iOS and desktop each engine resolves its own patch
+  // path, which can be a newer patch installed during the window, and its
+  // failure must not mark the running patch Bad.
+  if (launch_paused_.load()) {
+    return;
+  }
+  ReportRootIsolateLaunchFailure();
+}
+
+void Updater::ReportRootIsolateLaunchFailure() {
   // Guard: only report failure once per process.
   bool expected = false;
   if (!launch_completed_.compare_exchange_strong(expected, true)) {

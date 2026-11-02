@@ -127,7 +127,7 @@ TEST_F(UpdaterTest, FailureAfterResumeIsReported) {
   Updater::Instance().ReportLaunchStart();
   Updater::Instance().ReportLaunchPaused();
   Updater::Instance().ReportLaunchResumed();
-  Updater::Instance().ReportLaunchFailure();
+  Updater::Instance().ReportRootIsolateLaunchFailure();
   Updater::Instance().CloseLaunchWindow();
 
   EXPECT_EQ(mock_->launch_failure_count(), 1);
@@ -173,7 +173,7 @@ TEST_F(UpdaterTest, FailureInTheBackgroundIsReported) {
   Updater::Instance().ReportLaunchStart();
   Updater::Instance().ReportLaunchPaused();
   Updater::Instance().ReportLaunchResumed();
-  Updater::Instance().ReportLaunchFailure();
+  Updater::Instance().ReportRootIsolateLaunchFailure();
   EXPECT_EQ(mock_->launch_failure_count(), 1);
   EXPECT_EQ(mock_->launch_success_count(), 0);
 }
@@ -194,7 +194,7 @@ TEST_F(UpdaterTest, CloseBetweenResumeAndOpenDoesNothing) {
   Updater::Instance().SetAppInBackground(true);
   EXPECT_EQ(mock_->launch_success_count(), 0);
 
-  Updater::Instance().ReportLaunchFailure();
+  Updater::Instance().ReportRootIsolateLaunchFailure();
   EXPECT_EQ(mock_->launch_failure_count(), 1);
   EXPECT_EQ(mock_->launch_success_count(), 0);
 }
@@ -221,10 +221,62 @@ TEST_F(UpdaterTest, FailureAfterTheWindowClosedIsIgnored) {
   Updater::Instance().ReportLaunchResumed();
   Updater::Instance().OpenLaunchWindow(false);
   Updater::Instance().CloseLaunchWindow();
-  Updater::Instance().ReportLaunchFailure();
+  Updater::Instance().ReportRootIsolateLaunchFailure();
 
   EXPECT_EQ(mock_->launch_success_count(), 1);
   EXPECT_EQ(mock_->launch_failure_count(), 0);
+}
+
+// A later engine's patch load failure or VM-less Shell, once the first Shell
+// is built, says nothing about the patch this process runs: on iOS and
+// desktop each engine resolves its own patch path, which can be a newer patch
+// installed during the window.
+TEST_F(UpdaterTest, LaterEnginesLoadFailureIsIgnored) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchFailure();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().ReportLaunchFailure();
+  Updater::Instance().OpenLaunchWindow(false);
+  Updater::Instance().ReportLaunchFailure();
+  EXPECT_EQ(mock_->launch_failure_count(), 0);
+
+  Updater::Instance().CloseLaunchWindow();
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+}
+
+// A clean exit inside the window (Dart's exit(), a desktop quit returning
+// from main) reports success, and starts no update thread in a process
+// that is exiting. A crash or a kill runs no exit handler.
+TEST_F(UpdaterTest, ProcessExitInTheWindowReportsSuccess) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::OnProcessExit();
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  Updater::Instance().OpenLaunchWindow(false);
+  Updater::OnProcessExit();
+  Updater::OnProcessExit();
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+
+  // The window's own close afterwards reports nothing more.
+  Updater::Instance().CloseLaunchWindow();
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+}
+
+// An exit after a failed launch reports nothing.
+TEST_F(UpdaterTest, ProcessExitAfterFailureReportsNothing) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().ReportRootIsolateLaunchFailure();
+  Updater::OnProcessExit();
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
 }
 
 TEST_F(UpdaterTest, MockUpdaterTracksShouldAutoUpdate) {
