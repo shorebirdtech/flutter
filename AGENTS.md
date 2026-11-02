@@ -21,13 +21,15 @@ on a future upstream merge.
   directory: `shorebird/` (`ci/`, `docs/`), `packages/shorebird_tests/`,
   `packages/flutter_tools/lib/src/shorebird/`,
   `engine/src/flutter/shell/common/shorebird/`,
-  `engine/src/flutter/runtime/shorebird/`.
+  `engine/src/flutter/runtime/shorebird/`. The updater (Rust, from the
+  archived shorebirdtech/updater) is ours too, at
+  `engine/src/flutter/third_party/updater/`; its own `CLAUDE.md` covers it.
 - A Shorebird hook inside an upstream file (`DEPS`, `assets.dart`,
   `FlutterPlugin.kt`, ...) is still an edit to an upstream file.
 - `.github/workflows/shorebird_*.yml` are ours; the other workflows are
   upstream's. Don't edit those unless the change requires it.
 - `DEPS` is upstream's, but we override `dart_sdk_git` and `dart_sdk_revision`
-  (Shorebird's Dart SDK), add `updater_git`/`updater_rev`, and fetch the
+  (Shorebird's Dart SDK) and fetch the
   macos-arm64 prebuilt Dart SDK from GCS. Expect conflicts there on every
   upstream merge.
 - When a change must touch an upstream file, prefer a small additive

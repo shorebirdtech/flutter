@@ -24,3 +24,16 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-patch"]
+  # Shorebird: the Rust updater's crates.
+  - package-ecosystem: "cargo"
+    directories:
+      - "/engine/src/flutter/third_party/updater/library"
+      - "/engine/src/flutter/third_party/updater/patch"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 5
+    groups:
+      updater-deps:
+        patterns:
+          - "*"

@@ -1,7 +1,7 @@
 //! Test-only C symbols layered on top of `updater`.
 //!
 //! This crate exists so Dart integration tests under
-//! `shorebird_code_push/test/integration/` can drive the updater
+//! `integration_test/` can drive the updater
 //! end-to-end without bloating the production C API or adding
 //! `#[cfg(test)]` symbols to the cdylib that ships in the engine.
 //!

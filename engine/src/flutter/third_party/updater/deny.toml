@@ -1,4 +1,4 @@
-# cargo-deny checks for the workspace, run in CI (.github/workflows/main.yaml).
+# cargo-deny checks for the workspace, run in CI (.github/workflows/shorebird_updater.yml at the repository root).
 # The updater is linked into every Shorebird app, so what we depend on and
 # where it comes from is checked on every PR: https://embarkstudios.github.io/cargo-deny/
 #

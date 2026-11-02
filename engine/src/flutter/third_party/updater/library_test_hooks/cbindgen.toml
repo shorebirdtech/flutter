@@ -1,7 +1,7 @@
 # cbindgen configuration for the test-hooks C surface.
 #
 # Output: include/library_test_hooks.h — consumed by the Dart integration
-# test suite under `shorebird_code_push/test/integration/`. No stability
+# test suite under `integration_test/`. No stability
 # guarantee; this header changes as new test hooks are added.
 #
 # build.rs runs cbindgen with `with_src("src/lib.rs")`. Only the

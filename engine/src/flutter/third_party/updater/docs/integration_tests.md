@@ -1,5 +1,9 @@
 # Integration Tests for the Updater
 
+> The suite this proposed now lives in `integration_test/` (a test-only
+> package next to the Rust code), and `shorebird_code_push` lives in
+> shorebirdtech/shorebird. Paths below are as written before that move.
+
 Status: design exploration. This is a proposal, not a committed plan. The goal
 is to agree on the shape before writing harness code.
 

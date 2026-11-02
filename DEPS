@@ -19,8 +19,6 @@ vars = {
   'skia_revision': '8df24be66531469e576a806749a0202ae26b8d08',
   "dart_sdk_revision": "d1b37f9ffefcfea5c851d6a38b395a852490c949",
   "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
-  "updater_git": "https://github.com/shorebirdtech/updater.git",
-  "updater_rev": "b3e2b63b87767741aaa7a4aa14ab54bb2d1a0f84",
 
   # Do not download the Emscripten SDK by default.
   # This prevents us from downloading the Emscripten toolchain for builds
@@ -493,9 +491,6 @@ deps = {
 
   'engine/src/flutter/third_party/ocmock':
    Var('flutter_git') + '/third_party/ocmock' + '@' +  Var('ocmock_rev'),
-
-  'engine/src/flutter/third_party/updater':
-   Var('updater_git') + '@' + Var('updater_rev'),
 
   'engine/src/flutter/third_party/libjpeg-turbo/src':
    Var('flutter_git') + '/third_party/libjpeg-turbo' + '@' + '0fb821f3b2e570b2783a94ccd9a2fb1f4916ae9f',

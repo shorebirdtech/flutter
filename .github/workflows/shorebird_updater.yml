@@ -1,0 +1,231 @@
+# cspell:words dorny clippy rustup taiki cdylib
+# CI for the Rust updater in engine/src/flutter/third_party/updater (the
+# shorebirdtech/updater repo until it moved here). The engine build and its
+# tests (shorebird_engine_tests.yml) cover how the engine links it; this
+# covers the crates themselves and the Dart integration tests.
+name: shorebird_updater
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel superseded PR runs: a newer push's result covers the older one.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+  push:
+    branches:
+      - shorebird/dev
+  # cargo-deny checks advisories against every crate in Cargo.lock. A newly
+  # published advisory against a crate we already ship shows up here weekly,
+  # rather than failing unrelated framework PRs.
+  schedule:
+    - cron: "0 14 * * 1"
+  workflow_dispatch:
+
+env:
+  UPDATER_DIR: engine/src/flutter/third_party/updater
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: read
+
+    outputs:
+      updater: ${{ steps.filter.outputs.updater }}
+
+    name: 👀 Detect Changes
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # A scheduled run has no diff to filter; its jobs run by event.
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        id: filter
+        with:
+          filters: |
+            updater:
+              - .github/workflows/shorebird_updater.yml
+              - engine/src/flutter/third_party/updater/**
+
+  build_rust:
+    needs: changes
+    if: ${{ needs.changes.outputs.updater == 'true' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, nscloud-windows-2022-amd64-8x16, ubuntu-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    name: 🦀 Build and test (${{ matrix.os }})
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ env.UPDATER_DIR }}
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check Formatting
+        run: cargo fmt --all --check
+
+      # No explicit build step needed: clippy already compiles all targets.
+      # One crate per run, so the test-hooks feature library_test_hooks turns
+      # on doesn't hide warnings in the production updater crate.
+      - name: Clippy
+        run: |
+          cargo clippy -p updater --all-targets -- -D warnings
+          cargo clippy -p patch --all-targets -- -D warnings
+          cargo clippy -p library_test_hooks --all-targets -- -D warnings
+
+      # Plain `cargo test` builds only the default members (library, patch),
+      # so the test-hooks feature never leaks into the production crate's
+      # tests; library_test_hooks (the fixture corpus) runs on its own.
+      - name: Test
+        run: |
+          cargo test
+          cargo test -p library_test_hooks
+
+  # The host builds above never compile code behind cfg(target_os =
+  # "android") or cfg(target_os = "ios"); the engine build is the first place
+  # those paths compile. Lint them for the mobile targets here instead.
+  check_mobile_targets:
+    needs: changes
+    if: ${{ needs.changes.outputs.updater == 'true' }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-linux-android
+            os: ubuntu-latest
+          - target: aarch64-apple-ios
+            os: macos-latest
+          # The engine's arm64 iOS simulator build links this target.
+          - target: aarch64-apple-ios-sim
+            os: macos-latest
+
+    runs-on: ${{ matrix.os }}
+
+    name: 📱 Check library (${{ matrix.target }})
+
+    defaults:
+      run:
+        working-directory: ${{ env.UPDATER_DIR }}/library
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: 🦀 Add ${{ matrix.target }}
+        run: rustup target add ${{ matrix.target }}
+
+      # The runner image ships an NDK at ANDROID_NDK_HOME; cargo-ndk points
+      # the C compiler that zstd-sys builds with at it.
+      - name: 🤖 Install cargo-ndk
+        if: ${{ contains(matrix.target, 'android') }}
+        uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        with:
+          tool: cargo-ndk
+
+      - name: 🤖 Clippy (Android)
+        if: ${{ contains(matrix.target, 'android') }}
+        run: cargo ndk --target ${{ matrix.target }} clippy -- -D warnings
+
+      - name: 🍎 Clippy (iOS)
+        if: ${{ contains(matrix.target, 'ios') }}
+        run: cargo clippy --target ${{ matrix.target }} -- -D warnings
+
+  # Advisories, banned crates and sources for every crate in Cargo.lock
+  # (config in deny.toml).
+  cargo_deny:
+    needs: changes
+    if: ${{ needs.changes.outputs.updater == 'true' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+
+    runs-on: ubuntu-latest
+
+    name: 🛡️ cargo deny
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: 🛡️ cargo deny
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          manifest-path: ${{ env.UPDATER_DIR }}/Cargo.toml
+          command: check advisories bans sources
+
+  # shorebird_code_push's Dart API against the real Rust updater, through the
+  # library_test_hooks cdylib (the tests build it with cargo).
+  integration_test:
+    needs: changes
+    if: ${{ needs.changes.outputs.updater == 'true' }}
+
+    runs-on: ubuntu-latest
+
+    name: 🎯 Integration tests
+
+    defaults:
+      run:
+        working-directory: ${{ env.UPDATER_DIR }}/integration_test
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+
+      - name: 📦 Install Dependencies
+        run: flutter pub get
+
+      - run: dart format --set-exit-if-changed .
+
+      - run: flutter analyze .
+
+      - name: 🧪 Test
+        run: flutter test
+
+  cspell:
+    needs: changes
+    if: ${{ needs.changes.outputs.updater == 'true' }}
+
+    runs-on: ubuntu-latest
+
+    name: CSpell
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: streetsidesoftware/cspell-action@ce1816e4ce36532956ac6e983737392774b6e169 # v9.2.0
+        with:
+          incremental_files_only: false
+          root: ${{ env.UPDATER_DIR }}
+          config: ${{ env.UPDATER_DIR }}/cspell.config.yaml
+
+  # The one check to require: it passes when every job above passed or was
+  # skipped because nothing under the updater changed.
+  shorebird_updater:
+    needs: [build_rust, check_mobile_targets, cargo_deny, integration_test, cspell]
+    if: ${{ always() }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      # A cancelled job never ran its checks, so it fails the gate too.
+      - name: ⛔️ exit(1) on failure
+        if: ${{ contains(join(needs.*.result, ','), 'failure') || contains(join(needs.*.result, ','), 'cancelled') }}
+        run: exit 1

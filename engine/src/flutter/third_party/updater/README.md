@@ -13,75 +13,48 @@ written in Rust and is used to update the code running in the Flutter
 app. The updater library is built as a static library and is linked
 into the Flutter engine during build time.
 
+This directory was the shorebirdtech/updater repository until 2026-11. It was
+copied here as one commit; its earlier history is in the archived
+[shorebirdtech/updater](https://github.com/shorebirdtech/updater) repository.
+
 ## Parts
 
 - `library`: Runtime library linked into Flutter Engine to unpack and apply
-  updates. Build into libupdater.a and linked into libflutter.so.
+  updates. Built into libupdater.a and linked into libflutter.so.
+- `library_test_hooks`: Test-only cdylib that wraps `library` with extra C
+  symbols for the integration tests. Never linked into an engine.
 - `patch`: Developer tooling to package Shorebird updates ("patches"). Built
   into `patch.exe` and downloaded and run by `shorebird` command line tool:
   https://github.com/shorebirdtech/shorebird/tree/main/packages/shorebird_cli.
-- `shorebird_code_push`: The Dart bindings for communicating with the updater
-  library from within a Flutter app. Published to pub.dev, usage is optional by
-  developers.
+- `integration_test`: Dart tests that drive `shorebird_code_push`'s API
+  against the real Rust updater (through `library_test_hooks`) and a fake
+  patch server.
+- `fixtures`: Language-neutral cases that freeze updater behavior; see
+  [fixtures/README.md](fixtures/README.md).
+
+`shorebird_code_push`, the Dart package apps use to talk to the updater, lives
+in shorebirdtech/shorebird at
+[`packages/shorebird_code_push`](https://github.com/shorebirdtech/shorebird/tree/main/packages/shorebird_code_push).
+It binds a copy of `library/include/updater_dart.h`; a change to that header
+lands here first and is copied there.
 
 Most interesting code is in the `library` directory. There is also
 a [README.md](library/README.md) in that directory explaining the design.
 
 ## Developing
 
-It's best to edit this repository from within an engine checkout. See
-[BUILDING_ENGINE.md](BUILDING_ENGINE.md) for instructions on how to set up an
-engine checkout.
-
-The workflow I use involves 2 to 3 VSC windows:
-
-1. Opening the engine `src`.
-
-In that terminal I:
-
 ```
-cd third_party/updater
+cargo test                       # library, patch
+cargo build -p library_test_hooks
+cd integration_test && flutter test
 ```
 
-2. To build the updater as part of the engine:
-
-```
-cargo ndk --target aarch64-linux-android build --release && \
-    ninja -C ../../out/android_release_arm64 && say "done"
-```
-
-The cargo part _should not_ be needed, but I haven't yet done the work to
-integrate the Rust code into the gn files for the Flutter engine yet.
-
-I add `say "done"` to the end as linking can take several minutes for release
-Android builds.
-
-3.  In a second window, I open `code third_party/updater`. I do this because
-    otherwise the `rust_analyzer` can't seem to find the rust code. We could
-    fix this by adding the directory to the VSC workspace, but I'm not sure
-    where we would put the workspace file in the first place. `src` is actually
-    `shorebirdtech/buildroot` and is controlled via `gclient` by
-    `shorebirdtech/engine/DEPS`.
-
-4.  In a third window I open my test app. e.g.:
-
-```
-flutter create test_app
-cd test_app
-shorebird init
-shorebird release
-code .
-```
-
-5. To run the test app with my local engine I use:
-
-```
-shorebird run --local-engine-src-path $HOME/Documents/GitHub/engine/src \
-    --local-engine android_release_arm64
-```
-
-You may also need to build `out/host_release` once as `flutter build` looks for
-some Dart `.dill` files in `host_release`.
+The engine builds `library` through GN
+(`//flutter/shell/common/shorebird/build_rust_updater.gni`), so an engine
+build picks up changes here directly. See
+[shorebird/docs/BUILDING.md](../../../../../shorebird/docs/BUILDING.md) for
+building the engine. CI is `.github/workflows/shorebird_updater.yml` at the
+repository root.
 
 ## Coverage
 
