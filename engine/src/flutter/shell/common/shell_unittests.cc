@@ -5234,6 +5234,23 @@ class ShorebirdLaunchTest : public ShellTest {
     FlushPlatformTaskRunner(shell);
   }
 
+  // RunEngine, for a run that may fail.
+  void RunEngineExpecting(Shell* shell,
+                          RunConfiguration configuration,
+                          Engine::RunStatus expected) {
+    fml::AutoResetWaitableEvent latch;
+    fml::TaskRunner::RunNowOrPostTask(
+        shell->GetTaskRunners().GetPlatformTaskRunner(),
+        [shell, &latch, &configuration, expected]() {
+          shell->RunEngine(std::move(configuration),
+                           [&latch, expected](Engine::RunStatus run_status) {
+                             EXPECT_EQ(run_status, expected);
+                             latch.Signal();
+                           });
+        });
+    latch.Wait();
+  }
+
   shorebird::MockUpdater* mock_ = nullptr;
 };
 
@@ -5395,6 +5412,116 @@ TEST_F(ShorebirdLaunchTest, AnotherShellsTeardownKeepsTheWindowOpen) {
   DestroyShell(std::move(shell2), task_runners2);
   FlushPlatformTaskRunner(shell1.get());
   EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  DestroyShell(std::move(shell1), task_runners1);
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+}
+
+// A root isolate that fails to launch is a failed launch of the patch: the
+// owner reports it, opens no window, and its teardown reports no success.
+TEST_F(ShorebirdLaunchTest, RootIsolateFailingToLaunchReportsFailure) {
+  shorebird::Updater::SetLaunchWindowForTesting(fml::TimeDelta::Zero());
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("shorebirdEntrypointThatDoesNotExist");
+  RunEngineExpecting(shell.get(), std::move(configuration),
+                     Engine::RunStatus::Failure);
+  FlushPlatformTaskRunner(shell.get());
+
+  EXPECT_EQ(
+      mock_->call_log(),
+      (std::vector<std::string>{"ReportLaunchStart", "ReportLaunchPaused",
+                                "ReportLaunchResumed", "ReportLaunchFailure"}));
+
+  DestroyShell(std::move(shell), task_runners);
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+}
+
+// Detached, like paused, means the app left the foreground; inactive, like
+// hidden, doesn't close the window.
+TEST_F(ShorebirdLaunchTest, DetachedClosesTheWindowAndInactiveDoesNot) {
+  shorebird::Updater::SetLaunchWindowForTesting(
+      fml::TimeDelta::FromSeconds(60 * 60));
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+  FlushPlatformTaskRunner(shell.get());
+
+  SendLifecycleState(shell.get(), "AppLifecycleState.inactive");
+  SendLifecycleState(shell.get(), "AppLifecycleState.resumed");
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  SendLifecycleState(shell.get(), "AppLifecycleState.detached");
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+
+  DestroyShell(std::move(shell), task_runners);
+}
+
+// An app that left the foreground and came back before its engine ran is in
+// the foreground when the root isolate launches, so the window stays open.
+TEST_F(ShorebirdLaunchTest, ReturningToTheForegroundBeforeRunKeepsTheWindow) {
+  shorebird::Updater::SetLaunchWindowForTesting(
+      fml::TimeDelta::FromSeconds(60 * 60));
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+
+  SendLifecycleState(shell.get(), "AppLifecycleState.paused");
+  SendLifecycleState(shell.get(), "AppLifecycleState.resumed");
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+  FlushPlatformTaskRunner(shell.get());
+
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  DestroyShell(std::move(shell), task_runners);
+}
+
+// A second engine that runs while the first one's window is open doesn't own
+// the window: it resumes nothing, and its teardown keeps the window open.
+TEST_F(ShorebirdLaunchTest, SecondRunningEngineDoesNotOwnTheWindow) {
+  shorebird::Updater::SetLaunchWindowForTesting(
+      fml::TimeDelta::FromSeconds(60 * 60));
+  auto settings = CreateSettingsForFixture();
+  auto task_runners1 = GetTaskRunnersForFixture();
+  auto shell1 = CreateShell(settings, task_runners1);
+  ASSERT_TRUE(shell1);
+  auto configuration1 = RunConfiguration::InferFromSettings(settings);
+  configuration1.SetEntrypoint("emptyMain");
+  RunEngine(shell1.get(), std::move(configuration1));
+
+  // No rendering surface, as in AnotherShellsTeardownKeepsTheWindowOpen.
+  auto task_runners2 = GetTaskRunnersForFixture();
+  auto shell2 = CreateShell({
+      .settings = settings,
+      .task_runners = task_runners2,
+      .platform_view_create_callback =
+          [task_runners2](Shell& shell) {
+            return std::make_unique<PlatformView>(shell, task_runners2);
+          },
+  });
+  ASSERT_TRUE(shell2);
+  auto configuration2 = RunConfiguration::InferFromSettings(settings);
+  configuration2.SetEntrypoint("emptyMain");
+  RunEngine(shell2.get(), std::move(configuration2));
+  DestroyShell(std::move(shell2), task_runners2);
+  FlushPlatformTaskRunner(shell1.get());
+
+  EXPECT_EQ(mock_->call_log(),
+            (std::vector<std::string>{"ReportLaunchStart", "ReportLaunchPaused",
+                                      "ReportLaunchResumed"}));
 
   DestroyShell(std::move(shell1), task_runners1);
   EXPECT_EQ(mock_->launch_success_count(), 1);
