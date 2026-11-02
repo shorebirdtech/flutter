@@ -242,6 +242,8 @@ class AOTSnapshotter {
     _logger.printTrace('targetingAndroidPlatform = $targetingAndroidPlatform');
 
     final bool shouldSplitDebugInfo = splitDebugInfo?.isNotEmpty ?? false;
+
+    final bool shouldSplitDebugInfo = splitDebugInfo?.isNotEmpty ?? false;
     // We strip snapshot by default, but allow to suppress this behavior
     // by supplying --no-strip in extraGenSnapshotOptions.
     var shouldStrip = true;
@@ -308,6 +310,9 @@ class AOTSnapshotter {
       if (stripAfterBuild) {
         _logger.printTrace('Will strip AOT snapshot manually after build and dSYM generation.');
       }
+    } else if (targetingAndroidPlatform) {
+      stripAfterBuild = false;
+      // When building for Android, we let AGP handle stripping of debug symbols.
     } else {
       stripAfterBuild = false;
       if (shouldStrip) {
