@@ -283,7 +283,7 @@ Engine::RunStatus Engine::Run(RunConfiguration configuration) {
           configuration.GetEngineId()))              //
   {
     if (owns_launch_window) {
-      shorebird::Updater::Instance().ReportLaunchFailure();
+      shorebird::Updater::Instance().ReportRootIsolateLaunchFailure();
     }
     return RunStatus::Failure;
   }
@@ -430,11 +430,13 @@ bool Engine::HandleLifecyclePlatformMessage(PlatformMessage* message) {
   if (state == "AppLifecycleState.paused" ||
       state == "AppLifecycleState.detached") {
     shorebird_in_background_ = true;
+    shorebird::Updater::Instance().NoteAppInBackground(true);
     task_runners_.GetPlatformTaskRunner()->PostTask(
         [] { shorebird::Updater::Instance().CloseLaunchWindow(); });
   } else if (state == "AppLifecycleState.resumed" ||
              state == "AppLifecycleState.inactive") {
     shorebird_in_background_ = false;
+    shorebird::Updater::Instance().NoteAppInBackground(false);
   }
   runtime_controller_->SetInitialLifecycleState(state);
   // Always forward these messages to the framework by returning false.
