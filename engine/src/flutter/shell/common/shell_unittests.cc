@@ -5569,7 +5569,8 @@ TEST_F(ShorebirdLaunchTest, AnotherEngineLeavingTheForegroundClosesTheWindow) {
 // Another engine that left the foreground before the owner ran (Android: a
 // FlutterFragment's engine paused while the owner was pre-warmed) closes the
 // owner's window as soon as it opens.
-TEST_F(ShorebirdLaunchTest, AnotherEngineInTheBackgroundBeforeRunClosesTheWindow) {
+TEST_F(ShorebirdLaunchTest,
+       AnotherEngineInTheBackgroundBeforeRunClosesTheWindow) {
   shorebird::Updater::SetLaunchWindowForTesting(
       fml::TimeDelta::FromSeconds(60 * 60));
   auto settings = CreateSettingsForFixture();
