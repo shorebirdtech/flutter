@@ -109,8 +109,10 @@ or
     if (extraGenSnapshotOptions != null) '--ExtraGenSnapshotOptions=$extraGenSnapshotOptions',
     if (frontendServerStarterPath != null) '-dFrontendServerStarterPath=$frontendServerStarterPath',
     if (extraFrontEndOptions != null) '--ExtraFrontEndOptions=$extraFrontEndOptions',
-    if (shorebirdPublicKey != null) '-dShorebirdPublicKey=$shorebirdPublicKey',
-    if (shorebirdDdMaxBytes != null) '-dShorebirdDdMaxBytes=$shorebirdDdMaxBytes',
+    if (shorebirdPublicKey != null && shorebirdPublicKey.isNotEmpty)
+      '-dShorebirdPublicKey=$shorebirdPublicKey',
+    if (shorebirdDdMaxBytes != null && shorebirdDdMaxBytes.isNotEmpty)
+      '-dShorebirdDdMaxBytes=$shorebirdDdMaxBytes',
     target,
   ]);
   assembleProcess.stdout

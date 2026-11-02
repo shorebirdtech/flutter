@@ -567,7 +567,7 @@ abstract final class LinkSupplement {
     maybeCopy('App.ft.link');
     maybeCopy('App.field_table.json');
     // DD table files for cascade limiter (produced by 2-pass release build
-    // when SHOREBIRD_DD_MAX_BYTES is set).
+    // when the ShorebirdDdMaxBytes define is set).
     maybeCopy('App.dd.link');
     maybeCopy('App.dd_callers.link');
     maybeCopy('App.dd_identity.link');
