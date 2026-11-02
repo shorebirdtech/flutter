@@ -5527,6 +5527,45 @@ TEST_F(ShorebirdLaunchTest, SecondRunningEngineDoesNotOwnTheWindow) {
   EXPECT_EQ(mock_->launch_success_count(), 1);
 }
 
+// Lifecycle is app-wide on mobile, so any engine's message that the app left
+// the foreground closes the window, not only the owner's. An add-to-app
+// engine whose screen is closed sends it too; closing early errs toward
+// keeping the patch, never toward blaming it.
+TEST_F(ShorebirdLaunchTest, AnotherEngineLeavingTheForegroundClosesTheWindow) {
+  shorebird::Updater::SetLaunchWindowForTesting(
+      fml::TimeDelta::FromSeconds(60 * 60));
+  auto settings = CreateSettingsForFixture();
+  auto task_runners1 = GetTaskRunnersForFixture();
+  auto shell1 = CreateShell(settings, task_runners1);
+  ASSERT_TRUE(shell1);
+  auto configuration1 = RunConfiguration::InferFromSettings(settings);
+  configuration1.SetEntrypoint("emptyMain");
+  RunEngine(shell1.get(), std::move(configuration1));
+
+  // No rendering surface, as in AnotherShellsTeardownKeepsTheWindowOpen.
+  auto task_runners2 = GetTaskRunnersForFixture();
+  auto shell2 = CreateShell({
+      .settings = settings,
+      .task_runners = task_runners2,
+      .platform_view_create_callback =
+          [task_runners2](Shell& shell) {
+            return std::make_unique<PlatformView>(shell, task_runners2);
+          },
+  });
+  ASSERT_TRUE(shell2);
+  auto configuration2 = RunConfiguration::InferFromSettings(settings);
+  configuration2.SetEntrypoint("emptyMain");
+  RunEngine(shell2.get(), std::move(configuration2));
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  SendLifecycleState(shell2.get(), "AppLifecycleState.paused");
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+
+  DestroyShell(std::move(shell2), task_runners2);
+  DestroyShell(std::move(shell1), task_runners1);
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+}
+
 // In add-to-app, multiple engines may be created within a single process.
 // Only the first engine should report the launch to the Rust updater. This
 // prevents the updater from promoting a newly-downloaded patch to
