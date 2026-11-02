@@ -1025,7 +1025,6 @@ void main() {
             '--deterministic',
             '--snapshot_kind=app-aot-elf',
             '--elf=build/foo/app.so',
-            '--strip',
             '--no-sim-use-hardfp',
             '--no-use-integer-division',
             'main.dill',
@@ -1059,7 +1058,6 @@ void main() {
             '--deterministic',
             '--snapshot_kind=app-aot-elf',
             '--elf=build/foo/app.so',
-            '--strip',
             '--no-sim-use-hardfp',
             '--no-use-integer-division',
             '--dwarf-stack-traces',
@@ -1096,7 +1094,6 @@ void main() {
             '--deterministic',
             '--snapshot_kind=app-aot-elf',
             '--elf=build/foo/app.so',
-            '--strip',
             '--no-sim-use-hardfp',
             '--no-use-integer-division',
             '--obfuscate',
@@ -1132,7 +1129,6 @@ void main() {
               '--deterministic',
               '--snapshot_kind=app-aot-elf',
               '--elf=build/foo/app.so',
-              '--strip',
               '--no-sim-use-hardfp',
               '--no-use-integer-division',
               'main.dill',
@@ -1167,7 +1163,6 @@ void main() {
             '--deterministic',
             '--snapshot_kind=app-aot-elf',
             '--elf=build/foo/app.so',
-            '--strip',
             'main.dill',
           ],
         ),
@@ -1175,6 +1170,37 @@ void main() {
 
       final int genSnapshotExitCode = await snapshotter.build(
         platform: TargetPlatform.android_arm64,
+        buildMode: BuildMode.release,
+        mainPath: 'main.dill',
+        outputPath: outputPath,
+        dartObfuscation: false,
+      );
+
+      expect(genSnapshotExitCode, 0);
+      expect(processManager, hasNoRemainingExpectations);
+    });
+
+    testWithoutContext('strips during build for linux-x64 by default', () async {
+      final String outputPath = fileSystem.path.join('build', 'foo');
+      processManager.addCommand(
+        FakeCommand(
+          command: <String>[
+            artifacts.getArtifactPath(
+              Artifact.genSnapshot,
+              platform: TargetPlatform.linux_x64,
+              mode: BuildMode.release,
+            ),
+            '--deterministic',
+            '--snapshot_kind=app-aot-elf',
+            '--elf=build/foo/app.so',
+            '--strip',
+            'main.dill',
+          ],
+        ),
+      );
+
+      final int genSnapshotExitCode = await snapshotter.build(
+        platform: TargetPlatform.linux_x64,
         buildMode: BuildMode.release,
         mainPath: 'main.dill',
         outputPath: outputPath,

@@ -802,11 +802,11 @@ To fix this, you can either:
       //
       // Upstream Flutter PR #181275 (3.44) inverted libapp.so strip
       // responsibility — Flutter stopped stripping it, AGP is expected to,
-      // and this check fails the build if `.sym/.dbg` is absent. Shorebird
-      // flows that either keep libapp.so unstripped (legacy fixtures with
-      // `keepDebugSymbols.add("**/libapp.so")`) or pre-strip via
-      // `--extra-gen-snapshot-options=--strip` (obfuscated builds) both
-      // produce AABs without `libapp.so.sym`. Returning `true` here lets the
+      // and this check fails the build if `.sym/.dbg` is absent. Apps that
+      // keep libapp.so unstripped (legacy `keepDebugSymbols.add("**/libapp.so")`)
+      // or pass `--strip` to gen_snapshot themselves (e.g.
+      // `--extra-gen-snapshot-options=--strip`) produce AABs without
+      // `libapp.so.sym`. Returning `true` here lets the
       // build succeed; the trade-off is that Play Console won't get Dart
       // crash symbols for these AABs. New apps should remove the legacy
       // `keepDebugSymbols` line to re-enable AGP-side stripping.
