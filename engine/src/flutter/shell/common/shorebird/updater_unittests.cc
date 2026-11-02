@@ -178,6 +178,55 @@ TEST_F(UpdaterTest, FailureInTheBackgroundIsReported) {
   EXPECT_EQ(mock_->launch_success_count(), 0);
 }
 
+// The window is 5 s: long enough for main and the first frames, short
+// enough that a later crash isn't blamed on the patch.
+TEST_F(UpdaterTest, LaunchWindowIsFiveSeconds) {
+  EXPECT_EQ(Updater::LaunchWindow(), fml::TimeDelta::FromSeconds(5));
+}
+
+// A close that races the launch, between resume and the root isolate
+// launching, reports nothing: the launch may still fail.
+TEST_F(UpdaterTest, CloseBetweenResumeAndOpenDoesNothing) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().CloseLaunchWindow();
+  Updater::Instance().SetAppInBackground(true);
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  Updater::Instance().ReportLaunchFailure();
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+}
+
+// An app back in the foreground opens the window and keeps it open.
+TEST_F(UpdaterTest, ReturningToTheForegroundKeepsTheWindowOpen) {
+  Updater::Instance().SetAppInBackground(true);
+  Updater::Instance().SetAppInBackground(false);
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().OpenLaunchWindow(false);
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  Updater::Instance().CloseLaunchWindow();
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+}
+
+// Success after the window closes is the last report: a later failure (a
+// second engine's root isolate) can't undo it.
+TEST_F(UpdaterTest, FailureAfterTheWindowClosedIsIgnored) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().OpenLaunchWindow(false);
+  Updater::Instance().CloseLaunchWindow();
+  Updater::Instance().ReportLaunchFailure();
+
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+  EXPECT_EQ(mock_->launch_failure_count(), 0);
+}
+
 TEST_F(UpdaterTest, MockUpdaterTracksShouldAutoUpdate) {
   mock_->set_should_auto_update(false);
   EXPECT_FALSE(Updater::Instance().ShouldAutoUpdate());
