@@ -889,8 +889,8 @@ flavors:
           .createSync(recursive: true);
 
       final String build = environment.buildDir.path;
-      // Both archs go through the same code path now (the DD-pass is gated on
-      // SHOREBIRD_DD_MAX_BYTES which isn't set in this test), so neither
+      // Both archs go through the same code path now (the DD pass is skipped
+      // on macOS), so neither
       // architecture has an extra async hop. With concurrent Future.wait, the
       // archs reach gen_snapshot in iteration order: arm64 first
       // (`kDarwinArchs = 'arm64 x86_64'`), x86_64 second. They then
