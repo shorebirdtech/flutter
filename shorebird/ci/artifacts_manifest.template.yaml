@@ -55,6 +55,16 @@ artifact_overrides:
   - flutter_infra_release/flutter/$engine/linux-x64/artifacts.zip
   - flutter_infra_release/flutter/$engine/linux-x64-release/linux-x64-flutter-gtk.zip
 
+  # macOS debug and profile artifacts
+  - flutter_infra_release/flutter/$engine/darwin-arm64/artifacts.zip
+  - flutter_infra_release/flutter/$engine/darwin-arm64-profile/artifacts.zip
+  - flutter_infra_release/flutter/$engine/darwin-x64/artifacts.zip
+  - flutter_infra_release/flutter/$engine/darwin-x64/framework.zip
+  - flutter_infra_release/flutter/$engine/darwin-x64/gen_snapshot.zip
+  - flutter_infra_release/flutter/$engine/darwin-x64-profile/artifacts.zip
+  - flutter_infra_release/flutter/$engine/darwin-x64-profile/framework.zip
+  - flutter_infra_release/flutter/$engine/darwin-x64-profile/gen_snapshot.zip
+
   # macOS release artifacts
   - flutter_infra_release/flutter/$engine/darwin-x64-release/artifacts.zip
   - flutter_infra_release/flutter/$engine/darwin-x64-release/framework.zip
