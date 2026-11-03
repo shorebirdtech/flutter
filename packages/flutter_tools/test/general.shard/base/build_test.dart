@@ -187,7 +187,7 @@ void main() {
     late FakeProcessManager processManager;
     late BufferLogger logger;
 
-    // Shorebird-specific: aot_tools runs gen_snapshot for iOS release builds.
+    // Shorebird-specific: aot_tools runs gen_snapshot for iOS builds.
     List<String> aotToolsPrefix(String genSnapshotPath) => shorebirdAotToolsGenSnapshotCommand(
       artifacts,
       fileSystem,
@@ -269,7 +269,7 @@ void main() {
       processManager.addCommands(<FakeCommand>[
         FakeCommand(
           command: <String>[
-            genSnapshotPath,
+            ...aotToolsPrefix(genSnapshotPath),
             '--deterministic',
             ...kLinkInfoArgs,
             '--snapshot_kind=app-aot-assembly',
@@ -346,7 +346,7 @@ void main() {
       processManager.addCommands(<FakeCommand>[
         FakeCommand(
           command: <String>[
-            genSnapshotPath,
+            ...aotToolsPrefix(genSnapshotPath),
             '--deterministic',
             ...kLinkInfoArgs,
             '--snapshot_kind=app-aot-assembly',

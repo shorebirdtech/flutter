@@ -836,13 +836,12 @@ flavors:
     },
   );
 
-  // Shorebird-specific: aot_tools builds iOS release snapshots, so an Xcode
-  // rebuild (flutter assemble) builds the same App as `shorebird release`.
-  // Profile builds run gen_snapshot directly.
+  // Shorebird-specific: aot_tools builds iOS snapshots, so an Xcode rebuild
+  // (flutter assemble) builds the same App as `shorebird release`.
   for (final release in <bool>[true, false]) {
     final recorder = _RecordingProcessManager();
     testUsingContext(
-      'AotAssembly${release ? 'Release runs gen_snapshot through' : 'Profile runs gen_snapshot without'} aot_tools',
+      'AotAssembly${release ? 'Release' : 'Profile'} runs gen_snapshot through aot_tools',
       () async {
         final FileSystem fileSystem = MemoryFileSystem.test();
         final environment = Environment.test(
@@ -865,8 +864,8 @@ flavors:
         final Target target = release ? const AotAssemblyRelease() : const AotAssemblyProfile();
         await expectLater(target.build(environment), throwsException);
         final List<String> first = recorder.commands.first;
-        expect(first, release ? contains('gen-snapshot') : isNot(contains('gen-snapshot')));
-        expect(first.contains('--link-dir=${environment.buildDir.path}'), release);
+        expect(first, contains('gen-snapshot'));
+        expect(first, contains('--link-dir=${environment.buildDir.path}'));
       },
       overrides: <Type, Generator>{
         FileSystem: () => fileSystem,

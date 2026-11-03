@@ -8,8 +8,10 @@ import 'package:flutter_tools/src/base/file_system.dart';
 import 'package:flutter_tools/src/base/platform.dart';
 import 'package:flutter_tools/src/cache.dart';
 import 'package:flutter_tools/src/shorebird/shorebird_aot_tools.dart';
+import 'package:test/fake.dart';
 
 import '../../src/common.dart';
+import '../../src/context.dart';
 import '../../src/fake_process_manager.dart';
 import '../../src/fakes.dart';
 
@@ -35,7 +37,10 @@ void main() {
 
     expect(
       shorebirdAotToolsPath(artifacts, fileSystem),
-      ShorebirdAotTools(cache).location.childFile(kShorebirdAotToolsDill).path,
+      ShorebirdAotTools(
+        cache,
+        platform: FakePlatform(operatingSystem: 'macos'),
+      ).location.childFile(kShorebirdAotToolsDill).path,
     );
     expect(
       shorebirdAotToolsPath(artifacts, fileSystem),
@@ -43,21 +48,60 @@ void main() {
     );
   });
 
-  testWithoutContext('a local engine uses the aot-tools.dill its host build wrote', () {
+  testWithoutContext('a local engine runs aot_tools from its source tree', () {
     final artifacts = Artifacts.testLocalEngine(
       localEngine: 'out/ios_release',
       localEngineHost: 'out/host_release',
       fileSystem: fileSystem,
     );
+    final String hostOut = artifacts.localEngineInfo!.hostOutPath;
 
     expect(
       shorebirdAotToolsPath(artifacts, fileSystem),
       fileSystem.path.join(
-        artifacts.localEngineInfo!.hostOutPath,
-        'aot_tools',
-        kShorebirdAotToolsDill,
+        fileSystem.path.dirname(fileSystem.path.dirname(hostOut)),
+        'flutter/third_party/dart/pkg/aot_tools/bin/aot_tools.dart',
       ),
     );
+  });
+
+  group(ShorebirdAotTools, () {
+    late Cache cache;
+
+    setUp(() {
+      cache = Cache.test(
+        rootOverride: fileSystem.directory('/flutter'),
+        fileSystem: fileSystem,
+        processManager: FakeProcessManager.any(),
+      );
+      cache.getRoot().createSync(recursive: true);
+      cache.setStampFor('engine', 'abc123');
+    });
+
+    testWithoutContext('downloads aot-tools.dill for the engine revision', () async {
+      final artifactUpdater = _FakeArtifactUpdater();
+      final artifact = ShorebirdAotTools(cache, platform: FakePlatform(operatingSystem: 'macos'));
+      await artifact.updateInner(artifactUpdater, fileSystem, FakeOperatingSystemUtils());
+
+      expect(artifactUpdater.downloaded, <Uri>[
+        Uri.parse('${cache.storageBaseUrl}/shorebird/abc123/aot-tools.dill'),
+      ]);
+    });
+
+    testUsingContext('is out of date on macOS until the dill exists', () async {
+      final artifact = ShorebirdAotTools(cache, platform: FakePlatform(operatingSystem: 'macos'));
+      artifact.location.createSync(recursive: true);
+      cache.setStampFor(artifact.stampName, artifact.version!);
+      expect(await artifact.isUpToDate(fileSystem), isFalse);
+
+      artifact.location.childFile(kShorebirdAotToolsDill).createSync();
+      expect(await artifact.isUpToDate(fileSystem), isTrue);
+    });
+
+    testUsingContext('is never needed off macOS', () async {
+      final artifact = ShorebirdAotTools(cache, platform: FakePlatform());
+      expect(await artifact.isUpToDate(fileSystem), isTrue);
+    });
   });
 
   testWithoutContext('shorebirdLinkFileNames lists the link files in a directory', () {
@@ -82,4 +126,13 @@ void main() {
     ]);
     expect(shorebirdLinkFileNames(fileSystem, 'missing'), isEmpty);
   });
+}
+
+class _FakeArtifactUpdater extends Fake implements ArtifactUpdater {
+  final downloaded = <Uri>[];
+
+  @override
+  Future<void> downloadFile(String artifactName, Uri url, Directory location) async {
+    downloaded.add(url);
+  }
 }

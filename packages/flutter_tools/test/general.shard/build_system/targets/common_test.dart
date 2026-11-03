@@ -812,8 +812,14 @@ void main() {
       processManager.addCommands(<FakeCommand>[
         FakeCommand(
           command: <String>[
+            // Shorebird-specific: aot_tools runs gen_snapshot for iOS.
+            'Artifact.engineDartBinary',
+            './artifacts/shorebird_aot_tools/aot-tools.dill',
+            'gen-snapshot',
             // This path is not known by the cache due to the iOS gen_snapshot split.
-            'Artifact.genSnapshotArm64.TargetPlatform.ios.profile',
+            '--gen-snapshot=Artifact.genSnapshotArm64.TargetPlatform.ios.profile',
+            '--link-dir=$build',
+            '--',
             '--deterministic',
             ...linkInfoArgsFor(build),
             '--write-v8-snapshot-profile-to=code_size_1/snapshot.arm64.json',

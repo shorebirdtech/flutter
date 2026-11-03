@@ -34,6 +34,7 @@ class GenSnapshot {
     required FileSystem fileSystem,
   }) : _artifacts = artifacts,
        _fileSystem = fileSystem,
+       _verbose = logger.isVerbose,
        _processUtils = ProcessUtils(logger: logger, processManager: processManager);
 
   final Artifacts _artifacts;
@@ -59,6 +60,7 @@ class GenSnapshot {
   };
 
   final FileSystem _fileSystem;
+  final bool _verbose;
 
   Future<int> run({
     required SnapshotType snapshotType,
@@ -96,6 +98,7 @@ class GenSnapshot {
               genSnapshotPath: snapshotterPath,
               linkDir: shorebirdLinkDir,
               genSnapshotArgs: args,
+              verbose: _verbose,
             ),
       mapFunction: (String line) => kIgnoredWarnings.contains(line) ? null : line,
     );
@@ -277,11 +280,9 @@ class AOTSnapshotter {
       snapshotType: snapshotType,
       additionalArgs: genSnapshotArgs,
       darwinArch: darwinArch,
-      // Shorebird-specific: aot_tools builds iOS release snapshots, so they
-      // get what the Shorebird linker needs however the build was started.
-      shorebirdLinkDir: platform == TargetPlatform.ios && buildMode == BuildMode.release
-          ? outputDir.parent.path
-          : null,
+      // Shorebird-specific: aot_tools builds iOS snapshots, so they get what
+      // the Shorebird linker needs however the build was started.
+      shorebirdLinkDir: platform == TargetPlatform.ios ? outputDir.parent.path : null,
     );
     if (genSnapshotExitCode != 0) {
       _logger.printError('Dart snapshot generator failed with exit code $genSnapshotExitCode');

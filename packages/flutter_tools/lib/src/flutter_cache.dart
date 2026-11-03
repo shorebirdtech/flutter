@@ -53,7 +53,7 @@ class FlutterCache extends Cache {
     }
     registerArtifact(FontSubsetArtifacts(this, platform: platform));
     // Shorebird-specific.
-    registerArtifact(ShorebirdAotTools(this));
+    registerArtifact(ShorebirdAotTools(this, platform: platform));
     registerArtifact(
       PubDependencies(
         logger: logger,
