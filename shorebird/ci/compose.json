@@ -92,7 +92,7 @@
     ]
   },
   "ios-framework-debug": {
-    "requires": ["ios"],
+    "requires": ["ios", "ios-debug"],
     "script": "flutter/sky/tools/create_ios_framework.py",
     "flags": ["--no-extension-safe-frameworks"],
     "path_args": {
@@ -106,7 +106,7 @@
     ]
   },
   "ios-framework-profile": {
-    "requires": ["ios"],
+    "requires": ["ios", "ios-profile"],
     "script": "flutter/sky/tools/create_ios_framework.py",
     "flags": ["--no-extension-safe-frameworks"],
     "path_args": {
