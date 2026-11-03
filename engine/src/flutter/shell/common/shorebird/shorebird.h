@@ -64,7 +64,10 @@ void ConfigureShorebird(std::string code_cache_path,
                         Settings& settings,
                         const std::string& shorebird_yaml,
                         const std::string& version,
-                        const std::string& version_code);
+                        const std::string& version_code,
+                        const std::string& process_token = "",
+                        const std::string& previous_exit_process_token = "",
+                        int previous_exit_reason = 0);
 
 /// Used for reading app_id from shorebird.yaml.
 /// Exposed for testing.

@@ -187,6 +187,9 @@ public class FlutterJNI {
       @Nullable String shorebirdYaml,
       @Nullable String version,
       @Nullable String versionCode,
+      @Nullable String processToken,
+      @Nullable String previousExitProcessToken,
+      int previousExitReason,
       long initTimeMillis,
       int apiLevel);
 
@@ -245,6 +248,9 @@ public class FlutterJNI {
       Log.e(TAG, "Did you remember to include shorebird.yaml in your pubspec.yaml's assets?");
     }
 
+    // Shorebird: tells the updater a kill from a crash (Android 11+).
+    ShorebirdProcessExit processExit = ShorebirdProcessExit.recordAndRead(context);
+
     FlutterJNI.nativeInit(
         context,
         args,
@@ -254,6 +260,9 @@ public class FlutterJNI {
         shorebirdYaml,
         version,
         versionCode,
+        processExit.processToken,
+        processExit.previousExitProcessToken,
+        processExit.previousExitReason,
         initTimeMillis,
         apiLevel);
     FlutterJNI.initCalled = true;

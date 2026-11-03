@@ -47,6 +47,19 @@ struct AppConfig {
 
   /// YAML configuration from shorebird.yaml.
   std::string yaml_config;
+
+  /// A token naming this process, or empty. On Android 11+ it is also the
+  /// process's state summary (`ActivityManager.setProcessStateSummary`), so
+  /// the OS's record of how the process ended carries it, and the updater
+  /// writes it into the boot breadcrumb.
+  std::string process_token;
+
+  /// The token on the OS's record of how the previous process ended, or
+  /// empty when there is none (every platform but Android 11+).
+  std::string previous_exit_process_token;
+
+  /// `ApplicationExitInfo.getReason()` from that record.
+  int previous_exit_reason = 0;
 };
 
 /// Abstract interface for the Shorebird updater.
@@ -116,7 +129,8 @@ struct AppConfig {
 ///   isolate launches, or earlier when the app leaves the foreground or the
 ///   owning engine shuts down. A death before then, a crash in building the
 ///   isolate, in main or in the first frames, rolls the patch back on the
-///   next launch.
+///   next launch (on Android 11+, unless the OS says the process was killed
+///   rather than crashed).
 ///
 /// Tests can call `ResetLaunchStateForTesting()` to re-enable the guards.
 class Updater {

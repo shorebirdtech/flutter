@@ -262,6 +262,7 @@ android_java_sources = [
   "io/flutter/embedding/engine/FlutterOverlaySurface.java",
   "io/flutter/embedding/engine/FlutterShellArgs.java",
   "io/flutter/embedding/engine/ShorebirdHttpClient.java",
+  "io/flutter/embedding/engine/ShorebirdProcessExit.java",
   "io/flutter/embedding/engine/dart/DartExecutor.java",
   "io/flutter/embedding/engine/dart/DartMessenger.java",
   "io/flutter/embedding/engine/dart/PlatformMessageHandler.java",

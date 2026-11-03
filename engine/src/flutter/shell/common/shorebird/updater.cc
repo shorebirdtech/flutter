@@ -247,6 +247,13 @@ bool RealUpdater::DoInit(const AppConfig& config) {
   params.original_libapp_paths_size = static_cast<int>(c_paths.size());
   params.app_storage_dir = config.app_storage_dir.c_str();
   params.code_cache_dir = config.code_cache_dir.c_str();
+  params.process_token =
+      config.process_token.empty() ? nullptr : config.process_token.c_str();
+  params.previous_exit_process_token =
+      config.previous_exit_process_token.empty()
+          ? nullptr
+          : config.previous_exit_process_token.c_str();
+  params.previous_exit_reason = config.previous_exit_reason;
 
   // Convert our FileCallbacks to the Rust struct
   ::FileCallbacks rust_callbacks;
