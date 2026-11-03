@@ -4,9 +4,11 @@ name: shorebird_android_engine_tests
 # Shorebird's release didn't run until now:
 #   - Robolectric: the Android embedding's Java tests (upstream's linux_unopt
 #     builder, ci/builders/linux_unopt.json "ci/android_debug_unopt").
-#   - Native engine tests on an x86_64 emulator: flutter_shell_native_unittests
-#     and the Impeller Android/Vulkan unittests (upstream's
-#     linux_android_emulator builder, ci/builders/linux_android_emulator.json).
+#   - flutter_shell_native_unittests (the Android shell's C++ tests) on an
+#     x86_64 emulator (upstream's linux_android_emulator builder,
+#     ci/builders/linux_android_emulator.json). That builder also runs the
+#     Impeller Android/Vulkan unittests; they aren't here because we don't
+#     change graphics code (Eric 2026-11-03, arc step 7659).
 #
 # A release runs this by workflow_dispatch at the engine commit it ships
 # (_build_engine release_flutter/release.yaml `coverage:`, key engine_sha),
@@ -58,11 +60,7 @@ jobs:
             gn_args: --android --android-cpu=x64 --no-lto
             out_dir: android_debug_x64
             rust_target: x86_64-linux-android
-            targets: >-
-              flutter/impeller/renderer/backend/vulkan:vulkan_android_unittests
-              flutter/impeller/renderer/backend/vulkan:vulkan_android_apk_unittests
-              flutter/impeller/toolkit/android:unittests
-              flutter/shell/platform/android:flutter_shell_native_unittests
+            targets: flutter/shell/platform/android:flutter_shell_native_unittests
 
     steps:
       - name: 📚 Git Checkout
@@ -159,10 +157,11 @@ jobs:
         run: python3 flutter/testing/run_tests.py --variant ${{ matrix.out_dir }} --type java --android-variant ${{ matrix.out_dir }}
         working-directory: engine/src
 
-      # Upstream runs these on an API 36 google_apis x86_64 AVD. KVM is
-      # available on Namespace's Linux runners. run_tests.py --type android
-      # pushes each test binary over adb and runs it.
-      - name: 🧪 Run native tests on the emulator
+      # Upstream runs this on an API 36 google_apis x86_64 AVD. KVM is
+      # available on Namespace's Linux runners. As run_tests.py --type
+      # android does for each binary: push it over adb and run it. That
+      # command also runs the two Impeller suites, which we leave out.
+      - name: 🧪 Run flutter_shell_native_unittests on the emulator
         if: matrix.suite == 'android'
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -173,4 +172,6 @@ jobs:
           ram-size: 4096M
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
           working-directory: engine/src
-          script: python3 flutter/testing/run_tests.py --type android --android-variant ${{ matrix.out_dir }}
+          script: |
+            adb push out/${{ matrix.out_dir }}/flutter_shell_native_unittests /data/local/tmp/flutter_shell_native_unittests
+            adb shell /data/local/tmp/flutter_shell_native_unittests
