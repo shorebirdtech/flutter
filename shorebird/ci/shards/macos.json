@@ -69,7 +69,7 @@
       },
       {
         "type": "gn_ninja",
-        "gn_args": ["--ios", "--runtime-mode=debug"],
+        "gn_args": ["--ios", "--runtime-mode=debug", "--gn-arg=shorebird_runtime=true", "--gn-arg=dart_force_simulator=false"],
         "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
         "out_dir": "ios_debug"
       },
