@@ -837,14 +837,20 @@ flavors:
     },
   );
 
-  // Shorebird-specific: the ShorebirdDdMaxBytes define is what turns on the
-  // DD pass for Xcode rebuilds (flutter assemble), so guard the plumbing from
-  // the define to AOTSnapshotter.build.
-  for (final bool withDefine in <bool>[true, false]) {
+  // Shorebird-specific: every iOS release build runs the DD pass unless the
+  // ShorebirdDdMaxBytes define turns it off; profile builds only with the
+  // define. Guards the path from the defines to AOTSnapshotter.build.
+  for (final (String mode, String? define, bool expectDd) in <(String, String?, bool)>[
+    ('release', null, true),
+    ('release', '100000', true),
+    ('release', '0', false),
+    ('profile', null, false),
+    ('profile', '100000', true),
+  ]) {
     final recorder = _RecordingProcessManager();
     testUsingContext(
-      'AotAssemblyRelease ${withDefine ? 'runs' : 'skips'} the DD pass '
-      '${withDefine ? 'with' : 'without'} the $kShorebirdDdMaxBytes define',
+      'AotAssembly ${expectDd ? 'runs' : 'skips'} the DD pass in $mode mode '
+      '${define == null ? 'with no' : 'with a $define'} $kShorebirdDdMaxBytes define',
       () async {
         final FileSystem fileSystem = MemoryFileSystem.test();
         final environment = Environment.test(
@@ -852,9 +858,9 @@ flavors:
           defines: <String, String>{
             kTargetPlatform: 'ios',
             kSdkRoot: 'path/to/iPhoneOS.sdk',
-            kBuildMode: 'release',
+            kBuildMode: mode,
             kIosArchs: 'arm64',
-            if (withDefine) kShorebirdDdMaxBytes: '100000',
+            if (define != null) kShorebirdDdMaxBytes: define,
           },
           processManager: recorder,
           artifacts: artifacts,
@@ -865,11 +871,14 @@ flavors:
 
         // The recorder fails every process, so the build stops after the
         // first gen_snapshot run; that run is pass 1 of DD when it's on.
-        await expectLater(const AotAssemblyRelease().build(environment), throwsException);
+        final Target target = mode == 'release'
+            ? const AotAssemblyRelease()
+            : const AotAssemblyProfile();
+        await expectLater(target.build(environment), throwsException);
         final List<String> first = recorder.commands.first;
         expect(
           first.any((String arg) => arg.startsWith('--print_dd_function_identity_to=')),
-          withDefine,
+          expectDd,
         );
       },
       overrides: <Type, Generator>{

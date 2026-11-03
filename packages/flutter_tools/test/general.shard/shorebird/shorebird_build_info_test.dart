@@ -138,7 +138,7 @@ void main() {
     );
 
     testUsingContext(
-      'treats an empty key and a zero or malformed DD value as unset',
+      'treats an empty key and a malformed DD value as unset',
       () async {
         final BuildInfo buildInfo = await getBuildInfo();
         expect(buildInfo.shorebirdPublicKey, isNull);
@@ -157,9 +157,11 @@ void main() {
     );
 
     testUsingContext(
-      'treats a zero DD value as unset',
+      'keeps a zero DD value, which turns the DD pass off',
       () async {
-        expect((await getBuildInfo()).shorebirdDdMaxBytes, isNull);
+        final BuildInfo buildInfo = await getBuildInfo();
+        expect(buildInfo.shorebirdDdMaxBytes, 0);
+        expect(buildInfo.toBuildSystemEnvironment()[kShorebirdDdMaxBytes], '0');
       },
       overrides: <Type, Generator>{
         FileSystem: () => fileSystem,
@@ -167,5 +169,31 @@ void main() {
         Platform: () => FakePlatform(environment: <String, String>{'SHOREBIRD_DD_MAX_BYTES': '0'}),
       },
     );
+  });
+
+  group('shorebirdDdMaxBytes', () {
+    test('defaults to the built-in cap in release mode only', () {
+      expect(shorebirdDdMaxBytes(const <String, String>{}, BuildMode.release), 10000);
+      expect(kShorebirdDefaultDdMaxBytes, 10000);
+      expect(shorebirdDdMaxBytes(const <String, String>{}, BuildMode.profile), 0);
+      expect(shorebirdDdMaxBytes(const <String, String>{}, BuildMode.debug), 0);
+    });
+
+    test('takes a non-negative override in any mode, 0 meaning off', () {
+      for (final mode in <BuildMode>[BuildMode.release, BuildMode.profile]) {
+        expect(shorebirdDdMaxBytes(const <String, String>{kShorebirdDdMaxBytes: '500'}, mode), 500);
+        expect(shorebirdDdMaxBytes(const <String, String>{kShorebirdDdMaxBytes: '0'}, mode), 0);
+      }
+    });
+
+    test('ignores a malformed or negative override', () {
+      for (final value in <String>['', 'nope', '-1']) {
+        expect(
+          shorebirdDdMaxBytes(<String, String>{kShorebirdDdMaxBytes: value}, BuildMode.release),
+          10000,
+          reason: value,
+        );
+      }
+    });
   });
 }

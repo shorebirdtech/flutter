@@ -195,8 +195,9 @@ class BuildInfo {
   /// read from the `SHOREBIRD_PUBLIC_KEY` environment variable.
   final String? shorebirdPublicKey;
 
-  /// Shorebird: the cap on the iOS DD table, read from the
-  /// `SHOREBIRD_DD_MAX_BYTES` environment variable. Null means no DD pass.
+  /// Shorebird: an override of the cap on the iOS DD table, read from the
+  /// `SHOREBIRD_DD_MAX_BYTES` environment variable for debugging; 0 turns the
+  /// DD pass off. Null means the default (see `shorebirdDdMaxBytes`).
   final int? shorebirdDdMaxBytes;
 
   /// If provided, an output directory where one or more v8-style heap snapshots

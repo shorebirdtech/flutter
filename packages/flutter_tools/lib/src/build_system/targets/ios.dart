@@ -120,7 +120,7 @@ abstract class AotAssemblyBase extends Target {
           dartObfuscation: dartObfuscation,
           extraGenSnapshotOptions: archExtraGenSnapshotOptions,
           // Shorebird-specific.
-          ddMaxBytes: int.tryParse(environment.defines[kShorebirdDdMaxBytes] ?? '') ?? 0,
+          ddMaxBytes: shorebirdDdMaxBytes(environment.defines, buildMode),
         ),
       );
     }

@@ -192,7 +192,7 @@ class AOTSnapshotter {
     String? splitDebugInfo,
     required bool dartObfuscation,
     bool quiet = false,
-    // Shorebird: the cap on the DD table, from kShorebirdDdMaxBytes. 0 means
+    // Shorebird: the cap on the DD table, from shorebirdDdMaxBytes. 0 means
     // no DD pass.
     int ddMaxBytes = 0,
   }) async {
