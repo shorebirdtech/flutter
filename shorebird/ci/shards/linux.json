@@ -9,7 +9,7 @@
       },
       {
         "type": "gn_ninja",
-        "gn_args": ["--android", "--android-cpu=arm64"],
+        "gn_args": ["--android", "--android-cpu=arm64", "--no-lto"],
         "ninja_targets": ["default"],
         "out_dir": "android_debug_arm64"
       },
@@ -50,7 +50,7 @@
       },
       {
         "type": "gn_ninja",
-        "gn_args": ["--android"],
+        "gn_args": ["--android", "--no-lto"],
         "ninja_targets": ["default", "flutter/sky/dist:zip_old_location", "flutter/lib/gpu/dist:zip_old_location"],
         "out_dir": "android_debug"
       },
@@ -102,7 +102,7 @@
       },
       {
         "type": "gn_ninja",
-        "gn_args": ["--android", "--android-cpu=x64"],
+        "gn_args": ["--android", "--android-cpu=x64", "--no-lto"],
         "ninja_targets": ["default"],
         "out_dir": "android_debug_x64"
       },
