@@ -110,7 +110,10 @@ int _checkIos(String outPath, String nmPath, Iterable<String> builds) {
     final unexpectedEntries = <NmEntry>[];
 
     for (final NmEntry entry in NmEntry.parse(nmResult.stdout as String)) {
-      if (entry.isCInternalSymbol || entry.isAllowedCSymbol || entry.isAllowedObjCSymbol) {
+      if (entry.isCInternalSymbol ||
+          entry.isAllowedCSymbol ||
+          entry.isAllowedObjCSymbol ||
+          entry.isShorebirdCApiSymbol) {
         continue;
       }
       final bool isSwiftSymbol = switch (entry.type) {
@@ -190,7 +193,13 @@ int _checkAndroid(String outPath, String nmPath, Iterable<String> builds) {
       final bool isValidFlutterGpuSymbol =
           key.startsWith('InternalFlutterGpu') && entryMap[key] == 'T';
       final bool isLibcxxSymbol = key.endsWith('_lcxx_override');
-      if (!isValidFlutterGpuSymbol && !isLibcxxSymbol && entryMap[key] != expectedSymbols[key]) {
+      // Shorebird: the updater's C API, which package:shorebird_code_push
+      // looks up at runtime (shell/platform/android/android_exports.lst).
+      final bool isShorebirdCApiSymbol = key.startsWith('shorebird_') && entryMap[key] == 'T';
+      if (!isValidFlutterGpuSymbol &&
+          !isLibcxxSymbol &&
+          !isShorebirdCApiSymbol &&
+          entryMap[key] != expectedSymbols[key]) {
         badSymbols[key] = entryMap[key]!;
       }
     }
@@ -272,6 +281,12 @@ final class NmEntry {
             name.startsWith(r'_OBJC_CLASS_$_Flutter')),
       _ => false,
     };
+  }
+
+  /// Shorebird: the updater's C API, which package:shorebird_code_push
+  /// looks up at runtime.
+  bool get isShorebirdCApiSymbol {
+    return type == '(__TEXT,__text)' && name.startsWith('_shorebird_');
   }
 
   bool get isCInternalSymbol {

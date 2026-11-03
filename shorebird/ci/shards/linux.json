@@ -18,6 +18,10 @@
         "gn_args": ["--android", "--android-cpu=arm64", "--runtime-mode=profile"],
         "ninja_targets": ["default", "gen_snapshot"],
         "out_dir": "android_profile_arm64"
+      },
+      {
+        "type": "shell",
+        "command": "flutter/third_party/dart/tools/sdks/dart-sdk/bin/dart flutter/testing/symbols/verify_exported.dart \"$PWD/out\" flutter/buildtools"
       }
     ],
     "artifacts": [
@@ -59,6 +63,10 @@
         "gn_args": ["--android", "--runtime-mode=profile"],
         "ninja_targets": ["default", "gen_snapshot"],
         "out_dir": "android_profile"
+      },
+      {
+        "type": "shell",
+        "command": "flutter/third_party/dart/tools/sdks/dart-sdk/bin/dart flutter/testing/symbols/verify_exported.dart \"$PWD/out\" flutter/buildtools"
       }
     ],
     "artifacts": [
@@ -111,6 +119,10 @@
         "gn_args": ["--android", "--android-cpu=x64", "--runtime-mode=profile"],
         "ninja_targets": ["default", "gen_snapshot"],
         "out_dir": "android_profile_x64"
+      },
+      {
+        "type": "shell",
+        "command": "flutter/third_party/dart/tools/sdks/dart-sdk/bin/dart flutter/testing/symbols/verify_exported.dart \"$PWD/out\" flutter/buildtools"
       }
     ],
     "artifacts": [
