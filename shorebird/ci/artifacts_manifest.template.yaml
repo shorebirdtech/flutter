@@ -92,6 +92,10 @@ artifact_overrides:
   # Common release artifacts
   - flutter_infra_release/flutter/$engine/flutter_patched_sdk_product.zip
 
+  # iOS debug and profile artifacts
+  - flutter_infra_release/flutter/$engine/ios/artifacts.zip
+  - flutter_infra_release/flutter/$engine/ios-profile/artifacts.zip
+
   # iOS release artifacts
   - flutter_infra_release/flutter/$engine/ios-release/artifacts.zip
   - flutter_infra_release/flutter/$engine/ios-release/Flutter.framework.dSYM.zip

@@ -66,6 +66,18 @@
         "gn_args": ["--ios", "--runtime-mode=debug", "--simulator", "--simulator-cpu=arm64"],
         "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
         "out_dir": "ios_debug_sim_arm64"
+      },
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--ios", "--runtime-mode=debug"],
+        "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
+        "out_dir": "ios_debug"
+      },
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--ios", "--runtime-mode=profile"],
+        "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
+        "out_dir": "ios_profile"
       }
     ],
     "compose_input": "ios-framework"
