@@ -62,27 +62,13 @@
         "gn_args": ["--runtime-mode=release", "--mac", "--mac-cpu=arm64"],
         "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts"],
         "out_dir": "mac_release_arm64"
-      },
-      {
-        "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=debug", "--mac", "--mac-cpu=arm64"],
-        "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts"],
-        "out_dir": "mac_debug_arm64"
-      },
-      {
-        "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=profile", "--mac", "--mac-cpu=arm64"],
-        "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts"],
-        "out_dir": "mac_profile_arm64"
       }
     ],
     "compose_input": "macos-framework",
     "artifacts": [
       {"src": "host_release_arm64/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-darwin-arm64.zip", "zip": true, "content_hash": true},
       {"src": "mac_release_arm64/zip_archives/darwin-arm64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64-release/artifacts.zip"},
-      {"src": "mac_release_arm64/analyze_snapshot_arm64", "dst": "shorebird/$engine/analyze-snapshot-macos-arm64"},
-      {"src": "mac_debug_arm64/zip_archives/darwin-arm64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-arm64/artifacts.zip"},
-      {"src": "mac_profile_arm64/zip_archives/darwin-arm64-profile/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-arm64-profile/artifacts.zip"}
+      {"src": "mac_release_arm64/analyze_snapshot_arm64", "dst": "shorebird/$engine/analyze-snapshot-macos-arm64"}
     ]
   },
   "mac-x64": {
@@ -100,18 +86,6 @@
         "out_dir": "mac_release"
       },
       {
-        "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=debug", "--mac", "--mac-cpu=x64"],
-        "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts"],
-        "out_dir": "mac_debug"
-      },
-      {
-        "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=profile", "--mac", "--mac-cpu=x64"],
-        "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts"],
-        "out_dir": "mac_profile"
-      },
-      {
         "type": "shell",
         "command": "flutter/bin/et stamp && cp out/engine_stamp.json out/mac_release/engine_stamp.json"
       }
@@ -120,8 +94,58 @@
     "artifacts": [
       {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-darwin-x64.zip", "zip": true, "content_hash": true},
       {"src": "mac_release/engine_stamp.json", "dst": "flutter_infra_release/flutter/$engine/engine_stamp.json"},
-      {"src": "mac_release/analyze_snapshot_x64", "dst": "shorebird/$engine/analyze-snapshot-macos-x64"},
-      {"src": "mac_debug/zip_archives/darwin-x64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64/artifacts.zip"},
+      {"src": "mac_release/analyze_snapshot_x64", "dst": "shorebird/$engine/analyze-snapshot-macos-x64"}
+    ]
+  },
+  "mac-arm64-debug": {
+    "steps": [
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--runtime-mode=debug", "--mac", "--mac-cpu=arm64"],
+        "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts"],
+        "out_dir": "mac_debug_arm64"
+      }
+    ],
+    "artifacts": [
+      {"src": "mac_debug_arm64/zip_archives/darwin-arm64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-arm64/artifacts.zip"}
+    ]
+  },
+  "mac-arm64-profile": {
+    "steps": [
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--runtime-mode=profile", "--mac", "--mac-cpu=arm64"],
+        "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts"],
+        "out_dir": "mac_profile_arm64"
+      }
+    ],
+    "artifacts": [
+      {"src": "mac_profile_arm64/zip_archives/darwin-arm64-profile/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-arm64-profile/artifacts.zip"}
+    ]
+  },
+  "mac-x64-debug": {
+    "steps": [
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--runtime-mode=debug", "--mac", "--mac-cpu=x64"],
+        "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts"],
+        "out_dir": "mac_debug"
+      }
+    ],
+    "artifacts": [
+      {"src": "mac_debug/zip_archives/darwin-x64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64/artifacts.zip"}
+    ]
+  },
+  "mac-x64-profile": {
+    "steps": [
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--runtime-mode=profile", "--mac", "--mac-cpu=x64"],
+        "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts"],
+        "out_dir": "mac_profile"
+      }
+    ],
+    "artifacts": [
       {"src": "mac_profile/zip_archives/darwin-x64-profile/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64-profile/artifacts.zip"}
     ]
   }
