@@ -92,8 +92,10 @@ artifact_overrides:
   # Common release artifacts
   - flutter_infra_release/flutter/$engine/flutter_patched_sdk_product.zip
 
-  # iOS debug and profile artifacts
-  - flutter_infra_release/flutter/$engine/ios/artifacts.zip
+  # iOS profile artifacts. ios/artifacts.zip (debug) is built and staged but
+  # still served from upstream: FFI callbacks on the fork's simulator are
+  # unproven on iPhones that can't JIT (iOS 26). Serve it once a debug run
+  # on such a device passes.
   - flutter_infra_release/flutter/$engine/ios-profile/artifacts.zip
 
   # iOS release artifacts
