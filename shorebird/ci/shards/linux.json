@@ -67,7 +67,7 @@
       {
         "type": "gn_ninja",
         "gn_args": ["--no-prebuilt-dart-sdk"],
-        "ninja_targets": ["flutter/build/archives:artifacts"],
+        "ninja_targets": ["flutter/build/archives:artifacts", "flutter/build/archives:flutter_patched_sdk"],
         "out_dir": "host_debug"
       },
       {
@@ -80,6 +80,7 @@
       {"src": "host_release/zip_archives/flutter_patched_sdk_product.zip", "dst": "flutter_infra_release/flutter/$engine/flutter_patched_sdk_product.zip"},
       {"src": "host_release/zip_archives/linux-x64-release/linux-x64-flutter-gtk.zip", "dst": "flutter_infra_release/flutter/$engine/linux-x64-release/linux-x64-flutter-gtk.zip"},
       {"src": "host_debug/zip_archives/linux-x64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/linux-x64/artifacts.zip"},
+      {"src": "host_debug/zip_archives/flutter_patched_sdk.zip", "dst": "flutter_infra_release/flutter/$engine/flutter_patched_sdk.zip"},
       {"src": "host_release/aot_tools/aot-tools.dill", "dst": "shorebird/$engine/aot-tools.dill"}
     ]
   }

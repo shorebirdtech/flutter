@@ -44,7 +44,8 @@ artifact_overrides:
   - download.flutter.io/io/flutter/x86_64_release/1.0.0-$engine/x86_64_release-1.0.0-$engine.pom
   - download.flutter.io/io/flutter/x86_64_release/1.0.0-$engine/x86_64_release-1.0.0-$engine.jar
 
-  # Common release artifacts
+  # Common artifacts
+  - flutter_infra_release/flutter/$engine/flutter_patched_sdk.zip
   - flutter_infra_release/flutter/$engine/flutter_patched_sdk_product.zip
 
   # iOS release artifacts
@@ -54,6 +55,16 @@ artifact_overrides:
   # Linux release artifacts
   - flutter_infra_release/flutter/$engine/linux-x64/artifacts.zip
   - flutter_infra_release/flutter/$engine/linux-x64-release/linux-x64-flutter-gtk.zip
+
+  # macOS debug and profile artifacts
+  - flutter_infra_release/flutter/$engine/darwin-arm64/artifacts.zip
+  - flutter_infra_release/flutter/$engine/darwin-arm64-profile/artifacts.zip
+  - flutter_infra_release/flutter/$engine/darwin-x64/artifacts.zip
+  - flutter_infra_release/flutter/$engine/darwin-x64/framework.zip
+  - flutter_infra_release/flutter/$engine/darwin-x64/gen_snapshot.zip
+  - flutter_infra_release/flutter/$engine/darwin-x64-profile/artifacts.zip
+  - flutter_infra_release/flutter/$engine/darwin-x64-profile/framework.zip
+  - flutter_infra_release/flutter/$engine/darwin-x64-profile/gen_snapshot.zip
 
   # macOS release artifacts
   - flutter_infra_release/flutter/$engine/darwin-x64-release/artifacts.zip
