@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Reproduces https://github.com/flutter/flutter/issues/192365 end to end:
-// `Scene.toImage` from Dart while the view has no window surface, rendered by
-// Impeller's OpenGL ES backend.
+// Reproduces, end to end, snapshot and readback work from Dart while the view
+// has no window surface, rendered by Impeller's OpenGL ES backend:
+//  - `Scene.toImage` (https://github.com/flutter/flutter/issues/192365).
+//  - `Image.toByteData` on a raster-owned image
+//    (https://github.com/flutter/flutter/issues/195627).
 //
 // The OpenGL ES driver is |MockGLES|, so this runs on any host. EGL is faked
 // just enough to model what matters on Android:
@@ -217,6 +219,36 @@ void ConfigureMockDriver(NiceMock<impeller::testing::MockGLESImpl>& gl) {
       .WillByDefault(Return(GL_FRAMEBUFFER_COMPLETE));
 }
 
+/// An Impeller OpenGL ES context on |MockGLES| whose reactor may only react on
+/// the thread that has |egl| current.
+struct FakeGLESContext {
+  std::shared_ptr<impeller::testing::MockGLES> mock_gles;
+  std::shared_ptr<FakeEGL> egl;
+  std::shared_ptr<impeller::ContextGLES> context;
+  std::shared_ptr<FakeEGLReactorWorker> worker;
+};
+
+FakeGLESContext CreateFakeGLESContext() {
+  auto mock_gles_impl =
+      std::make_unique<NiceMock<impeller::testing::MockGLESImpl>>();
+  ConfigureMockDriver(*mock_gles_impl);
+  FakeGLESContext result;
+  result.mock_gles =
+      impeller::testing::MockGLES::Init(std::move(mock_gles_impl));
+  result.egl = std::make_shared<FakeEGL>();
+  result.context =
+      impeller::ContextGLES::Create(impeller::Flags{},
+                                    std::make_unique<impeller::ProcTableGLES>(
+                                        impeller::testing::kMockResolverGLES),
+                                    ShaderLibraryMappings(),
+                                    /*enable_gpu_tracing=*/false);
+  if (result.context) {
+    result.worker = std::make_shared<FakeEGLReactorWorker>(result.egl);
+    result.context->AddReactorWorker(result.worker);
+  }
+  return result;
+}
+
 }  // namespace
 
 // In unoptimized builds this stops first at the FML_DCHECK in
@@ -224,23 +256,10 @@ void ConfigureMockDriver(NiceMock<impeller::testing::MockGLESImpl>& gl) {
 // with no context current. In optimized builds it crashes with the
 // use-after-free in DeviceBufferGLES::OnGetContents from the issue.
 TEST_F(ShellTest, SceneToImageWithoutSurfaceOnImpellerGLES) {
-  auto mock_gles_impl =
-      std::make_unique<NiceMock<impeller::testing::MockGLESImpl>>();
-  ConfigureMockDriver(*mock_gles_impl);
-  std::shared_ptr<impeller::testing::MockGLES> mock_gles =
-      impeller::testing::MockGLES::Init(std::move(mock_gles_impl));
-
-  auto egl = std::make_shared<FakeEGL>();
-  std::shared_ptr<impeller::ContextGLES> context =
-      impeller::ContextGLES::Create(impeller::Flags{},
-                                    std::make_unique<impeller::ProcTableGLES>(
-                                        impeller::testing::kMockResolverGLES),
-                                    ShaderLibraryMappings(),
-                                    /*enable_gpu_tracing=*/false);
-  ASSERT_TRUE(context);
-  ASSERT_TRUE(std::static_pointer_cast<impeller::Context>(context)->IsValid());
-  auto worker = std::make_shared<FakeEGLReactorWorker>(egl);
-  context->AddReactorWorker(worker);
+  FakeGLESContext gles = CreateFakeGLESContext();
+  ASSERT_TRUE(gles.context);
+  ASSERT_TRUE(
+      std::static_pointer_cast<impeller::Context>(gles.context)->IsValid());
 
   Settings settings = CreateSettingsForFixture();
   settings.enable_impeller = true;
@@ -255,9 +274,9 @@ TEST_F(ShellTest, SceneToImageWithoutSurfaceOnImpellerGLES) {
       .settings = settings,
       .task_runners = task_runners,
       .platform_view_create_callback =
-          [&context, &egl](Shell& shell) -> std::unique_ptr<PlatformView> {
+          [&gles](Shell& shell) -> std::unique_ptr<PlatformView> {
         return std::make_unique<NoSurfaceGLESPlatformView>(
-            shell, shell.GetTaskRunners(), context, egl);
+            shell, shell.GetTaskRunners(), gles.context, gles.egl);
       },
   });
   ASSERT_TRUE(shell->IsSetup());
