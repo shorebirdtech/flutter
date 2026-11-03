@@ -25,6 +25,51 @@ artifact_overrides:
   - flutter_infra_release/flutter/$engine/android-x64-release/symbols.zip
   - flutter_infra_release/flutter/$engine/android-x64-release/windows-x64.zip
 
+  # Android debug and profile artifacts
+  - flutter_infra_release/flutter/$engine/android-arm-profile/artifacts.zip
+  - flutter_infra_release/flutter/$engine/android-arm-profile/darwin-x64.zip
+  - flutter_infra_release/flutter/$engine/android-arm-profile/linux-x64.zip
+  - flutter_infra_release/flutter/$engine/android-arm-profile/symbols.zip
+  - flutter_infra_release/flutter/$engine/android-arm-profile/windows-x64.zip
+  - flutter_infra_release/flutter/$engine/android-arm/artifacts.zip
+  - flutter_infra_release/flutter/$engine/android-arm/symbols.zip
+  - flutter_infra_release/flutter/$engine/android-arm64-profile/artifacts.zip
+  - flutter_infra_release/flutter/$engine/android-arm64-profile/darwin-x64.zip
+  - flutter_infra_release/flutter/$engine/android-arm64-profile/linux-x64.zip
+  - flutter_infra_release/flutter/$engine/android-arm64-profile/symbols.zip
+  - flutter_infra_release/flutter/$engine/android-arm64-profile/windows-x64.zip
+  - flutter_infra_release/flutter/$engine/android-arm64/artifacts.zip
+  - flutter_infra_release/flutter/$engine/android-arm64/symbols.zip
+  - flutter_infra_release/flutter/$engine/android-x64-profile/artifacts.zip
+  - flutter_infra_release/flutter/$engine/android-x64-profile/darwin-x64.zip
+  - flutter_infra_release/flutter/$engine/android-x64-profile/linux-x64.zip
+  - flutter_infra_release/flutter/$engine/android-x64-profile/symbols.zip
+  - flutter_infra_release/flutter/$engine/android-x64-profile/windows-x64.zip
+  - flutter_infra_release/flutter/$engine/android-x64/artifacts.zip
+  - flutter_infra_release/flutter/$engine/android-x64/symbols.zip
+
+  # Android debug and profile Maven artifacts
+  - download.flutter.io/io/flutter/arm64_v8a_debug/1.0.0-$engine/arm64_v8a_debug-1.0.0-$engine.pom
+  - download.flutter.io/io/flutter/arm64_v8a_debug/1.0.0-$engine/arm64_v8a_debug-1.0.0-$engine.jar
+  - download.flutter.io/io/flutter/arm64_v8a_profile/1.0.0-$engine/arm64_v8a_profile-1.0.0-$engine.pom
+  - download.flutter.io/io/flutter/arm64_v8a_profile/1.0.0-$engine/arm64_v8a_profile-1.0.0-$engine.jar
+  - download.flutter.io/io/flutter/armeabi_v7a_debug/1.0.0-$engine/armeabi_v7a_debug-1.0.0-$engine.pom
+  - download.flutter.io/io/flutter/armeabi_v7a_debug/1.0.0-$engine/armeabi_v7a_debug-1.0.0-$engine.jar
+  - download.flutter.io/io/flutter/armeabi_v7a_profile/1.0.0-$engine/armeabi_v7a_profile-1.0.0-$engine.pom
+  - download.flutter.io/io/flutter/armeabi_v7a_profile/1.0.0-$engine/armeabi_v7a_profile-1.0.0-$engine.jar
+  - download.flutter.io/io/flutter/flutter_embedding_debug/1.0.0-$engine/flutter_embedding_debug-1.0.0-$engine.pom
+  - download.flutter.io/io/flutter/flutter_embedding_debug/1.0.0-$engine/flutter_embedding_debug-1.0.0-$engine.jar
+  - download.flutter.io/io/flutter/flutter_embedding_profile/1.0.0-$engine/flutter_embedding_profile-1.0.0-$engine.pom
+  - download.flutter.io/io/flutter/flutter_embedding_profile/1.0.0-$engine/flutter_embedding_profile-1.0.0-$engine.jar
+  - download.flutter.io/io/flutter/x86_64_debug/1.0.0-$engine/x86_64_debug-1.0.0-$engine.pom
+  - download.flutter.io/io/flutter/x86_64_debug/1.0.0-$engine/x86_64_debug-1.0.0-$engine.jar
+  - download.flutter.io/io/flutter/x86_64_profile/1.0.0-$engine/x86_64_profile-1.0.0-$engine.pom
+  - download.flutter.io/io/flutter/x86_64_profile/1.0.0-$engine/x86_64_profile-1.0.0-$engine.jar
+
+  # Dart and Flutter GPU packages (flutter_tools unpacks them into bin/cache/pkg)
+  - flutter_infra_release/flutter/$engine/sky_engine.zip
+  - flutter_infra_release/flutter/$engine/flutter_gpu.zip
+
   # engine_stamp.json
   - flutter_infra_release/flutter/$engine/engine_stamp.json
 
