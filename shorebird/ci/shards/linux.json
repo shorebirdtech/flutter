@@ -22,7 +22,8 @@
         "gn_args": ["--android", "--android-cpu=arm64", "--runtime-mode=profile"],
         "ninja_targets": ["default", "gen_snapshot"],
         "out_dir": "android_profile_arm64"
-      }
+      },
+      {"type": "verify_exported"}
     ],
     "artifacts": [
       {"src": "android_release_arm64/zip_archives/android-arm64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/artifacts.zip"},
@@ -63,7 +64,8 @@
         "gn_args": ["--android", "--runtime-mode=profile"],
         "ninja_targets": ["default", "gen_snapshot"],
         "out_dir": "android_profile"
-      }
+      },
+      {"type": "verify_exported"}
     ],
     "artifacts": [
       {"src": "android_release/zip_archives/android-arm-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/artifacts.zip"},
@@ -115,7 +117,8 @@
         "gn_args": ["--android", "--android-cpu=x64", "--runtime-mode=profile"],
         "ninja_targets": ["default", "gen_snapshot"],
         "out_dir": "android_profile_x64"
-      }
+      },
+      {"type": "verify_exported"}
     ],
     "artifacts": [
       {"src": "android_release_x64/zip_archives/android-x64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/artifacts.zip"},
