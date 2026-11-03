@@ -443,8 +443,44 @@ void main() {
       expect(processManager, hasNoRemainingExpectations);
     });
 
+    testWithoutContext('iOS build with ddMaxBytes runs the DD analysis pass first', () async {
+      final String genSnapshotPath = artifacts.getArtifactPath(
+        Artifact.genSnapshotArm64,
+        platform: TargetPlatform.ios,
+        mode: BuildMode.release,
+      );
+      processManager.addCommand(
+        FakeCommand(
+          command: <String>[
+            genSnapshotPath,
+            '--deterministic',
+            ...kLinkInfoArgs,
+            '--snapshot_kind=app-aot-elf',
+            '--elf=${fileSystem.path.join('build', 'App_dd_analysis.so')}',
+            '--print_dd_function_identity_to=${fileSystem.path.join('build', 'App.dd_identity.link')}',
+            'main.dill',
+          ],
+          exitCode: 1,
+        ),
+      );
+
+      final int genSnapshotExitCode = await snapshotter.build(
+        platform: TargetPlatform.ios,
+        buildMode: BuildMode.release,
+        mainPath: 'main.dill',
+        outputPath: fileSystem.path.join('build', 'foo'),
+        darwinArch: DarwinArch.arm64,
+        sdkRoot: 'path/to/sdk',
+        dartObfuscation: false,
+        ddMaxBytes: 100000,
+      );
+
+      expect(genSnapshotExitCode, 1);
+      expect(processManager, hasNoRemainingExpectations);
+    });
+
     testWithoutContext('iOS build without DD deletes tables from an earlier DD pass', () async {
-      // An earlier build with SHOREBIRD_DD_MAX_BYTES left these next to the
+      // An earlier build with a DD max bytes left these next to the
       // output directory, where LinkSupplement would ship them.
       const ddFiles = <String>[
         'App.dd_identity.link',

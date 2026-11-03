@@ -15,7 +15,6 @@ import '../../darwin/darwin.dart';
 import '../../devfs.dart';
 import '../../isolated/native_assets/dart_hook_result.dart';
 import '../../project.dart';
-import '../../shorebird/shorebird_build_key.dart';
 import '../../shorebird/shorebird_kernel.dart';
 import '../build_system.dart';
 import '../depfile.dart';
@@ -29,7 +28,7 @@ import 'native_assets.dart';
 
 /// Copies the pre-built flutter bundle.
 // This is a one-off rule for implementing build bundle in terms of assemble.
-class CopyFlutterBundle extends Target with ShorebirdPublicKeyBuildKey {
+class CopyFlutterBundle extends Target {
   const CopyFlutterBundle();
 
   @override
@@ -561,7 +560,7 @@ abstract final class LinkSupplement {
     maybeCopy('App.ft.link');
     maybeCopy('App.field_table.json');
     // DD table files for cascade limiter (produced by 2-pass release build
-    // when SHOREBIRD_DD_MAX_BYTES is set).
+    // when the ShorebirdDdMaxBytes define is set).
     maybeCopy('App.dd.link');
     maybeCopy('App.dd_callers.link');
     maybeCopy('App.dd_identity.link');
