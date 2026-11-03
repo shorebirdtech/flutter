@@ -367,13 +367,16 @@ deps = {
 
   # Prebuilt Dart SDK of the same revision as the Dart SDK source checkout
   'engine/src/flutter/prebuilts/linux-x64/dart-sdk': {
-    'packages': [
+    'bucket': 'shorebird-dart-sdk-prebuilt',
+    'objects': [
       {
-        'package': 'flutter/dart-sdk/linux-amd64',
-        'version': 'git_revision:'+Var('dart_revision')
+        'object_name': Var('dart_sdk_revision') + '/dart-sdk-linux-x64.tar.gz',
+        'sha256sum': '47f042a36a270616b4cca332508a4cc51f72a15e88e8b5166326241da7fefac6',
+        'size_bytes': 228672738,
+        'generation': 1793749198048162,
       }
     ],
-    'dep_type': 'cipd',
+    'dep_type': 'gcs',
     'condition': 'host_os == "linux" and download_dart_sdk'
   },
   'engine/src/flutter/prebuilts/linux-arm64/dart-sdk': {
@@ -387,13 +390,16 @@ deps = {
     'condition': 'host_os == "linux" and download_dart_sdk'
   },
   'engine/src/flutter/prebuilts/macos-x64/dart-sdk': {
-    'packages': [
+    'bucket': 'shorebird-dart-sdk-prebuilt',
+    'objects': [
       {
-        'package': 'flutter/dart-sdk/mac-amd64',
-        'version': 'git_revision:'+Var('dart_revision')
+        'object_name': Var('dart_sdk_revision') + '/dart-sdk-darwin-x64.tar.gz',
+        'sha256sum': '1a49031d1aeb011ad2dde835143fb821ba5a90fb77185b3d6ca8ce08f4631df8',
+        'size_bytes': 218135277,
+        'generation': 1793749671080942,
       }
     ],
-    'dep_type': 'cipd',
+    'dep_type': 'gcs',
     'condition': 'host_os == "mac" and download_dart_sdk'
   },
   # Consume Shorebird's own published Dart SDK (built from
@@ -420,13 +426,16 @@ deps = {
     'condition': 'host_os == "mac" and download_dart_sdk'
   },
   'engine/src/flutter/prebuilts/windows-x64/dart-sdk': {
-    'packages': [
+    'bucket': 'shorebird-dart-sdk-prebuilt',
+    'objects': [
       {
-        'package': 'flutter/dart-sdk/windows-amd64',
-        'version': 'git_revision:'+Var('dart_revision')
+        'object_name': Var('dart_sdk_revision') + '/dart-sdk-windows-x64.tar.gz',
+        'sha256sum': 'd1c55c11085e3132d69470b90b8252ac94dda078a798a769c28cc95c55ae41a2',
+        'size_bytes': 212233353,
+        'generation': 1793749268604517,
       }
     ],
-    'dep_type': 'cipd',
+    'dep_type': 'gcs',
     'condition': 'host_os == "win" and download_dart_sdk'
   },
   'engine/src/flutter/prebuilts/windows-arm64/dart-sdk': {
