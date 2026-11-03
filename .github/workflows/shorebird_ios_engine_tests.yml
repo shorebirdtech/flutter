@@ -1,0 +1,189 @@
+name: shorebird_ios_engine_tests
+
+# The iOS engine's simulator tests, as upstream's mac_unopt builders run
+# them (engine/src/flutter/ci/builders/mac_unopt.json, ci/ios_debug_unopt_sim*):
+# the embedding's Objective-C XCTests (run_tests.py --type objc) and the
+# scenario_app's integration and golden tests, on each simulator variant.
+#
+# A release runs this on the engine commit it ships (_build_engine
+# release_flutter release.yaml `coverage:`, keyed on the engine SHA), so it is
+# dispatch-only: per-commit CI doesn't run it. It also runs on PRs that
+# change this file, so a change to it is tested before it lands.
+#
+# The scenario_app's goldens are images of an iPhone SE (3rd generation) on
+# the iOS 26.2 simulator (testing/ios_scenario_app/ios/Scenarios/
+# ScenariosUITests/golden_*_26.2_simulator.png), so the job runs on that
+# device and runtime, as upstream does.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/shorebird_ios_engine_tests.yml
+
+permissions:
+  contents: read
+
+jobs:
+  ios-engine-tests:
+    name: 🧪 iOS engine tests (${{ matrix.variant }})
+    # Fork PRs get no secrets (the sync needs the dart-sdk deploy key) and
+    # must not run on our Namespace runners.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # x86_64 simulator: Namespace has only Apple silicon Macs, so this
+          # one runs on GitHub's Intel image, as upstream runs it on cpu=x86.
+          - variant: ios_debug_unopt_sim
+            gn: --simulator-cpu x64
+            runs-on: '["macos-15-intel"]'
+            namespace: false
+          - variant: ios_debug_unopt_sim_arm64
+            gn: --simulator-cpu arm64
+            runs-on: '["nscloud-macos-sequoia-arm64-12x28-with-cache", "nscloud-cache-tag-shorebird-ios-engine-tests", "nscloud-cache-size-100gb"]'
+            namespace: true
+          - variant: ios_debug_unopt_sim_arm64_extension_safe
+            gn: --simulator-cpu arm64 --darwin-extension-safe
+            runs-on: '["nscloud-macos-sequoia-arm64-12x28-with-cache", "nscloud-cache-tag-shorebird-ios-engine-tests", "nscloud-cache-size-100gb"]'
+            namespace: true
+    # The cache volume has its own tag, not the release build's: PR code
+    # (DEPS hooks, gn, ninja actions) runs with it mounted, and must not be
+    # able to plant anything a release build later runs.
+    runs-on: ${{ fromJSON(matrix.runs-on) }}
+    timeout-minutes: 180
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: 📦 Setup namespace cache
+        if: matrix.namespace
+        uses: namespacelabs/nscloud-cache-action@1124a6f3ce44e5cf84cc22111530961f4d2a15f9 # v1.7.0
+        with:
+          path: |
+            ~/depot_tools
+            ~/cipd_cache
+
+      # CIPD_CACHE_DIR must be absolute; ~ doesn't expand in `env:`.
+      - name: 📦 Configure CIPD cache
+        run: |
+          mkdir -p "$HOME/cipd_cache"
+          echo "CIPD_CACHE_DIR=$HOME/cipd_cache" >> "$GITHUB_ENV"
+
+      # The scenario_app's goldens were taken on iOS 26.2 (see the top of
+      # this file); any other runtime fails them on rendering differences.
+      - name: 🍎 Select Xcode with the iOS 26.2 simulator
+        run: |
+          for xcode in /Applications/Xcode*.app; do
+            if DEVELOPER_DIR="$xcode/Contents/Developer" xcrun simctl list runtimes 2>/dev/null | grep -q 'com.apple.CoreSimulator.SimRuntime.iOS-26-2'; then
+              sudo xcode-select -s "$xcode/Contents/Developer"
+              xcodebuild -version
+              exit 0
+            fi
+          done
+          echo "::error::No Xcode here has the iOS 26.2 simulator runtime the scenario_app goldens need."
+          ls -d /Applications/Xcode*.app
+          xcrun simctl list runtimes
+          exit 1
+
+      # Pinned as _build_engine's shard-build.yaml pins it, so the updater
+      # these tests link is built with the release build's compiler.
+      - name: 🦀 Setup Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master 2026-10-16
+        with:
+          toolchain: 1.99.1
+          targets: aarch64-apple-ios-sim,x86_64-apple-ios,aarch64-apple-darwin,x86_64-apple-darwin
+
+      # DEPS pulls shorebirdtech/dart-sdk (private) over SSH.
+      - name: 🔑 Setup SSH
+        uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DART_SDK_DEPLOY_KEY }}
+
+      - name: 🧰 Setup depot_tools
+        run: |
+          if [[ ! -d "$HOME/depot_tools/.git" ]]; then
+            git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git "$HOME/depot_tools"
+          else
+            cd "$HOME/depot_tools"
+            git checkout main 2>/dev/null || git checkout -b main origin/main
+            git pull --quiet
+          fi
+          echo "$HOME/depot_tools" >> "$GITHUB_PATH"
+
+      # Unmanaged solution rooted at this checkout, so gclient syncs the DEPS
+      # of the commit under test and leaves the checkout itself alone.
+      # download_dart_sdk: the macOS prebuilt Dart is in a private bucket
+      # this repo has no identity for; the build makes its own
+      # (--no-prebuilt-dart-sdk below). The iOS engine compiles its VM from
+      # source either way.
+      - name: ⚙️ Setup gclient config
+        run: |
+          cat > .gclient << EOF
+          solutions = [
+            {
+              "managed": False,
+              "name": ".",
+              "url": "git@github.com:shorebirdtech/flutter.git",
+              "custom_deps": {},
+              "deps_file": "DEPS",
+              "safesync_url": "",
+              "custom_vars": {
+                "download_android_deps": False,
+                "download_fuchsia_deps": False,
+                "download_dart_sdk": False,
+              },
+            },
+          ]
+          EOF
+
+      # Each dep at its pinned revision, depth 1, as _build_engine's shards
+      # sync: no git mirror to fill on a cache-volume miss.
+      - name: 🔄 Sync engine dependencies (gclient)
+        run: gclient sync -v --delete_unversioned_trees --no-history
+
+      # Only the sync needs the deploy key; drop it before running PR code.
+      - name: 🔑 Remove deploy key
+        run: ssh-add -D
+
+      - name: ⚙️ Generate build files (gn)
+        run: >-
+          ./flutter/tools/gn --ios --runtime-mode debug --simulator --no-lto
+          --unoptimized ${{ matrix.gn }} --no-prebuilt-dart-sdk --no-rbe
+          --target-dir ci/${{ matrix.variant }}
+        working-directory: engine/src
+
+      - name: 🔨 Build
+        id: build
+        run: ninja -C out/ci/${{ matrix.variant }} flutter/testing/ios_scenario_app flutter/shell/platform/darwin/ios:ios_test_flutter
+        working-directory: engine/src
+
+      # Both suites write a failing run's xcresult bundle here, zipped.
+      - name: 📁 Test outputs directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/test_outputs"
+          echo "FLUTTER_TEST_OUTPUTS_DIR=$RUNNER_TEMP/test_outputs" >> "$GITHUB_ENV"
+
+      - name: 🧪 Objective-C unit tests
+        run: python3 flutter/testing/run_tests.py --variant ci/${{ matrix.variant }} --type objc --ios-variant ci/${{ matrix.variant }}
+        working-directory: engine/src
+
+      # Runs even when the unit tests fail, so one run reports both suites.
+      - name: 🧪 Scenario app integration tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: flutter/testing/ios_scenario_app/run_ios_tests.sh ci/${{ matrix.variant }}
+        working-directory: engine/src
+
+      - name: 📤 Upload failed xcresults
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xcresult-${{ matrix.variant }}
+          path: ${{ runner.temp }}/test_outputs
+          if-no-files-found: ignore
