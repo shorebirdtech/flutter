@@ -26,7 +26,6 @@ void main() {
     treeShakeIcons: false,
     packageConfigPath: '.dart_tool/package_config.json',
     shorebirdPublicKey: publicKey,
-    shorebirdDdMaxBytes: 100000,
   );
 
   testWithoutContext('encodeShorebirdPublicKey has no slash and round-trips', () {
@@ -40,26 +39,50 @@ void main() {
     expect(decodeShorebirdPublicKey(<String, String>{kShorebirdPublicKey: ''}), isNull);
   });
 
+  group('shorebirdDdMaxBytes', () {
+    testWithoutContext('defaults release builds to kDefaultShorebirdDdMaxBytes', () {
+      expect(
+        shorebirdDdMaxBytes(<String, String>{}, BuildMode.release),
+        kDefaultShorebirdDdMaxBytes,
+      );
+      expect(
+        shorebirdDdMaxBytes(<String, String>{kShorebirdDdMaxBytes: ''}, BuildMode.release),
+        kDefaultShorebirdDdMaxBytes,
+      );
+    });
+
+    testWithoutContext('lets the define override the cap or turn the pass off', () {
+      expect(
+        shorebirdDdMaxBytes(<String, String>{kShorebirdDdMaxBytes: '20000'}, BuildMode.release),
+        20000,
+      );
+      expect(
+        shorebirdDdMaxBytes(<String, String>{kShorebirdDdMaxBytes: '0'}, BuildMode.release),
+        0,
+      );
+    });
+
+    testWithoutContext('is 0 for builds that are not release', () {
+      expect(shorebirdDdMaxBytes(<String, String>{}, BuildMode.profile), 0);
+      expect(shorebirdDdMaxBytes(<String, String>{}, BuildMode.debug), 0);
+    });
+  });
+
   testWithoutContext('toBuildSystemEnvironment includes the Shorebird values', () {
     final Map<String, String> defines = buildInfo.toBuildSystemEnvironment();
     expect(defines[kShorebirdPublicKey], encodeShorebirdPublicKey(publicKey));
-    expect(defines[kShorebirdDdMaxBytes], '100000');
   });
 
   testWithoutContext('toEnvironmentConfig includes the Shorebird values', () {
     final Map<String, String> config = buildInfo.toEnvironmentConfig();
     expect(config['SHOREBIRD_ENCODED_PUBLIC_KEY'], encodeShorebirdPublicKey(publicKey));
-    expect(config['SHOREBIRD_BUILD_DD_MAX_BYTES'], '100000');
     expect(config.values, isNot(contains(contains('//'))));
   });
 
   testWithoutContext('toGradleConfig includes the Shorebird values', () {
     expect(
       buildInfo.toGradleConfig(),
-      containsAll(<String>[
-        '-Pshorebird-public-key=${encodeShorebirdPublicKey(publicKey)}',
-        '-Pshorebird-dd-max-bytes=100000',
-      ]),
+      contains('-Pshorebird-public-key=${encodeShorebirdPublicKey(publicKey)}'),
     );
   });
 
@@ -90,7 +113,7 @@ void main() {
       buildDirFor(<String, String>{}).path,
       buildDirFor(<String, String>{kShorebirdPublicKey: encodeShorebirdPublicKey('a')}).path,
       buildDirFor(<String, String>{kShorebirdPublicKey: encodeShorebirdPublicKey('b')}).path,
-      buildDirFor(<String, String>{kShorebirdDdMaxBytes: '100000'}).path,
+      buildDirFor(<String, String>{kShorebirdDdMaxBytes: '0'}).path,
     }, hasLength(4));
   });
 
@@ -114,15 +137,20 @@ void main() {
         DummyFlutterCommand().getBuildInfo(forcedBuildMode: BuildMode.release);
 
     testUsingContext(
-      'reads SHOREBIRD_PUBLIC_KEY and SHOREBIRD_DD_MAX_BYTES from the environment',
+      'reads SHOREBIRD_PUBLIC_KEY from the environment',
       () async {
         final BuildInfo buildInfo = await getBuildInfo();
         expect(buildInfo.shorebirdPublicKey, publicKey);
-        expect(buildInfo.shorebirdDdMaxBytes, 100000);
-        // No other variable reaches the native build settings or the defines.
-        expect(buildInfo.toEnvironmentConfig().values.join(), isNot(contains('token')));
-        expect(buildInfo.toBuildSystemEnvironment().values.join(), isNot(contains('token')));
-        expect(buildInfo.toGradleConfig().join(), isNot(contains('token')));
+        // No other variable reaches the native build settings or the defines,
+        // including SHOREBIRD_DD_MAX_BYTES, which older shorebird CLIs set.
+        for (final value in <String>[
+          ...buildInfo.toEnvironmentConfig().values,
+          ...buildInfo.toBuildSystemEnvironment().values,
+          ...buildInfo.toGradleConfig(),
+        ]) {
+          expect(value, isNot(contains('token')));
+          expect(value, isNot(contains('123456')));
+        }
       },
       overrides: <Type, Generator>{
         FileSystem: () => fileSystem,
@@ -130,7 +158,7 @@ void main() {
         Platform: () => FakePlatform(
           environment: <String, String>{
             'SHOREBIRD_PUBLIC_KEY': publicKey,
-            'SHOREBIRD_DD_MAX_BYTES': '100000',
+            'SHOREBIRD_DD_MAX_BYTES': '123456',
             'SHOREBIRD_TOKEN': 'token',
           },
         ),
@@ -138,33 +166,14 @@ void main() {
     );
 
     testUsingContext(
-      'treats an empty key and a zero or malformed DD value as unset',
+      'treats an empty key as unset',
       () async {
-        final BuildInfo buildInfo = await getBuildInfo();
-        expect(buildInfo.shorebirdPublicKey, isNull);
-        expect(buildInfo.shorebirdDdMaxBytes, isNull);
+        expect((await getBuildInfo()).shorebirdPublicKey, isNull);
       },
       overrides: <Type, Generator>{
         FileSystem: () => fileSystem,
         ProcessManager: () => FakeProcessManager.any(),
-        Platform: () => FakePlatform(
-          environment: <String, String>{
-            'SHOREBIRD_PUBLIC_KEY': '',
-            'SHOREBIRD_DD_MAX_BYTES': 'nope',
-          },
-        ),
-      },
-    );
-
-    testUsingContext(
-      'treats a zero DD value as unset',
-      () async {
-        expect((await getBuildInfo()).shorebirdDdMaxBytes, isNull);
-      },
-      overrides: <Type, Generator>{
-        FileSystem: () => fileSystem,
-        ProcessManager: () => FakeProcessManager.any(),
-        Platform: () => FakePlatform(environment: <String, String>{'SHOREBIRD_DD_MAX_BYTES': '0'}),
+        Platform: () => FakePlatform(environment: <String, String>{'SHOREBIRD_PUBLIC_KEY': ''}),
       },
     );
   });

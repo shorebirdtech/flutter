@@ -1538,12 +1538,10 @@ abstract class FlutterCommand extends Command<void> {
     _addFlutterVersionToDartDefines(globals.flutterVersion, dartDefines);
     _addFeatureFlagsToDartDefines(dartDefines);
 
-    // Shorebird-specific: the shorebird CLI sets these two environment
-    // variables on `flutter build`. They are the only ones read here, and
-    // BuildInfo passes them to `flutter assemble` as defines.
+    // Shorebird-specific: the shorebird CLI sets this environment variable on
+    // `flutter build`. It is the only one read here, and BuildInfo passes it
+    // to `flutter assemble` as a define.
     final String? shorebirdPublicKey = globals.platform.environment['SHOREBIRD_PUBLIC_KEY'];
-    final int shorebirdDdMaxBytes =
-        int.tryParse(globals.platform.environment['SHOREBIRD_DD_MAX_BYTES'] ?? '') ?? 0;
 
     return BuildInfo(
       buildMode,
@@ -1567,7 +1565,6 @@ abstract class FlutterCommand extends Command<void> {
       performanceMeasurementFile: performanceMeasurementFile,
       shorebirdTraceFilePath: shorebirdTraceFilePath,
       shorebirdPublicKey: shorebirdPublicKey == '' ? null : shorebirdPublicKey,
-      shorebirdDdMaxBytes: shorebirdDdMaxBytes > 0 ? shorebirdDdMaxBytes : null,
       packageConfigPath: packagesPath ?? packageConfigFile.path,
       codeSizeDirectory: codeSizeDirectory,
       androidGradleDaemon: androidGradleDaemon,

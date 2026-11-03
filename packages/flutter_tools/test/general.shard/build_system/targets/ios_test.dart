@@ -837,14 +837,15 @@ flavors:
     },
   );
 
-  // Shorebird-specific: the ShorebirdDdMaxBytes define is what turns on the
-  // DD pass for Xcode rebuilds (flutter assemble), so guard the plumbing from
-  // the define to AOTSnapshotter.build.
-  for (final bool withDefine in <bool>[true, false]) {
+  // Shorebird-specific: release builds run the DD pass with no setting at all,
+  // so an Xcode rebuild (flutter assemble) gets the same DD table as the
+  // release the CLI built. The define is only a debugging override; 0 turns
+  // the pass off.
+  for (final ddOff in <bool>[false, true]) {
     final recorder = _RecordingProcessManager();
     testUsingContext(
-      'AotAssemblyRelease ${withDefine ? 'runs' : 'skips'} the DD pass '
-      '${withDefine ? 'with' : 'without'} the $kShorebirdDdMaxBytes define',
+      'AotAssemblyRelease ${ddOff ? 'skips' : 'runs'} the DD pass '
+      '${ddOff ? 'with $kShorebirdDdMaxBytes=0' : 'by default'}',
       () async {
         final FileSystem fileSystem = MemoryFileSystem.test();
         final environment = Environment.test(
@@ -854,7 +855,7 @@ flavors:
             kSdkRoot: 'path/to/iPhoneOS.sdk',
             kBuildMode: 'release',
             kIosArchs: 'arm64',
-            if (withDefine) kShorebirdDdMaxBytes: '100000',
+            if (ddOff) kShorebirdDdMaxBytes: '0',
           },
           processManager: recorder,
           artifacts: artifacts,
@@ -869,7 +870,7 @@ flavors:
         final List<String> first = recorder.commands.first;
         expect(
           first.any((String arg) => arg.startsWith('--print_dd_function_identity_to=')),
-          withDefine,
+          !ddOff,
         );
       },
       overrides: <Type, Generator>{

@@ -2,15 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../build_info.dart';
 import '../convert.dart';
 
 /// The define for the patch public key, encoded with
 /// [encodeShorebirdPublicKey].
 const kShorebirdPublicKey = 'ShorebirdPublicKey';
 
-/// The define for the cap on the iOS DD table in bytes. Absent means no DD
-/// pass.
+/// A debugging override for the cap on the iOS DD table in bytes; `0` turns
+/// the DD pass off. Nothing sets it: release builds use
+/// [kDefaultShorebirdDdMaxBytes].
 const kShorebirdDdMaxBytes = 'ShorebirdDdMaxBytes';
+
+/// The cap on the iOS DD table that release builds use. It matches the
+/// defaults of `analyze_snapshot --dd_max_bytes` and `aot_tools link
+/// --dd-max-bytes`, so a release built by any path (`flutter build`, an Xcode
+/// archive, fastlane) has the DD table its patches are linked against.
+const kDefaultShorebirdDdMaxBytes = 10000;
+
+/// The cap on the DD table for an iOS AOT build in [buildMode], where `0`
+/// means no DD pass. Only release builds run the pass, since only they are
+/// patched.
+int shorebirdDdMaxBytes(Map<String, String> environmentDefines, BuildMode buildMode) {
+  if (buildMode != BuildMode.release) {
+    return 0;
+  }
+  final int? override = int.tryParse(environmentDefines[kShorebirdDdMaxBytes] ?? '');
+  return override ?? kDefaultShorebirdDdMaxBytes;
+}
 
 /// Encodes the patch public key for [kShorebirdPublicKey].
 ///
