@@ -4,7 +4,7 @@
 # public API — they're consumed only by the integration tests.
 #
 # Regenerate with:
-#   dart run ffigen --config ffigen_test_hooks.yaml
+#   dart run ffigen --config ffigen.yaml
 #
 # The header is produced by `cargo build -p library_test_hooks`. If
 # the header is stale, run that first.

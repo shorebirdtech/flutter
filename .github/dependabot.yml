@@ -26,9 +26,8 @@ updates:
         update-types: ["version-update:semver-patch"]
   # Shorebird: the Rust updater's crates.
   - package-ecosystem: "cargo"
-    directories:
-      - "/engine/src/flutter/third_party/updater/library"
-      - "/engine/src/flutter/third_party/updater/patch"
+    # The workspace root: library and patch share its Cargo.lock.
+    directory: "/engine/src/flutter/third_party/updater"
     schedule:
       interval: "weekly"
     cooldown:

@@ -27,22 +27,23 @@ class TestHooksBindings {
     return _signal(arg0, arg1);
   }
 
-  late final _signalPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int)>> Function(
-            ffi.Int,
-            ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>,
-          )
-        >
-      >('signal');
-  late final _signal = _signalPtr
-      .asFunction<
-        ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int)>> Function(
-          int,
-          ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>,
-        )
-      >();
+  late final _signalPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int)>> Function(
+        ffi.Int,
+        ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>,
+      )
+    >
+  >('signal');
+  late final _signal =
+      _signalPtr
+          .asFunction<
+            ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>
+            Function(
+              int,
+              ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>,
+            )
+          >();
 
   int getpriority(int arg0, int arg1) {
     return _getpriority(arg0, arg1);
@@ -52,8 +53,8 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, id_t)>>(
         'getpriority',
       );
-  late final _getpriority = _getpriorityPtr
-      .asFunction<int Function(int, int)>();
+  late final _getpriority =
+      _getpriorityPtr.asFunction<int Function(int, int)>();
 
   int getiopolicy_np(int arg0, int arg1) {
     return _getiopolicy_np(arg0, arg1);
@@ -63,30 +64,28 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int)>>(
         'getiopolicy_np',
       );
-  late final _getiopolicy_np = _getiopolicy_npPtr
-      .asFunction<int Function(int, int)>();
+  late final _getiopolicy_np =
+      _getiopolicy_npPtr.asFunction<int Function(int, int)>();
 
   int getrlimit(int arg0, ffi.Pointer<rlimit> arg1) {
     return _getrlimit(arg0, arg1);
   }
 
-  late final _getrlimitPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Pointer<rlimit>)>
-      >('getrlimit');
-  late final _getrlimit = _getrlimitPtr
-      .asFunction<int Function(int, ffi.Pointer<rlimit>)>();
+  late final _getrlimitPtr = _lookup<
+    ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Pointer<rlimit>)>
+  >('getrlimit');
+  late final _getrlimit =
+      _getrlimitPtr.asFunction<int Function(int, ffi.Pointer<rlimit>)>();
 
   int getrusage(int arg0, ffi.Pointer<rusage> arg1) {
     return _getrusage(arg0, arg1);
   }
 
-  late final _getrusagePtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Pointer<rusage>)>
-      >('getrusage');
-  late final _getrusage = _getrusagePtr
-      .asFunction<int Function(int, ffi.Pointer<rusage>)>();
+  late final _getrusagePtr = _lookup<
+    ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Pointer<rusage>)>
+  >('getrusage');
+  late final _getrusage =
+      _getrusagePtr.asFunction<int Function(int, ffi.Pointer<rusage>)>();
 
   int setpriority(int arg0, int arg1, int arg2) {
     return _setpriority(arg0, arg1, arg2);
@@ -96,8 +95,8 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, id_t, ffi.Int)>>(
         'setpriority',
       );
-  late final _setpriority = _setpriorityPtr
-      .asFunction<int Function(int, int, int)>();
+  late final _setpriority =
+      _setpriorityPtr.asFunction<int Function(int, int, int)>();
 
   int setiopolicy_np(int arg0, int arg1, int arg2) {
     return _setiopolicy_np(arg0, arg1, arg2);
@@ -107,19 +106,18 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int, ffi.Int)>>(
         'setiopolicy_np',
       );
-  late final _setiopolicy_np = _setiopolicy_npPtr
-      .asFunction<int Function(int, int, int)>();
+  late final _setiopolicy_np =
+      _setiopolicy_npPtr.asFunction<int Function(int, int, int)>();
 
   int setrlimit(int arg0, ffi.Pointer<rlimit> arg1) {
     return _setrlimit(arg0, arg1);
   }
 
-  late final _setrlimitPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Pointer<rlimit>)>
-      >('setrlimit');
-  late final _setrlimit = _setrlimitPtr
-      .asFunction<int Function(int, ffi.Pointer<rlimit>)>();
+  late final _setrlimitPtr = _lookup<
+    ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Pointer<rlimit>)>
+  >('setrlimit');
+  late final _setrlimit =
+      _setrlimitPtr.asFunction<int Function(int, ffi.Pointer<rlimit>)>();
 
   int wait(ffi.Pointer<ffi.Int> arg0) {
     return _wait(arg0);
@@ -133,12 +131,11 @@ class TestHooksBindings {
     return _waitpid(arg0, arg1, arg2);
   }
 
-  late final _waitpidPtr =
-      _lookup<
-        ffi.NativeFunction<pid_t Function(pid_t, ffi.Pointer<ffi.Int>, ffi.Int)>
-      >('waitpid');
-  late final _waitpid = _waitpidPtr
-      .asFunction<int Function(int, ffi.Pointer<ffi.Int>, int)>();
+  late final _waitpidPtr = _lookup<
+    ffi.NativeFunction<pid_t Function(pid_t, ffi.Pointer<ffi.Int>, ffi.Int)>
+  >('waitpid');
+  late final _waitpid =
+      _waitpidPtr.asFunction<int Function(int, ffi.Pointer<ffi.Int>, int)>();
 
   int waitid(
     idtype_t arg0,
@@ -149,34 +146,29 @@ class TestHooksBindings {
     return _waitid(arg0.value, arg1, arg2, arg3);
   }
 
-  late final _waitidPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.UnsignedInt,
-            id_t,
-            ffi.Pointer<siginfo_t>,
-            ffi.Int,
-          )
-        >
-      >('waitid');
-  late final _waitid = _waitidPtr
-      .asFunction<int Function(int, int, ffi.Pointer<siginfo_t>, int)>();
+  late final _waitidPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(ffi.UnsignedInt, id_t, ffi.Pointer<siginfo_t>, ffi.Int)
+    >
+  >('waitid');
+  late final _waitid =
+      _waitidPtr
+          .asFunction<int Function(int, int, ffi.Pointer<siginfo_t>, int)>();
 
   int wait3(ffi.Pointer<ffi.Int> arg0, int arg1, ffi.Pointer<rusage> arg2) {
     return _wait3(arg0, arg1, arg2);
   }
 
-  late final _wait3Ptr =
-      _lookup<
-        ffi.NativeFunction<
-          pid_t Function(ffi.Pointer<ffi.Int>, ffi.Int, ffi.Pointer<rusage>)
-        >
-      >('wait3');
-  late final _wait3 = _wait3Ptr
-      .asFunction<
-        int Function(ffi.Pointer<ffi.Int>, int, ffi.Pointer<rusage>)
-      >();
+  late final _wait3Ptr = _lookup<
+    ffi.NativeFunction<
+      pid_t Function(ffi.Pointer<ffi.Int>, ffi.Int, ffi.Pointer<rusage>)
+    >
+  >('wait3');
+  late final _wait3 =
+      _wait3Ptr
+          .asFunction<
+            int Function(ffi.Pointer<ffi.Int>, int, ffi.Pointer<rusage>)
+          >();
 
   int wait4(
     int arg0,
@@ -187,21 +179,16 @@ class TestHooksBindings {
     return _wait4(arg0, arg1, arg2, arg3);
   }
 
-  late final _wait4Ptr =
-      _lookup<
-        ffi.NativeFunction<
-          pid_t Function(
-            pid_t,
-            ffi.Pointer<ffi.Int>,
-            ffi.Int,
-            ffi.Pointer<rusage>,
-          )
-        >
-      >('wait4');
-  late final _wait4 = _wait4Ptr
-      .asFunction<
-        int Function(int, ffi.Pointer<ffi.Int>, int, ffi.Pointer<rusage>)
-      >();
+  late final _wait4Ptr = _lookup<
+    ffi.NativeFunction<
+      pid_t Function(pid_t, ffi.Pointer<ffi.Int>, ffi.Int, ffi.Pointer<rusage>)
+    >
+  >('wait4');
+  late final _wait4 =
+      _wait4Ptr
+          .asFunction<
+            int Function(int, ffi.Pointer<ffi.Int>, int, ffi.Pointer<rusage>)
+          >();
 
   ffi.Pointer<ffi.Void> alloca(int __size) {
     return _alloca(__size);
@@ -211,8 +198,8 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Pointer<ffi.Void> Function(ffi.Size)>>(
         'alloca',
       );
-  late final _alloca = _allocaPtr
-      .asFunction<ffi.Pointer<ffi.Void> Function(int)>();
+  late final _alloca =
+      _allocaPtr.asFunction<ffi.Pointer<ffi.Void> Function(int)>();
 
   late final ffi.Pointer<ffi.Int> ___mb_cur_max = _lookup<ffi.Int>(
     '__mb_cur_max',
@@ -226,40 +213,40 @@ class TestHooksBindings {
     return _malloc_type_malloc(size, type_id);
   }
 
-  late final _malloc_type_mallocPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Void> Function(ffi.Size, malloc_type_id_t)
-        >
-      >('malloc_type_malloc');
-  late final _malloc_type_malloc = _malloc_type_mallocPtr
-      .asFunction<ffi.Pointer<ffi.Void> Function(int, int)>();
+  late final _malloc_type_mallocPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Void> Function(ffi.Size, malloc_type_id_t)
+    >
+  >('malloc_type_malloc');
+  late final _malloc_type_malloc =
+      _malloc_type_mallocPtr
+          .asFunction<ffi.Pointer<ffi.Void> Function(int, int)>();
 
   ffi.Pointer<ffi.Void> malloc_type_calloc(int count, int size, int type_id) {
     return _malloc_type_calloc(count, size, type_id);
   }
 
-  late final _malloc_type_callocPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Void> Function(ffi.Size, ffi.Size, malloc_type_id_t)
-        >
-      >('malloc_type_calloc');
-  late final _malloc_type_calloc = _malloc_type_callocPtr
-      .asFunction<ffi.Pointer<ffi.Void> Function(int, int, int)>();
+  late final _malloc_type_callocPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Void> Function(ffi.Size, ffi.Size, malloc_type_id_t)
+    >
+  >('malloc_type_calloc');
+  late final _malloc_type_calloc =
+      _malloc_type_callocPtr
+          .asFunction<ffi.Pointer<ffi.Void> Function(int, int, int)>();
 
   void malloc_type_free(ffi.Pointer<ffi.Void> ptr, int type_id) {
     return _malloc_type_free(ptr, type_id);
   }
 
-  late final _malloc_type_freePtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Void Function(ffi.Pointer<ffi.Void>, malloc_type_id_t)
-        >
-      >('malloc_type_free');
-  late final _malloc_type_free = _malloc_type_freePtr
-      .asFunction<void Function(ffi.Pointer<ffi.Void>, int)>();
+  late final _malloc_type_freePtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Void Function(ffi.Pointer<ffi.Void>, malloc_type_id_t)
+    >
+  >('malloc_type_free');
+  late final _malloc_type_free =
+      _malloc_type_freePtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>, int)>();
 
   ffi.Pointer<ffi.Void> malloc_type_realloc(
     ffi.Pointer<ffi.Void> ptr,
@@ -269,33 +256,33 @@ class TestHooksBindings {
     return _malloc_type_realloc(ptr, size, type_id);
   }
 
-  late final _malloc_type_reallocPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Void> Function(
-            ffi.Pointer<ffi.Void>,
-            ffi.Size,
-            malloc_type_id_t,
-          )
-        >
-      >('malloc_type_realloc');
-  late final _malloc_type_realloc = _malloc_type_reallocPtr
-      .asFunction<
-        ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>, int, int)
-      >();
+  late final _malloc_type_reallocPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Void> Function(
+        ffi.Pointer<ffi.Void>,
+        ffi.Size,
+        malloc_type_id_t,
+      )
+    >
+  >('malloc_type_realloc');
+  late final _malloc_type_realloc =
+      _malloc_type_reallocPtr
+          .asFunction<
+            ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>, int, int)
+          >();
 
   ffi.Pointer<ffi.Void> malloc_type_valloc(int size, int type_id) {
     return _malloc_type_valloc(size, type_id);
   }
 
-  late final _malloc_type_vallocPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Void> Function(ffi.Size, malloc_type_id_t)
-        >
-      >('malloc_type_valloc');
-  late final _malloc_type_valloc = _malloc_type_vallocPtr
-      .asFunction<ffi.Pointer<ffi.Void> Function(int, int)>();
+  late final _malloc_type_vallocPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Void> Function(ffi.Size, malloc_type_id_t)
+    >
+  >('malloc_type_valloc');
+  late final _malloc_type_valloc =
+      _malloc_type_vallocPtr
+          .asFunction<ffi.Pointer<ffi.Void> Function(int, int)>();
 
   ffi.Pointer<ffi.Void> malloc_type_aligned_alloc(
     int alignment,
@@ -305,14 +292,14 @@ class TestHooksBindings {
     return _malloc_type_aligned_alloc(alignment, size, type_id);
   }
 
-  late final _malloc_type_aligned_allocPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Void> Function(ffi.Size, ffi.Size, malloc_type_id_t)
-        >
-      >('malloc_type_aligned_alloc');
-  late final _malloc_type_aligned_alloc = _malloc_type_aligned_allocPtr
-      .asFunction<ffi.Pointer<ffi.Void> Function(int, int, int)>();
+  late final _malloc_type_aligned_allocPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Void> Function(ffi.Size, ffi.Size, malloc_type_id_t)
+    >
+  >('malloc_type_aligned_alloc');
+  late final _malloc_type_aligned_alloc =
+      _malloc_type_aligned_allocPtr
+          .asFunction<ffi.Pointer<ffi.Void> Function(int, int, int)>();
 
   int malloc_type_posix_memalign(
     ffi.Pointer<ffi.Pointer<ffi.Void>> memptr,
@@ -323,21 +310,21 @@ class TestHooksBindings {
     return _malloc_type_posix_memalign(memptr, alignment, size, type_id);
   }
 
-  late final _malloc_type_posix_memalignPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.Pointer<ffi.Pointer<ffi.Void>>,
-            ffi.Size,
-            ffi.Size,
-            malloc_type_id_t,
-          )
-        >
-      >('malloc_type_posix_memalign');
-  late final _malloc_type_posix_memalign = _malloc_type_posix_memalignPtr
-      .asFunction<
-        int Function(ffi.Pointer<ffi.Pointer<ffi.Void>>, int, int, int)
-      >();
+  late final _malloc_type_posix_memalignPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(
+        ffi.Pointer<ffi.Pointer<ffi.Void>>,
+        ffi.Size,
+        ffi.Size,
+        malloc_type_id_t,
+      )
+    >
+  >('malloc_type_posix_memalign');
+  late final _malloc_type_posix_memalign =
+      _malloc_type_posix_memalignPtr
+          .asFunction<
+            int Function(ffi.Pointer<ffi.Pointer<ffi.Void>>, int, int, int)
+          >();
 
   ffi.Pointer<ffi.Void> malloc_type_zone_malloc(
     ffi.Pointer<malloc_zone_t> zone,
@@ -347,20 +334,20 @@ class TestHooksBindings {
     return _malloc_type_zone_malloc(zone, size, type_id);
   }
 
-  late final _malloc_type_zone_mallocPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Void> Function(
-            ffi.Pointer<malloc_zone_t>,
-            ffi.Size,
-            malloc_type_id_t,
-          )
-        >
-      >('malloc_type_zone_malloc');
-  late final _malloc_type_zone_malloc = _malloc_type_zone_mallocPtr
-      .asFunction<
-        ffi.Pointer<ffi.Void> Function(ffi.Pointer<malloc_zone_t>, int, int)
-      >();
+  late final _malloc_type_zone_mallocPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Void> Function(
+        ffi.Pointer<malloc_zone_t>,
+        ffi.Size,
+        malloc_type_id_t,
+      )
+    >
+  >('malloc_type_zone_malloc');
+  late final _malloc_type_zone_malloc =
+      _malloc_type_zone_mallocPtr
+          .asFunction<
+            ffi.Pointer<ffi.Void> Function(ffi.Pointer<malloc_zone_t>, int, int)
+          >();
 
   ffi.Pointer<ffi.Void> malloc_type_zone_calloc(
     ffi.Pointer<malloc_zone_t> zone,
@@ -371,26 +358,26 @@ class TestHooksBindings {
     return _malloc_type_zone_calloc(zone, count, size, type_id);
   }
 
-  late final _malloc_type_zone_callocPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Void> Function(
-            ffi.Pointer<malloc_zone_t>,
-            ffi.Size,
-            ffi.Size,
-            malloc_type_id_t,
-          )
-        >
-      >('malloc_type_zone_calloc');
-  late final _malloc_type_zone_calloc = _malloc_type_zone_callocPtr
-      .asFunction<
-        ffi.Pointer<ffi.Void> Function(
-          ffi.Pointer<malloc_zone_t>,
-          int,
-          int,
-          int,
-        )
-      >();
+  late final _malloc_type_zone_callocPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Void> Function(
+        ffi.Pointer<malloc_zone_t>,
+        ffi.Size,
+        ffi.Size,
+        malloc_type_id_t,
+      )
+    >
+  >('malloc_type_zone_calloc');
+  late final _malloc_type_zone_calloc =
+      _malloc_type_zone_callocPtr
+          .asFunction<
+            ffi.Pointer<ffi.Void> Function(
+              ffi.Pointer<malloc_zone_t>,
+              int,
+              int,
+              int,
+            )
+          >();
 
   void malloc_type_zone_free(
     ffi.Pointer<malloc_zone_t> zone,
@@ -400,20 +387,24 @@ class TestHooksBindings {
     return _malloc_type_zone_free(zone, ptr, type_id);
   }
 
-  late final _malloc_type_zone_freePtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Void Function(
-            ffi.Pointer<malloc_zone_t>,
-            ffi.Pointer<ffi.Void>,
-            malloc_type_id_t,
-          )
-        >
-      >('malloc_type_zone_free');
-  late final _malloc_type_zone_free = _malloc_type_zone_freePtr
-      .asFunction<
-        void Function(ffi.Pointer<malloc_zone_t>, ffi.Pointer<ffi.Void>, int)
-      >();
+  late final _malloc_type_zone_freePtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Void Function(
+        ffi.Pointer<malloc_zone_t>,
+        ffi.Pointer<ffi.Void>,
+        malloc_type_id_t,
+      )
+    >
+  >('malloc_type_zone_free');
+  late final _malloc_type_zone_free =
+      _malloc_type_zone_freePtr
+          .asFunction<
+            void Function(
+              ffi.Pointer<malloc_zone_t>,
+              ffi.Pointer<ffi.Void>,
+              int,
+            )
+          >();
 
   ffi.Pointer<ffi.Void> malloc_type_zone_realloc(
     ffi.Pointer<malloc_zone_t> zone,
@@ -424,26 +415,26 @@ class TestHooksBindings {
     return _malloc_type_zone_realloc(zone, ptr, size, type_id);
   }
 
-  late final _malloc_type_zone_reallocPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Void> Function(
-            ffi.Pointer<malloc_zone_t>,
-            ffi.Pointer<ffi.Void>,
-            ffi.Size,
-            malloc_type_id_t,
-          )
-        >
-      >('malloc_type_zone_realloc');
-  late final _malloc_type_zone_realloc = _malloc_type_zone_reallocPtr
-      .asFunction<
-        ffi.Pointer<ffi.Void> Function(
-          ffi.Pointer<malloc_zone_t>,
-          ffi.Pointer<ffi.Void>,
-          int,
-          int,
-        )
-      >();
+  late final _malloc_type_zone_reallocPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Void> Function(
+        ffi.Pointer<malloc_zone_t>,
+        ffi.Pointer<ffi.Void>,
+        ffi.Size,
+        malloc_type_id_t,
+      )
+    >
+  >('malloc_type_zone_realloc');
+  late final _malloc_type_zone_realloc =
+      _malloc_type_zone_reallocPtr
+          .asFunction<
+            ffi.Pointer<ffi.Void> Function(
+              ffi.Pointer<malloc_zone_t>,
+              ffi.Pointer<ffi.Void>,
+              int,
+              int,
+            )
+          >();
 
   ffi.Pointer<ffi.Void> malloc_type_zone_valloc(
     ffi.Pointer<malloc_zone_t> zone,
@@ -453,20 +444,20 @@ class TestHooksBindings {
     return _malloc_type_zone_valloc(zone, size, type_id);
   }
 
-  late final _malloc_type_zone_vallocPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Void> Function(
-            ffi.Pointer<malloc_zone_t>,
-            ffi.Size,
-            malloc_type_id_t,
-          )
-        >
-      >('malloc_type_zone_valloc');
-  late final _malloc_type_zone_valloc = _malloc_type_zone_vallocPtr
-      .asFunction<
-        ffi.Pointer<ffi.Void> Function(ffi.Pointer<malloc_zone_t>, int, int)
-      >();
+  late final _malloc_type_zone_vallocPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Void> Function(
+        ffi.Pointer<malloc_zone_t>,
+        ffi.Size,
+        malloc_type_id_t,
+      )
+    >
+  >('malloc_type_zone_valloc');
+  late final _malloc_type_zone_valloc =
+      _malloc_type_zone_vallocPtr
+          .asFunction<
+            ffi.Pointer<ffi.Void> Function(ffi.Pointer<malloc_zone_t>, int, int)
+          >();
 
   ffi.Pointer<ffi.Void> malloc_type_zone_memalign(
     ffi.Pointer<malloc_zone_t> zone,
@@ -477,26 +468,26 @@ class TestHooksBindings {
     return _malloc_type_zone_memalign(zone, alignment, size, type_id);
   }
 
-  late final _malloc_type_zone_memalignPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Void> Function(
-            ffi.Pointer<malloc_zone_t>,
-            ffi.Size,
-            ffi.Size,
-            malloc_type_id_t,
-          )
-        >
-      >('malloc_type_zone_memalign');
-  late final _malloc_type_zone_memalign = _malloc_type_zone_memalignPtr
-      .asFunction<
-        ffi.Pointer<ffi.Void> Function(
-          ffi.Pointer<malloc_zone_t>,
-          int,
-          int,
-          int,
-        )
-      >();
+  late final _malloc_type_zone_memalignPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Void> Function(
+        ffi.Pointer<malloc_zone_t>,
+        ffi.Size,
+        ffi.Size,
+        malloc_type_id_t,
+      )
+    >
+  >('malloc_type_zone_memalign');
+  late final _malloc_type_zone_memalign =
+      _malloc_type_zone_memalignPtr
+          .asFunction<
+            ffi.Pointer<ffi.Void> Function(
+              ffi.Pointer<malloc_zone_t>,
+              int,
+              int,
+              int,
+            )
+          >();
 
   ffi.Pointer<ffi.Void> malloc(int __size) {
     return _malloc(__size);
@@ -506,19 +497,18 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Pointer<ffi.Void> Function(ffi.Size)>>(
         'malloc',
       );
-  late final _malloc = _mallocPtr
-      .asFunction<ffi.Pointer<ffi.Void> Function(int)>();
+  late final _malloc =
+      _mallocPtr.asFunction<ffi.Pointer<ffi.Void> Function(int)>();
 
   ffi.Pointer<ffi.Void> calloc(int __count, int __size) {
     return _calloc(__count, __size);
   }
 
-  late final _callocPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Pointer<ffi.Void> Function(ffi.Size, ffi.Size)>
-      >('calloc');
-  late final _calloc = _callocPtr
-      .asFunction<ffi.Pointer<ffi.Void> Function(int, int)>();
+  late final _callocPtr = _lookup<
+    ffi.NativeFunction<ffi.Pointer<ffi.Void> Function(ffi.Size, ffi.Size)>
+  >('calloc');
+  late final _calloc =
+      _callocPtr.asFunction<ffi.Pointer<ffi.Void> Function(int, int)>();
 
   void free(ffi.Pointer<ffi.Void> arg0) {
     return _free(arg0);
@@ -528,34 +518,38 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
         'free',
       );
-  late final _free = _freePtr
-      .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+  late final _free =
+      _freePtr.asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   ffi.Pointer<ffi.Void> realloc(ffi.Pointer<ffi.Void> __ptr, int __size) {
     return _realloc(__ptr, __size);
   }
 
-  late final _reallocPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>, ffi.Size)
-        >
-      >('realloc');
-  late final _realloc = _reallocPtr
-      .asFunction<ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>, int)>();
+  late final _reallocPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>, ffi.Size)
+    >
+  >('realloc');
+  late final _realloc =
+      _reallocPtr
+          .asFunction<
+            ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>, int)
+          >();
 
   ffi.Pointer<ffi.Void> reallocf(ffi.Pointer<ffi.Void> __ptr, int __size) {
     return _reallocf(__ptr, __size);
   }
 
-  late final _reallocfPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>, ffi.Size)
-        >
-      >('reallocf');
-  late final _reallocf = _reallocfPtr
-      .asFunction<ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>, int)>();
+  late final _reallocfPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>, ffi.Size)
+    >
+  >('reallocf');
+  late final _reallocf =
+      _reallocfPtr
+          .asFunction<
+            ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>, int)
+          >();
 
   ffi.Pointer<ffi.Void> valloc(int __size) {
     return _valloc(__size);
@@ -565,19 +559,18 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Pointer<ffi.Void> Function(ffi.Size)>>(
         'valloc',
       );
-  late final _valloc = _vallocPtr
-      .asFunction<ffi.Pointer<ffi.Void> Function(int)>();
+  late final _valloc =
+      _vallocPtr.asFunction<ffi.Pointer<ffi.Void> Function(int)>();
 
   ffi.Pointer<ffi.Void> aligned_alloc(int __alignment, int __size) {
     return _aligned_alloc(__alignment, __size);
   }
 
-  late final _aligned_allocPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Pointer<ffi.Void> Function(ffi.Size, ffi.Size)>
-      >('aligned_alloc');
-  late final _aligned_alloc = _aligned_allocPtr
-      .asFunction<ffi.Pointer<ffi.Void> Function(int, int)>();
+  late final _aligned_allocPtr = _lookup<
+    ffi.NativeFunction<ffi.Pointer<ffi.Void> Function(ffi.Size, ffi.Size)>
+  >('aligned_alloc');
+  late final _aligned_alloc =
+      _aligned_allocPtr.asFunction<ffi.Pointer<ffi.Void> Function(int, int)>();
 
   int posix_memalign(
     ffi.Pointer<ffi.Pointer<ffi.Void>> __memptr,
@@ -587,18 +580,16 @@ class TestHooksBindings {
     return _posix_memalign(__memptr, __alignment, __size);
   }
 
-  late final _posix_memalignPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.Pointer<ffi.Pointer<ffi.Void>>,
-            ffi.Size,
-            ffi.Size,
-          )
-        >
-      >('posix_memalign');
-  late final _posix_memalign = _posix_memalignPtr
-      .asFunction<int Function(ffi.Pointer<ffi.Pointer<ffi.Void>>, int, int)>();
+  late final _posix_memalignPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(ffi.Pointer<ffi.Pointer<ffi.Void>>, ffi.Size, ffi.Size)
+    >
+  >('posix_memalign');
+  late final _posix_memalign =
+      _posix_memalignPtr
+          .asFunction<
+            int Function(ffi.Pointer<ffi.Pointer<ffi.Void>>, int, int)
+          >();
 
   void abort() {
     return _abort();
@@ -622,31 +613,31 @@ class TestHooksBindings {
     return _atexit(arg0);
   }
 
-  late final _atexitPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>>)
-        >
-      >('atexit');
-  late final _atexit = _atexitPtr
-      .asFunction<
-        int Function(ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>>)
-      >();
+  late final _atexitPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>>)
+    >
+  >('atexit');
+  late final _atexit =
+      _atexitPtr
+          .asFunction<
+            int Function(ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>>)
+          >();
 
   int at_quick_exit(ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>> arg0) {
     return _at_quick_exit(arg0);
   }
 
-  late final _at_quick_exitPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>>)
-        >
-      >('at_quick_exit');
-  late final _at_quick_exit = _at_quick_exitPtr
-      .asFunction<
-        int Function(ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>>)
-      >();
+  late final _at_quick_exitPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>>)
+    >
+  >('at_quick_exit');
+  late final _at_quick_exit =
+      _at_quick_exitPtr
+          .asFunction<
+            int Function(ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>>)
+          >();
 
   double atof(ffi.Pointer<ffi.Char> arg0) {
     return _atof(arg0);
@@ -656,8 +647,8 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Double Function(ffi.Pointer<ffi.Char>)>>(
         'atof',
       );
-  late final _atof = _atofPtr
-      .asFunction<double Function(ffi.Pointer<ffi.Char>)>();
+  late final _atof =
+      _atofPtr.asFunction<double Function(ffi.Pointer<ffi.Char>)>();
 
   int atoi(ffi.Pointer<ffi.Char> arg0) {
     return _atoi(arg0);
@@ -687,8 +678,8 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.LongLong Function(ffi.Pointer<ffi.Char>)>>(
         'atoll',
       );
-  late final _atoll = _atollPtr
-      .asFunction<int Function(ffi.Pointer<ffi.Char>)>();
+  late final _atoll =
+      _atollPtr.asFunction<int Function(ffi.Pointer<ffi.Char>)>();
 
   ffi.Pointer<ffi.Void> bsearch(
     ffi.Pointer<ffi.Void> __key,
@@ -705,36 +696,36 @@ class TestHooksBindings {
     return _bsearch(__key, __base, __nel, __width, __compar);
   }
 
-  late final _bsearchPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Void> Function(
-            ffi.Pointer<ffi.Void>,
-            ffi.Pointer<ffi.Void>,
-            ffi.Size,
-            ffi.Size,
-            ffi.Pointer<
-              ffi.NativeFunction<
-                ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
-              >
-            >,
-          )
-        >
-      >('bsearch');
-  late final _bsearch = _bsearchPtr
-      .asFunction<
-        ffi.Pointer<ffi.Void> Function(
-          ffi.Pointer<ffi.Void>,
-          ffi.Pointer<ffi.Void>,
-          int,
-          int,
-          ffi.Pointer<
-            ffi.NativeFunction<
-              ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
-            >
-          >,
-        )
-      >();
+  late final _bsearchPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Void> Function(
+        ffi.Pointer<ffi.Void>,
+        ffi.Pointer<ffi.Void>,
+        ffi.Size,
+        ffi.Size,
+        ffi.Pointer<
+          ffi.NativeFunction<
+            ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
+          >
+        >,
+      )
+    >
+  >('bsearch');
+  late final _bsearch =
+      _bsearchPtr
+          .asFunction<
+            ffi.Pointer<ffi.Void> Function(
+              ffi.Pointer<ffi.Void>,
+              ffi.Pointer<ffi.Void>,
+              int,
+              int,
+              ffi.Pointer<
+                ffi.NativeFunction<
+                  ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
+                >
+              >,
+            )
+          >();
 
   div_t div(int arg0, int arg1) {
     return _div(arg0, arg1);
@@ -757,14 +748,12 @@ class TestHooksBindings {
     return _getenv(arg0);
   }
 
-  late final _getenvPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>)
-        >
-      >('getenv');
-  late final _getenv = _getenvPtr
-      .asFunction<ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>)>();
+  late final _getenvPtr = _lookup<
+    ffi.NativeFunction<ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>)>
+  >('getenv');
+  late final _getenv =
+      _getenvPtr
+          .asFunction<ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>)>();
 
   int labs(int arg0) {
     return _labs(arg0);
@@ -804,12 +793,11 @@ class TestHooksBindings {
     return _mblen(__s, __n);
   }
 
-  late final _mblenPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>, ffi.Size)>
-      >('mblen');
-  late final _mblen = _mblenPtr
-      .asFunction<int Function(ffi.Pointer<ffi.Char>, int)>();
+  late final _mblenPtr = _lookup<
+    ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>, ffi.Size)>
+  >('mblen');
+  late final _mblen =
+      _mblenPtr.asFunction<int Function(ffi.Pointer<ffi.Char>, int)>();
 
   int mbstowcs(
     ffi.Pointer<ffi.WChar> arg0,
@@ -819,39 +807,31 @@ class TestHooksBindings {
     return _mbstowcs(arg0, arg1, __n);
   }
 
-  late final _mbstowcsPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Size Function(
-            ffi.Pointer<ffi.WChar>,
-            ffi.Pointer<ffi.Char>,
-            ffi.Size,
-          )
-        >
-      >('mbstowcs');
-  late final _mbstowcs = _mbstowcsPtr
-      .asFunction<
-        int Function(ffi.Pointer<ffi.WChar>, ffi.Pointer<ffi.Char>, int)
-      >();
+  late final _mbstowcsPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Size Function(ffi.Pointer<ffi.WChar>, ffi.Pointer<ffi.Char>, ffi.Size)
+    >
+  >('mbstowcs');
+  late final _mbstowcs =
+      _mbstowcsPtr
+          .asFunction<
+            int Function(ffi.Pointer<ffi.WChar>, ffi.Pointer<ffi.Char>, int)
+          >();
 
   int mbtowc(ffi.Pointer<ffi.WChar> arg0, ffi.Pointer<ffi.Char> arg1, int __n) {
     return _mbtowc(arg0, arg1, __n);
   }
 
-  late final _mbtowcPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.Pointer<ffi.WChar>,
-            ffi.Pointer<ffi.Char>,
-            ffi.Size,
-          )
-        >
-      >('mbtowc');
-  late final _mbtowc = _mbtowcPtr
-      .asFunction<
-        int Function(ffi.Pointer<ffi.WChar>, ffi.Pointer<ffi.Char>, int)
-      >();
+  late final _mbtowcPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(ffi.Pointer<ffi.WChar>, ffi.Pointer<ffi.Char>, ffi.Size)
+    >
+  >('mbtowc');
+  late final _mbtowc =
+      _mbtowcPtr
+          .asFunction<
+            int Function(ffi.Pointer<ffi.WChar>, ffi.Pointer<ffi.Char>, int)
+          >();
 
   void qsort(
     ffi.Pointer<ffi.Void> __base,
@@ -867,34 +847,34 @@ class TestHooksBindings {
     return _qsort(__base, __nel, __width, __compar);
   }
 
-  late final _qsortPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Void Function(
-            ffi.Pointer<ffi.Void>,
-            ffi.Size,
-            ffi.Size,
-            ffi.Pointer<
-              ffi.NativeFunction<
-                ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
-              >
-            >,
-          )
-        >
-      >('qsort');
-  late final _qsort = _qsortPtr
-      .asFunction<
-        void Function(
-          ffi.Pointer<ffi.Void>,
-          int,
-          int,
-          ffi.Pointer<
-            ffi.NativeFunction<
-              ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
-            >
-          >,
-        )
-      >();
+  late final _qsortPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Void Function(
+        ffi.Pointer<ffi.Void>,
+        ffi.Size,
+        ffi.Size,
+        ffi.Pointer<
+          ffi.NativeFunction<
+            ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
+          >
+        >,
+      )
+    >
+  >('qsort');
+  late final _qsort =
+      _qsortPtr
+          .asFunction<
+            void Function(
+              ffi.Pointer<ffi.Void>,
+              int,
+              int,
+              ffi.Pointer<
+                ffi.NativeFunction<
+                  ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
+                >
+              >,
+            )
+          >();
 
   void quick_exit(int arg0) {
     return _quick_exit(arg0);
@@ -926,22 +906,22 @@ class TestHooksBindings {
     return _strtod(arg0, arg1);
   }
 
-  late final _strtodPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Double Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          )
-        >
-      >('strtod');
-  late final _strtod = _strtodPtr
-      .asFunction<
-        double Function(
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-        )
-      >();
+  late final _strtodPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Double Function(
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+      )
+    >
+  >('strtod');
+  late final _strtod =
+      _strtodPtr
+          .asFunction<
+            double Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+            )
+          >();
 
   double strtof(
     ffi.Pointer<ffi.Char> arg0,
@@ -950,22 +930,22 @@ class TestHooksBindings {
     return _strtof(arg0, arg1);
   }
 
-  late final _strtofPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Float Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          )
-        >
-      >('strtof');
-  late final _strtof = _strtofPtr
-      .asFunction<
-        double Function(
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-        )
-      >();
+  late final _strtofPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Float Function(
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+      )
+    >
+  >('strtof');
+  late final _strtof =
+      _strtofPtr
+          .asFunction<
+            double Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+            )
+          >();
 
   int strtol(
     ffi.Pointer<ffi.Char> __str,
@@ -975,24 +955,24 @@ class TestHooksBindings {
     return _strtol(__str, __endptr, __base);
   }
 
-  late final _strtolPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Long Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-            ffi.Int,
-          )
-        >
-      >('strtol');
-  late final _strtol = _strtolPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          int,
-        )
-      >();
+  late final _strtolPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Long Function(
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+        ffi.Int,
+      )
+    >
+  >('strtol');
+  late final _strtol =
+      _strtolPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+              int,
+            )
+          >();
 
   int strtoll(
     ffi.Pointer<ffi.Char> __str,
@@ -1002,24 +982,24 @@ class TestHooksBindings {
     return _strtoll(__str, __endptr, __base);
   }
 
-  late final _strtollPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.LongLong Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-            ffi.Int,
-          )
-        >
-      >('strtoll');
-  late final _strtoll = _strtollPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          int,
-        )
-      >();
+  late final _strtollPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.LongLong Function(
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+        ffi.Int,
+      )
+    >
+  >('strtoll');
+  late final _strtoll =
+      _strtollPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+              int,
+            )
+          >();
 
   int strtoul(
     ffi.Pointer<ffi.Char> __str,
@@ -1029,24 +1009,24 @@ class TestHooksBindings {
     return _strtoul(__str, __endptr, __base);
   }
 
-  late final _strtoulPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.UnsignedLong Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-            ffi.Int,
-          )
-        >
-      >('strtoul');
-  late final _strtoul = _strtoulPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          int,
-        )
-      >();
+  late final _strtoulPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.UnsignedLong Function(
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+        ffi.Int,
+      )
+    >
+  >('strtoul');
+  late final _strtoul =
+      _strtoulPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+              int,
+            )
+          >();
 
   int strtoull(
     ffi.Pointer<ffi.Char> __str,
@@ -1056,24 +1036,24 @@ class TestHooksBindings {
     return _strtoull(__str, __endptr, __base);
   }
 
-  late final _strtoullPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.UnsignedLongLong Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-            ffi.Int,
-          )
-        >
-      >('strtoull');
-  late final _strtoull = _strtoullPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          int,
-        )
-      >();
+  late final _strtoullPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.UnsignedLongLong Function(
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+        ffi.Int,
+      )
+    >
+  >('strtoull');
+  late final _strtoull =
+      _strtoullPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+              int,
+            )
+          >();
 
   int system(ffi.Pointer<ffi.Char> arg0) {
     return _system(arg0);
@@ -1083,8 +1063,8 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>)>>(
         'system',
       );
-  late final _system = _systemPtr
-      .asFunction<int Function(ffi.Pointer<ffi.Char>)>();
+  late final _system =
+      _systemPtr.asFunction<int Function(ffi.Pointer<ffi.Char>)>();
 
   int wcstombs(
     ffi.Pointer<ffi.Char> arg0,
@@ -1094,31 +1074,26 @@ class TestHooksBindings {
     return _wcstombs(arg0, arg1, __n);
   }
 
-  late final _wcstombsPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Size Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.WChar>,
-            ffi.Size,
-          )
-        >
-      >('wcstombs');
-  late final _wcstombs = _wcstombsPtr
-      .asFunction<
-        int Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.WChar>, int)
-      >();
+  late final _wcstombsPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Size Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.WChar>, ffi.Size)
+    >
+  >('wcstombs');
+  late final _wcstombs =
+      _wcstombsPtr
+          .asFunction<
+            int Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.WChar>, int)
+          >();
 
   int wctomb(ffi.Pointer<ffi.Char> arg0, int arg1) {
     return _wctomb(arg0, arg1);
   }
 
-  late final _wctombPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>, ffi.WChar)>
-      >('wctomb');
-  late final _wctomb = _wctombPtr
-      .asFunction<int Function(ffi.Pointer<ffi.Char>, int)>();
+  late final _wctombPtr = _lookup<
+    ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>, ffi.WChar)>
+  >('wctomb');
+  late final _wctomb =
+      _wctombPtr.asFunction<int Function(ffi.Pointer<ffi.Char>, int)>();
 
   void _Exit(int arg0) {
     return __Exit(arg0);
@@ -1156,37 +1131,36 @@ class TestHooksBindings {
     return _ecvt(arg0, arg1, arg2, arg3);
   }
 
-  late final _ecvtPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Char> Function(
-            ffi.Double,
-            ffi.Int,
-            ffi.Pointer<ffi.Int>,
-            ffi.Pointer<ffi.Int>,
-          )
-        >
-      >('ecvt');
-  late final _ecvt = _ecvtPtr
-      .asFunction<
-        ffi.Pointer<ffi.Char> Function(
-          double,
-          int,
-          ffi.Pointer<ffi.Int>,
-          ffi.Pointer<ffi.Int>,
-        )
-      >();
+  late final _ecvtPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Char> Function(
+        ffi.Double,
+        ffi.Int,
+        ffi.Pointer<ffi.Int>,
+        ffi.Pointer<ffi.Int>,
+      )
+    >
+  >('ecvt');
+  late final _ecvt =
+      _ecvtPtr
+          .asFunction<
+            ffi.Pointer<ffi.Char> Function(
+              double,
+              int,
+              ffi.Pointer<ffi.Int>,
+              ffi.Pointer<ffi.Int>,
+            )
+          >();
 
   double erand48(ffi.Pointer<ffi.UnsignedShort> arg0) {
     return _erand48(arg0);
   }
 
-  late final _erand48Ptr =
-      _lookup<
-        ffi.NativeFunction<ffi.Double Function(ffi.Pointer<ffi.UnsignedShort>)>
-      >('erand48');
-  late final _erand48 = _erand48Ptr
-      .asFunction<double Function(ffi.Pointer<ffi.UnsignedShort>)>();
+  late final _erand48Ptr = _lookup<
+    ffi.NativeFunction<ffi.Double Function(ffi.Pointer<ffi.UnsignedShort>)>
+  >('erand48');
+  late final _erand48 =
+      _erand48Ptr.asFunction<double Function(ffi.Pointer<ffi.UnsignedShort>)>();
 
   ffi.Pointer<ffi.Char> fcvt(
     double arg0,
@@ -1197,26 +1171,26 @@ class TestHooksBindings {
     return _fcvt(arg0, arg1, arg2, arg3);
   }
 
-  late final _fcvtPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Char> Function(
-            ffi.Double,
-            ffi.Int,
-            ffi.Pointer<ffi.Int>,
-            ffi.Pointer<ffi.Int>,
-          )
-        >
-      >('fcvt');
-  late final _fcvt = _fcvtPtr
-      .asFunction<
-        ffi.Pointer<ffi.Char> Function(
-          double,
-          int,
-          ffi.Pointer<ffi.Int>,
-          ffi.Pointer<ffi.Int>,
-        )
-      >();
+  late final _fcvtPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Char> Function(
+        ffi.Double,
+        ffi.Int,
+        ffi.Pointer<ffi.Int>,
+        ffi.Pointer<ffi.Int>,
+      )
+    >
+  >('fcvt');
+  late final _fcvt =
+      _fcvtPtr
+          .asFunction<
+            ffi.Pointer<ffi.Char> Function(
+              double,
+              int,
+              ffi.Pointer<ffi.Int>,
+              ffi.Pointer<ffi.Int>,
+            )
+          >();
 
   ffi.Pointer<ffi.Char> gcvt(
     double arg0,
@@ -1226,20 +1200,16 @@ class TestHooksBindings {
     return _gcvt(arg0, arg1, arg2);
   }
 
-  late final _gcvtPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Char> Function(
-            ffi.Double,
-            ffi.Int,
-            ffi.Pointer<ffi.Char>,
-          )
-        >
-      >('gcvt');
-  late final _gcvt = _gcvtPtr
-      .asFunction<
-        ffi.Pointer<ffi.Char> Function(double, int, ffi.Pointer<ffi.Char>)
-      >();
+  late final _gcvtPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Char> Function(ffi.Double, ffi.Int, ffi.Pointer<ffi.Char>)
+    >
+  >('gcvt');
+  late final _gcvt =
+      _gcvtPtr
+          .asFunction<
+            ffi.Pointer<ffi.Char> Function(double, int, ffi.Pointer<ffi.Char>)
+          >();
 
   int getsubopt(
     ffi.Pointer<ffi.Pointer<ffi.Char>> arg0,
@@ -1249,24 +1219,24 @@ class TestHooksBindings {
     return _getsubopt(arg0, arg1, arg2);
   }
 
-  late final _getsuboptPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          )
-        >
-      >('getsubopt');
-  late final _getsubopt = _getsuboptPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-        )
-      >();
+  late final _getsuboptPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+      )
+    >
+  >('getsubopt');
+  late final _getsubopt =
+      _getsuboptPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+            )
+          >();
 
   int grantpt(int arg0) {
     return _grantpt(arg0);
@@ -1284,31 +1254,30 @@ class TestHooksBindings {
     return _initstate(arg0, arg1, __size);
   }
 
-  late final _initstatePtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Char> Function(
-            ffi.UnsignedInt,
-            ffi.Pointer<ffi.Char>,
-            ffi.Size,
-          )
-        >
-      >('initstate');
-  late final _initstate = _initstatePtr
-      .asFunction<
-        ffi.Pointer<ffi.Char> Function(int, ffi.Pointer<ffi.Char>, int)
-      >();
+  late final _initstatePtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Char> Function(
+        ffi.UnsignedInt,
+        ffi.Pointer<ffi.Char>,
+        ffi.Size,
+      )
+    >
+  >('initstate');
+  late final _initstate =
+      _initstatePtr
+          .asFunction<
+            ffi.Pointer<ffi.Char> Function(int, ffi.Pointer<ffi.Char>, int)
+          >();
 
   int jrand48(ffi.Pointer<ffi.UnsignedShort> arg0) {
     return _jrand48(arg0);
   }
 
-  late final _jrand48Ptr =
-      _lookup<
-        ffi.NativeFunction<ffi.Long Function(ffi.Pointer<ffi.UnsignedShort>)>
-      >('jrand48');
-  late final _jrand48 = _jrand48Ptr
-      .asFunction<int Function(ffi.Pointer<ffi.UnsignedShort>)>();
+  late final _jrand48Ptr = _lookup<
+    ffi.NativeFunction<ffi.Long Function(ffi.Pointer<ffi.UnsignedShort>)>
+  >('jrand48');
+  late final _jrand48 =
+      _jrand48Ptr.asFunction<int Function(ffi.Pointer<ffi.UnsignedShort>)>();
 
   ffi.Pointer<ffi.Char> l64a(int arg0) {
     return _l64a(arg0);
@@ -1324,12 +1293,11 @@ class TestHooksBindings {
     return _lcong48(arg0);
   }
 
-  late final _lcong48Ptr =
-      _lookup<
-        ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.UnsignedShort>)>
-      >('lcong48');
-  late final _lcong48 = _lcong48Ptr
-      .asFunction<void Function(ffi.Pointer<ffi.UnsignedShort>)>();
+  late final _lcong48Ptr = _lookup<
+    ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.UnsignedShort>)>
+  >('lcong48');
+  late final _lcong48 =
+      _lcong48Ptr.asFunction<void Function(ffi.Pointer<ffi.UnsignedShort>)>();
 
   int lrand48() {
     return _lrand48();
@@ -1344,14 +1312,12 @@ class TestHooksBindings {
     return _mktemp(arg0);
   }
 
-  late final _mktempPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>)
-        >
-      >('mktemp');
-  late final _mktemp = _mktempPtr
-      .asFunction<ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>)>();
+  late final _mktempPtr = _lookup<
+    ffi.NativeFunction<ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>)>
+  >('mktemp');
+  late final _mktemp =
+      _mktempPtr
+          .asFunction<ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>)>();
 
   int mkstemp(ffi.Pointer<ffi.Char> arg0) {
     return _mkstemp(arg0);
@@ -1361,8 +1327,8 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>)>>(
         'mkstemp',
       );
-  late final _mkstemp = _mkstempPtr
-      .asFunction<int Function(ffi.Pointer<ffi.Char>)>();
+  late final _mkstemp =
+      _mkstempPtr.asFunction<int Function(ffi.Pointer<ffi.Char>)>();
 
   int mrand48() {
     return _mrand48();
@@ -1377,12 +1343,11 @@ class TestHooksBindings {
     return _nrand48(arg0);
   }
 
-  late final _nrand48Ptr =
-      _lookup<
-        ffi.NativeFunction<ffi.Long Function(ffi.Pointer<ffi.UnsignedShort>)>
-      >('nrand48');
-  late final _nrand48 = _nrand48Ptr
-      .asFunction<int Function(ffi.Pointer<ffi.UnsignedShort>)>();
+  late final _nrand48Ptr = _lookup<
+    ffi.NativeFunction<ffi.Long Function(ffi.Pointer<ffi.UnsignedShort>)>
+  >('nrand48');
+  late final _nrand48 =
+      _nrand48Ptr.asFunction<int Function(ffi.Pointer<ffi.UnsignedShort>)>();
 
   int posix_openpt(int arg0) {
     return _posix_openpt(arg0);
@@ -1400,21 +1365,20 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Pointer<ffi.Char> Function(ffi.Int)>>(
         'ptsname',
       );
-  late final _ptsname = _ptsnamePtr
-      .asFunction<ffi.Pointer<ffi.Char> Function(int)>();
+  late final _ptsname =
+      _ptsnamePtr.asFunction<ffi.Pointer<ffi.Char> Function(int)>();
 
   int ptsname_r(int fildes, ffi.Pointer<ffi.Char> buffer, int buflen) {
     return _ptsname_r(fildes, buffer, buflen);
   }
 
-  late final _ptsname_rPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(ffi.Int, ffi.Pointer<ffi.Char>, ffi.Size)
-        >
-      >('ptsname_r');
-  late final _ptsname_r = _ptsname_rPtr
-      .asFunction<int Function(int, ffi.Pointer<ffi.Char>, int)>();
+  late final _ptsname_rPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(ffi.Int, ffi.Pointer<ffi.Char>, ffi.Size)
+    >
+  >('ptsname_r');
+  late final _ptsname_r =
+      _ptsname_rPtr.asFunction<int Function(int, ffi.Pointer<ffi.Char>, int)>();
 
   int putenv(ffi.Pointer<ffi.Char> arg0) {
     return _putenv(arg0);
@@ -1424,8 +1388,8 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>)>>(
         'putenv',
       );
-  late final _putenv = _putenvPtr
-      .asFunction<int Function(ffi.Pointer<ffi.Char>)>();
+  late final _putenv =
+      _putenvPtr.asFunction<int Function(ffi.Pointer<ffi.Char>)>();
 
   int random() {
     return _random();
@@ -1440,12 +1404,11 @@ class TestHooksBindings {
     return _rand_r(arg0);
   }
 
-  late final _rand_rPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.UnsignedInt>)>
-      >('rand_r');
-  late final _rand_r = _rand_rPtr
-      .asFunction<int Function(ffi.Pointer<ffi.UnsignedInt>)>();
+  late final _rand_rPtr = _lookup<
+    ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.UnsignedInt>)>
+  >('rand_r');
+  late final _rand_r =
+      _rand_rPtr.asFunction<int Function(ffi.Pointer<ffi.UnsignedInt>)>();
 
   ffi.Pointer<ffi.Char> realpath(
     ffi.Pointer<ffi.Char> arg0,
@@ -1454,39 +1417,39 @@ class TestHooksBindings {
     return _realpath(arg0, arg1);
   }
 
-  late final _realpathPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Char> Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Char>,
-          )
-        >
-      >('realpath');
-  late final _realpath = _realpathPtr
-      .asFunction<
-        ffi.Pointer<ffi.Char> Function(
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Char>,
-        )
-      >();
+  late final _realpathPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Char> Function(
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Char>,
+      )
+    >
+  >('realpath');
+  late final _realpath =
+      _realpathPtr
+          .asFunction<
+            ffi.Pointer<ffi.Char> Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+            )
+          >();
 
   ffi.Pointer<ffi.UnsignedShort> seed48(ffi.Pointer<ffi.UnsignedShort> arg0) {
     return _seed48(arg0);
   }
 
-  late final _seed48Ptr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.UnsignedShort> Function(
-            ffi.Pointer<ffi.UnsignedShort>,
-          )
-        >
-      >('seed48');
-  late final _seed48 = _seed48Ptr
-      .asFunction<
-        ffi.Pointer<ffi.UnsignedShort> Function(ffi.Pointer<ffi.UnsignedShort>)
-      >();
+  late final _seed48Ptr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.UnsignedShort> Function(ffi.Pointer<ffi.UnsignedShort>)
+    >
+  >('seed48');
+  late final _seed48 =
+      _seed48Ptr
+          .asFunction<
+            ffi.Pointer<ffi.UnsignedShort> Function(
+              ffi.Pointer<ffi.UnsignedShort>,
+            )
+          >();
 
   int setenv(
     ffi.Pointer<ffi.Char> __name,
@@ -1496,20 +1459,16 @@ class TestHooksBindings {
     return _setenv(__name, __value, __overwrite);
   }
 
-  late final _setenvPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Char>,
-            ffi.Int,
-          )
-        >
-      >('setenv');
-  late final _setenv = _setenvPtr
-      .asFunction<
-        int Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, int)
-      >();
+  late final _setenvPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, ffi.Int)
+    >
+  >('setenv');
+  late final _setenv =
+      _setenvPtr
+          .asFunction<
+            int Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, int)
+          >();
 
   void setkey(ffi.Pointer<ffi.Char> arg0) {
     return _setkey(arg0);
@@ -1519,21 +1478,19 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Char>)>>(
         'setkey',
       );
-  late final _setkey = _setkeyPtr
-      .asFunction<void Function(ffi.Pointer<ffi.Char>)>();
+  late final _setkey =
+      _setkeyPtr.asFunction<void Function(ffi.Pointer<ffi.Char>)>();
 
   ffi.Pointer<ffi.Char> setstate(ffi.Pointer<ffi.Char> arg0) {
     return _setstate(arg0);
   }
 
-  late final _setstatePtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>)
-        >
-      >('setstate');
-  late final _setstate = _setstatePtr
-      .asFunction<ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>)>();
+  late final _setstatePtr = _lookup<
+    ffi.NativeFunction<ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>)>
+  >('setstate');
+  late final _setstate =
+      _setstatePtr
+          .asFunction<ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>)>();
 
   void srand48(int arg0) {
     return _srand48(arg0);
@@ -1569,8 +1526,8 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>)>>(
         'unsetenv',
       );
-  late final _unsetenv = _unsetenvPtr
-      .asFunction<int Function(ffi.Pointer<ffi.Char>)>();
+  late final _unsetenv =
+      _unsetenvPtr.asFunction<int Function(ffi.Pointer<ffi.Char>)>();
 
   int arc4random() {
     return _arc4random();
@@ -1584,25 +1541,25 @@ class TestHooksBindings {
     return _arc4random_addrandom(arg0, __datlen);
   }
 
-  late final _arc4random_addrandomPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Void Function(ffi.Pointer<ffi.UnsignedChar>, ffi.Int)
-        >
-      >('arc4random_addrandom');
-  late final _arc4random_addrandom = _arc4random_addrandomPtr
-      .asFunction<void Function(ffi.Pointer<ffi.UnsignedChar>, int)>();
+  late final _arc4random_addrandomPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Void Function(ffi.Pointer<ffi.UnsignedChar>, ffi.Int)
+    >
+  >('arc4random_addrandom');
+  late final _arc4random_addrandom =
+      _arc4random_addrandomPtr
+          .asFunction<void Function(ffi.Pointer<ffi.UnsignedChar>, int)>();
 
   void arc4random_buf(ffi.Pointer<ffi.Void> __buf, int __nbytes) {
     return _arc4random_buf(__buf, __nbytes);
   }
 
-  late final _arc4random_bufPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>, ffi.Size)>
-      >('arc4random_buf');
-  late final _arc4random_buf = _arc4random_bufPtr
-      .asFunction<void Function(ffi.Pointer<ffi.Void>, int)>();
+  late final _arc4random_bufPtr = _lookup<
+    ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>, ffi.Size)>
+  >('arc4random_buf');
+  late final _arc4random_buf =
+      _arc4random_bufPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>, int)>();
 
   void arc4random_stir() {
     return _arc4random_stir();
@@ -1610,8 +1567,8 @@ class TestHooksBindings {
 
   late final _arc4random_stirPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function()>>('arc4random_stir');
-  late final _arc4random_stir = _arc4random_stirPtr
-      .asFunction<void Function()>();
+  late final _arc4random_stir =
+      _arc4random_stirPtr.asFunction<void Function()>();
 
   int arc4random_uniform(int __upper_bound) {
     return _arc4random_uniform(__upper_bound);
@@ -1621,8 +1578,8 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Uint32 Function(ffi.Uint32)>>(
         'arc4random_uniform',
       );
-  late final _arc4random_uniform = _arc4random_uniformPtr
-      .asFunction<int Function(int)>();
+  late final _arc4random_uniform =
+      _arc4random_uniformPtr.asFunction<int Function(int)>();
 
   ffi.Pointer<ffi.Char> cgetcap(
     ffi.Pointer<ffi.Char> arg0,
@@ -1632,24 +1589,24 @@ class TestHooksBindings {
     return _cgetcap(arg0, arg1, arg2);
   }
 
-  late final _cgetcapPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Char> Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Char>,
-            ffi.Int,
-          )
-        >
-      >('cgetcap');
-  late final _cgetcap = _cgetcapPtr
-      .asFunction<
-        ffi.Pointer<ffi.Char> Function(
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Char>,
-          int,
-        )
-      >();
+  late final _cgetcapPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Char> Function(
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Char>,
+        ffi.Int,
+      )
+    >
+  >('cgetcap');
+  late final _cgetcap =
+      _cgetcapPtr
+          .asFunction<
+            ffi.Pointer<ffi.Char> Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              int,
+            )
+          >();
 
   int cgetclose() {
     return _cgetclose();
@@ -1668,24 +1625,24 @@ class TestHooksBindings {
     return _cgetent(arg0, arg1, arg2);
   }
 
-  late final _cgetentPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-            ffi.Pointer<ffi.Char>,
-          )
-        >
-      >('cgetent');
-  late final _cgetent = _cgetentPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          ffi.Pointer<ffi.Char>,
-        )
-      >();
+  late final _cgetentPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+        ffi.Pointer<ffi.Char>,
+      )
+    >
+  >('cgetent');
+  late final _cgetent =
+      _cgetentPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+              ffi.Pointer<ffi.Char>,
+            )
+          >();
 
   int cgetfirst(
     ffi.Pointer<ffi.Pointer<ffi.Char>> arg0,
@@ -1694,35 +1651,37 @@ class TestHooksBindings {
     return _cgetfirst(arg0, arg1);
   }
 
-  late final _cgetfirstPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          )
-        >
-      >('cgetfirst');
-  late final _cgetfirst = _cgetfirstPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-        )
-      >();
+  late final _cgetfirstPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+      )
+    >
+  >('cgetfirst');
+  late final _cgetfirst =
+      _cgetfirstPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+            )
+          >();
 
   int cgetmatch(ffi.Pointer<ffi.Char> arg0, ffi.Pointer<ffi.Char> arg1) {
     return _cgetmatch(arg0, arg1);
   }
 
-  late final _cgetmatchPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>)
-        >
-      >('cgetmatch');
-  late final _cgetmatch = _cgetmatchPtr
-      .asFunction<int Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>)>();
+  late final _cgetmatchPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>)
+    >
+  >('cgetmatch');
+  late final _cgetmatch =
+      _cgetmatchPtr
+          .asFunction<
+            int Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>)
+          >();
 
   int cgetnext(
     ffi.Pointer<ffi.Pointer<ffi.Char>> arg0,
@@ -1731,22 +1690,22 @@ class TestHooksBindings {
     return _cgetnext(arg0, arg1);
   }
 
-  late final _cgetnextPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          )
-        >
-      >('cgetnext');
-  late final _cgetnext = _cgetnextPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-        )
-      >();
+  late final _cgetnextPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+      )
+    >
+  >('cgetnext');
+  late final _cgetnext =
+      _cgetnextPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+            )
+          >();
 
   int cgetnum(
     ffi.Pointer<ffi.Char> arg0,
@@ -1756,24 +1715,24 @@ class TestHooksBindings {
     return _cgetnum(arg0, arg1, arg2);
   }
 
-  late final _cgetnumPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Long>,
-          )
-        >
-      >('cgetnum');
-  late final _cgetnum = _cgetnumPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Long>,
-        )
-      >();
+  late final _cgetnumPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Long>,
+      )
+    >
+  >('cgetnum');
+  late final _cgetnum =
+      _cgetnumPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Long>,
+            )
+          >();
 
   int cgetset(ffi.Pointer<ffi.Char> arg0) {
     return _cgetset(arg0);
@@ -1783,8 +1742,8 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>)>>(
         'cgetset',
       );
-  late final _cgetset = _cgetsetPtr
-      .asFunction<int Function(ffi.Pointer<ffi.Char>)>();
+  late final _cgetset =
+      _cgetsetPtr.asFunction<int Function(ffi.Pointer<ffi.Char>)>();
 
   int cgetstr(
     ffi.Pointer<ffi.Char> arg0,
@@ -1794,24 +1753,24 @@ class TestHooksBindings {
     return _cgetstr(arg0, arg1, arg2);
   }
 
-  late final _cgetstrPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          )
-        >
-      >('cgetstr');
-  late final _cgetstr = _cgetstrPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-        )
-      >();
+  late final _cgetstrPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+      )
+    >
+  >('cgetstr');
+  late final _cgetstr =
+      _cgetstrPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+            )
+          >();
 
   int cgetustr(
     ffi.Pointer<ffi.Char> arg0,
@@ -1821,24 +1780,24 @@ class TestHooksBindings {
     return _cgetustr(arg0, arg1, arg2);
   }
 
-  late final _cgetustrPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          )
-        >
-      >('cgetustr');
-  late final _cgetustr = _cgetustrPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-        )
-      >();
+  late final _cgetustrPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+      )
+    >
+  >('cgetustr');
+  late final _cgetustr =
+      _cgetustrPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+            )
+          >();
 
   int daemon(int arg0, int arg1) {
     return _daemon(arg0, arg1);
@@ -1852,12 +1811,11 @@ class TestHooksBindings {
     return _devname(arg0, arg1);
   }
 
-  late final _devnamePtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Pointer<ffi.Char> Function(dev_t, mode_t)>
-      >('devname');
-  late final _devname = _devnamePtr
-      .asFunction<ffi.Pointer<ffi.Char> Function(int, int)>();
+  late final _devnamePtr = _lookup<
+    ffi.NativeFunction<ffi.Pointer<ffi.Char> Function(dev_t, mode_t)>
+  >('devname');
+  late final _devname =
+      _devnamePtr.asFunction<ffi.Pointer<ffi.Char> Function(int, int)>();
 
   ffi.Pointer<ffi.Char> devname_r(
     int arg0,
@@ -1868,21 +1826,21 @@ class TestHooksBindings {
     return _devname_r(arg0, arg1, buf, len);
   }
 
-  late final _devname_rPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Char> Function(
-            dev_t,
-            mode_t,
-            ffi.Pointer<ffi.Char>,
-            ffi.Int,
-          )
-        >
-      >('devname_r');
-  late final _devname_r = _devname_rPtr
-      .asFunction<
-        ffi.Pointer<ffi.Char> Function(int, int, ffi.Pointer<ffi.Char>, int)
-      >();
+  late final _devname_rPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Char> Function(
+        dev_t,
+        mode_t,
+        ffi.Pointer<ffi.Char>,
+        ffi.Int,
+      )
+    >
+  >('devname_r');
+  late final _devname_r =
+      _devname_rPtr
+          .asFunction<
+            ffi.Pointer<ffi.Char> Function(int, int, ffi.Pointer<ffi.Char>, int)
+          >();
 
   ffi.Pointer<ffi.Char> getbsize(
     ffi.Pointer<ffi.Int> arg0,
@@ -1891,33 +1849,32 @@ class TestHooksBindings {
     return _getbsize(arg0, arg1);
   }
 
-  late final _getbsizePtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Pointer<ffi.Char> Function(
-            ffi.Pointer<ffi.Int>,
-            ffi.Pointer<ffi.Long>,
-          )
-        >
-      >('getbsize');
-  late final _getbsize = _getbsizePtr
-      .asFunction<
-        ffi.Pointer<ffi.Char> Function(
-          ffi.Pointer<ffi.Int>,
-          ffi.Pointer<ffi.Long>,
-        )
-      >();
+  late final _getbsizePtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<ffi.Char> Function(
+        ffi.Pointer<ffi.Int>,
+        ffi.Pointer<ffi.Long>,
+      )
+    >
+  >('getbsize');
+  late final _getbsize =
+      _getbsizePtr
+          .asFunction<
+            ffi.Pointer<ffi.Char> Function(
+              ffi.Pointer<ffi.Int>,
+              ffi.Pointer<ffi.Long>,
+            )
+          >();
 
   int getloadavg(ffi.Pointer<ffi.Double> arg0, int __nelem) {
     return _getloadavg(arg0, __nelem);
   }
 
-  late final _getloadavgPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Double>, ffi.Int)>
-      >('getloadavg');
-  late final _getloadavg = _getloadavgPtr
-      .asFunction<int Function(ffi.Pointer<ffi.Double>, int)>();
+  late final _getloadavgPtr = _lookup<
+    ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Double>, ffi.Int)>
+  >('getloadavg');
+  late final _getloadavg =
+      _getloadavgPtr.asFunction<int Function(ffi.Pointer<ffi.Double>, int)>();
 
   ffi.Pointer<ffi.Char> getprogname() {
     return _getprogname();
@@ -1927,8 +1884,8 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Pointer<ffi.Char> Function()>>(
         'getprogname',
       );
-  late final _getprogname = _getprognamePtr
-      .asFunction<ffi.Pointer<ffi.Char> Function()>();
+  late final _getprogname =
+      _getprognamePtr.asFunction<ffi.Pointer<ffi.Char> Function()>();
 
   void setprogname(ffi.Pointer<ffi.Char> arg0) {
     return _setprogname(arg0);
@@ -1938,8 +1895,8 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Char>)>>(
         'setprogname',
       );
-  late final _setprogname = _setprognamePtr
-      .asFunction<void Function(ffi.Pointer<ffi.Char>)>();
+  late final _setprogname =
+      _setprognamePtr.asFunction<void Function(ffi.Pointer<ffi.Char>)>();
 
   int heapsort(
     ffi.Pointer<ffi.Void> __base,
@@ -1955,34 +1912,34 @@ class TestHooksBindings {
     return _heapsort(__base, __nel, __width, __compar);
   }
 
-  late final _heapsortPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.Pointer<ffi.Void>,
-            ffi.Size,
-            ffi.Size,
-            ffi.Pointer<
-              ffi.NativeFunction<
-                ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
-              >
-            >,
-          )
-        >
-      >('heapsort');
-  late final _heapsort = _heapsortPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Void>,
-          int,
-          int,
-          ffi.Pointer<
-            ffi.NativeFunction<
-              ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
-            >
-          >,
-        )
-      >();
+  late final _heapsortPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(
+        ffi.Pointer<ffi.Void>,
+        ffi.Size,
+        ffi.Size,
+        ffi.Pointer<
+          ffi.NativeFunction<
+            ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
+          >
+        >,
+      )
+    >
+  >('heapsort');
+  late final _heapsort =
+      _heapsortPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Void>,
+              int,
+              int,
+              ffi.Pointer<
+                ffi.NativeFunction<
+                  ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
+                >
+              >,
+            )
+          >();
 
   int mergesort(
     ffi.Pointer<ffi.Void> __base,
@@ -1998,34 +1955,34 @@ class TestHooksBindings {
     return _mergesort(__base, __nel, __width, __compar);
   }
 
-  late final _mergesortPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.Pointer<ffi.Void>,
-            ffi.Size,
-            ffi.Size,
-            ffi.Pointer<
-              ffi.NativeFunction<
-                ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
-              >
-            >,
-          )
-        >
-      >('mergesort');
-  late final _mergesort = _mergesortPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Void>,
-          int,
-          int,
-          ffi.Pointer<
-            ffi.NativeFunction<
-              ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
-            >
-          >,
-        )
-      >();
+  late final _mergesortPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(
+        ffi.Pointer<ffi.Void>,
+        ffi.Size,
+        ffi.Size,
+        ffi.Pointer<
+          ffi.NativeFunction<
+            ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
+          >
+        >,
+      )
+    >
+  >('mergesort');
+  late final _mergesort =
+      _mergesortPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Void>,
+              int,
+              int,
+              ffi.Pointer<
+                ffi.NativeFunction<
+                  ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
+                >
+              >,
+            )
+          >();
 
   void psort(
     ffi.Pointer<ffi.Void> __base,
@@ -2041,34 +1998,34 @@ class TestHooksBindings {
     return _psort(__base, __nel, __width, __compar);
   }
 
-  late final _psortPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Void Function(
-            ffi.Pointer<ffi.Void>,
-            ffi.Size,
-            ffi.Size,
-            ffi.Pointer<
-              ffi.NativeFunction<
-                ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
-              >
-            >,
-          )
-        >
-      >('psort');
-  late final _psort = _psortPtr
-      .asFunction<
-        void Function(
-          ffi.Pointer<ffi.Void>,
-          int,
-          int,
-          ffi.Pointer<
-            ffi.NativeFunction<
-              ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
-            >
-          >,
-        )
-      >();
+  late final _psortPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Void Function(
+        ffi.Pointer<ffi.Void>,
+        ffi.Size,
+        ffi.Size,
+        ffi.Pointer<
+          ffi.NativeFunction<
+            ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
+          >
+        >,
+      )
+    >
+  >('psort');
+  late final _psort =
+      _psortPtr
+          .asFunction<
+            void Function(
+              ffi.Pointer<ffi.Void>,
+              int,
+              int,
+              ffi.Pointer<
+                ffi.NativeFunction<
+                  ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)
+                >
+              >,
+            )
+          >();
 
   void psort_r(
     ffi.Pointer<ffi.Void> __base,
@@ -2089,44 +2046,44 @@ class TestHooksBindings {
     return _psort_r(__base, __nel, __width, arg3, __compar);
   }
 
-  late final _psort_rPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Void Function(
-            ffi.Pointer<ffi.Void>,
-            ffi.Size,
-            ffi.Size,
-            ffi.Pointer<ffi.Void>,
-            ffi.Pointer<
-              ffi.NativeFunction<
-                ffi.Int Function(
-                  ffi.Pointer<ffi.Void>,
-                  ffi.Pointer<ffi.Void>,
-                  ffi.Pointer<ffi.Void>,
-                )
-              >
-            >,
-          )
-        >
-      >('psort_r');
-  late final _psort_r = _psort_rPtr
-      .asFunction<
-        void Function(
-          ffi.Pointer<ffi.Void>,
-          int,
-          int,
-          ffi.Pointer<ffi.Void>,
-          ffi.Pointer<
-            ffi.NativeFunction<
-              ffi.Int Function(
-                ffi.Pointer<ffi.Void>,
-                ffi.Pointer<ffi.Void>,
-                ffi.Pointer<ffi.Void>,
-              )
-            >
-          >,
-        )
-      >();
+  late final _psort_rPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Void Function(
+        ffi.Pointer<ffi.Void>,
+        ffi.Size,
+        ffi.Size,
+        ffi.Pointer<ffi.Void>,
+        ffi.Pointer<
+          ffi.NativeFunction<
+            ffi.Int Function(
+              ffi.Pointer<ffi.Void>,
+              ffi.Pointer<ffi.Void>,
+              ffi.Pointer<ffi.Void>,
+            )
+          >
+        >,
+      )
+    >
+  >('psort_r');
+  late final _psort_r =
+      _psort_rPtr
+          .asFunction<
+            void Function(
+              ffi.Pointer<ffi.Void>,
+              int,
+              int,
+              ffi.Pointer<ffi.Void>,
+              ffi.Pointer<
+                ffi.NativeFunction<
+                  ffi.Int Function(
+                    ffi.Pointer<ffi.Void>,
+                    ffi.Pointer<ffi.Void>,
+                    ffi.Pointer<ffi.Void>,
+                  )
+                >
+              >,
+            )
+          >();
 
   void qsort_r(
     ffi.Pointer<ffi.Void> __base,
@@ -2147,44 +2104,44 @@ class TestHooksBindings {
     return _qsort_r(__base, __nel, __width, arg3, __compar);
   }
 
-  late final _qsort_rPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Void Function(
-            ffi.Pointer<ffi.Void>,
-            ffi.Size,
-            ffi.Size,
-            ffi.Pointer<ffi.Void>,
-            ffi.Pointer<
-              ffi.NativeFunction<
-                ffi.Int Function(
-                  ffi.Pointer<ffi.Void>,
-                  ffi.Pointer<ffi.Void>,
-                  ffi.Pointer<ffi.Void>,
-                )
-              >
-            >,
-          )
-        >
-      >('qsort_r');
-  late final _qsort_r = _qsort_rPtr
-      .asFunction<
-        void Function(
-          ffi.Pointer<ffi.Void>,
-          int,
-          int,
-          ffi.Pointer<ffi.Void>,
-          ffi.Pointer<
-            ffi.NativeFunction<
-              ffi.Int Function(
-                ffi.Pointer<ffi.Void>,
-                ffi.Pointer<ffi.Void>,
-                ffi.Pointer<ffi.Void>,
-              )
-            >
-          >,
-        )
-      >();
+  late final _qsort_rPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Void Function(
+        ffi.Pointer<ffi.Void>,
+        ffi.Size,
+        ffi.Size,
+        ffi.Pointer<ffi.Void>,
+        ffi.Pointer<
+          ffi.NativeFunction<
+            ffi.Int Function(
+              ffi.Pointer<ffi.Void>,
+              ffi.Pointer<ffi.Void>,
+              ffi.Pointer<ffi.Void>,
+            )
+          >
+        >,
+      )
+    >
+  >('qsort_r');
+  late final _qsort_r =
+      _qsort_rPtr
+          .asFunction<
+            void Function(
+              ffi.Pointer<ffi.Void>,
+              int,
+              int,
+              ffi.Pointer<ffi.Void>,
+              ffi.Pointer<
+                ffi.NativeFunction<
+                  ffi.Int Function(
+                    ffi.Pointer<ffi.Void>,
+                    ffi.Pointer<ffi.Void>,
+                    ffi.Pointer<ffi.Void>,
+                  )
+                >
+              >,
+            )
+          >();
 
   int radixsort(
     ffi.Pointer<ffi.Pointer<ffi.UnsignedChar>> __base,
@@ -2195,26 +2152,26 @@ class TestHooksBindings {
     return _radixsort(__base, __nel, __table, __endbyte);
   }
 
-  late final _radixsortPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.Pointer<ffi.Pointer<ffi.UnsignedChar>>,
-            ffi.Int,
-            ffi.Pointer<ffi.UnsignedChar>,
-            ffi.UnsignedInt,
-          )
-        >
-      >('radixsort');
-  late final _radixsort = _radixsortPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Pointer<ffi.UnsignedChar>>,
-          int,
-          ffi.Pointer<ffi.UnsignedChar>,
-          int,
-        )
-      >();
+  late final _radixsortPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(
+        ffi.Pointer<ffi.Pointer<ffi.UnsignedChar>>,
+        ffi.Int,
+        ffi.Pointer<ffi.UnsignedChar>,
+        ffi.UnsignedInt,
+      )
+    >
+  >('radixsort');
+  late final _radixsort =
+      _radixsortPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Pointer<ffi.UnsignedChar>>,
+              int,
+              ffi.Pointer<ffi.UnsignedChar>,
+              int,
+            )
+          >();
 
   int rpmatch(ffi.Pointer<ffi.Char> arg0) {
     return _rpmatch(arg0);
@@ -2224,8 +2181,8 @@ class TestHooksBindings {
       _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>)>>(
         'rpmatch',
       );
-  late final _rpmatch = _rpmatchPtr
-      .asFunction<int Function(ffi.Pointer<ffi.Char>)>();
+  late final _rpmatch =
+      _rpmatchPtr.asFunction<int Function(ffi.Pointer<ffi.Char>)>();
 
   int sradixsort(
     ffi.Pointer<ffi.Pointer<ffi.UnsignedChar>> __base,
@@ -2236,26 +2193,26 @@ class TestHooksBindings {
     return _sradixsort(__base, __nel, __table, __endbyte);
   }
 
-  late final _sradixsortPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int Function(
-            ffi.Pointer<ffi.Pointer<ffi.UnsignedChar>>,
-            ffi.Int,
-            ffi.Pointer<ffi.UnsignedChar>,
-            ffi.UnsignedInt,
-          )
-        >
-      >('sradixsort');
-  late final _sradixsort = _sradixsortPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Pointer<ffi.UnsignedChar>>,
-          int,
-          ffi.Pointer<ffi.UnsignedChar>,
-          int,
-        )
-      >();
+  late final _sradixsortPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int Function(
+        ffi.Pointer<ffi.Pointer<ffi.UnsignedChar>>,
+        ffi.Int,
+        ffi.Pointer<ffi.UnsignedChar>,
+        ffi.UnsignedInt,
+      )
+    >
+  >('sradixsort');
+  late final _sradixsort =
+      _sradixsortPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Pointer<ffi.UnsignedChar>>,
+              int,
+              ffi.Pointer<ffi.UnsignedChar>,
+              int,
+            )
+          >();
 
   void sranddev() {
     return _sranddev();
@@ -2284,26 +2241,26 @@ class TestHooksBindings {
     return _strtonum(__numstr, __minval, __maxval, __errstrp);
   }
 
-  late final _strtonumPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.LongLong Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.LongLong,
-            ffi.LongLong,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          )
-        >
-      >('strtonum');
-  late final _strtonum = _strtonumPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Char>,
-          int,
-          int,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-        )
-      >();
+  late final _strtonumPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.LongLong Function(
+        ffi.Pointer<ffi.Char>,
+        ffi.LongLong,
+        ffi.LongLong,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+      )
+    >
+  >('strtonum');
+  late final _strtonum =
+      _strtonumPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Char>,
+              int,
+              int,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+            )
+          >();
 
   int strtoq(
     ffi.Pointer<ffi.Char> __str,
@@ -2313,24 +2270,24 @@ class TestHooksBindings {
     return _strtoq(__str, __endptr, __base);
   }
 
-  late final _strtoqPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.LongLong Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-            ffi.Int,
-          )
-        >
-      >('strtoq');
-  late final _strtoq = _strtoqPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          int,
-        )
-      >();
+  late final _strtoqPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.LongLong Function(
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+        ffi.Int,
+      )
+    >
+  >('strtoq');
+  late final _strtoq =
+      _strtoqPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+              int,
+            )
+          >();
 
   int strtouq(
     ffi.Pointer<ffi.Char> __str,
@@ -2340,24 +2297,24 @@ class TestHooksBindings {
     return _strtouq(__str, __endptr, __base);
   }
 
-  late final _strtouqPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.UnsignedLongLong Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Pointer<ffi.Char>>,
-            ffi.Int,
-          )
-        >
-      >('strtouq');
-  late final _strtouq = _strtouqPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Pointer<ffi.Char>>,
-          int,
-        )
-      >();
+  late final _strtouqPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.UnsignedLongLong Function(
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Pointer<ffi.Char>>,
+        ffi.Int,
+      )
+    >
+  >('strtouq');
+  late final _strtouq =
+      _strtouqPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<ffi.Char>>,
+              int,
+            )
+          >();
 
   late final ffi.Pointer<ffi.Pointer<ffi.Char>> _suboptarg =
       _lookup<ffi.Pointer<ffi.Char>>('suboptarg');
@@ -2376,8 +2333,8 @@ class TestHooksBindings {
 
   late final _shorebird_test_resetPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function()>>('shorebird_test_reset');
-  late final _shorebird_test_reset = _shorebird_test_resetPtr
-      .asFunction<void Function()>();
+  late final _shorebird_test_reset =
+      _shorebird_test_resetPtr.asFunction<void Function()>();
 
   /// Test-only convenience wrapper around `shorebird_init` that builds
   /// `AppParameters` and stub `FileCallbacks` internally. Dart tests
@@ -2399,28 +2356,28 @@ class TestHooksBindings {
     );
   }
 
-  late final _shorebird_test_initPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Bool Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Char>,
-          )
-        >
-      >('shorebird_test_init');
-  late final _shorebird_test_init = _shorebird_test_initPtr
-      .asFunction<
-        bool Function(
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Char>,
-        )
-      >();
+  late final _shorebird_test_initPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Bool Function(
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Char>,
+      )
+    >
+  >('shorebird_test_init');
+  late final _shorebird_test_init =
+      _shorebird_test_initPtr
+          .asFunction<
+            bool Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+            )
+          >();
 
   /// Simulates the engine's successful boot of `next_boot_patch`.
   /// In production this is two engine actions (launch-start, then

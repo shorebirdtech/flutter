@@ -1,6 +1,7 @@
 - Issues for the updater live in `shorebirdtech/shorebird`, labels `updater` and `package_code_push`. PRs go to `shorebirdtech/flutter` (this directory) for Rust changes, and to `shorebirdtech/shorebird` (`packages/shorebird_code_push`) for the Dart package.
 - Rust tests that call `shorebird_init` need `#[serial]`: the config is a global.
 - `library/include/*.h` come from `cbindgen` in `library/build.rs`; `updater_bindings.g.dart` comes from `ffigen` in shorebirdtech/shorebird `packages/shorebird_code_push`, which reads its own copy of `updater_dart.h` (`native/updater_dart.h`); a header change lands here first, then is copied there. Don't hand-edit either.
+- The engine's `engine/src/flutter/.gitignore` applies here too (`*.lock`, `*.log`, `build/`, `coverage/`, files named `version` or `tags`, ...); after adding files, check `git status --ignored`.
 - Fail open: any error leaves the app on its installed version.
 - `fixtures/` freezes updater behavior as JSON cases replayed through the C API by `library_test_hooks/tests/fixture_corpus.rs`; see `fixtures/README.md`. An intended behavior change updates its case in the same PR.
 

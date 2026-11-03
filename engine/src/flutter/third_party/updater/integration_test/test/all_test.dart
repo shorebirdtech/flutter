@@ -10,7 +10,7 @@
 // outgrows one file, see `docs/integration_tests.md` for the
 // concurrency-override path.
 //
-// The unit tests under `test/src/` are unaffected: they only use
+// shorebird_code_push's own unit tests (in shorebirdtech/shorebird) only use
 // `_MockUpdaterBindings` and never load the real cdylib.
 
 // `setUpAll` shells out to `cargo build -p library_test_hooks`. On a
@@ -43,6 +43,9 @@ void main() {
       final path = await buildTestHooksCdylib();
       engine = TestEngine.setup(path);
     } on Object catch (e, st) {
+      // CI has the toolchain, so a failed build there is a failure, not a
+      // reason to skip every test and report green.
+      if (Platform.environment['CI'] == 'true') rethrow;
       skipReason = 'Could not build/load library_test_hooks cdylib.\n$e\n$st';
     }
   });
