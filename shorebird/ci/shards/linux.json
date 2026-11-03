@@ -143,13 +143,13 @@
       },
       {
         "type": "gn_ninja",
-        "gn_args": ["--no-prebuilt-dart-sdk"],
+        "gn_args": ["--no-prebuilt-dart-sdk", "--no-lto"],
         "ninja_targets": ["flutter/build/archives:artifacts", "flutter/build/archives:flutter_patched_sdk", "flutter/shell/platform/linux:flutter_gtk"],
         "out_dir": "host_debug"
       },
       {
         "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=profile", "--no-prebuilt-dart-sdk"],
+        "gn_args": ["--runtime-mode=profile", "--no-prebuilt-dart-sdk", "--no-lto"],
         "ninja_targets": ["flutter/shell/platform/linux:flutter_gtk"],
         "out_dir": "host_profile"
       },
