@@ -18,6 +18,9 @@
         "gn_args": ["--android", "--android-cpu=arm64", "--runtime-mode=profile"],
         "ninja_targets": ["default", "gen_snapshot"],
         "out_dir": "android_profile_arm64"
+      },
+      {
+        "type": "verify_exported"
       }
     ],
     "artifacts": [
@@ -59,6 +62,9 @@
         "gn_args": ["--android", "--runtime-mode=profile"],
         "ninja_targets": ["default", "gen_snapshot"],
         "out_dir": "android_profile"
+      },
+      {
+        "type": "verify_exported"
       }
     ],
     "artifacts": [
@@ -111,6 +117,9 @@
         "gn_args": ["--android", "--android-cpu=x64", "--runtime-mode=profile"],
         "ninja_targets": ["default", "gen_snapshot"],
         "out_dir": "android_profile_x64"
+      },
+      {
+        "type": "verify_exported"
       }
     ],
     "artifacts": [
