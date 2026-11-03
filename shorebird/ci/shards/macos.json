@@ -70,6 +70,26 @@
     ],
     "compose_input": "ios-framework"
   },
+  "ios-debug": {
+    "steps": [
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--ios", "--runtime-mode=debug", "--gn-arg=shorebird_runtime=true", "--gn-arg=dart_force_simulator=false"],
+        "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
+        "out_dir": "ios_debug"
+      }
+    ]
+  },
+  "ios-profile": {
+    "steps": [
+      {
+        "type": "gn_ninja",
+        "gn_args": ["--ios", "--runtime-mode=profile"],
+        "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
+        "out_dir": "ios_profile"
+      }
+    ]
+  },
   "mac-arm64": {
     "steps": [
       {

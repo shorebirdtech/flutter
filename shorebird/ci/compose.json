@@ -90,5 +90,33 @@
     "artifacts": [
       {"src": "profile/snapshot/gen_snapshot.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64-profile/gen_snapshot.zip"}
     ]
+  },
+  "ios-framework-debug": {
+    "requires": ["ios", "ios-debug"],
+    "script": "flutter/sky/tools/create_ios_framework.py",
+    "flags": ["--no-extension-safe-frameworks"],
+    "path_args": {
+      "--arm64-out-dir": "ios_debug",
+      "--simulator-x64-out-dir": "ios_debug_sim",
+      "--simulator-arm64-out-dir": "ios_debug_sim_arm64"
+    },
+    "dst": "release/debug",
+    "artifacts": [
+      {"src": "debug/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/ios/artifacts.zip"}
+    ]
+  },
+  "ios-framework-profile": {
+    "requires": ["ios", "ios-profile"],
+    "script": "flutter/sky/tools/create_ios_framework.py",
+    "flags": ["--no-extension-safe-frameworks"],
+    "path_args": {
+      "--arm64-out-dir": "ios_profile",
+      "--simulator-x64-out-dir": "ios_debug_sim",
+      "--simulator-arm64-out-dir": "ios_debug_sim_arm64"
+    },
+    "dst": "release/profile",
+    "artifacts": [
+      {"src": "profile/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/ios-profile/artifacts.zip"}
+    ]
   }
 }
