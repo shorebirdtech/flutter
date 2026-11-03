@@ -47,7 +47,6 @@ class BuildInfo {
     this.performanceMeasurementFile,
     this.shorebirdTraceFilePath,
     this.shorebirdPublicKey,
-    this.shorebirdDdMaxBytes,
     required this.packageConfigPath,
     this.codeSizeDirectory,
     this.androidGradleDaemon = true,
@@ -94,7 +93,6 @@ class BuildInfo {
       dartExperiments: dartExperiments,
       performanceMeasurementFile: performanceMeasurementFile,
       shorebirdPublicKey: shorebirdPublicKey,
-      shorebirdDdMaxBytes: shorebirdDdMaxBytes,
       packageConfigPath: packageConfigPath ?? this.packageConfigPath,
       codeSizeDirectory: codeSizeDirectory,
       androidGradleDaemon: androidGradleDaemon,
@@ -194,10 +192,6 @@ class BuildInfo {
   /// Shorebird: the patch public key written into the generated shorebird.yaml,
   /// read from the `SHOREBIRD_PUBLIC_KEY` environment variable.
   final String? shorebirdPublicKey;
-
-  /// Shorebird: the cap on the iOS DD table, read from the
-  /// `SHOREBIRD_DD_MAX_BYTES` environment variable. Null means no DD pass.
-  final int? shorebirdDdMaxBytes;
 
   /// If provided, an output directory where one or more v8-style heap snapshots
   /// will be written for code size profiling.
@@ -399,7 +393,6 @@ class BuildInfo {
       if (useLocalCanvasKit) kUseLocalCanvasKitFlag: useLocalCanvasKit.toString(),
       if (shorebirdPublicKey != null)
         kShorebirdPublicKey: encodeShorebirdPublicKey(shorebirdPublicKey!),
-      if (shorebirdDdMaxBytes != null) kShorebirdDdMaxBytes: shorebirdDdMaxBytes.toString(),
     };
   }
 
@@ -429,8 +422,6 @@ class BuildInfo {
       'FLAVOR': ?flavor,
       if (shorebirdPublicKey != null)
         'SHOREBIRD_ENCODED_PUBLIC_KEY': encodeShorebirdPublicKey(shorebirdPublicKey!),
-      if (shorebirdDdMaxBytes != null)
-        'SHOREBIRD_BUILD_DD_MAX_BYTES': shorebirdDdMaxBytes.toString(),
     };
   }
 
@@ -455,7 +446,6 @@ class BuildInfo {
       if (codeSizeDirectory != null) '-Pcode-size-directory=$codeSizeDirectory',
       if (shorebirdPublicKey != null)
         '-Pshorebird-public-key=${encodeShorebirdPublicKey(shorebirdPublicKey!)}',
-      if (shorebirdDdMaxBytes != null) '-Pshorebird-dd-max-bytes=$shorebirdDdMaxBytes',
       for (final String projectArg in androidProjectArgs) '-P$projectArg',
       if (androidGradleProjectCacheDir != null) '--project-cache-dir=$androidGradleProjectCacheDir',
     ];
