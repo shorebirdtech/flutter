@@ -165,6 +165,10 @@ class AotAssemblyRelease extends AotAssemblyBase {
   @override
   List<Source> get inputs => const <Source>[
     Source.pattern('{FLUTTER_ROOT}/packages/flutter_tools/lib/src/build_system/targets/ios.dart'),
+    // Shorebird-specific: holds the default DD cap.
+    Source.pattern(
+      '{FLUTTER_ROOT}/packages/flutter_tools/lib/src/shorebird/shorebird_defines.dart',
+    ),
     Source.pattern('{BUILD_DIR}/app.dill'),
     Source.artifact(Artifact.engineDartBinary),
     Source.artifact(Artifact.skyEnginePath),

@@ -9,15 +9,18 @@ import '../convert.dart';
 /// [encodeShorebirdPublicKey].
 const kShorebirdPublicKey = 'ShorebirdPublicKey';
 
-/// A debugging override for the cap on the iOS DD table in bytes; `0` turns
-/// the DD pass off. Nothing sets it: release builds use
-/// [kDefaultShorebirdDdMaxBytes].
+/// A debugging override for the cap on the iOS DD table in bytes, passed only
+/// to `flutter assemble` directly (`-dShorebirdDdMaxBytes=0`). `0` or less
+/// turns the DD pass off; a value that isn't a number is ignored. Nothing sets
+/// it: release builds use [kDefaultShorebirdDdMaxBytes].
 const kShorebirdDdMaxBytes = 'ShorebirdDdMaxBytes';
 
 /// The cap on the iOS DD table that release builds use. It matches the
 /// defaults of `analyze_snapshot --dd_max_bytes` and `aot_tools link
 /// --dd-max-bytes`, so a release built by any path (`flutter build`, an Xcode
 /// archive, fastlane) has the DD table its patches are linked against.
+/// This file is an input of `AotAssemblyRelease`, so changing the cap
+/// rebuilds cached apps.
 const kDefaultShorebirdDdMaxBytes = 10000;
 
 /// The cap on the DD table for an iOS AOT build in [buildMode], where `0`
