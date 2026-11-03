@@ -14,6 +14,10 @@
         "out_dir": "android_debug_arm64"
       },
       {
+        "type": "clang_tidy",
+        "out_dir": "android_debug_arm64"
+      },
+      {
         "type": "gn_ninja",
         "gn_args": ["--android", "--android-cpu=arm64", "--runtime-mode=profile"],
         "ninja_targets": ["default", "gen_snapshot"],
@@ -148,6 +152,10 @@
         "out_dir": "host_debug"
       },
       {
+        "type": "clang_tidy",
+        "out_dir": "host_debug"
+      },
+      {
         "type": "shell",
         "command": "mkdir -p out/host_release/aot_tools && out/host_release/dart-sdk/bin/dart pub get --offline --directory=flutter/third_party/dart/pkg/aot_tools && out/host_release/dart-sdk/bin/dart compile kernel flutter/third_party/dart/pkg/aot_tools/bin/aot_tools.dart -o out/host_release/aot_tools/aot-tools.dill"
       }
@@ -172,6 +180,10 @@
         "type": "gn_ninja",
         "gn_args": ["--enable-fontconfig", "--no-prebuilt-dart-sdk", "--no-lto"],
         "ninja_targets": ["flutter/shell/platform/linux:flutter_gtk"],
+        "out_dir": "host_debug_desktop"
+      },
+      {
+        "type": "clang_tidy",
         "out_dir": "host_debug_desktop"
       },
       {

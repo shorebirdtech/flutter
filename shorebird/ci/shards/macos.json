@@ -62,6 +62,10 @@
         "out_dir": "ios_debug_sim"
       },
       {
+        "type": "clang_tidy",
+        "out_dir": "ios_debug_sim"
+      },
+      {
         "type": "gn_ninja",
         "gn_args": ["--ios", "--runtime-mode=debug", "--simulator", "--simulator-cpu=arm64"],
         "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
@@ -144,6 +148,10 @@
         "type": "gn_ninja",
         "gn_args": ["--runtime-mode=debug", "--mac", "--mac-cpu=arm64"],
         "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts"],
+        "out_dir": "mac_debug_arm64"
+      },
+      {
+        "type": "clang_tidy",
         "out_dir": "mac_debug_arm64"
       }
     ],
