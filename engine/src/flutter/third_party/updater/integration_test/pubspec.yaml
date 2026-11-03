@@ -12,11 +12,12 @@ environment:
 dependencies:
   ffi: ^2.0.2
   # The tests use the package's src/ internals, so they need its source, not
-  # just its published API. It lives in shorebirdtech/shorebird.
+  # just its published API. It lives in shorebirdtech/shorebird; pinned, so a
+  # package change there can't turn this repo's updater PRs red unannounced.
   shorebird_code_push:
     git:
       url: https://github.com/shorebirdtech/shorebird.git
-      ref: main
+      ref: f2f5cb81cf38697527f28bc65ed0a99bf210d947
       path: packages/shorebird_code_push
 
 dev_dependencies:
