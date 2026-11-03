@@ -19,6 +19,7 @@ import 'convert.dart';
 import 'darwin/darwin.dart';
 import 'globals.dart' as globals;
 import 'runner/flutter_command.dart' show FlutterOptions;
+import 'shorebird/shorebird_defines.dart';
 
 /// Whether icon font subsetting is enabled by default.
 const kIconTreeShakerEnabledDefault = true;
@@ -45,6 +46,8 @@ class BuildInfo {
     required this.treeShakeIcons,
     this.performanceMeasurementFile,
     this.shorebirdTraceFilePath,
+    this.shorebirdPublicKey,
+    this.shorebirdDdMaxBytes,
     required this.packageConfigPath,
     this.codeSizeDirectory,
     this.androidGradleDaemon = true,
@@ -93,6 +96,8 @@ class BuildInfo {
       dartDefines: dartDefines ?? this.dartDefines,
       dartExperiments: dartExperiments,
       performanceMeasurementFile: performanceMeasurementFile,
+      shorebirdPublicKey: shorebirdPublicKey,
+      shorebirdDdMaxBytes: shorebirdDdMaxBytes,
       packageConfigPath: packageConfigPath ?? this.packageConfigPath,
       codeSizeDirectory: codeSizeDirectory,
       androidGradleDaemon: androidGradleDaemon,
@@ -191,6 +196,14 @@ class BuildInfo {
   /// Format JSON file here. Named `shorebird` to keep the fork's
   /// surface area visibly distinct from upstream Flutter.
   final String? shorebirdTraceFilePath;
+
+  /// Shorebird: the patch public key written into the generated shorebird.yaml,
+  /// read from the `SHOREBIRD_PUBLIC_KEY` environment variable.
+  final String? shorebirdPublicKey;
+
+  /// Shorebird: the cap on the iOS DD table, read from the
+  /// `SHOREBIRD_DD_MAX_BYTES` environment variable. Null means no DD pass.
+  final int? shorebirdDdMaxBytes;
 
   /// If provided, an output directory where one or more v8-style heap snapshots
   /// will be written for code size profiling.
@@ -420,6 +433,9 @@ class BuildInfo {
       kBuildNumber: ?buildNumber,
       kFlavor: ?flavor,
       if (useLocalCanvasKit) kUseLocalCanvasKitFlag: useLocalCanvasKit.toString(),
+      if (shorebirdPublicKey != null)
+        kShorebirdPublicKey: encodeShorebirdPublicKey(shorebirdPublicKey!),
+      if (shorebirdDdMaxBytes != null) kShorebirdDdMaxBytes: shorebirdDdMaxBytes.toString(),
     };
   }
 
@@ -445,6 +461,10 @@ class BuildInfo {
       'PACKAGE_CONFIG': packageConfigPath,
       'CODE_SIZE_DIRECTORY': ?codeSizeDirectory,
       'FLAVOR': ?flavor,
+      if (shorebirdPublicKey != null)
+        'SHOREBIRD_ENCODED_PUBLIC_KEY': encodeShorebirdPublicKey(shorebirdPublicKey!),
+      if (shorebirdDdMaxBytes != null)
+        'SHOREBIRD_BUILD_DD_MAX_BYTES': shorebirdDdMaxBytes.toString(),
     };
   }
 
@@ -469,6 +489,9 @@ class BuildInfo {
       if (codeSizeDirectory != null) '-Pcode-size-directory=$codeSizeDirectory',
       if (androidEnableHcpp != null) '-Penable-hcpp=$androidEnableHcpp',
       if (explicitAndroidEnableHcpp != null) '-Pexplicit-enable-hcpp=$explicitAndroidEnableHcpp',
+      if (shorebirdPublicKey != null)
+        '-Pshorebird-public-key=${encodeShorebirdPublicKey(shorebirdPublicKey!)}',
+      if (shorebirdDdMaxBytes != null) '-Pshorebird-dd-max-bytes=$shorebirdDdMaxBytes',
       for (final String projectArg in androidProjectArgs) '-P$projectArg',
       if (androidGradleProjectCacheDir != null) '--project-cache-dir=$androidGradleProjectCacheDir',
     ];
