@@ -18,6 +18,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -48,8 +49,8 @@ public class ShorebirdHttpClientTest {
             try {
               Socket socket = server.accept();
               executor.execute(() -> serve(socket));
-            } catch (IOException e) {
-              return; // Closed by tearDown.
+            } catch (IOException | RuntimeException e) {
+              return; // Closed or shut down by tearDown.
             }
           }
         });
@@ -69,7 +70,7 @@ public class ShorebirdHttpClientTest {
       String line;
       while (!(line = readLine(in)).isEmpty()) {
         int colon = line.indexOf(':');
-        String name = line.substring(0, colon).trim().toLowerCase();
+        String name = line.substring(0, colon).trim().toLowerCase(Locale.ROOT);
         headers.put(name, line.substring(colon + 1).trim());
       }
       int length = Integer.parseInt(headers.getOrDefault("content-length", "0"));
@@ -233,7 +234,11 @@ public class ShorebirdHttpClientTest {
   @Test
   public void httpToHttpsRedirectIsFollowed() {
     // Followed to a closed https port, so it fails connecting rather than on the redirect.
-    assertEquals(ShorebirdHttpClient.TRANSPORT_ERROR, get("/to-https").result);
+    ShorebirdHttpClient client = get("/to-https");
+    assertEquals(ShorebirdHttpClient.TRANSPORT_ERROR, client.result);
+    // A refused connect proves the redirect was followed; a dropped /to-https
+    // response would be an unexpected end of stream instead.
+    assertTrue(client.error, client.error.contains("ConnectException"));
   }
 
   @Test
