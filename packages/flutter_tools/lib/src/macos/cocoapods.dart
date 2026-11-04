@@ -442,7 +442,9 @@ class CocoaPods {
             ..write(line)
             ..write('\n');
           final PodInstallPhase? phase = _podPhaseForLogLine(line);
-          if (phase != null) phases.transitionTo(phase.wireName);
+          if (phase != null) {
+            phases.transitionTo(phase.wireName);
+          }
         })
         .asFuture<void>();
 
@@ -740,7 +742,9 @@ const _podPhaseMarkers = <String, PodInstallPhase>{
 /// into, or null if the line doesn't contain any of the known markers.
 PodInstallPhase? _podPhaseForLogLine(String line) {
   for (final MapEntry<String, PodInstallPhase> entry in _podPhaseMarkers.entries) {
-    if (line.contains(entry.key)) return entry.value;
+    if (line.contains(entry.key)) {
+      return entry.value;
+    }
   }
   return null;
 }
