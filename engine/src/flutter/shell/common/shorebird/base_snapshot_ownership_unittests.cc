@@ -15,8 +15,7 @@
 // and nothing here asserts how many times ConfigureShorebird resolves.
 
 #include <dlfcn.h>
-#include <limits.h>
-#include <stdlib.h>
+#include <sys/stat.h>
 
 #include <string>
 
@@ -47,18 +46,6 @@ std::string FakeBaseSnapshotPath() {
   return fml::paths::JoinPaths({GetFixturesPath(), kFakeBaseSnapshotName});
 }
 
-// dyld reports the canonicalized path, so /tmp/x comes back as /private/tmp/x
-// and comparing against the string handed to dlopen fails on any out directory
-// reached through a symlink. glibc echoes the string instead, so only one of
-// the two needs this, and normalizing both costs nothing.
-std::string Resolved(const std::string& path) {
-  char buffer[PATH_MAX];
-  if (::realpath(path.c_str(), buffer) == nullptr) {
-    return path;
-  }
-  return buffer;
-}
-
 // Asks the loader whether the image is mapped rather than inferring it from
 // what the snapshot returned. RTLD_NOLOAD yields a handle only for an image
 // already in the process, and the dlclose releases the reference this takes.
@@ -80,7 +67,21 @@ std::string OwningImageOf(const uint8_t* address) {
   if (::dladdr(address, &info) == 0 || info.dli_fname == nullptr) {
     return "";
   }
-  return Resolved(info.dli_fname);
+  return info.dli_fname;
+}
+
+// Whether two paths name the same file. The fixtures copy is a hardlink of the
+// built library (the mac toolchain's copy tool is `ln -f`), and dyld names an
+// image by the kernel's path for the file (F_GETPATH), which for a hardlinked
+// file can be either link; dyld also canonicalizes /tmp to /private/tmp. So
+// the owning image is matched by device and inode, not by its name.
+bool SameFile(const std::string& a, const std::string& b) {
+  struct stat sa = {};
+  struct stat sb = {};
+  if (::stat(a.c_str(), &sa) != 0 || ::stat(b.c_str(), &sb) != 0) {
+    return false;
+  }
+  return sa.st_dev == sb.st_dev && sa.st_ino == sb.st_ino;
 }
 
 Settings SettingsForLibrary(const std::string& path) {
@@ -94,11 +95,14 @@ Settings SettingsForLibrary(const std::string& path) {
 // both are what Shorebird_SetBaseSnapshots passes on, so both get asserted.
 void ExpectResolvedFromLibrary(const DartSnapshot& snapshot,
                                const std::string& path) {
-  const std::string resolved = Resolved(path);
   ASSERT_NE(snapshot.GetDataMapping(), nullptr);
-  EXPECT_EQ(OwningImageOf(snapshot.GetDataMapping()), resolved);
+  const std::string data_image = OwningImageOf(snapshot.GetDataMapping());
+  EXPECT_TRUE(SameFile(data_image, path)) << data_image << " is not " << path;
   ASSERT_NE(snapshot.GetInstructionsMapping(), nullptr);
-  EXPECT_EQ(OwningImageOf(snapshot.GetInstructionsMapping()), resolved);
+  const std::string instructions_image =
+      OwningImageOf(snapshot.GetInstructionsMapping());
+  EXPECT_TRUE(SameFile(instructions_image, path))
+      << instructions_image << " is not " << path;
 }
 
 // Named rather than inlined because a missing library is otherwise invisible
