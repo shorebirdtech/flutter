@@ -367,13 +367,16 @@ deps = {
 
   # Prebuilt Dart SDK of the same revision as the Dart SDK source checkout
   'engine/src/flutter/prebuilts/linux-x64/dart-sdk': {
-    'packages': [
+    'bucket': 'shorebird-dart-sdk-prebuilt',
+    'objects': [
       {
-        'package': 'flutter/dart-sdk/linux-amd64',
-        'version': 'git_revision:'+Var('dart_revision')
+        'object_name': Var('dart_sdk_revision') + '/dart-sdk-linux-x64.tar.gz',
+        'sha256sum': '636bf51574d52487abc148733f33388b3b14e4b05c53c6fca32dd8ed6e0e9574',
+        'size_bytes': 236358097,
+        'generation': 1793823932947849,
       }
     ],
-    'dep_type': 'cipd',
+    'dep_type': 'gcs',
     'condition': 'host_os == "linux" and download_dart_sdk'
   },
   'engine/src/flutter/prebuilts/linux-arm64/dart-sdk': {
@@ -390,19 +393,22 @@ deps = {
     'condition': 'host_os == "linux" and download_dart_sdk'
   },
   'engine/src/flutter/prebuilts/macos-x64/dart-sdk': {
-    'packages': [
+    'bucket': 'shorebird-dart-sdk-prebuilt',
+    'objects': [
       {
-        'package': 'flutter/dart-sdk/mac-amd64',
-        'version': 'git_revision:'+Var('dart_revision')
+        'object_name': Var('dart_sdk_revision') + '/dart-sdk-darwin-x64.tar.gz',
+        'sha256sum': '897513e7cb465cc8e3ffec483fa9424d653e7f4468754489452a4853e36aeb9f',
+        'size_bytes': 225533540,
+        'generation': 1793824033166029,
       }
     ],
-    'dep_type': 'cipd',
+    'dep_type': 'gcs',
     'condition': 'host_os == "mac" and download_dart_sdk'
   },
   # Consume Shorebird's own published Dart SDK (built from
   # shorebirdtech/dart-sdk) from GCS instead of Google's CIPD prebuilt, so
   # the engine builds against our Dart fork and skips rebuilding it from
-  # source (see shards/macos.json: mac-arm64 drops --no-prebuilt-dart-sdk).
+  # source (no engine shard passes --no-prebuilt-dart-sdk).
   # The object is keyed by Var('dart_sdk_revision') so it tracks the same
   # fork revision as the source clone above; sha256sum/size_bytes pin the
   # specific artifact's content and must be updated whenever that revision
@@ -423,13 +429,16 @@ deps = {
     'condition': 'host_os == "mac" and download_dart_sdk'
   },
   'engine/src/flutter/prebuilts/windows-x64/dart-sdk': {
-    'packages': [
+    'bucket': 'shorebird-dart-sdk-prebuilt',
+    'objects': [
       {
-        'package': 'flutter/dart-sdk/windows-amd64',
-        'version': 'git_revision:'+Var('dart_revision')
+        'object_name': Var('dart_sdk_revision') + '/dart-sdk-windows-x64.tar.gz',
+        'sha256sum': 'f59a947d40c3741a5ac459362cb79017d90b7e2b480ed8c42d8ced75b0d737f6',
+        'size_bytes': 219250245,
+        'generation': 1793823863246002,
       }
     ],
-    'dep_type': 'cipd',
+    'dep_type': 'gcs',
     'condition': 'host_os == "win" and download_dart_sdk'
   },
   'engine/src/flutter/prebuilts/windows-arm64/dart-sdk': {
