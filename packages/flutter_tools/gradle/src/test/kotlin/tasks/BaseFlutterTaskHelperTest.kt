@@ -354,6 +354,7 @@ class BaseFlutterTaskHelperTest {
         verify { mockExecSpec.args("-dAndroidArchs=${BaseFlutterTaskPropertiesTest.TARGET_PLATFORM_VALUES_JOINED_LIST}") }
         verify { mockExecSpec.args("-dMinSdkVersion=${BaseFlutterTaskPropertiesTest.MIN_SDK_VERSION_TEST}") }
         verify { mockExecSpec.args(ruleNamesList) }
+        verify(exactly = 0) { mockExecSpec.args(match<String> { it.startsWith("--shorebird-trace-file") }) }
     }
 
     @Test
