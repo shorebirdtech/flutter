@@ -111,7 +111,7 @@
       }
     ],
     "artifacts": [
-      {"src": "host_debug_arm64/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-windows-arm64.zip", "zip": true, "content_hash": true},
+      {"src": "host_debug_arm64/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-windows-arm64.zip", "zip": true},
       {"src": "host_debug_arm64/zip_archives/windows-arm64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/windows-arm64/artifacts.zip"},
       {"src": "host_debug_arm64/zip_archives/windows-arm64/font-subset.zip", "dst": "flutter_infra_release/flutter/$engine/windows-arm64/font-subset.zip"},
       {"src": "host_debug_arm64/zip_archives/windows-arm64-debug/windows-arm64-flutter.zip", "dst": "flutter_infra_release/flutter/$engine/windows-arm64-debug/windows-arm64-flutter.zip"},
