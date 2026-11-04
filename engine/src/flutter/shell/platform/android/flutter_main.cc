@@ -164,8 +164,12 @@ void FlutterMain::Init(JNIEnv* env,
   std::string version_string = fml::jni::JavaStringToString(env, version);
   std::string version_code_string =
       fml::jni::JavaStringToString(env, versionCode);
-  ConfigureShorebird(code_cache_path, app_storage_path, settings,
-                     shorebird_yaml, version_string, version_code_string);
+  ShorebirdConfigArgs shorebird_args(
+      code_cache_path, app_storage_path, settings.application_library_paths,
+      shorebird_yaml, {version_string, version_code_string});
+  std::string patch_path;
+  ConfigureShorebird(shorebird_args, patch_path);
+  ApplyPatchToSettings(patch_path, settings);
 #endif
 
   flutter::DartCallbackCache::LoadCacheFromDisk();

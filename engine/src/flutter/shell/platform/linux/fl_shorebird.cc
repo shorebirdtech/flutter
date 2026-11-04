@@ -48,8 +48,9 @@ gboolean SetUpShorebird(const char* assets_path, std::string& patch_path) {
   ReleaseVersion release_version{version_map["version"].GetString(),
                                  version_map["build_number"].GetString()};
 
-  ShorebirdConfigArgs shorebird_args(code_cache_path, code_cache_path, app_path,
-                                     shorebird_yaml_contents, release_version);
+  ShorebirdConfigArgs shorebird_args(code_cache_path, code_cache_path,
+                                     {app_path}, shorebird_yaml_contents,
+                                     release_version);
   return ConfigureShorebird(shorebird_args, patch_path);
 }
 
