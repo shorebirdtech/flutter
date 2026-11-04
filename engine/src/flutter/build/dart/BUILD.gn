@@ -12,6 +12,10 @@ if (build_engine_artifacts) {
     copy_tree("dart_sdk") {
       source = prebuilt_dart_sdk
       dest = "$root_out_dir/dart-sdk"
+
+      # A dep_type gcs prebuilt leaves gclient's download (.<object>.tar.gz)
+      # and its bookkeeping files (.<object>_tar_gz_*) beside the SDK.
+      exclude = ".*.tar.gz,.*_tar_gz_*"
     }
   } else {
     group("dart_sdk") {
