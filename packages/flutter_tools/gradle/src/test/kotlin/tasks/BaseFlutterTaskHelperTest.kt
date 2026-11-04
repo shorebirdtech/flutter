@@ -41,6 +41,7 @@ class BaseFlutterTaskHelperTest {
         internal val FLUTTER_EXECUTABLE_ABSOLUTE_PATH_TEST = "/path/to/flutter/bin/flutter".replace("/", File.separator)
         internal val LOCAL_ENGINE_SRC_PATH_TEST = "/path/to/flutter/engine/src".replace("/", File.separator)
         internal val PERFORMANCE_MEASUREMENT_FILE_TEST = "/path/to/build/performance_file".replace("/", File.separator)
+        internal val SHOREBIRD_TRACE_FILE_TEST = "/path/to/build/shorebird_trace.json".replace("/", File.separator)
         internal val FRONTEND_SERVER_STARTER_PATH_TEST = "/path/to/starter/script_file".replace("/", File.separator)
         internal val SPLIT_DEBUG_INFO_TEST = "/path/to/build/debug_info_directory".replace("/", File.separator)
         internal val CODE_SIZE_DIRECTORY_TEST = "/path/to/build/code_size_directory".replace("/", File.separator)
@@ -188,6 +189,7 @@ class BaseFlutterTaskHelperTest {
         every { baseFlutterTask.verbose } returns true
         every { baseFlutterTask.intermediateDir } returns BaseFlutterTaskPropertiesTest.intermediateDirFileTest
         every { baseFlutterTask.performanceMeasurementFile } returns BaseFlutterTaskPropertiesTest.PERFORMANCE_MEASUREMENT_FILE_TEST
+        every { baseFlutterTask.shorebirdTraceFile } returns BaseFlutterTaskPropertiesTest.SHOREBIRD_TRACE_FILE_TEST
 
         every { baseFlutterTask.buildMode } returns buildModeString
         every { baseFlutterTask.flutterRoot } returns BaseFlutterTaskPropertiesTest.flutterRootTest
@@ -243,6 +245,7 @@ class BaseFlutterTaskHelperTest {
         verify { mockExecSpec.args("--depfile", "${BaseFlutterTaskPropertiesTest.intermediateDirFileTest}/flutter_build.d") }
         verify { mockExecSpec.args("--output", "${BaseFlutterTaskPropertiesTest.intermediateDirFileTest}") }
         verify { mockExecSpec.args("--performance-measurement-file=${BaseFlutterTaskPropertiesTest.PERFORMANCE_MEASUREMENT_FILE_TEST}") }
+        verify { mockExecSpec.args("--shorebird-trace-file=${BaseFlutterTaskPropertiesTest.SHOREBIRD_TRACE_FILE_TEST}") }
         verify { mockExecSpec.args("-dTargetFile=${BaseFlutterTaskPropertiesTest.FLUTTER_TARGET_FILE_PATH}") }
         verify { mockExecSpec.args("-dTargetPlatform=android") }
         verify { mockExecSpec.args("-dBuildMode=$buildModeString") }
@@ -293,6 +296,7 @@ class BaseFlutterTaskHelperTest {
         every { baseFlutterTask.verbose } returns true
         every { baseFlutterTask.intermediateDir } returns BaseFlutterTaskPropertiesTest.intermediateDirFileTest
         every { baseFlutterTask.performanceMeasurementFile } returns null
+        every { baseFlutterTask.shorebirdTraceFile } returns null
 
         every { baseFlutterTask.buildMode } returns buildModeString
         every { baseFlutterTask.flutterRoot } returns BaseFlutterTaskPropertiesTest.flutterRootTest
@@ -350,6 +354,7 @@ class BaseFlutterTaskHelperTest {
         verify { mockExecSpec.args("-dAndroidArchs=${BaseFlutterTaskPropertiesTest.TARGET_PLATFORM_VALUES_JOINED_LIST}") }
         verify { mockExecSpec.args("-dMinSdkVersion=${BaseFlutterTaskPropertiesTest.MIN_SDK_VERSION_TEST}") }
         verify { mockExecSpec.args(ruleNamesList) }
+        verify(exactly = 0) { mockExecSpec.args(match<String> { it.startsWith("--shorebird-trace-file") }) }
     }
 
     @Test

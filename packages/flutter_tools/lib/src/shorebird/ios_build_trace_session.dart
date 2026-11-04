@@ -1,15 +1,19 @@
+// Copyright 2014 The Flutter Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 // Shorebird-specific. Keeps the build-trace plumbing for
 // `flutter build ios` out of mac.dart so the Shorebird fork's diff
 // against upstream stays small and the build flow reads the same as
 // upstream.
 
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io' show ProcessResult;
 
 import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 
 import '../base/file_system.dart';
+import '../base/io.dart' show ProcessResult;
+import '../convert.dart';
 import 'network_trace_span.dart';
 
 /// Wraps the lifecycle of a Shorebird build trace across one

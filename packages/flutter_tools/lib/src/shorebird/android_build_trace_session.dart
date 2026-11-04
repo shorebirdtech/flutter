@@ -1,13 +1,16 @@
+// Copyright 2014 The Flutter Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 // Shorebird-specific. Keeps the build-trace plumbing for
 // `flutter build apk` / `flutter build appbundle` out of gradle.dart
 // so the Shorebird fork's diff against upstream stays small and the
 // build flow reads the same as upstream.
 
-import 'dart:io' show Process;
-
 import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 
 import '../base/file_system.dart';
+import '../base/io.dart' show Process;
 import '../build_info.dart';
 import '../cache.dart';
 import 'network_trace_span.dart';

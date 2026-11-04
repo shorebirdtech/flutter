@@ -79,7 +79,6 @@ void main() {
           '%(refname:short)',
           'refs/remotes/origin/flutter_release/*',
         ],
-        stdout: '',
       ),
       FakeCommand(
         command: const [

@@ -1,3 +1,7 @@
+// Copyright 2014 The Flutter Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 // Shorebird-specific. Converts build-system performance measurements
 // into build-trace spans. Shared by `flutter assemble` (which writes
 // them to its own file for the parent tool to merge) and by commands
