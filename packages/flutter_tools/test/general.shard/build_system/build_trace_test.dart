@@ -4,8 +4,8 @@
 
 import 'package:file/memory.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
-import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 import 'package:flutter_tools/src/convert.dart';
+import 'package:shorebird_build_trace/shorebird_build_trace.dart';
 
 import '../../src/common.dart';
 
@@ -22,7 +22,7 @@ void main() {
         args: <String, Object?>{'key': 'value'},
       );
 
-      final result = event.toJson();
+      final Map<String, Object?> result = event.toJson();
 
       expect(result['ph'], 'X');
       expect(result['name'], 'test_target');
@@ -44,7 +44,7 @@ void main() {
         tid: 1,
       );
 
-      final result = event.toJson();
+      final Map<String, Object?> result = event.toJson();
 
       expect(result.containsKey('args'), isFalse);
     });
@@ -62,7 +62,7 @@ void main() {
       };
 
       final event = BuildTraceEvent.fromJson(original);
-      final result = event.toJson();
+      final Map<String, Object?> result = event.toJson();
 
       expect(result['name'], 'test');
       expect(result['cat'], 'flutter');
@@ -92,7 +92,7 @@ void main() {
         end: DateTime.fromMicrosecondsSinceEpoch(5000),
       );
 
-      final outFile = fileSystem.file('trace.json');
+      final File outFile = fileSystem.file('trace.json');
       tracer.writeToFile(outFile);
 
       final events = json.decode(outFile.readAsStringSync()) as List<Object?>;
@@ -112,7 +112,7 @@ void main() {
       final tracer = BuildTracer();
 
       // Write a trace file to merge.
-      final sourceFile = fileSystem.file('source_trace.json');
+      final File sourceFile = fileSystem.file('source_trace.json');
       sourceFile.writeAsStringSync(
         json.encode(<Map<String, Object?>>[
           <String, Object?>{
@@ -138,7 +138,7 @@ void main() {
 
       tracer.mergeEventsFromFile(sourceFile);
 
-      final outFile = fileSystem.file('trace.json');
+      final File outFile = fileSystem.file('trace.json');
       tracer.writeToFile(outFile);
 
       final events = json.decode(outFile.readAsStringSync()) as List<Object?>;
@@ -162,7 +162,7 @@ void main() {
       // Should not throw.
       tracer.mergeEventsFromFile(fileSystem.file('does_not_exist.json'));
 
-      final outFile = fileSystem.file('trace.json');
+      final File outFile = fileSystem.file('trace.json');
       tracer.writeToFile(outFile);
 
       final events = json.decode(outFile.readAsStringSync()) as List<Object?>;
@@ -180,7 +180,7 @@ void main() {
         end: DateTime.fromMicrosecondsSinceEpoch(100),
       );
 
-      final outFile = fileSystem.file('/a/b/c/trace.json');
+      final File outFile = fileSystem.file('/a/b/c/trace.json');
       tracer.writeToFile(outFile);
 
       expect(outFile.existsSync(), isTrue);
@@ -215,7 +215,7 @@ void main() {
         args: <String, Object?>{'skipped': false},
       );
 
-      final outFile = fileSystem.file('trace.json');
+      final File outFile = fileSystem.file('trace.json');
       tracer.writeToFile(outFile);
 
       // Verify it's a valid JSON array.

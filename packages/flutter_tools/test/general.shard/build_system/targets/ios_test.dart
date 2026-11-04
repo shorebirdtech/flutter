@@ -840,7 +840,7 @@ flavors:
   // Shorebird-specific: the ShorebirdDdMaxBytes define is what turns on the
   // DD pass for Xcode rebuilds (flutter assemble), so guard the plumbing from
   // the define to AOTSnapshotter.build.
-  for (final bool withDefine in <bool>[true, false]) {
+  for (final withDefine in <bool>[true, false]) {
     final recorder = _RecordingProcessManager();
     testUsingContext(
       'AotAssemblyRelease ${withDefine ? 'runs' : 'skips'} the DD pass '
