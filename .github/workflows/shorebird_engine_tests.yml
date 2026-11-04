@@ -112,8 +112,7 @@ jobs:
               # Per solution: gclient ignores a top-level custom_vars. A
               # host build needs no Android or Fuchsia deps, and the build
               # below passes --no-prebuilt-dart-sdk, so it skips the prebuilt
-              # Dart SDK too (linux-x64's sits in a private bucket this job
-              # has no credentials for).
+              # Dart SDK too.
               "custom_vars": {
                 "download_android_deps": False,
                 "download_dart_sdk": False,
