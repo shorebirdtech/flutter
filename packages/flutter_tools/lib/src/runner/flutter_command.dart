@@ -815,10 +815,9 @@ abstract class FlutterCommand extends Command<void> {
   void usesWebResourcesCdnFlag() {
     argParser.addFlag(
       FlutterOptions.kWebResourcesCdnFlag,
-      // Shorebird: Flutter's CDN (gstatic.com/flutter-canvaskit) has no copy
-      // of CanvasKit for Shorebird's engine revisions, so default to the
-      // copy built into build/web/canvaskit/.
-      defaultsTo: false,
+      // Shorebird: off by default (upstream: defaultsTo: true). Flutter's CDN
+      // (gstatic.com/flutter-canvaskit) has no CanvasKit for Shorebird's
+      // engine revisions, so load the copy built into build/web/canvaskit/.
       help: 'Use Web static resources hosted on a CDN.',
     );
   }
