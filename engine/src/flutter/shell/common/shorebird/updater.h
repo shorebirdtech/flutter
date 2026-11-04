@@ -237,6 +237,7 @@ class MockUpdater : public Updater {
     return last_release_version_;
   }
   const std::string& last_yaml_config() const { return last_yaml_config_; }
+  const AppConfig& last_config() const { return last_config_; }
 
   // Test configuration
   void set_init_result(bool value) { init_result_ = value; }
@@ -260,6 +261,7 @@ class MockUpdater : public Updater {
   std::string next_boot_patch_path_;
   std::string last_release_version_;
   std::string last_yaml_config_;
+  AppConfig last_config_;
   std::vector<std::string> call_log_;
 };
 
