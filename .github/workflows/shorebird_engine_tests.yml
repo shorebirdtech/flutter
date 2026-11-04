@@ -153,12 +153,15 @@ jobs:
         run: ninja -C out/host_debug_unopt shorebird_unittests shell_unittests flutter/shell/platform/linux:flutter_linux_sources
         working-directory: engine/src
 
+      # From exe.unstripped/, where run_tests.py (the release's engine tests)
+      # runs Linux test binaries, so a test that finds files relative to its
+      # own binary fails here too.
       - name: 🧪 Run shorebird_unittests
-        run: ./out/host_debug_unopt/shorebird_unittests
+        run: ./out/host_debug_unopt/exe.unstripped/shorebird_unittests
         working-directory: engine/src
 
       - name: 🧪 Run Shorebird shell_unittests
-        run: ./out/host_debug_unopt/shell_unittests '--gtest_filter=*Shorebird*'
+        run: ./out/host_debug_unopt/exe.unstripped/shell_unittests '--gtest_filter=*Shorebird*'
         working-directory: engine/src
 
       # ci/format.sh is what `et format` and the engine pre-push hook run.
