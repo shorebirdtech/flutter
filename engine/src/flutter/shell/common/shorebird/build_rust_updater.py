@@ -174,12 +174,14 @@ def _configure_android_env(env, rust_target, ndk_path, api_level):
 
 
 def _configure_linux_cross_env(env, rust_target, clang_dir, sysroot):
-  """Point the cc crate at the engine's clang for a cross build to Linux.
+  """Point cargo and the cc crate at the engine's clang for a cross build to Linux.
 
-  Cargo builds a staticlib without linking, so only the C dependencies
-  (compiled by the cc crate in build scripts) need a target compiler. The
-  cc crate reads CC_<target>, AR_<target> and CFLAGS_<target>, which leave
-  build scripts themselves, compiled for the host, on the host compiler.
+  The C dependencies (compiled by the cc crate in build scripts) need a
+  target compiler, and the updater crate also builds a cdylib, which needs a
+  target linker. The cc crate reads CC_<target>, AR_<target> and
+  CFLAGS_<target>; cargo reads CARGO_TARGET_<TARGET>_LINKER and _RUSTFLAGS.
+  All are keyed on the target, so build scripts, compiled for the host, stay
+  on the host compiler.
   """
   clang_dir = os.path.abspath(clang_dir)
   # aarch64-unknown-linux-gnu -> aarch64-linux-gnu, clang's spelling.
@@ -192,6 +194,11 @@ def _configure_linux_cross_env(env, rust_target, clang_dir, sysroot):
   env[f'CC_{triple}'] = os.path.join(clang_dir, 'clang')
   env[f'AR_{triple}'] = os.path.join(clang_dir, 'llvm-ar')
   env[f'CFLAGS_{triple}'] = ' '.join(flags)
+  cargo_triple = triple.upper()
+  env[f'CARGO_TARGET_{cargo_triple}_LINKER'] = os.path.join(clang_dir, 'clang')
+  env[f'CARGO_TARGET_{cargo_triple}_RUSTFLAGS'] = ' '.join(
+      f'-C link-arg={flag}' for flag in flags + ['-fuse-ld=lld']
+  )
 
 
 if __name__ == '__main__':
