@@ -6,8 +6,9 @@ name: shorebird_release_tests
 # green run at that commit. Each job is one of upstream's Linux .ci.yaml
 # targets, run the way upstream's flutter_drone recipe runs it: SHARD and
 # SUBSHARD into dev/bots/test.dart. The upstream suites a release doesn't
-# run (framework_tests, tool integration, customer_testing, devicelab) are
-# listed with why in release.yaml's not_run.
+# run (framework_tests, the rest of tool integration, customer_testing,
+# devicelab) are listed with why in release.yaml's not_run. One test from
+# tool integration does run: the Flutter Gradle plugin's own unit tests.
 #
 # Everything runs on what the commit ships: bin/flutter downloads the Dart SDK
 # and engine artifacts for bin/internal/engine.version from
@@ -53,6 +54,10 @@ jobs:
           - { shard: build_tests, subshard: 5_5 }
           # Linux analyze.
           - { shard: analyze }
+          # The Flutter Gradle plugin's unit tests (./gradlew test under
+          # packages/flutter_tools/gradle), the one tool_integration_tests
+          # test a release runs: the fork changes the plugin.
+          - { shard: gradle_plugin }
 
     env:
       SHARD: ${{ matrix.shard }}
@@ -78,7 +83,7 @@ jobs:
           java-version: "21"
 
       - name: 📦 Linux desktop build dependencies
-        if: matrix.shard != 'analyze'
+        if: matrix.shard != 'analyze' && matrix.shard != 'gradle_plugin'
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libupower-glib-dev liblzma-dev libstdc++-12-dev
@@ -102,6 +107,18 @@ jobs:
           echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
 
       - name: 🧪 dev/bots/test.dart
+        if: matrix.shard != 'gradle_plugin'
         run: |
           bin/flutter pub get -C dev/bots
           bin/cache/dart-sdk/bin/dart dev/bots/test.dart
+
+      # Not a dev/bots/test.dart shard: upstream runs this test inside
+      # tool_integration_tests, which a release doesn't run.
+      - name: 🧪 Flutter Gradle plugin unit tests
+        if: matrix.shard == 'gradle_plugin'
+        working-directory: packages/flutter_tools
+        env:
+          FLUTTER_ROOT: ${{ github.workspace }}
+        run: |
+          ../../bin/flutter pub get
+          ../../bin/cache/dart-sdk/bin/dart test test/integration.shard/android_run_flutter_gradle_plugin_tests_test.dart
