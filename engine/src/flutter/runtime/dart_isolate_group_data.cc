@@ -4,11 +4,17 @@
 
 #include "flutter/runtime/dart_isolate_group_data.h"
 
+#include <atomic>
 #include <utility>
 
+#include "flutter/runtime/dart_service_isolate.h"
 #include "flutter/runtime/dart_snapshot.h"
 
 namespace flutter {
+
+namespace {
+std::atomic<size_t> g_application_isolate_group_count{0};
+}  // namespace
 
 DartIsolateGroupData::DartIsolateGroupData(
     const Settings& settings,
@@ -28,9 +34,20 @@ DartIsolateGroupData::DartIsolateGroupData(
       isolate_shutdown_callback_(isolate_shutdown_callback),
       native_assets_manager_(std::move(native_assets_manager)) {
   FML_DCHECK(isolate_snapshot_) << "Must contain a valid isolate snapshot.";
+  if (advisory_script_uri_ != DART_VM_SERVICE_ISOLATE_NAME) {
+    g_application_isolate_group_count.fetch_add(1, std::memory_order_relaxed);
+  }
 }
 
-DartIsolateGroupData::~DartIsolateGroupData() = default;
+DartIsolateGroupData::~DartIsolateGroupData() {
+  if (advisory_script_uri_ != DART_VM_SERVICE_ISOLATE_NAME) {
+    g_application_isolate_group_count.fetch_sub(1, std::memory_order_relaxed);
+  }
+}
+
+size_t DartIsolateGroupData::ApplicationIsolateGroupCountForTesting() {
+  return g_application_isolate_group_count.load(std::memory_order_relaxed);
+}
 
 const Settings& DartIsolateGroupData::GetSettings() const {
   return settings_;

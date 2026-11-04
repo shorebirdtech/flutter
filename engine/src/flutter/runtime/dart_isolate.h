@@ -349,6 +349,12 @@ class DartIsolate : public UIDartState {
   [[nodiscard]] bool Shutdown();
 
   //----------------------------------------------------------------------------
+  /// @brief      Kills and waits for all unowned child isolates in this root
+  ///             isolate's group to exit before `Shutdown()` is called.
+  ///
+  void ShutdownChildIsolates();
+
+  //----------------------------------------------------------------------------
   /// @brief      Registers a callback that will be invoked in isolate scope
   ///             just before the isolate transitions to the `Phase::Shutdown`
   ///             phase.

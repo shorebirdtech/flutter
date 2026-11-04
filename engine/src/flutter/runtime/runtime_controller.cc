@@ -91,9 +91,19 @@ std::unique_ptr<RuntimeController> RuntimeController::Spawn(
 
 RuntimeController::~RuntimeController() {
   FML_DCHECK(Dart_CurrentIsolate() == nullptr);
+  if (!platform_isolate_manager_->HasShutdownMaybeFalseNegative()) {
+    auto platform_task_runner = context_.task_runners.GetPlatformTaskRunner();
+    if (platform_task_runner &&
+        platform_task_runner->RunsTasksOnCurrentThread()) {
+      platform_isolate_manager_->ShutdownPlatformIsolates();
+    }
+  }
   std::shared_ptr<DartIsolate> root_isolate = root_isolate_.lock();
   if (root_isolate) {
     root_isolate->SetReturnCodeCallback(nullptr);
+    if (spawning_isolate_.expired()) {
+      root_isolate->ShutdownChildIsolates();
+    }
     auto result = root_isolate->Shutdown();
     if (!result) {
       FML_DLOG(ERROR) << "Could not shutdown the root isolate.";

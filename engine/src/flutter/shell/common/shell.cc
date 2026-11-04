@@ -1638,10 +1638,17 @@ void Shell::OnPreEngineRestart() {
   // Shorebird: shared rather than a stack local, because the wait below can
   // give up while the task is still queued, and the task outlives this frame
   // when it does.
+  std::shared_ptr<PlatformIsolateManager> platform_isolate_manager =
+      engine_ && engine_->GetRuntimeController()
+          ? engine_->GetRuntimeController()->GetPlatformIsolateManager()
+          : nullptr;
   auto latch = std::make_shared<fml::AutoResetWaitableEvent>();
   fml::TaskRunner::RunNowOrPostTask(
       task_runners_.GetPlatformTaskRunner(),
-      [view = platform_view_->GetWeakPtr(), latch]() {
+      [view = platform_view_->GetWeakPtr(), platform_isolate_manager, latch]() {
+        if (platform_isolate_manager) {
+          platform_isolate_manager->ShutdownPlatformIsolates();
+        }
         if (view) {
           view->OnPreEngineRestart();
         }

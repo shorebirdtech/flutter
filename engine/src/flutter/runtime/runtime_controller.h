@@ -702,6 +702,10 @@ class RuntimeController : public PlatformConfigurationClient,
     return platform_isolate_manager_;
   }
 
+  std::shared_ptr<PlatformIsolateManager> GetPlatformIsolateManager() const {
+    return platform_isolate_manager_;
+  }
+
   void SetRootIsolateOwnerToCurrentThread();
 
   //--------------------------------------------------------------------------
