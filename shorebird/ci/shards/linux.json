@@ -188,7 +188,7 @@
     ]
   },
   "web": {
-    "gclient_variables": {"download_emsdk": true},
+    "gclient_variables": {"download_android_deps": false, "download_emsdk": true, "download_jdk": false},
     "steps": [
       {
         "type": "gn_ninja",
