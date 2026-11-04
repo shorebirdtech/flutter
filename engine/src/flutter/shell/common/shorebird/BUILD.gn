@@ -2,6 +2,11 @@ import("//flutter/common/config.gni")
 import("//flutter/shell/common/shorebird/build_rust_updater.gni")
 import("//flutter/testing/testing.gni")
 
+if (is_linux) {
+  import("//build/config/sysroot.gni")
+  import("//build/toolchain/toolchain.gni")
+}
+
 if (is_ios || is_mac) {
   import("//build/config/darwin/darwin_sdk.gni")
 }
@@ -77,6 +82,23 @@ if (shorebird_updater_supported) {
       args += [
         "--mac-deployment-target",
         mac_deployment_target,
+      ]
+    }
+
+    if (is_linux && target_cpu != host_cpu) {
+      # A cross build (linux-arm64 on an x64 host) has no system C compiler
+      # for the target, and ring and zstd-sys compile C. Use the engine's
+      # clang and sysroot, the same ones the C++ engine builds with.
+      if (host_cpu == "arm64") {
+        _clang_dir = "$buildtools_path/linux-arm64/clang/bin"
+      } else {
+        _clang_dir = "$buildtools_path/linux-x64/clang/bin"
+      }
+      args += [
+        "--linux-clang-dir",
+        rebase_path(_clang_dir, root_build_dir),
+        "--linux-sysroot",
+        sysroot,
       ]
     }
 
