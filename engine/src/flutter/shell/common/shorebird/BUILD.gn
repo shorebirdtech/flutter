@@ -2,7 +2,7 @@ import("//flutter/common/config.gni")
 import("//flutter/shell/common/shorebird/build_rust_updater.gni")
 import("//flutter/testing/testing.gni")
 
-if (is_linux) {
+if (is_linux || is_win) {
   import("//build/config/sysroot.gni")
   import("//build/toolchain/toolchain.gni")
 }
@@ -99,6 +99,18 @@ if (shorebird_updater_supported) {
         rebase_path(_clang_dir, root_build_dir),
         "--linux-sysroot",
         sysroot,
+      ]
+    }
+
+    if (is_win && target_cpu == "arm64") {
+      # ring compiles its C for Windows on arm64 only with clang (build.rs
+      # falls back to a bare `clang` from PATH otherwise). Name the engine's
+      # clang (the GNU driver; ring overrides clang-cl) so the build doesn't
+      # depend on what LLVM the machine has.
+      args += [
+        "--windows-clang",
+        rebase_path("$buildtools_path/windows-x64/clang/bin/clang.exe",
+                    root_build_dir),
       ]
     }
 

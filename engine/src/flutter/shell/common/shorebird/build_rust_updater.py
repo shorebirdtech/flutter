@@ -45,6 +45,9 @@ def main():
   parser.add_argument(
       '--linux-sysroot', help='Sysroot of the Linux target; given with --linux-clang-dir'
   )
+  parser.add_argument(
+      '--windows-clang', help='The engine\'s clang.exe; given for a Windows arm64 target'
+  )
   args = parser.parse_args()
 
   env = os.environ.copy()
@@ -87,6 +90,9 @@ def main():
 
   if args.linux_clang_dir:
     _configure_linux_cross_env(env, args.rust_target, args.linux_clang_dir, args.linux_sysroot)
+
+  if args.windows_clang:
+    env[f'CC_{args.rust_target.replace("-", "_")}'] = os.path.abspath(args.windows_clang)
 
   # GN passes paths relative to the build output dir (which is cwd when
   # Ninja runs the action). Resolve them to absolute paths so they work
@@ -184,16 +190,17 @@ def _configure_linux_cross_env(env, rust_target, clang_dir, sysroot):
   on the host compiler.
   """
   clang_dir = os.path.abspath(clang_dir)
-  # aarch64-unknown-linux-gnu -> aarch64-linux-gnu, clang's spelling.
-  arch, _, rest = rust_target.partition('-unknown-')
-  clang_target = f'{arch}-{rest}'
-  flags = [f'--target={clang_target}']
+  flags = [f'--target={rust_target}']
   if sysroot:
     flags.append(f'--sysroot={os.path.abspath(sysroot)}')
   triple = rust_target.replace('-', '_')
   env[f'CC_{triple}'] = os.path.join(clang_dir, 'clang')
   env[f'AR_{triple}'] = os.path.join(clang_dir, 'llvm-ar')
   env[f'CFLAGS_{triple}'] = ' '.join(flags)
+  # Cargo ignores target rustflags whenever RUSTFLAGS is set, which would
+  # drop the link flags below.
+  env.pop('RUSTFLAGS', None)
+  env.pop('CARGO_ENCODED_RUSTFLAGS', None)
   cargo_triple = triple.upper()
   env[f'CARGO_TARGET_{cargo_triple}_LINKER'] = os.path.join(clang_dir, 'clang')
   env[f'CARGO_TARGET_{cargo_triple}_RUSTFLAGS'] = ' '.join(
