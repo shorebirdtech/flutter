@@ -14,10 +14,6 @@ import 'package:flutter_tools/src/macos/xcode.dart';
 import '../../src/common.dart';
 import '../../src/fake_process_manager.dart';
 
-const kWhichSysctlCommand = FakeCommand(command: <String>['which', 'sysctl']);
-
-const kARMCheckCommand = FakeCommand(command: <String>['sysctl', 'hw.optional.arm64'], exitCode: 1);
-
 const kDefaultClang = <String>[
   '-miphoneos-version-min=15.0',
   '-isysroot',
@@ -243,7 +239,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -319,7 +315,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -390,7 +386,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -511,7 +507,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -595,7 +591,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -675,7 +671,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -775,7 +771,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -855,7 +851,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -932,7 +928,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -1004,7 +1000,7 @@ void main() {
           ],
         ),
         kWhichSysctlCommand,
-        kARMCheckCommand,
+        kx64CheckCommand,
         const FakeCommand(
           command: <String>[
             'xcrun',

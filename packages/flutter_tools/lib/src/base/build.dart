@@ -210,7 +210,7 @@ class AOTSnapshotter {
     // the concept of "optimizes patch snapshot" from "uses linker" and probably
     // only uses the linker on iOS, but optimize patch snapshots everywhere.
     // TODO(eseidel): TargetPlatform.darwin doesn't use the linker.
-    bool usesLinker = (platform == TargetPlatform.ios || platform == TargetPlatform.darwin);
+    final bool usesLinker = platform == TargetPlatform.ios || platform == TargetPlatform.darwin;
     final dumpLinkInfoArgs = <String>[
       // Shorebird dumps the class table information during snapshot compilation which is later used during linking.
       '--print_class_table_link_debug_info_to=${_fileSystem.path.join(outputDir.parent.path, 'App.class_table.json')}',
@@ -348,7 +348,7 @@ class AOTSnapshotter {
     // Skip DD on macOS until that work is done. Patches built without DD
     // activation will compute DD on the fly when applied, which is the
     // pre-1.6.99 behavior — slightly worse link percentage but functional.
-    final bool ddPassSupported = platform != TargetPlatform.darwin;
+    final ddPassSupported = platform != TargetPlatform.darwin;
     if (ddMaxBytes > 0 && usesLinker && ddPassSupported) {
       final int pass1Exit = await _runDdAnalysisPass(
         snapshotType: snapshotType,
