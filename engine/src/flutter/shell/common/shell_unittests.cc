@@ -55,8 +55,19 @@
 #include "third_party/skia/include/gpu/ganesh/mock/GrMockTypes.h"
 #include "third_party/tonic/converter/dart_converter.h"
 
+#include "flutter/fml/paths.h"
+#include "flutter/runtime/dart_isolate_group_data.h"
+#include "flutter/runtime/shorebird/patch_mapping.h"
 #include "flutter/shell/common/shorebird/hot_restart.h"
 #include "flutter/shell/common/shorebird/updater.h"
+#include "third_party/dart/runtime/include/dart_native_api.h"
+
+#if defined(FML_OS_MACOSX)
+#include <mach/mach.h>
+#elif defined(FML_OS_LINUX)
+#include <unistd.h>
+#include <cstdio>
+#endif
 
 #ifdef SHELL_ENABLE_VULKAN
 #include "flutter/vulkan/vulkan_application.h"  // nogncheck
@@ -5630,6 +5641,479 @@ TEST_F(ShellTest, CloneWithSnapshotCarriesSnapshotAndReusesVM) {
   });
 
   DestroyShell(std::move(shell));
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
+}
+
+namespace {
+
+#pragma pack(push, 1)
+struct TestVmcodeElfHeader64 {
+  uint8_t ident[16];
+  uint16_t type;
+  uint16_t machine;
+  uint32_t version;
+  uint64_t entry_point;
+  uint64_t program_table_offset;
+  uint64_t section_table_offset;
+  uint32_t flags;
+  uint16_t header_size;
+  uint16_t program_table_entry_size;
+  uint16_t num_program_headers;
+  uint16_t section_table_entry_size;
+  uint16_t num_section_headers;
+  uint16_t shstrtab_section_index;
+};
+
+struct TestVmcodeProgramHeader64 {
+  uint32_t type;
+  uint32_t flags;
+  uint64_t file_offset;
+  uint64_t memory_offset;
+  uint64_t physical_memory_offset;
+  uint64_t file_size;
+  uint64_t memory_size;
+  uint64_t alignment;
+};
+
+struct TestVmcodeSectionHeader64 {
+  uint32_t name;
+  uint32_t type;
+  uint64_t flags;
+  uint64_t memory_offset;
+  uint64_t file_offset;
+  uint64_t file_size;
+  uint32_t link;
+  uint32_t info;
+  uint64_t alignment;
+  uint64_t entry_size;
+};
+
+struct TestVmcodeSymbol64 {
+  uint32_t name;
+  uint8_t info;
+  uint8_t other;
+  uint16_t section;
+  uint64_t value;
+  uint64_t size;
+};
+#pragma pack(pop)
+
+// Builds a runnable 64-bit `.vmcode` image preceded by a 16 KB Shorebird link
+// header, carrying the active VM's isolate snapshot data at
+// `_kDartSnapshotData` so `Dart_CreateIsolateGroup` can boot an `IsolateGroup`
+// directly from the `Dart_LoadELF` mapping.
+std::vector<uint8_t> BuildRunnableVmcodeBytes(const uint8_t* snapshot_data,
+                                              size_t snapshot_data_size) {
+  constexpr size_t kPageSize = 16384;
+  constexpr uint64_t kPhdrOffset = sizeof(TestVmcodeElfHeader64);
+  constexpr uint64_t kShdrOffset = 256;
+  constexpr uint64_t kShstrtabOffset = 512;
+  constexpr uint64_t kDynstrOffset = 640;
+  constexpr uint64_t kDynsymOffset = 768;
+  constexpr uint64_t kSnapshotDataOffset = 1024;
+  const uint64_t kSnapshotTextOffset =
+      ((kSnapshotDataOffset + snapshot_data_size + 63) / 64) * 64;
+  constexpr uint64_t kSnapshotTextSize = 256;
+  const size_t elf_size =
+      ((kSnapshotTextOffset + kSnapshotTextSize + kPageSize - 1) / kPageSize) *
+      kPageSize;
+
+  std::vector<uint8_t> elf(elf_size, 0);
+
+  const char kShstrtab[] = "\0.shstrtab\0.dynstr\0.dynsym\0";
+  std::memcpy(elf.data() + kShstrtabOffset, kShstrtab, sizeof(kShstrtab));
+
+  const char kDynstr[] = "\0_kDartSnapshotData\0_kDartSnapshotText\0";
+  std::memcpy(elf.data() + kDynstrOffset, kDynstr, sizeof(kDynstr));
+
+  TestVmcodeSymbol64 syms[3] = {};
+  syms[1].name = 1;  // "_kDartSnapshotData"
+  syms[1].info = (1 << 4) | 1;
+  syms[1].section = 1;
+  syms[1].value = kSnapshotDataOffset;
+  syms[1].size = snapshot_data_size;
+
+  syms[2].name = 20;  // "_kDartSnapshotText"
+  syms[2].info = (1 << 4) | 2;
+  syms[2].section = 1;
+  syms[2].value = kSnapshotTextOffset;
+  syms[2].size = kSnapshotTextSize;
+  std::memcpy(elf.data() + kDynsymOffset, syms, sizeof(syms));
+
+  std::memcpy(elf.data() + kSnapshotDataOffset, snapshot_data,
+              snapshot_data_size);
+  std::memcpy(elf.data() + kSnapshotTextOffset, &kSnapshotTextSize,
+              sizeof(kSnapshotTextSize));
+
+  TestVmcodeProgramHeader64 phdr = {};
+  phdr.type = 1;   // PT_LOAD
+  phdr.flags = 4;  // PF_R
+  phdr.file_offset = 0;
+  phdr.memory_offset = 0;
+  phdr.physical_memory_offset = 0;
+  phdr.file_size = elf_size;
+  phdr.memory_size = elf_size;
+  phdr.alignment = kPageSize;
+  std::memcpy(elf.data() + kPhdrOffset, &phdr, sizeof(phdr));
+
+  TestVmcodeSectionHeader64 shdrs[4] = {};
+  shdrs[1].name = 1;
+  shdrs[1].type = 3;  // SHT_STRTAB
+  shdrs[1].file_offset = kShstrtabOffset;
+  shdrs[1].memory_offset = kShstrtabOffset;
+  shdrs[1].file_size = sizeof(kShstrtab);
+  shdrs[1].alignment = 1;
+
+  shdrs[2].name = 11;
+  shdrs[2].type = 3;  // SHT_STRTAB
+  shdrs[2].flags = 2;
+  shdrs[2].file_offset = kDynstrOffset;
+  shdrs[2].memory_offset = kDynstrOffset;
+  shdrs[2].file_size = sizeof(kDynstr);
+  shdrs[2].alignment = 1;
+
+  shdrs[3].name = 19;
+  shdrs[3].type = 11;  // SHT_DYNSYM
+  shdrs[3].flags = 2;
+  shdrs[3].file_offset = kDynsymOffset;
+  shdrs[3].memory_offset = kDynsymOffset;
+  shdrs[3].file_size = sizeof(syms);
+  shdrs[3].link = 2;
+  shdrs[3].alignment = 8;
+  shdrs[3].entry_size = sizeof(TestVmcodeSymbol64);
+  std::memcpy(elf.data() + kShdrOffset, shdrs, sizeof(shdrs));
+
+  TestVmcodeElfHeader64 ehdr = {};
+  ehdr.ident[0] = '\x7f';
+  ehdr.ident[1] = 'E';
+  ehdr.ident[2] = 'L';
+  ehdr.ident[3] = 'F';
+  ehdr.ident[4] = 2;  // ELFCLASS64
+  ehdr.ident[5] = 1;  // ELFDATA2LSB
+  ehdr.ident[6] = 1;  // EV_CURRENT
+  ehdr.type = 3;      // ET_DYN
+#if defined(__aarch64__)
+  ehdr.machine = 183;  // EM_AARCH64
+#elif defined(__x86_64__)
+  ehdr.machine = 62;   // EM_X86_64
+#endif
+  ehdr.version = 1;
+  ehdr.program_table_offset = kPhdrOffset;
+  ehdr.section_table_offset = kShdrOffset;
+  ehdr.header_size = sizeof(TestVmcodeElfHeader64);
+  ehdr.program_table_entry_size = sizeof(TestVmcodeProgramHeader64);
+  ehdr.num_program_headers = 1;
+  ehdr.section_table_entry_size = sizeof(TestVmcodeSectionHeader64);
+  ehdr.num_section_headers = 4;
+  ehdr.shstrtab_section_index = 1;
+  std::memcpy(elf.data(), &ehdr, sizeof(ehdr));
+
+  std::vector<uint8_t> vmcode(kPageSize + elf.size(), 0);
+  const int32_t kHeader[] = {
+      2,
+      16,
+      32,
+      48,
+      64,
+  };
+  std::memcpy(vmcode.data(), kHeader, sizeof(kHeader));
+  std::memcpy(vmcode.data() + kPageSize, elf.data(), elf.size());
+  return vmcode;
+}
+
+size_t CurrentProcessResidentBytes() {
+#if defined(FML_OS_MACOSX)
+  mach_task_basic_info_data_t info = {};
+  mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+  if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+                reinterpret_cast<task_info_t>(&info), &count) != KERN_SUCCESS) {
+    return 0;
+  }
+  return static_cast<size_t>(info.resident_size);
+#elif defined(FML_OS_LINUX)
+  FILE* fp = std::fopen("/proc/self/statm", "r");
+  if (!fp) {
+    return 0;
+  }
+  unsigned long size = 0;
+  unsigned long resident = 0;
+  int scanned = std::fscanf(fp, "%lu %lu", &size, &resident);
+  std::fclose(fp);
+  if (scanned != 2) {
+    return 0;
+  }
+  return static_cast<size_t>(resident) *
+         static_cast<size_t>(sysconf(_SC_PAGESIZE));
+#else
+  return 0;
+#endif
+}
+
+}  // namespace
+
+TEST_F(ShellTest, ShorebirdHotRestartTerminatesChildAndPlatformIsolates) {
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
+  LoadedPatch::ResetCountsForTesting();
+
+  auto mock = std::make_shared<shorebird::MockUpdater>();
+  auto settings = CreateSettingsForFixture();
+  settings.shorebird_updater = mock;
+  auto shell = CreateShell(settings);
+  ASSERT_TRUE(ValidateShell(shell.get()));
+
+  std::string reported_state;
+  fml::AutoResetWaitableEvent state_latch;
+  fml::AutoResetWaitableEvent worker_latch;
+  fml::AutoResetWaitableEvent platform_isolate_latch;
+
+  AddNativeCallback(
+      "ShorebirdIsPatchActive",
+      CREATE_NATIVE_ENTRY([](Dart_NativeArguments args) {
+        Dart_SetBooleanReturnValue(args, LoadedPatch::LiveCountForTesting() > 0);
+      }));
+  AddNativeCallback(
+      "ShorebirdNotifyState",
+      CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
+        reported_state = tonic::DartConverter<std::string>::FromDart(
+            Dart_GetNativeArgument(args, 0));
+        state_latch.Signal();
+      }));
+  AddNativeCallback("ShorebirdNotifyWorkerSpawned",
+                    CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
+                      worker_latch.Signal();
+                    }));
+  AddNativeCallback("ShorebirdNotifyPlatformIsolate",
+                    CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
+                      platform_isolate_latch.Signal();
+                    }));
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("shorebirdToggleMain");
+  RunEngine(shell.get(), std::move(configuration));
+  state_latch.Wait();
+  worker_latch.Wait();
+  EXPECT_EQ(reported_state, "base");
+  EXPECT_EQ(DartIsolateGroupData::ApplicationIsolateGroupCountForTesting(), 1u);
+
+  std::weak_ptr<const DartIsolate> first_root_isolate;
+  std::shared_ptr<PlatformIsolateManager> first_platiso_mgr;
+  Dart_Isolate first_platform_isolate = nullptr;
+  RunOnUIThreadAndWait(shell.get(), [&]() {
+    auto* controller = shell->GetEngine()->GetRuntimeController();
+    first_root_isolate = controller->GetRootIsolate();
+    first_platiso_mgr = controller->GetPlatformIsolateManager();
+    auto root_isolate =
+        std::const_pointer_cast<DartIsolate>(first_root_isolate.lock());
+    ASSERT_TRUE(root_isolate);
+    tonic::DartState::Scope scope(root_isolate.get());
+    Dart_Handle lib = Dart_RootLibrary();
+    Dart_Handle entry_point = Dart_GetField(
+        lib, tonic::ToDart("shorebirdPlatformIsolateEntrypoint"));
+    char* error = nullptr;
+    first_platform_isolate =
+        root_isolate->CreatePlatformIsolate(entry_point, &error);
+    EXPECT_EQ(error, nullptr);
+    EXPECT_NE(first_platform_isolate, nullptr);
+  });
+  platform_isolate_latch.Wait();
+  EXPECT_TRUE(
+      first_platiso_mgr->IsRegisteredForTestingOnly(first_platform_isolate));
+
+  bool restarted = false;
+  RunOnUIThreadAndWait(shell.get(), [&]() {
+    restarted =
+        shorebird::HotRestartEngine(*shell->GetEngine(), shell->GetSettings());
+  });
+  ASSERT_TRUE(restarted);
+  state_latch.Wait();
+  worker_latch.Wait();
+
+  EXPECT_TRUE(first_root_isolate.expired());
+  EXPECT_TRUE(first_platiso_mgr->HasShutdownMaybeFalseNegative());
+  EXPECT_FALSE(
+      first_platiso_mgr->IsRegisteredForTestingOnly(first_platform_isolate));
+  EXPECT_EQ(DartIsolateGroupData::ApplicationIsolateGroupCountForTesting(), 1u);
+
+  // Verify the restarted root isolate has a fresh PlatformIsolateManager that
+  // can register a new platform isolate.
+  Dart_Isolate second_platform_isolate = nullptr;
+  std::shared_ptr<PlatformIsolateManager> second_platiso_mgr;
+  RunOnUIThreadAndWait(shell.get(), [&]() {
+    auto* controller = shell->GetEngine()->GetRuntimeController();
+    second_platiso_mgr = controller->GetPlatformIsolateManager();
+    EXPECT_NE(second_platiso_mgr, first_platiso_mgr);
+    EXPECT_FALSE(second_platiso_mgr->HasShutdownMaybeFalseNegative());
+    auto root_isolate = std::const_pointer_cast<DartIsolate>(
+        controller->GetRootIsolate().lock());
+    ASSERT_TRUE(root_isolate);
+    tonic::DartState::Scope scope(root_isolate.get());
+    Dart_Handle lib = Dart_RootLibrary();
+    Dart_Handle entry_point = Dart_GetField(
+        lib, tonic::ToDart("shorebirdPlatformIsolateEntrypoint"));
+    char* error = nullptr;
+    second_platform_isolate =
+        root_isolate->CreatePlatformIsolate(entry_point, &error);
+    EXPECT_EQ(error, nullptr);
+    EXPECT_NE(second_platform_isolate, nullptr);
+  });
+  platform_isolate_latch.Wait();
+  EXPECT_TRUE(
+      second_platiso_mgr->IsRegisteredForTestingOnly(second_platform_isolate));
+
+  DestroyShell(std::move(shell));
+  EXPECT_EQ(DartIsolateGroupData::ApplicationIsolateGroupCountForTesting(), 0u);
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
+}
+
+TEST_F(ShellTest, ShorebirdPatchToggle10xAcross20RestartsDoesNotLeak) {
+  ASSERT_FALSE(DartVMRef::IsInstanceRunning());
+  LoadedPatch::ResetCountsForTesting();
+
+  fml::ScopedTemporaryDirectory temp_dir;
+  ASSERT_TRUE(temp_dir.fd().is_valid());
+  const std::string patch_path =
+      fml::paths::JoinPaths({temp_dir.path(), "dlc.vmcode"});
+
+  auto mock = std::make_shared<shorebird::MockUpdater>();
+  auto settings = CreateSettingsForFixture();
+  settings.shorebird_updater = mock;
+  auto shell = CreateShell(settings);
+  ASSERT_TRUE(ValidateShell(shell.get()));
+
+  const DartSnapshot* base_snapshot_ptr =
+      shell->GetDartVM()->GetVMData()->GetIsolateSnapshot().get();
+  ASSERT_NE(base_snapshot_ptr, nullptr);
+  const uint8_t* base_data = base_snapshot_ptr->GetDataMapping();
+  ASSERT_NE(base_data, nullptr);
+  const int64_t base_data_size = Dart_SnapshotDataSize(base_data);
+  ASSERT_GT(base_data_size, 0);
+
+  auto vmcode_bytes = BuildRunnableVmcodeBytes(
+      base_data, static_cast<size_t>(base_data_size));
+  fml::NonOwnedMapping vmcode_mapping(vmcode_bytes.data(), vmcode_bytes.size());
+  ASSERT_TRUE(fml::WriteAtomically(temp_dir.fd(), "dlc.vmcode", vmcode_mapping));
+
+  std::string reported_state;
+  fml::AutoResetWaitableEvent state_latch;
+  fml::AutoResetWaitableEvent worker_latch;
+
+  AddNativeCallback(
+      "ShorebirdIsPatchActive",
+      CREATE_NATIVE_ENTRY([](Dart_NativeArguments args) {
+        Dart_SetBooleanReturnValue(args, LoadedPatch::LiveCountForTesting() > 0);
+      }));
+  AddNativeCallback(
+      "ShorebirdNotifyState",
+      CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
+        reported_state = tonic::DartConverter<std::string>::FromDart(
+            Dart_GetNativeArgument(args, 0));
+        state_latch.Signal();
+      }));
+  AddNativeCallback("ShorebirdNotifyWorkerSpawned",
+                    CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
+                      worker_latch.Signal();
+                    }));
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("shorebirdToggleMain");
+  RunEngine(shell.get(), std::move(configuration));
+  state_latch.Wait();
+  worker_latch.Wait();
+  EXPECT_EQ(reported_state, "base");
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 0u);
+  EXPECT_EQ(DartIsolateGroupData::ApplicationIsolateGroupCountForTesting(), 1u);
+
+  const uint8_t* initial_active_data = nullptr;
+  size_t initial_link_header_size = 0;
+  RunOnUIThreadAndWait(shell.get(), [&]() {
+    auto snapshot =
+        shell->GetEngine()->GetRuntimeController()->GetIsolateSnapshot();
+    initial_active_data = snapshot->GetDataMapping();
+    initial_link_header_size = snapshot->GetLinkHeaderSize();
+  });
+  EXPECT_EQ(initial_active_data, base_data);
+  EXPECT_EQ(initial_link_header_size, 0u);
+
+  size_t rss_after_cycle_1 = 0;
+  size_t rss_after_cycle_10 = 0;
+
+  for (int i = 0; i < 10; ++i) {
+    // 1. Toggle from base to patch while a child `Isolate.spawn` worker is
+    // alive in the base `IsolateGroup`.
+    std::weak_ptr<const DartIsolate> base_isolate_weak;
+    RunOnUIThreadAndWait(shell.get(), [&]() {
+      base_isolate_weak =
+          shell->GetEngine()->GetRuntimeController()->GetRootIsolate();
+      mock->set_next_boot_patch_path(patch_path);
+      ASSERT_TRUE(shorebird::HotRestartEngine(*shell->GetEngine(),
+                                              shell->GetSettings()));
+    });
+    state_latch.Wait();
+    worker_latch.Wait();
+
+    EXPECT_EQ(reported_state, "patched") << "cycle " << i;
+    EXPECT_TRUE(base_isolate_weak.expired()) << "cycle " << i;
+    EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 1u) << "cycle " << i;
+    EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), static_cast<size_t>(i))
+        << "cycle " << i;
+    EXPECT_EQ(DartIsolateGroupData::ApplicationIsolateGroupCountForTesting(),
+              1u)
+        << "cycle " << i;
+
+    // 2. Toggle from patch back to base while a child `Isolate.spawn` worker
+    // is alive in the patched `IsolateGroup`.
+    std::weak_ptr<const DartIsolate> patched_isolate_weak;
+    const uint8_t* active_data_after_off = nullptr;
+    size_t link_header_size_after_off = 0;
+    RunOnUIThreadAndWait(shell.get(), [&]() {
+      auto* controller = shell->GetEngine()->GetRuntimeController();
+      patched_isolate_weak = controller->GetRootIsolate();
+      EXPECT_NE(controller->GetIsolateSnapshot()->GetDataMapping(), base_data)
+          << "cycle " << i;
+      EXPECT_GT(controller->GetIsolateSnapshot()->GetLinkHeaderSize(), 0u)
+          << "cycle " << i;
+      mock->set_next_boot_patch_path("");
+      ASSERT_TRUE(shorebird::HotRestartEngine(*shell->GetEngine(),
+                                              shell->GetSettings()));
+      auto snapshot =
+          shell->GetEngine()->GetRuntimeController()->GetIsolateSnapshot();
+      active_data_after_off = snapshot->GetDataMapping();
+      link_header_size_after_off = snapshot->GetLinkHeaderSize();
+    });
+    state_latch.Wait();
+    worker_latch.Wait();
+
+    EXPECT_EQ(reported_state, "base") << "cycle " << i;
+    EXPECT_TRUE(patched_isolate_weak.expired()) << "cycle " << i;
+    EXPECT_EQ(active_data_after_off, base_data) << "cycle " << i;
+    EXPECT_EQ(link_header_size_after_off, 0u) << "cycle " << i;
+    EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 0u) << "cycle " << i;
+    EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), static_cast<size_t>(i + 1))
+        << "cycle " << i;
+    EXPECT_EQ(DartIsolateGroupData::ApplicationIsolateGroupCountForTesting(),
+              1u)
+        << "cycle " << i;
+
+    if (i == 0) {
+      rss_after_cycle_1 = CurrentProcessResidentBytes();
+    } else if (i == 9) {
+      rss_after_cycle_10 = CurrentProcessResidentBytes();
+    }
+  }
+
+  if (rss_after_cycle_1 > 0 && rss_after_cycle_10 > rss_after_cycle_1) {
+    const size_t rss_delta = rss_after_cycle_10 - rss_after_cycle_1;
+    // Nine full on/off cycles (18 IsolateGroup creations and 9 ELF loads)
+    // would grow RSS by >150 MiB if IsolateGroups or LoadedPatch ELFs leaked.
+    EXPECT_LT(rss_delta, 64u * 1024u * 1024u)
+        << "rss_after_cycle_1=" << rss_after_cycle_1
+        << " rss_after_cycle_10=" << rss_after_cycle_10;
+  }
+
+  DestroyShell(std::move(shell));
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 0u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 10u);
+  EXPECT_EQ(DartIsolateGroupData::ApplicationIsolateGroupCountForTesting(), 0u);
   ASSERT_FALSE(DartVMRef::IsInstanceRunning());
 }
 

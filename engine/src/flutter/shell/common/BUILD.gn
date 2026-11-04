@@ -344,6 +344,7 @@ if (enable_unittests) {
       "//flutter/assets",
       "//flutter/common/graphics",
       "//flutter/display_list/testing:display_list_testing",
+      "//flutter/runtime/shorebird:patch_cache",
       "//flutter/shell/common:base64",
       "//flutter/shell/common/shorebird:updater",
       "//flutter/shell/profiling:profiling_unittests",
