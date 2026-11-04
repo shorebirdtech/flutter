@@ -188,8 +188,12 @@ flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* p
     // Note: we intentionally pass cache_path twice. We provide two different directories
     //   to ConfigureShorebird because Android differentiates between data that persists
     //   between releases and data that does not. iOS does not make this distinction.
-    flutter::ConfigureShorebird(cache_path, cache_path, settings, shorebirdYamlContents.UTF8String,
-                                appVersion.UTF8String, appBuildNumber.UTF8String);
+    flutter::ShorebirdConfigArgs shorebird_args(
+        cache_path, cache_path, settings.application_library_paths,
+        shorebirdYamlContents.UTF8String, {appVersion.UTF8String, appBuildNumber.UTF8String});
+    std::string patch_path;
+    flutter::ConfigureShorebird(shorebird_args, patch_path);
+    flutter::ApplyPatchToSettings(patch_path, settings);
   } else {
     NSLog(@"Failed to find shorebird.yaml, not starting updater.");
   }

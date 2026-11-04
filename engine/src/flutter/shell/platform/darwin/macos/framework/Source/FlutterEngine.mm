@@ -689,7 +689,7 @@ static void SetThreadPriority(FlutterThreadPriority priority) {
   std::string cache_path =
       fml::paths::JoinPaths({getenv("HOME"), "Library", "Application Support", "shorebird"});
   flutter::ReleaseVersion release_version = {appVersion.UTF8String, appBuildNumber.UTF8String};
-  flutter::ShorebirdConfigArgs shorebird_args(cache_path, cache_path, bundlePath.UTF8String,
+  flutter::ShorebirdConfigArgs shorebird_args(cache_path, cache_path, {bundlePath.UTF8String},
                                               shorebirdYamlContents.UTF8String, release_version);
   NSLog(@"[shorebird] calling ConfigureShorebird");
   std::string patch_path;

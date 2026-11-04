@@ -203,6 +203,7 @@ bool MockUpdater::DoInit(const AppConfig& config) {
   init_count_++;
   last_release_version_ = config.release_version;
   last_yaml_config_ = config.yaml_config;
+  last_config_ = config;
   call_log_.push_back("Init");
   return init_result_;
 }
@@ -254,6 +255,7 @@ void MockUpdater::Reset() {
   next_boot_patch_path_.clear();
   last_release_version_.clear();
   last_yaml_config_.clear();
+  last_config_ = AppConfig();
   call_log_.clear();
 }
 
