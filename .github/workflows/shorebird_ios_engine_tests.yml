@@ -164,6 +164,14 @@ jobs:
         run: ninja -C out/ci/${{ matrix.variant }} flutter/testing/ios_scenario_app flutter/shell/platform/darwin/ios:ios_test_flutter
         working-directory: engine/src
 
+      # TEMPORARY diagnostic (drop before review): where NDEBUG gets defined empty.
+      - name: 🩺 NDEBUG origin
+        if: ${{ failure() && steps.build.outcome == 'failure' }}
+        working-directory: engine/src/out/ci/${{ matrix.variant }}
+        run: |
+          cmd=$(ninja -t commands obj/flutter/shell/platform/embedder/embedder_as_internal_library.embedder.o | tail -1)
+          eval "${cmd/ -c / -E -dD -c }" -o /tmp/pp.ii || true
+          awk '/^# [0-9]+ "/{loc=$0} /^#define NDEBUG|^#undef NDEBUG/{print NR": "$0"  <- "loc}' /tmp/pp.ii
       # Both suites write a failing run's xcresult bundle here, zipped.
       - name: 📁 Test outputs directory
         run: |
