@@ -561,9 +561,7 @@ abstract final class LinkSupplement {
 
     // Copy the link information (written by gen_snapshot, and for iOS
     // release by aot_tools) into the shorebird directory.
-    for (final String name in shorebirdLinkFileNames(environment.fileSystem, inputBuildDir)) {
-      maybeCopy(name);
-    }
+    shorebirdLinkFileNames(environment.fileSystem, inputBuildDir).forEach(maybeCopy);
     copyShorebirdKernel(environment, outputBuildDir: outputBuildDir);
   }
 }
