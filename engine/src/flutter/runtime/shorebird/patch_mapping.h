@@ -20,12 +20,12 @@ class PatchMapping final : public fml::Mapping {
   /// Creates a mapping for the isolate snapshot data from the given cache
   /// entry.
   static std::shared_ptr<PatchMapping> CreateIsolateData(
-      std::shared_ptr<PatchCacheEntry> entry);
+      const std::shared_ptr<PatchCacheEntry>& entry);
 
   /// Creates a mapping for the isolate snapshot instructions from the given
   /// cache entry.
   static std::shared_ptr<PatchMapping> CreateIsolateInstructions(
-      std::shared_ptr<PatchCacheEntry> entry);
+      const std::shared_ptr<PatchCacheEntry>& entry);
 
   ~PatchMapping() override;
 

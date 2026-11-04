@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <string>
+#include <utility>
 
 #include "flutter/common/settings.h"
 #include "flutter/fml/memory/ref_ptr.h"
@@ -33,11 +34,11 @@ struct ShorebirdConfigArgs {
                       std::string release_app_library_path,
                       std::string shorebird_yaml,
                       ReleaseVersion release_version)
-      : code_cache_path(code_cache_path),
-        app_storage_path(app_storage_path),
-        release_app_library_path(release_app_library_path),
-        shorebird_yaml(shorebird_yaml),
-        release_version(release_version) {}
+      : code_cache_path(std::move(code_cache_path)),
+        app_storage_path(std::move(app_storage_path)),
+        release_app_library_path(std::move(release_app_library_path)),
+        shorebird_yaml(std::move(shorebird_yaml)),
+        release_version(std::move(release_version)) {}
 };
 
 /// Newer api, used by Desktop implementations.

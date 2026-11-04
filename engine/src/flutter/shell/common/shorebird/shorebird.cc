@@ -178,9 +178,9 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   }
 
   auto code_cache_dir = fml::paths::JoinPaths(
-      {std::move(args.code_cache_path), shorebird_updater_dir_name, app_id});
+      {args.code_cache_path, shorebird_updater_dir_name, app_id});
   auto app_storage_dir = fml::paths::JoinPaths(
-      {std::move(args.app_storage_path), shorebird_updater_dir_name, app_id});
+      {args.app_storage_path, shorebird_updater_dir_name, app_id});
 
   fml::CreateDirectory(fml::paths::GetCachesDirectory(),
                        {shorebird_updater_dir_name},
