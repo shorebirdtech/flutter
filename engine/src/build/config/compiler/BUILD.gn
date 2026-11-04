@@ -488,11 +488,10 @@ config("compiler") {
 config("cxx_disable_modules") {
   disable_modules_flags = [ "-fno-modules" ]
 
-  # Some Clang versions do not disable ObjC modules (as tested by
-  # __has_feature(objc_modules)) when just -fno-modules is present.
-  # For C++ clang's driver passes -fno-cxx-modules on to cc1 as -Xclang would
-  # (C and ObjC never parse it), and spelled that way sccache can cache the
-  # compile. clang-cl ignores it, so Windows keeps -Xclang.
+  # -fno-modules leaves C++20 named modules on; -fno-cxx-modules turns them
+  # off. clang's driver passes it on to cc1 as -Xclang would, and spelled
+  # that way sccache can cache the compile. clang-cl ignores it, so Windows
+  # keeps -Xclang.
   if (is_win) {
     disable_modules_flags += [
       "-Xclang",
