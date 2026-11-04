@@ -8,11 +8,19 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
+import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.InetSocketAddress;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.junit.After;
 import org.junit.Before;
@@ -23,77 +31,130 @@ import org.junit.runner.RunWith;
 public class ShorebirdHttpClientTest {
   private static final String[] NO_HEADERS = new String[0];
 
-  private HttpServer server;
+  // A minimal HTTP/1.1 server on a ServerSocket: the unit tests compile against
+  // android.jar, which has no com.sun.net.httpserver. One request per
+  // connection, answered with Connection: close.
+  private ServerSocket server;
+  private ExecutorService executor;
   private String base;
 
   @Before
   public void setUp() throws IOException {
-    server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-    base = "http://127.0.0.1:" + server.getAddress().getPort();
-    // Echoes the request: method, Accept-Encoding, Range and body length.
-    server.createContext(
-        "/echo",
-        exchange -> {
-          int length = exchange.getRequestBody().readAllBytes().length;
-          String range = exchange.getRequestHeaders().getFirst("Range");
-          exchange.getResponseHeaders().add("X-Method", exchange.getRequestMethod());
-          exchange
-              .getResponseHeaders()
-              .add("X-Accept-Encoding", exchange.getRequestHeaders().getFirst("Accept-Encoding"));
-          exchange.getResponseHeaders().add("X-Range", String.valueOf(range));
-          exchange.getResponseHeaders().add("X-Body-Length", String.valueOf(length));
-          respond(exchange, range == null ? 200 : 206, new byte[5000]);
-        });
-    server.createContext(
-        "/redirect",
-        exchange -> {
-          exchange.getResponseHeaders().add("Location", "/echo");
-          respond(exchange, 302, new byte[0]);
-        });
-    server.createContext(
-        "/loop",
-        exchange -> {
-          exchange.getResponseHeaders().add("Location", "/loop");
-          respond(exchange, 302, new byte[0]);
-        });
-    server.createContext(
-        "/to-https",
-        exchange -> {
-          exchange.getResponseHeaders().add("Location", "https://127.0.0.1:1/");
-          respond(exchange, 302, new byte[0]);
-        });
-    server.createContext("/missing", exchange -> respond(exchange, 404, "nope".getBytes()));
-    server.createContext(
-        "/slow",
-        exchange -> {
-          exchange.sendResponseHeaders(200, 0);
-          OutputStream out = exchange.getResponseBody();
-          try {
-            for (int i = 0; i < 50; i++) {
-              out.write(new byte[10]);
-              out.flush();
-              Thread.sleep(100);
+    server = new ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"));
+    base = "http://127.0.0.1:" + server.getLocalPort();
+    executor = Executors.newCachedThreadPool();
+    executor.execute(
+        () -> {
+          while (!server.isClosed()) {
+            try {
+              Socket socket = server.accept();
+              executor.execute(() -> serve(socket));
+            } catch (IOException | RuntimeException e) {
+              return; // Closed or shut down by tearDown.
             }
-          } catch (IOException | InterruptedException e) {
-            // The client hung up.
           }
-          exchange.close();
         });
-    server.setExecutor(Executors.newCachedThreadPool());
-    server.start();
   }
 
   @After
-  public void tearDown() {
-    server.stop(0);
+  public void tearDown() throws IOException {
+    server.close();
+    executor.shutdownNow();
   }
 
-  private static void respond(HttpExchange exchange, int status, byte[] body) throws IOException {
-    exchange.sendResponseHeaders(status, body.length == 0 ? -1 : body.length);
-    if (body.length > 0) {
-      exchange.getResponseBody().write(body);
+  private static void serve(Socket socket) {
+    try (Socket s = socket) {
+      InputStream in = new BufferedInputStream(s.getInputStream());
+      String[] requestLine = readLine(in).split(" ");
+      Map<String, String> headers = new HashMap<>();
+      String line;
+      while (!(line = readLine(in)).isEmpty()) {
+        int colon = line.indexOf(':');
+        String name = line.substring(0, colon).trim().toLowerCase(Locale.ROOT);
+        headers.put(name, line.substring(colon + 1).trim());
+      }
+      int length = Integer.parseInt(headers.getOrDefault("content-length", "0"));
+      for (int i = 0; i < length; i++) {
+        in.read();
+      }
+      route(requestLine[0], requestLine[1], headers, length, s.getOutputStream());
+    } catch (IOException | RuntimeException e) {
+      // The client hung up, or sent something the test doesn't expect.
     }
-    exchange.close();
+  }
+
+  private static void route(
+      String method, String path, Map<String, String> headers, int length, OutputStream out)
+      throws IOException {
+    switch (path) {
+      case "/echo":
+        // Echoes the request: method, Accept-Encoding, Range and body length.
+        String range = headers.get("range");
+        respond(
+            out,
+            range == null ? 200 : 206,
+            new byte[5000],
+            "X-Method: " + method,
+            "X-Accept-Encoding: " + headers.get("accept-encoding"),
+            "X-Range: " + range,
+            "X-Body-Length: " + length);
+        break;
+      case "/redirect":
+        respond(out, 302, new byte[0], "Location: /echo");
+        break;
+      case "/loop":
+        respond(out, 302, new byte[0], "Location: /loop");
+        break;
+      case "/to-https":
+        respond(out, 302, new byte[0], "Location: https://127.0.0.1:1/");
+        break;
+      case "/missing":
+        respond(out, 404, "nope".getBytes(StandardCharsets.UTF_8));
+        break;
+      case "/slow":
+        // No Content-Length: the body runs until the connection closes.
+        String head = "HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n";
+        out.write(head.getBytes(StandardCharsets.UTF_8));
+        try {
+          for (int i = 0; i < 50; i++) {
+            out.write(new byte[10]);
+            out.flush();
+            Thread.sleep(100);
+          }
+        } catch (InterruptedException e) {
+          // Shut down by tearDown.
+        }
+        break;
+      default:
+        respond(out, 404, new byte[0]);
+    }
+  }
+
+  private static void respond(OutputStream out, int status, byte[] body, String... headers)
+      throws IOException {
+    StringBuilder head = new StringBuilder("HTTP/1.1 " + status + " X\r\n");
+    for (String header : headers) {
+      head.append(header).append("\r\n");
+    }
+    head.append("Content-Length: ").append(body.length).append("\r\n");
+    head.append("Connection: close\r\n\r\n");
+    out.write(head.toString().getBytes(StandardCharsets.UTF_8));
+    out.write(body);
+    out.flush();
+  }
+
+  private static String readLine(InputStream in) throws IOException {
+    ByteArrayOutputStream line = new ByteArrayOutputStream();
+    int c;
+    while ((c = in.read()) != '\n') {
+      if (c < 0) {
+        throw new IOException("connection closed mid-request");
+      }
+      if (c != '\r') {
+        line.write(c);
+      }
+    }
+    return line.toString("UTF-8");
   }
 
   private static String header(ShorebirdHttpClient client, String name) {
@@ -173,7 +234,11 @@ public class ShorebirdHttpClientTest {
   @Test
   public void httpToHttpsRedirectIsFollowed() {
     // Followed to a closed https port, so it fails connecting rather than on the redirect.
-    assertEquals(ShorebirdHttpClient.TRANSPORT_ERROR, get("/to-https").result);
+    ShorebirdHttpClient client = get("/to-https");
+    assertEquals(ShorebirdHttpClient.TRANSPORT_ERROR, client.result);
+    // A refused connect proves the redirect was followed; a dropped /to-https
+    // response would be an unexpected end of stream instead.
+    assertTrue(client.error, client.error.contains("ConnectException"));
   }
 
   @Test
