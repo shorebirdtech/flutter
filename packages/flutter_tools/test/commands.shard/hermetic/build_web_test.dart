@@ -841,6 +841,31 @@ void main() {
   );
 
   testUsingContext(
+    'Shorebird: loads CanvasKit from the build output by default',
+    () async {
+      final buildCommand = TestWebBuildCommand(fileSystem: fileSystem);
+      final CommandRunner<void> runner = createTestCommandRunner(buildCommand);
+      setupFileSystemForEndToEndTest(fileSystem);
+      await runner.run(<String>['build', 'web', '--no-pub']);
+      final BuildInfo buildInfo = await buildCommand.webCommand.getBuildInfo(
+        forcedBuildMode: BuildMode.release,
+      );
+      expect(buildInfo.useLocalCanvasKit, isTrue);
+      expect(
+        buildInfo.toBuildSystemEnvironment(),
+        containsPair(kUseLocalCanvasKitFlag, 'true'),
+      );
+    },
+    overrides: <Type, Generator>{
+      Platform: () => fakePlatform,
+      FileSystem: () => fileSystem,
+      FeatureFlags: () => TestFeatureFlags(isWebEnabled: true),
+      ProcessManager: () => processManager,
+      BuildSystem: () => TestBuildSystem.all(BuildResult(success: true)),
+    },
+  );
+
+  testUsingContext(
     'Rejects --base-href value that does not start with /',
     () async {
       final buildCommand = TestWebBuildCommand(fileSystem: fileSystem);
