@@ -71,9 +71,9 @@ std::string OwningImageOf(const uint8_t* address) {
 }
 
 // Whether two paths name the same file. The fixtures copy is a hardlink of the
-// built library (the mac toolchain's copy tool is `ln -f`), and dyld names an
-// image by the kernel's path for the file (F_GETPATH), which for a hardlinked
-// file can be either link; dyld also canonicalizes /tmp to /private/tmp. So
+// built library (the copy tool is `ln -f`). glibc's dladdr echoes the path
+// given to dlopen, but on the macOS CI runners dladdr named the image by the
+// other link (out/<variant>/), and dyld canonicalizes /tmp to /private/tmp. So
 // the owning image is matched by device and inode, not by its name.
 bool SameFile(const std::string& a, const std::string& b) {
   struct stat sa = {};
