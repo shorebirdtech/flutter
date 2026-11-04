@@ -92,9 +92,9 @@ void SetBaseSnapshot(fml::RefPtr<const DartSnapshot> base_vm_snapshot) {
   // the same buffer, so the VM snapshot is the base app snapshot. Holding it
   // here keeps App.framework mapped; see ResolveBaseVMSnapshot.
   vm_snapshot = std::move(base_vm_snapshot);
-  // Shorebird_SetBaseSnapshots below hands the interpreter both blobs, while
-  // DartSnapshot::IsValid() checks only the data half, so a snapshot can be
-  // non-null with no instructions at all. Check what is read, not what is
+  // Dart_CreateIsolateGroup needs both base blobs when running a linked patch,
+  // while DartSnapshot::IsValid() checks only the data half, so a snapshot can
+  // be non-null with no instructions at all. Check what is read, not what is
   // returned. vm_snapshot is already known non-null: ResolveBaseVMSnapshot
   // checked it before handing it over.
   FML_CHECK(vm_snapshot->IsValidForAOT())
@@ -111,13 +111,6 @@ void SetBaseSnapshot(fml::RefPtr<const DartSnapshot> base_vm_snapshot) {
   FML_LOG(INFO) << "[shorebird] SetBaseSnapshot mappings: "
                 << "data_size=" << data_size << " insns_size=" << insns_size
                 << " total=" << (data_size + insns_size);
-
-  // The VM isolate snapshot is gone, so there are no separate VM buffers to
-  // hand over. Shorebird_SetBaseSnapshots ignores them, as the Dart
-  // embedder's own call in runtime/bin/main_impl.cc does.
-  Shorebird_SetBaseSnapshots(data_ptr, insns_ptr,
-                             /*base_vm_snapshot_data=*/nullptr,
-                             /*base_vm_snapshot_instructions=*/nullptr);
 }
 #endif  // SHOREBIRD_USE_INTERPRETER
 
@@ -215,11 +208,12 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   }
 #endif  // FML_OS_MACOSX && !FML_OS_IOS
 
-  bool init_result = shorebird::Updater::Instance().Init(config);
+  auto updater = shorebird::Updater::Default();
+  bool init_result = updater->Init(config);
 
   FML_LOG(INFO) << "Checking for active patch";
-  shorebird::Updater::Instance().ValidateNextBootPatch();
-  std::string active_path = shorebird::Updater::Instance().NextBootPatchPath();
+  updater->ValidateNextBootPatch();
+  std::string active_path = updater->NextBootPatchPath();
   if (!active_path.empty()) {
     patch_path = active_path;
     FML_LOG(INFO) << "Shorebird updater: patch path: " << patch_path;
@@ -227,7 +221,7 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
     FML_LOG(INFO) << "Shorebird updater: no active patch.";
   }
 
-  // Launch reporting does not happen here. ResolveIsolateData in
+  // Launch reporting does not happen here. IsolateSnapshotFromSettings in
   // runtime/dart_snapshot.cc reports the start, so a FlutterEngineGroup or
   // add-to-app host that calls ConfigureShorebird() without ever creating a
   // Shell does not record a boot that never happened. The update thread
@@ -238,7 +232,8 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
 
 bool LoadPatchOrBase(const std::string& patch_path,
                      const std::string& base_path,
-                     const std::function<bool(const std::string&)>& load) {
+                     const std::function<bool(const std::string&)>& load,
+                     shorebird::Updater* updater) {
   if (patch_path.empty()) {
     return load(base_path);
   }
@@ -247,13 +242,9 @@ bool LoadPatchOrBase(const std::string& patch_path,
   }
   FML_LOG(ERROR) << "Shorebird: patch load failed, running base code from "
                  << base_path << " instead of " << patch_path;
-  // The failure report marks the booting patch bad, and a patch is only
-  // booting once the start is reported. Both are guarded once per process,
-  // so the Shell's own start report (ResolveIsolateData) is a no-op, and its
-  // success report does not record the base-code boot as the patch's. This
-  // is the same sequence TryLoadFromPatch runs on iOS.
-  shorebird::Updater::Instance().ReportLaunchStart();
-  shorebird::Updater::Instance().ReportLaunchFailure();
+  auto& active_updater = updater ? *updater : *shorebird::Updater::Default();
+  active_updater.ReportLaunchStart();
+  active_updater.ReportLaunchFailure();
   return load(base_path);
 }
 
@@ -265,6 +256,12 @@ void ConfigureShorebird(std::string code_cache_path,
                         const std::string& shorebird_yaml,
                         const std::string& version,
                         const std::string& version_code) {
+  settings.base_application_library_paths = settings.application_library_paths;
+  if (!settings.shorebird_updater) {
+    settings.shorebird_updater = shorebird::Updater::Default();
+  }
+  auto updater = shorebird::Updater::FromSettings(settings);
+
   // The interpreter path hands this to SetBaseSnapshot below, which holds it
   // for the life of the process, because a linked patch executes out of the
   // base image and needs it resolvable. Everywhere else a patch replaces
@@ -291,21 +288,21 @@ void ConfigureShorebird(std::string code_cache_path,
   // We could also pass these separately through to the updater if needed.
   shorebird::AppConfig config;
   config.release_version = version + "+" + version_code;
-  config.original_libapp_paths = settings.application_library_paths;
+  config.original_libapp_paths = settings.base_application_library_paths;
   config.app_storage_dir = app_storage_dir;
   config.code_cache_dir = code_cache_dir;
   config.file_callbacks = ShorebirdFileCallbacks();
   config.yaml_config = shorebird_yaml;
 
-  shorebird::Updater::Instance().Init(config);
+  updater->Init(config);
 
   // We only set the base snapshot on iOS for now.
 #if SHOREBIRD_USE_INTERPRETER
   SetBaseSnapshot(std::move(base_vm_snapshot));
 #endif
 
-  shorebird::Updater::Instance().ValidateNextBootPatch();
-  std::string active_path = shorebird::Updater::Instance().NextBootPatchPath();
+  updater->ValidateNextBootPatch();
+  std::string active_path = updater->NextBootPatchPath();
   if (!active_path.empty()) {
     FML_LOG(INFO) << "Shorebird updater: active path: " << active_path;
 

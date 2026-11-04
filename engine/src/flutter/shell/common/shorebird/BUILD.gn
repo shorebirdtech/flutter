@@ -156,6 +156,7 @@ source_set("updater") {
 
   deps = [
     ":engine_callbacks",
+    "//flutter/common",
     "//flutter/fml",
   ]
 

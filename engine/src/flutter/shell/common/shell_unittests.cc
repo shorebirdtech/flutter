@@ -5190,24 +5190,20 @@ TEST_F(ShellTest, ShoulDiscardLayerTreeIfFrameIsSizedIncorrectly) {
 // ResolveIsolateData, then ReportLaunchSuccess from the Shell constructor.
 // Both are guarded to run at most once per process.
 TEST_F(ShellTest, ShorebirdBootFlowCallsLaunchStartThenSuccess) {
-  auto mock = std::make_unique<shorebird::MockUpdater>();
-  auto* mock_ptr = mock.get();
-  shorebird::Updater::SetInstanceForTesting(std::move(mock));
-  shorebird::Updater::ResetLaunchStateForTesting();
+  auto mock = std::make_shared<shorebird::MockUpdater>();
 
   auto settings = CreateSettingsForFixture();
+  settings.shorebird_updater = mock;
   auto task_runners = GetTaskRunnersForFixture();
   auto shell = CreateShell(settings, task_runners);
   ASSERT_TRUE(shell);
 
-  const auto& log = mock_ptr->call_log();
+  const auto& log = mock->call_log();
   ASSERT_EQ(log.size(), 2u);
   EXPECT_EQ(log[0], "ReportLaunchStart");
   EXPECT_EQ(log[1], "ReportLaunchSuccess");
 
   DestroyShell(std::move(shell), task_runners);
-  shorebird::Updater::ResetLaunchStateForTesting();
-  shorebird::Updater::ResetInstanceForTesting();
 }
 
 // In add-to-app, multiple engines may be created within a single process.
@@ -5216,19 +5212,17 @@ TEST_F(ShellTest, ShorebirdBootFlowCallsLaunchStartThenSuccess) {
 // to "current_boot" when subsequent engines are still running the original
 // snapshot that was selected at process init time.
 TEST_F(ShellTest, ShorebirdUpdaterReportsOnlyOnceForMultipleShells) {
-  auto mock = std::make_unique<shorebird::MockUpdater>();
-  auto* mock_ptr = mock.get();
-  shorebird::Updater::SetInstanceForTesting(std::move(mock));
-  shorebird::Updater::ResetLaunchStateForTesting();
+  auto mock = std::make_shared<shorebird::MockUpdater>();
 
   auto settings = CreateSettingsForFixture();
+  settings.shorebird_updater = mock;
 
   // Create first shell — gets Start + Success
   auto task_runners1 = GetTaskRunnersForFixture();
   auto shell1 = CreateShell(settings, task_runners1);
   ASSERT_TRUE(shell1);
-  EXPECT_EQ(mock_ptr->launch_start_count(), 1);
-  EXPECT_EQ(mock_ptr->launch_success_count(), 1);
+  EXPECT_EQ(mock->launch_start_count(), 1);
+  EXPECT_EQ(mock->launch_success_count(), 1);
 
   // The guard is per process, so the second shell need not overlap the
   // first. Destroying the first shell before creating the second keeps the
@@ -5240,19 +5234,16 @@ TEST_F(ShellTest, ShorebirdUpdaterReportsOnlyOnceForMultipleShells) {
   auto task_runners2 = GetTaskRunnersForFixture();
   auto shell2 = CreateShell(settings, task_runners2);
   ASSERT_TRUE(shell2);
-  EXPECT_EQ(mock_ptr->launch_start_count(), 1);
-  EXPECT_EQ(mock_ptr->launch_success_count(), 1);
+  EXPECT_EQ(mock->launch_start_count(), 1);
+  EXPECT_EQ(mock->launch_success_count(), 1);
 
   // Only one Start+Success pair in the call log.
-  const auto& log = mock_ptr->call_log();
+  const auto& log = mock->call_log();
   ASSERT_EQ(log.size(), 2u);
   EXPECT_EQ(log[0], "ReportLaunchStart");
   EXPECT_EQ(log[1], "ReportLaunchSuccess");
 
   DestroyShell(std::move(shell2), task_runners2);
-
-  shorebird::Updater::ResetLaunchStateForTesting();
-  shorebird::Updater::ResetInstanceForTesting();
 }
 
 }  // namespace testing

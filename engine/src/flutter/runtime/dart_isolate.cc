@@ -261,12 +261,16 @@ std::weak_ptr<DartIsolate> DartIsolate::CreateRootIsolate(
                            isolate_group_data,
                        std::shared_ptr<DartIsolate>* isolate_data,
                        Dart_IsolateFlags* flags, char** error) {
+      const auto& snapshot = (*isolate_group_data)->GetIsolateSnapshot();
       return Dart_CreateIsolateGroup(
           (*isolate_group_data)->GetAdvisoryScriptURI().c_str(),
           (*isolate_group_data)->GetAdvisoryScriptEntrypoint().c_str(),
-          (*isolate_group_data)->GetIsolateSnapshot()->GetDataMapping(),
-          (*isolate_group_data)->GetIsolateSnapshot()->GetInstructionsMapping(),
-          flags, isolate_group_data, isolate_data, error);
+          snapshot->GetDataMapping(), snapshot->GetInstructionsMapping(),
+          snapshot->GetBaseDataMapping(),
+          snapshot->GetBaseInstructionsMapping(),
+          snapshot->GetLinkHeaderMapping(),
+          static_cast<intptr_t>(snapshot->GetLinkHeaderSize()), flags,
+          isolate_group_data, isolate_data, error);
     };
   }
 
@@ -1133,14 +1137,16 @@ Dart_Isolate DartIsolate::DartIsolateGroupCreateCallback(
       [](std::shared_ptr<DartIsolateGroupData>* isolate_group_data,
          std::shared_ptr<DartIsolate>* isolate_data, Dart_IsolateFlags* flags,
          char** error) {
+        const auto& snapshot = (*isolate_group_data)->GetIsolateSnapshot();
         return Dart_CreateIsolateGroup(
             (*isolate_group_data)->GetAdvisoryScriptURI().c_str(),
             (*isolate_group_data)->GetAdvisoryScriptEntrypoint().c_str(),
-            (*isolate_group_data)->GetIsolateSnapshot()->GetDataMapping(),
-            (*isolate_group_data)
-                ->GetIsolateSnapshot()
-                ->GetInstructionsMapping(),
-            flags, isolate_group_data, isolate_data, error);
+            snapshot->GetDataMapping(), snapshot->GetInstructionsMapping(),
+            snapshot->GetBaseDataMapping(),
+            snapshot->GetBaseInstructionsMapping(),
+            snapshot->GetLinkHeaderMapping(),
+            static_cast<intptr_t>(snapshot->GetLinkHeaderSize()), flags,
+            isolate_group_data, isolate_data, error);
       });
 
   if (*error) {

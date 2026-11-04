@@ -6,7 +6,6 @@
 
 #include <sstream>
 
-#include <third_party/dart/runtime/bin/elf_loader.h>
 #include "flutter/fml/native_library.h"
 #include "flutter/fml/paths.h"
 #include "flutter/fml/trace_event.h"
@@ -14,9 +13,9 @@
 #include "flutter/runtime/dart_vm.h"
 #include "third_party/dart/runtime/include/dart_api.h"
 
-#if SHOREBIRD_USE_INTERPRETER
-#include "flutter/runtime/shorebird/patch_cache.h"  // nogncheck
-#endif
+#if defined(SHOREBIRD_ENABLE_PATCH_MAPPING)
+#include "flutter/runtime/shorebird/patch_mapping.h"
+#endif  // defined(SHOREBIRD_ENABLE_PATCH_MAPPING)
 #include "flutter/shell/common/shorebird/updater.h"  // nogncheck
 
 namespace flutter {
@@ -104,6 +103,21 @@ static std::shared_ptr<const fml::Mapping> SearchMapping(
 
 #endif  // !DART_SNAPSHOT_STATIC_LINK
 
+static std::vector<std::string> BaseApplicationLibraryPaths(
+    const Settings& settings) {
+  const auto& source = !settings.base_application_library_paths.empty()
+                           ? settings.base_application_library_paths
+                           : settings.application_library_paths;
+  std::vector<std::string> result;
+  result.reserve(source.size());
+  for (const auto& path : source) {
+    if (path.find(".vmcode") == std::string::npos) {
+      result.push_back(path);
+    }
+  }
+  return result;
+}
+
 static std::shared_ptr<const fml::Mapping> ResolveVMData(
     const Settings& settings) {
 #if DART_SNAPSHOT_STATIC_LINK
@@ -114,11 +128,11 @@ static std::shared_ptr<const fml::Mapping> ResolveVMData(
   );
 #else   // DART_SNAPSHOT_STATIC_LINK
   return SearchMapping(
-      settings.vm_snapshot_data,           // embedder_mapping_callback
-      settings.vm_snapshot_data_path,      // file_path
-      settings.application_library_paths,  // native_library_paths
-      DartSnapshot::kVMDataSymbol,         // native_library_symbol_name
-      false                                // is_executable
+      settings.vm_snapshot_data,             // embedder_mapping_callback
+      settings.vm_snapshot_data_path,        // file_path
+      BaseApplicationLibraryPaths(settings), // native_library_paths
+      DartSnapshot::kVMDataSymbol,           // native_library_symbol_name
+      false                                  // is_executable
   );
 #endif  // DART_SNAPSHOT_STATIC_LINK
 }
@@ -133,11 +147,49 @@ static std::shared_ptr<const fml::Mapping> ResolveVMInstructions(
   );
 #else   // DART_SNAPSHOT_STATIC_LINK
   return SearchMapping(
-      settings.vm_snapshot_instr,           // embedder_mapping_callback
-      settings.vm_snapshot_instr_path,      // file_path
-      settings.application_library_paths,   // native_library_paths
-      DartSnapshot::kVMInstructionsSymbol,  // native_library_symbol_name
-      true                                  // is_executable
+      settings.vm_snapshot_instr,            // embedder_mapping_callback
+      settings.vm_snapshot_instr_path,       // file_path
+      BaseApplicationLibraryPaths(settings), // native_library_paths
+      DartSnapshot::kVMInstructionsSymbol,   // native_library_symbol_name
+      true                                   // is_executable
+  );
+#endif  // DART_SNAPSHOT_STATIC_LINK
+}
+
+static std::shared_ptr<const fml::Mapping> ResolveBaseIsolateData(
+    const Settings& settings) {
+#if DART_SNAPSHOT_STATIC_LINK
+  return std::make_unique<fml::NonOwnedMapping>(kDartSnapshotData,
+                                                0,        // size
+                                                nullptr,  // release_func
+                                                true      // dontneed_safe
+  );
+#else   // DART_SNAPSHOT_STATIC_LINK
+  return SearchMapping(
+      settings.isolate_snapshot_data,        // embedder_mapping_callback
+      settings.isolate_snapshot_data_path,   // file_path
+      BaseApplicationLibraryPaths(settings), // native_library_paths
+      DartSnapshot::kIsolateDataSymbol,      // native_library_symbol_name
+      false                                  // is_executable
+  );
+#endif  // DART_SNAPSHOT_STATIC_LINK
+}
+
+static std::shared_ptr<const fml::Mapping> ResolveBaseIsolateInstructions(
+    const Settings& settings) {
+#if DART_SNAPSHOT_STATIC_LINK
+  return std::make_unique<fml::NonOwnedMapping>(kDartSnapshotText,
+                                                0,        // size
+                                                nullptr,  // release_func
+                                                true      // dontneed_safe
+  );
+#else   // DART_SNAPSHOT_STATIC_LINK
+  return SearchMapping(
+      settings.isolate_snapshot_instr,           // embedder_mapping_callback
+      settings.isolate_snapshot_instr_path,      // file_path
+      BaseApplicationLibraryPaths(settings),     // native_library_paths
+      DartSnapshot::kIsolateInstructionsSymbol,  // native_library_symbol_name
+      true                                       // is_executable
   );
 #endif  // DART_SNAPSHOT_STATIC_LINK
 }
@@ -151,19 +203,6 @@ static std::shared_ptr<const fml::Mapping> ResolveIsolateData(
                                                 true      // dontneed_safe
   );
 #else  // DART_SNAPSHOT_STATIC_LINK
-  // Tell the Rust updater we're booting from whatever patch it selected.
-  // This copies next_boot → current_boot in the Rust state. The call is
-  // guarded inside Updater to execute at most once per process — see the
-  // Updater class comment for why this matters in add-to-app and
-  // FlutterEngineGroup scenarios.
-  shorebird::Updater::Instance().ReportLaunchStart();
-#if SHOREBIRD_USE_INTERPRETER
-  // Try loading from a Shorebird patch first.
-  if (auto mapping = TryLoadFromPatch(settings.application_library_paths,
-                                      PatchSymbol::kIsolateData)) {
-    return mapping;
-  }
-#endif  // SHOREBIRD_USE_INTERPRETER
   return SearchMapping(
       settings.isolate_snapshot_data,       // embedder_mapping_callback
       settings.isolate_snapshot_data_path,  // file_path
@@ -183,13 +222,6 @@ static std::shared_ptr<const fml::Mapping> ResolveIsolateInstructions(
                                                 true      // dontneed_safe
   );
 #else  // DART_SNAPSHOT_STATIC_LINK
-#if SHOREBIRD_USE_INTERPRETER
-  // Try loading from a Shorebird patch first.
-  if (auto mapping = TryLoadFromPatch(settings.application_library_paths,
-                                      PatchSymbol::kIsolateInstructions)) {
-    return mapping;
-  }
-#endif  // SHOREBIRD_USE_INTERPRETER
   return SearchMapping(
       settings.isolate_snapshot_instr,           // embedder_mapping_callback
       settings.isolate_snapshot_instr_path,      // file_path
@@ -213,9 +245,62 @@ fml::RefPtr<const DartSnapshot> DartSnapshot::VMSnapshotFromSettings(
   return nullptr;
 }
 
+fml::RefPtr<const DartSnapshot> DartSnapshot::BaseIsolateSnapshotFromSettings(
+    const Settings& settings) {
+  TRACE_EVENT0("flutter", "DartSnapshot::BaseIsolateSnapshotFromSettings");
+  auto snapshot = fml::MakeRefCounted<DartSnapshot>(
+      ResolveBaseIsolateData(settings),         //
+      ResolveBaseIsolateInstructions(settings)  //
+  );
+  if (snapshot->IsValid()) {
+    return snapshot;
+  }
+  return nullptr;
+}
+
+#if defined(SHOREBIRD_ENABLE_PATCH_MAPPING)
+fml::RefPtr<DartSnapshot> DartSnapshot::IsolateSnapshotFromLoadedPatch(
+    const std::shared_ptr<LoadedPatch>& patch,
+    fml::RefPtr<const DartSnapshot> base_snapshot) {
+  if (!patch) {
+    return nullptr;
+  }
+  auto snapshot = fml::MakeRefCounted<DartSnapshot>(
+      patch->CreateDataMapping(),          //
+      patch->CreateInstructionsMapping(),  //
+      std::move(base_snapshot),            //
+      patch->link_header()                 //
+  );
+  if (snapshot->IsValid()) {
+    return snapshot;
+  }
+  return nullptr;
+}
+#endif  // defined(SHOREBIRD_ENABLE_PATCH_MAPPING)
+
 fml::RefPtr<const DartSnapshot> DartSnapshot::IsolateSnapshotFromSettings(
     const Settings& settings) {
   TRACE_EVENT0("flutter", "DartSnapshot::IsolateSnapshotFromSettings");
+#if !DART_SNAPSHOT_STATIC_LINK
+  shorebird::Updater::FromSettings(settings)->ReportLaunchStart();
+#if defined(SHOREBIRD_ENABLE_PATCH_MAPPING)
+  if (!settings.application_library_paths.empty()) {
+    const auto& first_path = settings.application_library_paths.front();
+    if (first_path.find(".vmcode") != std::string::npos) {
+      auto patch = LoadedPatch::Load(first_path);
+      if (patch) {
+        auto base_snapshot = BaseIsolateSnapshotFromSettings(settings);
+        return IsolateSnapshotFromLoadedPatch(patch, std::move(base_snapshot));
+      }
+      FML_LOG(ERROR) << "Shorebird: patch load failed, running base code from "
+                        "the app image instead of "
+                     << first_path;
+      shorebird::Updater::FromSettings(settings)->ReportLaunchFailure();
+      return BaseIsolateSnapshotFromSettings(settings);
+    }
+  }
+#endif  // defined(SHOREBIRD_ENABLE_PATCH_MAPPING)
+#endif  // !DART_SNAPSHOT_STATIC_LINK
   auto snapshot =
       fml::MakeRefCounted<DartSnapshot>(ResolveIsolateData(settings),         //
                                         ResolveIsolateInstructions(settings)  //
@@ -258,8 +343,13 @@ fml::RefPtr<DartSnapshot> DartSnapshot::VMServiceIsolateSnapshotFromSettings(
 }
 
 DartSnapshot::DartSnapshot(std::shared_ptr<const fml::Mapping> data,
-                           std::shared_ptr<const fml::Mapping> instructions)
-    : data_(std::move(data)), instructions_(std::move(instructions)) {}
+                           std::shared_ptr<const fml::Mapping> instructions,
+                           fml::RefPtr<const DartSnapshot> base_snapshot,
+                           std::shared_ptr<const fml::Mapping> link_header)
+    : data_(std::move(data)),
+      instructions_(std::move(instructions)),
+      base_snapshot_(std::move(base_snapshot)),
+      link_header_(std::move(link_header)) {}
 
 DartSnapshot::~DartSnapshot() = default;
 
@@ -277,6 +367,22 @@ const uint8_t* DartSnapshot::GetDataMapping() const {
 
 const uint8_t* DartSnapshot::GetInstructionsMapping() const {
   return instructions_ ? instructions_->GetMapping() : nullptr;
+}
+
+const uint8_t* DartSnapshot::GetBaseDataMapping() const {
+  return base_snapshot_ ? base_snapshot_->GetDataMapping() : nullptr;
+}
+
+const uint8_t* DartSnapshot::GetBaseInstructionsMapping() const {
+  return base_snapshot_ ? base_snapshot_->GetInstructionsMapping() : nullptr;
+}
+
+const uint8_t* DartSnapshot::GetLinkHeaderMapping() const {
+  return link_header_ ? link_header_->GetMapping() : nullptr;
+}
+
+size_t DartSnapshot::GetLinkHeaderSize() const {
+  return link_header_ ? link_header_->GetSize() : 0;
 }
 
 bool DartSnapshot::IsDontNeedSafe() const {

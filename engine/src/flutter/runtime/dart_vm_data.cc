@@ -23,10 +23,15 @@ std::shared_ptr<const DartVMData> DartVMData::Create(
     }
   }
 
+  if (isolate_snapshot && isolate_snapshot->GetBaseSnapshot()) {
+    isolate_snapshot = isolate_snapshot->GetBaseSnapshot();
+  }
+
   if (!isolate_snapshot || !isolate_snapshot->IsValid()) {
-    // Caller did not provide a valid isolate snapshot. Attempt to infer one
-    // from the settings.
-    isolate_snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
+    // Caller did not provide a valid isolate snapshot. Infer the base isolate
+    // snapshot from settings so process-lifetime DartVMData never pins a patch
+    // mapping.
+    isolate_snapshot = DartSnapshot::BaseIsolateSnapshotFromSettings(settings);
     if (!isolate_snapshot) {
       FML_LOG(ERROR) << "Isolate snapshot invalid and could not be inferred "
                         "from settings.";

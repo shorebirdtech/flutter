@@ -56,7 +56,8 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
 /// library themselves before any Shell exists.
 bool LoadPatchOrBase(const std::string& patch_path,
                      const std::string& base_path,
-                     const std::function<bool(const std::string&)>& load);
+                     const std::function<bool(const std::string&)>& load,
+                     shorebird::Updater* updater = nullptr);
 
 /// Older api used by iOS and Android, directly manipulates Settings.
 void ConfigureShorebird(std::string code_cache_path,

@@ -4,6 +4,7 @@
 
 #include "flutter/shell/common/shorebird/updater.h"
 
+#include "flutter/common/settings.h"
 #include "flutter/fml/logging.h"
 
 #if SHOREBIRD_PLATFORM_SUPPORTED
@@ -14,37 +15,23 @@
 namespace flutter {
 namespace shorebird {
 
-// Static member definitions
-std::unique_ptr<Updater> Updater::instance_;
-std::mutex Updater::instance_mutex_;
-std::atomic<bool> Updater::launch_started_{false};
-std::atomic<bool> Updater::launch_completed_{false};
-std::atomic<bool> Updater::initialized_{false};
-std::atomic<bool> Updater::update_thread_started_{false};
-
-Updater& Updater::Instance() {
-  std::lock_guard<std::mutex> lock(instance_mutex_);
-  if (!instance_) {
+std::shared_ptr<Updater> Updater::Default() {
 #if SHOREBIRD_PLATFORM_SUPPORTED
-    instance_ = std::make_unique<RealUpdater>();
+  static std::shared_ptr<Updater> instance = std::make_shared<RealUpdater>();
 #else
-    instance_ = std::make_unique<NoOpUpdater>();
+  static std::shared_ptr<Updater> instance = std::make_shared<NoOpUpdater>();
 #endif
+  return instance;
+}
+
+std::shared_ptr<Updater> Updater::FromSettings(const Settings& settings) {
+  if (settings.shorebird_updater) {
+    return settings.shorebird_updater;
   }
-  return *instance_;
+  return Default();
 }
 
-void Updater::SetInstanceForTesting(std::unique_ptr<Updater> instance) {
-  std::lock_guard<std::mutex> lock(instance_mutex_);
-  instance_ = std::move(instance);
-}
-
-void Updater::ResetInstanceForTesting() {
-  std::lock_guard<std::mutex> lock(instance_mutex_);
-  instance_.reset();
-}
-
-void Updater::ResetLaunchStateForTesting() {
+void Updater::ResetLaunchState() {
   launch_started_.store(false);
   launch_completed_.store(false);
   initialized_.store(false);
@@ -81,8 +68,9 @@ void Updater::ReportLaunchSuccess() {
   }
 
   // Outside the guard above: a patch that failed to load already claimed it
-  // from TryLoadFromPatch, and the base-code boot reaching here is the launch
-  // that most needs a replacement patch. See the class comment.
+  // from DartSnapshot::IsolateSnapshotFromSettings, and the base-code boot
+  // reaching here is the launch that most needs a replacement patch. See the
+  // class comment.
   MaybeStartUpdateThread();
 }
 
@@ -243,6 +231,7 @@ void MockUpdater::StartUpdateThread() {
 }
 
 void MockUpdater::Reset() {
+  ResetLaunchState();
   init_count_ = 0;
   validate_count_ = 0;
   launch_start_count_ = 0;

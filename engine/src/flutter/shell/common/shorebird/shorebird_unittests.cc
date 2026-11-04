@@ -1,3 +1,7 @@
+// Copyright 2013 The Flutter Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 #include "flutter/shell/common/shorebird/shorebird.h"
 
 #include <algorithm>
@@ -10,6 +14,7 @@
 
 namespace flutter {
 namespace testing {
+
 TEST(Shorebird, GetValueFromYamlValueExists) {
   std::string yaml = "appid: com.example.app\nversion: 1.0.0\n";
   std::string key = "appid";
@@ -26,19 +31,6 @@ TEST(Shorebird, GetValueFromYamlValueDoesNotExist) {
 
 class LoadPatchOrBaseTest : public ::testing::Test {
  protected:
-  void SetUp() override {
-    auto mock = std::make_unique<shorebird::MockUpdater>();
-    mock_ = mock.get();
-    shorebird::Updater::SetInstanceForTesting(std::move(mock));
-    shorebird::Updater::ResetLaunchStateForTesting();
-  }
-
-  void TearDown() override {
-    mock_ = nullptr;
-    shorebird::Updater::ResetInstanceForTesting();
-    shorebird::Updater::ResetLaunchStateForTesting();
-  }
-
   // Loads only the paths in |loadable|, recording every attempt.
   bool Load(const std::string& path) {
     attempts_.push_back(path);
@@ -49,10 +41,10 @@ class LoadPatchOrBaseTest : public ::testing::Test {
   bool Run(const std::string& patch_path) {
     return LoadPatchOrBase(
         patch_path, "base.so",
-        [this](const std::string& path) { return Load(path); });
+        [this](const std::string& path) { return Load(path); }, &mock_);
   }
 
-  shorebird::MockUpdater* mock_ = nullptr;
+  shorebird::MockUpdater mock_;
   std::vector<std::string> loadable_;
   std::vector<std::string> attempts_;
 };
@@ -62,7 +54,7 @@ TEST_F(LoadPatchOrBaseTest, LoadsBaseWithoutAPatch) {
 
   EXPECT_TRUE(Run(""));
   EXPECT_EQ(attempts_, std::vector<std::string>({"base.so"}));
-  EXPECT_TRUE(mock_->call_log().empty());
+  EXPECT_TRUE(mock_.call_log().empty());
 }
 
 TEST_F(LoadPatchOrBaseTest, LoadsPatchWithoutReporting) {
@@ -71,7 +63,7 @@ TEST_F(LoadPatchOrBaseTest, LoadsPatchWithoutReporting) {
   EXPECT_TRUE(Run("patch.vmcode"));
   EXPECT_EQ(attempts_, std::vector<std::string>({"patch.vmcode"}));
   // The Shell reports the boot once it exists.
-  EXPECT_TRUE(mock_->call_log().empty());
+  EXPECT_TRUE(mock_.call_log().empty());
 }
 
 TEST_F(LoadPatchOrBaseTest, ReportsAFailedPatchAndLoadsBase) {
@@ -79,7 +71,7 @@ TEST_F(LoadPatchOrBaseTest, ReportsAFailedPatchAndLoadsBase) {
 
   EXPECT_TRUE(Run("patch.vmcode"));
   EXPECT_EQ(attempts_, std::vector<std::string>({"patch.vmcode", "base.so"}));
-  const auto& log = mock_->call_log();
+  const auto& log = mock_.call_log();
   ASSERT_EQ(log.size(), 2u);
   EXPECT_EQ(log[0], "ReportLaunchStart");
   EXPECT_EQ(log[1], "ReportLaunchFailure");
@@ -91,18 +83,18 @@ TEST_F(LoadPatchOrBaseTest, BaseBootAfterAFailedPatchIsNotReportedAsSuccess) {
   loadable_ = {"base.so"};
   ASSERT_TRUE(Run("patch.vmcode"));
 
-  shorebird::Updater::Instance().ReportLaunchStart();
-  shorebird::Updater::Instance().ReportLaunchSuccess();
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
 
-  EXPECT_EQ(mock_->launch_start_count(), 1);
-  EXPECT_EQ(mock_->launch_failure_count(), 1);
-  EXPECT_EQ(mock_->launch_success_count(), 0);
+  EXPECT_EQ(mock_.launch_start_count(), 1);
+  EXPECT_EQ(mock_.launch_failure_count(), 1);
+  EXPECT_EQ(mock_.launch_success_count(), 0);
 }
 
 TEST_F(LoadPatchOrBaseTest, FailsWhenNeitherLoads) {
   EXPECT_FALSE(Run("patch.vmcode"));
   EXPECT_EQ(attempts_, std::vector<std::string>({"patch.vmcode", "base.so"}));
-  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  EXPECT_EQ(mock_.launch_failure_count(), 1);
 }
 
 }  // namespace testing

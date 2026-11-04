@@ -22,6 +22,10 @@
 
 namespace flutter {
 
+namespace shorebird {
+class Updater;
+}  // namespace shorebird
+
 class FrameTiming {
  public:
   enum Phase {
@@ -384,6 +388,15 @@ struct Settings {
 
   MergedPlatformUIThread merged_platform_ui_thread =
       MergedPlatformUIThread::kEnabled;
+
+  // Unpatched application library paths recorded before ConfigureShorebird
+  // rewrites application_library_paths. Used by DartSnapshot and DartVMData
+  // to resolve base VM and base isolate snapshots without touching patch files.
+  std::vector<std::string> base_application_library_paths;
+
+  // Optional Shorebird Updater instance owned by the Shell or injected by
+  // tests. When null, consumers fall back to Updater::Default().
+  std::shared_ptr<shorebird::Updater> shorebird_updater;
 };
 
 }  // namespace flutter

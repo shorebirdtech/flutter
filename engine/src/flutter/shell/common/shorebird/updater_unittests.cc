@@ -14,82 +14,67 @@ namespace testing {
 
 class UpdaterTest : public ::testing::Test {
  protected:
-  void SetUp() override {
-    // Install a mock for each test and reset the once-per-process guards
-    // so each test starts with a clean slate.
-    auto mock = std::make_unique<MockUpdater>();
-    mock_ = mock.get();
-    Updater::SetInstanceForTesting(std::move(mock));
-    Updater::ResetLaunchStateForTesting();
-  }
-
-  void TearDown() override {
-    mock_ = nullptr;
-    Updater::ResetInstanceForTesting();
-    Updater::ResetLaunchStateForTesting();
-  }
-
-  MockUpdater* mock_ = nullptr;
+  MockUpdater mock_;
 };
 
-// ReportLaunchStart is guarded to run at most once per process.
+// ReportLaunchStart is guarded to run at most once per Updater instance.
 // The second call should be silently ignored.
 TEST_F(UpdaterTest, ReportLaunchStartOnlyCallsOnce) {
-  EXPECT_EQ(mock_->launch_start_count(), 0);
+  EXPECT_EQ(mock_.launch_start_count(), 0);
 
-  Updater::Instance().ReportLaunchStart();
-  EXPECT_EQ(mock_->launch_start_count(), 1);
+  mock_.ReportLaunchStart();
+  EXPECT_EQ(mock_.launch_start_count(), 1);
 
-  // Second call is a no-op due to the once-per-process guard.
-  Updater::Instance().ReportLaunchStart();
-  EXPECT_EQ(mock_->launch_start_count(), 1);
+  // Second call is a no-op due to the per-instance guard.
+  mock_.ReportLaunchStart();
+  EXPECT_EQ(mock_.launch_start_count(), 1);
 }
 
 TEST_F(UpdaterTest, ReportLaunchSuccessOnlyCallsOnce) {
-  EXPECT_EQ(mock_->launch_success_count(), 0);
+  EXPECT_EQ(mock_.launch_success_count(), 0);
 
-  Updater::Instance().ReportLaunchSuccess();
-  EXPECT_EQ(mock_->launch_success_count(), 1);
+  mock_.ReportLaunchSuccess();
+  EXPECT_EQ(mock_.launch_success_count(), 1);
 
   // Second call is a no-op.
-  Updater::Instance().ReportLaunchSuccess();
-  EXPECT_EQ(mock_->launch_success_count(), 1);
+  mock_.ReportLaunchSuccess();
+  EXPECT_EQ(mock_.launch_success_count(), 1);
 }
 
 TEST_F(UpdaterTest, ReportLaunchFailureOnlyCallsOnce) {
-  EXPECT_EQ(mock_->launch_failure_count(), 0);
+  EXPECT_EQ(mock_.launch_failure_count(), 0);
 
-  Updater::Instance().ReportLaunchFailure();
-  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  mock_.ReportLaunchFailure();
+  EXPECT_EQ(mock_.launch_failure_count(), 1);
 
   // Second call is a no-op.
-  Updater::Instance().ReportLaunchFailure();
-  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  mock_.ReportLaunchFailure();
+  EXPECT_EQ(mock_.launch_failure_count(), 1);
 }
 
 TEST_F(UpdaterTest, MockUpdaterTracksShouldAutoUpdate) {
-  mock_->set_should_auto_update(false);
-  EXPECT_FALSE(Updater::Instance().ShouldAutoUpdate());
+  mock_.set_should_auto_update(false);
+  EXPECT_FALSE(mock_.ShouldAutoUpdate());
 
-  mock_->set_should_auto_update(true);
-  EXPECT_TRUE(Updater::Instance().ShouldAutoUpdate());
+  mock_.set_should_auto_update(true);
+  EXPECT_TRUE(mock_.ShouldAutoUpdate());
 }
 
 TEST_F(UpdaterTest, MockUpdaterTracksStartUpdateThreadCalls) {
-  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+  EXPECT_EQ(mock_.start_update_thread_count(), 0);
 
-  Updater::Instance().StartUpdateThread();
-  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+  mock_.StartUpdateThread();
+  EXPECT_EQ(mock_.start_update_thread_count(), 1);
 }
 
 TEST_F(UpdaterTest, MockUpdaterCallLogRecordsSequence) {
-  EXPECT_TRUE(mock_->call_log().empty());
+  EXPECT_TRUE(mock_.call_log().empty());
 
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ShouldAutoUpdate();
-  Updater::Instance().ReportLaunchSuccess();
+  mock_.ReportLaunchStart();
+  mock_.ShouldAutoUpdate();
+  mock_.ReportLaunchSuccess();
 
-  const auto& log = mock_->call_log();
+  const auto& log = mock_.call_log();
   ASSERT_EQ(log.size(), 3u);
   EXPECT_EQ(log[0], "ReportLaunchStart");
   EXPECT_EQ(log[1], "ShouldAutoUpdate");
@@ -97,32 +82,32 @@ TEST_F(UpdaterTest, MockUpdaterCallLogRecordsSequence) {
 }
 
 TEST_F(UpdaterTest, MockUpdaterResetClearsState) {
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchSuccess();
-  mock_->set_should_auto_update(true);
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
+  mock_.set_should_auto_update(true);
 
-  EXPECT_EQ(mock_->launch_start_count(), 1);
-  EXPECT_EQ(mock_->launch_success_count(), 1);
-  EXPECT_TRUE(mock_->ShouldAutoUpdate());
+  EXPECT_EQ(mock_.launch_start_count(), 1);
+  EXPECT_EQ(mock_.launch_success_count(), 1);
+  EXPECT_TRUE(mock_.ShouldAutoUpdate());
 
-  mock_->Reset();
+  mock_.Reset();
 
-  EXPECT_EQ(mock_->launch_start_count(), 0);
-  EXPECT_EQ(mock_->launch_success_count(), 0);
+  EXPECT_EQ(mock_.launch_start_count(), 0);
+  EXPECT_EQ(mock_.launch_success_count(), 0);
   // Check call_log before ShouldAutoUpdate() since the method adds to call_log
-  EXPECT_TRUE(mock_->call_log().empty());
-  EXPECT_FALSE(mock_->ShouldAutoUpdate());
+  EXPECT_TRUE(mock_.call_log().empty());
+  EXPECT_FALSE(mock_.ShouldAutoUpdate());
 }
 
 // ReportLaunchStart and ReportLaunchSuccess are paired once per process.
 // The Rust updater no-ops both when no patch is booting.
 TEST_F(UpdaterTest, LaunchStartAndSuccessArePairedOncePerProcess) {
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchSuccess();
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
 
-  EXPECT_EQ(mock_->launch_start_count(), 1);
-  EXPECT_EQ(mock_->launch_success_count(), 1);
-  const auto& log = mock_->call_log();
+  EXPECT_EQ(mock_.launch_start_count(), 1);
+  EXPECT_EQ(mock_.launch_success_count(), 1);
+  const auto& log = mock_.call_log();
   ASSERT_EQ(log.size(), 2u);
   EXPECT_EQ(log[0], "ReportLaunchStart");
   EXPECT_EQ(log[1], "ReportLaunchSuccess");
@@ -130,12 +115,12 @@ TEST_F(UpdaterTest, LaunchStartAndSuccessArePairedOncePerProcess) {
 
 // ReportLaunchStart and ReportLaunchFailure are paired once per process.
 TEST_F(UpdaterTest, LaunchStartAndFailureArePairedOncePerProcess) {
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchFailure();
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchFailure();
 
-  EXPECT_EQ(mock_->launch_start_count(), 1);
-  EXPECT_EQ(mock_->launch_failure_count(), 1);
-  const auto& log = mock_->call_log();
+  EXPECT_EQ(mock_.launch_start_count(), 1);
+  EXPECT_EQ(mock_.launch_failure_count(), 1);
+  const auto& log = mock_.call_log();
   ASSERT_EQ(log.size(), 2u);
   EXPECT_EQ(log[0], "ReportLaunchStart");
   EXPECT_EQ(log[1], "ReportLaunchFailure");
@@ -148,51 +133,52 @@ TEST_F(UpdaterTest, LaunchStartAndFailureArePairedOncePerProcess) {
 // original snapshot.
 TEST_F(UpdaterTest, MultipleEnginesOnlyReportOnce) {
   // First engine boots.
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchSuccess();
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
 
   // Second engine boots — these should be no-ops.
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchSuccess();
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
 
-  EXPECT_EQ(mock_->launch_start_count(), 1);
-  EXPECT_EQ(mock_->launch_success_count(), 1);
+  EXPECT_EQ(mock_.launch_start_count(), 1);
+  EXPECT_EQ(mock_.launch_success_count(), 1);
 
-  const auto& log = mock_->call_log();
+  const auto& log = mock_.call_log();
   ASSERT_EQ(log.size(), 2u);
   EXPECT_EQ(log[0], "ReportLaunchStart");
   EXPECT_EQ(log[1], "ReportLaunchSuccess");
 }
 
-// ResetLaunchStateForTesting re-enables the guards, allowing tests to
-// verify launch calls on a fresh state.
-TEST_F(UpdaterTest, ResetLaunchStateReenablesGuards) {
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchSuccess();
-  EXPECT_EQ(mock_->launch_start_count(), 1);
-  EXPECT_EQ(mock_->launch_success_count(), 1);
+// Separate Updater instances own independent launch state without needing
+// global reset helpers.
+TEST_F(UpdaterTest, SeparateInstancesHaveIndependentLaunchState) {
+  MockUpdater first;
+  MockUpdater second;
 
-  Updater::ResetLaunchStateForTesting();
+  first.ReportLaunchStart();
+  first.ReportLaunchSuccess();
+  EXPECT_EQ(first.launch_start_count(), 1);
+  EXPECT_EQ(first.launch_success_count(), 1);
 
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchSuccess();
-  EXPECT_EQ(mock_->launch_start_count(), 2);
-  EXPECT_EQ(mock_->launch_success_count(), 2);
+  second.ReportLaunchStart();
+  second.ReportLaunchSuccess();
+  EXPECT_EQ(second.launch_start_count(), 1);
+  EXPECT_EQ(second.launch_success_count(), 1);
 }
 
 // The update thread starts from the launch-success report, once the boot is
 // recorded, and only then. See the Updater class comment for why it must not
 // start earlier.
 TEST_F(UpdaterTest, LaunchSuccessStartsUpdateThreadAfterBootIsRecorded) {
-  mock_->set_should_auto_update(true);
-  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
-  Updater::Instance().ReportLaunchStart();
-  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+  mock_.set_should_auto_update(true);
+  EXPECT_TRUE(mock_.Init(AppConfig{}));
+  mock_.ReportLaunchStart();
+  EXPECT_EQ(mock_.start_update_thread_count(), 0);
 
-  Updater::Instance().ReportLaunchSuccess();
+  mock_.ReportLaunchSuccess();
 
-  EXPECT_EQ(mock_->start_update_thread_count(), 1);
-  const auto& log = mock_->call_log();
+  EXPECT_EQ(mock_.start_update_thread_count(), 1);
+  const auto& log = mock_.call_log();
   ASSERT_EQ(log.size(), 5u);
   EXPECT_EQ(log[0], "Init");
   EXPECT_EQ(log[1], "ReportLaunchStart");
@@ -202,150 +188,142 @@ TEST_F(UpdaterTest, LaunchSuccessStartsUpdateThreadAfterBootIsRecorded) {
 }
 
 TEST_F(UpdaterTest, LaunchSuccessHonorsAutoUpdateDisabled) {
-  mock_->set_should_auto_update(false);
-  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchSuccess();
+  mock_.set_should_auto_update(false);
+  EXPECT_TRUE(mock_.Init(AppConfig{}));
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
 
-  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+  EXPECT_EQ(mock_.start_update_thread_count(), 0);
 }
 
 TEST_F(UpdaterTest, LaunchSuccessDoesNotStartUpdateThreadWhenInitFailed) {
-  mock_->set_should_auto_update(true);
-  mock_->set_init_result(false);
-  EXPECT_FALSE(Updater::Instance().Init(AppConfig{}));
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchSuccess();
+  mock_.set_should_auto_update(true);
+  mock_.set_init_result(false);
+  EXPECT_FALSE(mock_.Init(AppConfig{}));
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
 
-  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+  EXPECT_EQ(mock_.start_update_thread_count(), 0);
   // An unconfigured updater is never even asked.
-  const auto& log = mock_->call_log();
+  const auto& log = mock_.call_log();
   ASSERT_EQ(log.size(), 3u);
   EXPECT_EQ(log[2], "ReportLaunchSuccess");
 }
 
 TEST_F(UpdaterTest, LaunchSuccessWithoutInitDoesNotStartUpdateThread) {
-  mock_->set_should_auto_update(true);
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchSuccess();
+  mock_.set_should_auto_update(true);
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
 
-  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+  EXPECT_EQ(mock_.start_update_thread_count(), 0);
 }
 
 // An engine that never configured must not consume the update-thread guard on
 // behalf of one that did. The `initialized_` check runs ahead of the guard, so
 // a later configured engine in the same process still starts the thread.
 TEST_F(UpdaterTest, UnconfiguredEngineDoesNotClaimUpdateThreadGuard) {
-  mock_->set_should_auto_update(true);
-  Updater::Instance().ReportLaunchSuccess();
-  ASSERT_EQ(mock_->start_update_thread_count(), 0);
+  mock_.set_should_auto_update(true);
+  mock_.ReportLaunchSuccess();
+  ASSERT_EQ(mock_.start_update_thread_count(), 0);
 
-  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
-  Updater::Instance().ReportLaunchSuccess();
+  EXPECT_TRUE(mock_.Init(AppConfig{}));
+  mock_.ReportLaunchSuccess();
 
-  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+  EXPECT_EQ(mock_.start_update_thread_count(), 1);
 }
 
 TEST_F(UpdaterTest, LaunchFailureDoesNotStartUpdateThread) {
-  mock_->set_should_auto_update(true);
-  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchFailure();
+  mock_.set_should_auto_update(true);
+  EXPECT_TRUE(mock_.Init(AppConfig{}));
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchFailure();
 
-  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+  EXPECT_EQ(mock_.start_update_thread_count(), 0);
 }
 
 // Add-to-app: every engine reports success, but the process gets one update
 // thread, not one per engine.
 TEST_F(UpdaterTest, MultipleEnginesStartOneUpdateThread) {
-  mock_->set_should_auto_update(true);
-  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchSuccess();
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchSuccess();
+  mock_.set_should_auto_update(true);
+  EXPECT_TRUE(mock_.Init(AppConfig{}));
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
 
-  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+  EXPECT_EQ(mock_.start_update_thread_count(), 1);
 }
 
 // Add-to-app calls Init once per engine. A later failure does not undo an
 // earlier success: the process is still configured.
 TEST_F(UpdaterTest, InitSuccessIsLatchedAcrossLaterFailure) {
-  mock_->set_should_auto_update(true);
-  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
-  mock_->set_init_result(false);
-  EXPECT_FALSE(Updater::Instance().Init(AppConfig{}));
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchSuccess();
+  mock_.set_should_auto_update(true);
+  EXPECT_TRUE(mock_.Init(AppConfig{}));
+  mock_.set_init_result(false);
+  EXPECT_FALSE(mock_.Init(AppConfig{}));
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
 
-  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+  EXPECT_EQ(mock_.start_update_thread_count(), 1);
 }
 
 // A patch that fails to load reports failure before any Shell exists, then
 // the base-code boot that follows reports success. That launch is the one
 // that needs a replacement patch, so it still starts the update thread.
 TEST_F(UpdaterTest, LaunchFailureThenSuccessStartsUpdateThread) {
-  mock_->set_should_auto_update(true);
-  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchFailure();
-  Updater::Instance().ReportLaunchSuccess();
+  mock_.set_should_auto_update(true);
+  EXPECT_TRUE(mock_.Init(AppConfig{}));
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchFailure();
+  mock_.ReportLaunchSuccess();
 
-  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+  EXPECT_EQ(mock_.start_update_thread_count(), 1);
   // The boot outcome is already recorded, so the success is not forwarded.
-  EXPECT_EQ(mock_->launch_failure_count(), 1);
-  EXPECT_EQ(mock_->launch_success_count(), 0);
+  EXPECT_EQ(mock_.launch_failure_count(), 1);
+  EXPECT_EQ(mock_.launch_success_count(), 0);
 }
 
 // The thread start is guarded on its own, so a failure followed by several
 // engines reporting success still yields one thread.
 TEST_F(UpdaterTest, LaunchFailureThenMultipleEnginesStartOneUpdateThread) {
-  mock_->set_should_auto_update(true);
-  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchFailure();
-  Updater::Instance().ReportLaunchSuccess();
-  Updater::Instance().ReportLaunchSuccess();
+  mock_.set_should_auto_update(true);
+  EXPECT_TRUE(mock_.Init(AppConfig{}));
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchFailure();
+  mock_.ReportLaunchSuccess();
+  mock_.ReportLaunchSuccess();
 
-  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+  EXPECT_EQ(mock_.start_update_thread_count(), 1);
 }
 
 // The guard sits ahead of ShouldAutoUpdate, so the virtual call stays one per
 // process rather than one per engine reporting success.
 TEST_F(UpdaterTest, UpdateThreadGuardPrecedesShouldAutoUpdate) {
-  mock_->set_should_auto_update(true);
-  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
-  Updater::Instance().ReportLaunchStart();
-  Updater::Instance().ReportLaunchSuccess();
-  Updater::Instance().ReportLaunchSuccess();
+  mock_.set_should_auto_update(true);
+  EXPECT_TRUE(mock_.Init(AppConfig{}));
+  mock_.ReportLaunchStart();
+  mock_.ReportLaunchSuccess();
+  mock_.ReportLaunchSuccess();
 
-  EXPECT_EQ(mock_->start_update_thread_count(), 1);
-  const auto& log = mock_->call_log();
+  EXPECT_EQ(mock_.start_update_thread_count(), 1);
+  const auto& log = mock_.call_log();
   EXPECT_EQ(std::count(log.begin(), log.end(), "ShouldAutoUpdate"), 1);
 }
 
-// ResetLaunchStateForTesting also forgets that the thread already started.
-TEST_F(UpdaterTest, ResetLaunchStateForgetsUpdateThreadGuard) {
-  mock_->set_should_auto_update(true);
-  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
-  Updater::Instance().ReportLaunchSuccess();
-  ASSERT_EQ(mock_->start_update_thread_count(), 1);
+TEST_F(UpdaterTest, ResetClearsUpdateThreadAndInitGuards) {
+  mock_.set_should_auto_update(true);
+  EXPECT_TRUE(mock_.Init(AppConfig{}));
+  mock_.ReportLaunchSuccess();
+  ASSERT_EQ(mock_.start_update_thread_count(), 1);
 
-  Updater::ResetLaunchStateForTesting();
-  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
-  Updater::Instance().ReportLaunchSuccess();
+  mock_.Reset();
+  mock_.set_should_auto_update(true);
+  mock_.ReportLaunchSuccess();
+  EXPECT_EQ(mock_.start_update_thread_count(), 0);
 
-  EXPECT_EQ(mock_->start_update_thread_count(), 2);
-}
-
-// ResetLaunchStateForTesting also forgets the Init outcome.
-TEST_F(UpdaterTest, ResetLaunchStateForgetsInit) {
-  mock_->set_should_auto_update(true);
-  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
-  Updater::ResetLaunchStateForTesting();
-  Updater::Instance().ReportLaunchSuccess();
-
-  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+  EXPECT_TRUE(mock_.Init(AppConfig{}));
+  mock_.ReportLaunchSuccess();
+  EXPECT_EQ(mock_.start_update_thread_count(), 1);
 }
 
 }  // namespace testing

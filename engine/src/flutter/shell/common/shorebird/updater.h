@@ -14,6 +14,9 @@
 #include <vector>
 
 namespace flutter {
+
+struct Settings;
+
 namespace shorebird {
 
 /// File callbacks for iOS patch loading.
@@ -89,16 +92,14 @@ struct AppConfig {
 ///   patch) and mislabels the boot breadcrumb. After `ReportLaunchSuccess`
 ///   the booted patch is the last booted patch, and installs are safe.
 ///
-/// The start carries its own once-per-process guard rather than riding on
+/// The start carries its own per-instance guard rather than riding on
 /// the success report's. A patch that fails to load reports launch failure
-/// from `TryLoadFromPatch`, before any Shell exists, and that claims the
-/// shared report guard. The base-code boot that follows still reports
-/// success, and that launch is precisely the one that needs a replacement
-/// patch. The failure report itself does not start the thread, because the
-/// boot is still in progress at that point, which the bullets above rule
-/// out.
-///
-/// Tests can call `ResetLaunchStateForTesting()` to re-enable the guards.
+/// from `DartSnapshot::IsolateSnapshotFromSettings`, before any Shell exists,
+/// and that claims the shared report guard. The base-code boot that follows
+/// still reports success, and that launch is precisely the one that needs a
+/// replacement patch. The failure report itself does not start the thread,
+/// because the boot is still in progress at that point, which the bullets above
+/// rule out.
 class Updater {
  public:
   virtual ~Updater() = default;
@@ -131,17 +132,12 @@ class Updater {
   virtual bool ShouldAutoUpdate() = 0;
   virtual void StartUpdateThread() = 0;
 
-  // Singleton access
-  static Updater& Instance();
+  /// Returns the Updater instance carried on `settings.shorebird_updater` when
+  /// set, or the process-default Updater instance otherwise.
+  static std::shared_ptr<Updater> FromSettings(const Settings& settings);
 
-  // Test support - allows injecting a mock implementation
-  static void SetInstanceForTesting(std::unique_ptr<Updater> instance);
-  static void ResetInstanceForTesting();
-
-  /// Resets the once-per-process launch guards, the update-thread guard, and
-  /// the remembered `Init` outcome so tests can verify start/success/failure
-  /// calls on fresh Updater instances.
-  static void ResetLaunchStateForTesting();
+  /// Returns the process-default Updater instance.
+  static std::shared_ptr<Updater> Default();
 
  protected:
   Updater() = default;
@@ -152,23 +148,22 @@ class Updater {
   virtual void DoReportLaunchSuccess() = 0;
   virtual void DoReportLaunchFailure() = 0;
 
+  void ResetLaunchState();
+
  private:
-  // Starts the update thread at most once per process, if the updater is
-  // configured and auto-update is on. Called from `ReportLaunchSuccess`.
+  // Starts the update thread at most once per Updater instance, if the updater
+  // is configured and auto-update is on. Called from `ReportLaunchSuccess`.
   void MaybeStartUpdateThread();
 
-  static std::unique_ptr<Updater> instance_;
-  static std::mutex instance_mutex_;
-
-  // Once-per-process guards for launch lifecycle.
-  static std::atomic<bool> launch_started_;
-  static std::atomic<bool> launch_completed_;
+  // Per-instance guards for launch lifecycle.
+  std::atomic<bool> launch_started_{false};
+  std::atomic<bool> launch_completed_{false};
   // Whether any `Init` succeeded; the update thread needs a configured
-  // updater. Latched, never cleared outside tests.
-  static std::atomic<bool> initialized_;
+  // updater. Latched for the lifetime of this Updater instance.
+  std::atomic<bool> initialized_{false};
   // Separate from the launch guards above: a reported failure must not stop
   // a later successful boot from starting the thread. See the class comment.
-  static std::atomic<bool> update_thread_started_;
+  std::atomic<bool> update_thread_started_{false};
 };
 
 /// No-op implementation for unsupported platforms.
