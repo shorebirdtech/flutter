@@ -26,6 +26,7 @@
 #include "flutter/fml/logging.h"
 #include "flutter/fml/paths.h"
 #include "flutter/runtime/dart_snapshot.h"
+#include "flutter/testing/testing.h"
 #include "gtest/gtest.h"
 
 namespace flutter {
@@ -39,11 +40,11 @@ constexpr char kFakeBaseSnapshotName[] =
 constexpr char kFakeBaseSnapshotName[] = "libshorebird_fake_base_snapshot.so";
 #endif
 
-// The library is a data_deps of this suite, so it sits beside the binary.
+// shorebird_fixtures copies the library into this suite's fixtures directory,
+// an absolute path compiled in, so it is found whichever directory the binary
+// runs from (run_tests.py runs Linux suites out of exe.unstripped/).
 std::string FakeBaseSnapshotPath() {
-  auto [ok, directory] = fml::paths::GetExecutableDirectoryPath();
-  FML_CHECK(ok) << "could not locate the test binary's directory";
-  return fml::paths::JoinPaths({directory, kFakeBaseSnapshotName});
+  return fml::paths::JoinPaths({GetFixturesPath(), kFakeBaseSnapshotName});
 }
 
 // dyld reports the canonicalized path, so /tmp/x comes back as /private/tmp/x
@@ -105,8 +106,8 @@ void ExpectResolvedFromLibrary(const DartSnapshot& snapshot,
 // failure surfaces as a confusing mismatch on the owning image instead.
 void AssertStubIsPresentAndUnmapped(const std::string& path) {
   ASSERT_TRUE(fml::IsFile(path))
-      << kFakeBaseSnapshotName << " is missing beside the test binary; build "
-      << "the shorebird_unittests target rather than the binary alone";
+      << kFakeBaseSnapshotName << " is missing from the fixtures directory; "
+      << "build the shorebird_unittests target rather than the binary alone";
   ASSERT_FALSE(IsMapped(path))
       << kFakeBaseSnapshotName << " must not be linked into this binary, or "
       << "it can never unmap";
