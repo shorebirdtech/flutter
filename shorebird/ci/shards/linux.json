@@ -144,13 +144,13 @@
     "steps": [
       {
         "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=release", "--no-prebuilt-dart-sdk"],
-        "ninja_targets": ["dart_sdk", "flutter/build/archives:flutter_patched_sdk"],
+        "gn_args": ["--runtime-mode=release"],
+        "ninja_targets": ["dart_sdk", "flutter/build/archives:flutter_patched_sdk", "flutter/tools/font_subset"],
         "out_dir": "host_release"
       },
       {
         "type": "gn_ninja",
-        "gn_args": ["--no-prebuilt-dart-sdk", "--no-lto"],
+        "gn_args": ["--no-lto"],
         "ninja_targets": ["flutter/build/archives:artifacts", "flutter/build/archives:flutter_patched_sdk"],
         "out_dir": "host_debug"
       },
@@ -165,6 +165,7 @@
     ],
     "artifacts": [
       {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-linux-x64.zip", "zip": true, "content_hash": true},
+      {"src": "host_release/zip_archives/linux-x64/font-subset.zip", "dst": "flutter_infra_release/flutter/$engine/linux-x64/font-subset.zip"},
       {"src": "host_release/zip_archives/flutter_patched_sdk_product.zip", "dst": "flutter_infra_release/flutter/$engine/flutter_patched_sdk_product.zip"},
       {"src": "host_debug/zip_archives/linux-x64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/linux-x64/artifacts.zip"},
       {"src": "host_debug/zip_archives/flutter_patched_sdk.zip", "dst": "flutter_infra_release/flutter/$engine/flutter_patched_sdk.zip"},
@@ -175,13 +176,13 @@
     "steps": [
       {
         "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=release", "--enable-fontconfig", "--no-prebuilt-dart-sdk", "--no-lto"],
+        "gn_args": ["--runtime-mode=release", "--enable-fontconfig", "--no-lto"],
         "ninja_targets": ["flutter/shell/platform/linux:flutter_gtk"],
         "out_dir": "host_release_desktop"
       },
       {
         "type": "gn_ninja",
-        "gn_args": ["--enable-fontconfig", "--no-prebuilt-dart-sdk", "--no-lto"],
+        "gn_args": ["--enable-fontconfig", "--no-lto"],
         "ninja_targets": ["flutter/shell/platform/linux:flutter_gtk"],
         "out_dir": "host_debug_desktop"
       },
@@ -191,7 +192,7 @@
       },
       {
         "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=profile", "--enable-fontconfig", "--no-prebuilt-dart-sdk", "--no-lto"],
+        "gn_args": ["--runtime-mode=profile", "--enable-fontconfig", "--no-lto"],
         "ninja_targets": ["flutter/shell/platform/linux:flutter_gtk"],
         "out_dir": "host_profile_desktop"
       }
