@@ -93,6 +93,9 @@ artifact_overrides:
   - flutter_infra_release/flutter/$engine/flutter_patched_sdk.zip
   - flutter_infra_release/flutter/$engine/flutter_patched_sdk_product.zip
 
+  # Web artifacts
+  - flutter_infra_release/flutter/$engine/flutter-web-sdk.zip
+
   # iOS profile artifacts. ios/artifacts.zip (debug) is built and staged but
   # still served from upstream: FFI callbacks on the fork's simulator are
   # unproven on iPhones that can't JIT (iOS 26). Serve it once a debug run
