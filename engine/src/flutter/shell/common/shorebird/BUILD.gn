@@ -2,6 +2,11 @@ import("//flutter/common/config.gni")
 import("//flutter/shell/common/shorebird/build_rust_updater.gni")
 import("//flutter/testing/testing.gni")
 
+if (is_linux || is_win) {
+  import("//build/config/sysroot.gni")
+  import("//build/toolchain/toolchain.gni")
+}
+
 if (is_ios || is_mac) {
   import("//build/config/darwin/darwin_sdk.gni")
 }
@@ -77,6 +82,35 @@ if (shorebird_updater_supported) {
       args += [
         "--mac-deployment-target",
         mac_deployment_target,
+      ]
+    }
+
+    if (is_linux && target_cpu != host_cpu) {
+      # A cross build (linux-arm64 on an x64 host) has no system C compiler
+      # for the target, and ring and zstd-sys compile C. Use the engine's
+      # clang and sysroot, the same ones the C++ engine builds with.
+      if (host_cpu == "arm64") {
+        _clang_dir = "$buildtools_path/linux-arm64/clang/bin"
+      } else {
+        _clang_dir = "$buildtools_path/linux-x64/clang/bin"
+      }
+      args += [
+        "--linux-clang-dir",
+        rebase_path(_clang_dir, root_build_dir),
+        "--linux-sysroot",
+        sysroot,
+      ]
+    }
+
+    if (is_win && target_cpu == "arm64") {
+      # ring compiles its C for Windows on arm64 only with clang (build.rs
+      # falls back to a bare `clang` from PATH otherwise). Name the engine's
+      # clang (the GNU driver; ring overrides clang-cl) so the build doesn't
+      # depend on what LLVM the machine has.
+      args += [
+        "--windows-clang",
+        rebase_path("$buildtools_path/windows-x64/clang/bin/clang.exe",
+                    root_build_dir),
       ]
     }
 
