@@ -190,10 +190,6 @@ source_set("shorebird") {
 }
 
 if (enable_unittests) {
-  test_fixtures("shorebird_fixtures") {
-    fixtures = []
-  }
-
   # The ownership tests need dlfcn and a library they can watch dyld or the
   # dynamic loader unload, and no_default_deps below only exists where
   # BUILDCONFIG.gn wraps shared_library, which is use_flutter_cxx. Both hold
@@ -204,7 +200,7 @@ if (enable_unittests) {
 
   if (_supports_dlopen_ownership_tests) {
     # A stand-in for App.framework. Reached only through dlopen, so it is a
-    # data_deps of the suite below rather than a dep: linking it would hold the
+    # fixture of the suite below rather than a dep: linking it would hold the
     # image in the process for the life of the test binary, which is the one
     # thing the ownership tests need it not to do.
     shared_library("shorebird_fake_base_snapshot") {
@@ -222,6 +218,27 @@ if (enable_unittests) {
     }
   }
 
+  test_fixtures("shorebird_fixtures") {
+    fixtures = []
+
+    # The ownership tests find the stand-in through GetFixturesPath(), the way
+    # every engine suite finds its test data. The linker writes it to
+    # root_out_dir, but on Linux run_tests.py runs the binary out of
+    # exe.unstripped/, so "beside the test binary" is a different directory
+    # depending on who launches the suite. The fixtures directory is an
+    # absolute path compiled into the binary, so it is the same for both.
+    if (_supports_dlopen_ownership_tests) {
+      _fake_base_snapshot = "$root_out_dir/libshorebird_fake_base_snapshot"
+      if (is_mac) {
+        _fake_base_snapshot += ".dylib"
+      } else {
+        _fake_base_snapshot += ".so"
+      }
+      fixtures += [ _fake_base_snapshot ]
+      deps = [ ":shorebird_fake_base_snapshot" ]
+    }
+  }
+
   executable("shorebird_unittests") {
     testonly = true
 
@@ -235,7 +252,6 @@ if (enable_unittests) {
 
     if (_supports_dlopen_ownership_tests) {
       sources += [ "base_snapshot_ownership_unittests.cc" ]
-      data_deps = [ ":shorebird_fake_base_snapshot" ]
     }
 
     deps = [
