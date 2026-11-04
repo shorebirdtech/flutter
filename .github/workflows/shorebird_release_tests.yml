@@ -23,8 +23,10 @@ on:
     paths:
       - .github/workflows/shorebird_release_tests.yml
 
+# A PR's newer push supersedes its older run; a dispatched run (the release
+# gate's) is never cancelled by another dispatch on the same branch.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
 
 permissions:
@@ -96,7 +98,6 @@ jobs:
 
       - name: 🐦 Flutter (Dart SDK and engine artifacts for engine.version)
         run: |
-          bin/flutter config --no-analytics
           bin/flutter --version
           echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
 
