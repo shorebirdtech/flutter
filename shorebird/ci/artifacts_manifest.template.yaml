@@ -132,10 +132,15 @@ artifact_overrides:
   - flutter_infra_release/flutter/$engine/darwin-x64-release/artifacts.zip
   - flutter_infra_release/flutter/$engine/darwin-x64-release/framework.zip
   - flutter_infra_release/flutter/$engine/darwin-x64-release/gen_snapshot.zip
-  # const_finder.dart.snapshot is a kernel the arm64 host dart-sdk (a strict,
-  # sdk-hash-verifying prebuilt) loads during icon tree shaking, so it must be
-  # built against that same Dart, not proxied from upstream.
+
+  # font-subset.zip carries const_finder.dart.snapshot, a kernel the host
+  # dart-sdk (a strict, sdk-hash-verifying prebuilt) loads during icon tree
+  # shaking, so it must be built against that same Dart, not proxied from
+  # upstream.
   - flutter_infra_release/flutter/$engine/darwin-arm64/font-subset.zip
+  - flutter_infra_release/flutter/$engine/darwin-x64/font-subset.zip
+  - flutter_infra_release/flutter/$engine/linux-x64/font-subset.zip
+  - flutter_infra_release/flutter/$engine/windows-x64/font-subset.zip
 
   # Windows debug and profile artifacts
   - flutter_infra_release/flutter/$engine/windows-x64/flutter-cpp-client-wrapper.zip

@@ -145,7 +145,7 @@
       {
         "type": "gn_ninja",
         "gn_args": ["--runtime-mode=release"],
-        "ninja_targets": ["dart_sdk", "flutter/build/archives:flutter_patched_sdk"],
+        "ninja_targets": ["dart_sdk", "flutter/build/archives:flutter_patched_sdk", "flutter/tools/font_subset"],
         "out_dir": "host_release"
       },
       {
@@ -165,6 +165,7 @@
     ],
     "artifacts": [
       {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-linux-x64.zip", "zip": true, "content_hash": true},
+      {"src": "host_release/zip_archives/linux-x64/font-subset.zip", "dst": "flutter_infra_release/flutter/$engine/linux-x64/font-subset.zip"},
       {"src": "host_release/zip_archives/flutter_patched_sdk_product.zip", "dst": "flutter_infra_release/flutter/$engine/flutter_patched_sdk_product.zip"},
       {"src": "host_debug/zip_archives/linux-x64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/linux-x64/artifacts.zip"},
       {"src": "host_debug/zip_archives/flutter_patched_sdk.zip", "dst": "flutter_infra_release/flutter/$engine/flutter_patched_sdk.zip"},

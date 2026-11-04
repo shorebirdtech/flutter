@@ -64,12 +64,13 @@
       {
         "type": "gn_ninja",
         "gn_args": ["--runtime-mode=release"],
-        "ninja_targets": ["dart_sdk", "flutter/build/archives:windows_flutter", "gen_snapshot", "windows", "flutter/build/archives:artifacts"],
+        "ninja_targets": ["dart_sdk", "flutter/build/archives:windows_flutter", "gen_snapshot", "windows", "flutter/build/archives:artifacts", "flutter/tools/font_subset"],
         "out_dir": "host_release"
       }
     ],
     "artifacts": [
       {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-windows-x64.zip", "zip": true, "content_hash": true},
+      {"src": "host_release/zip_archives/windows-x64/font-subset.zip", "dst": "flutter_infra_release/flutter/$engine/windows-x64/font-subset.zip"},
       {"src": "host_release/zip_archives/windows-x64-release/windows-x64-flutter.zip", "dst": "flutter_infra_release/flutter/$engine/windows-x64-release/windows-x64-flutter.zip"}
     ]
   },
