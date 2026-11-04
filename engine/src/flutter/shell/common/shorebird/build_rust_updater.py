@@ -38,6 +38,13 @@ def main():
       '--mac-deployment-target',
       help='macOS deployment target (e.g. 10.15); required for *-apple-darwin targets',
   )
+  parser.add_argument(
+      '--linux-clang-dir',
+      help='Directory holding the engine\'s clang; given for a cross build to a Linux target',
+  )
+  parser.add_argument(
+      '--linux-sysroot', help='Sysroot of the Linux target; given with --linux-clang-dir'
+  )
   args = parser.parse_args()
 
   env = os.environ.copy()
@@ -77,6 +84,9 @@ def main():
       )
       return 1
     env['MACOSX_DEPLOYMENT_TARGET'] = args.mac_deployment_target
+
+  if args.linux_clang_dir:
+    _configure_linux_cross_env(env, args.rust_target, args.linux_clang_dir, args.linux_sysroot)
 
   # GN passes paths relative to the build output dir (which is cwd when
   # Ninja runs the action). Resolve them to absolute paths so they work
@@ -161,6 +171,27 @@ def _configure_android_env(env, rust_target, ndk_path, api_level):
   env[f'CARGO_TARGET_{triple_env}_LINKER'] = clang
   env['CC'] = clang
   env['AR'] = ar
+
+
+def _configure_linux_cross_env(env, rust_target, clang_dir, sysroot):
+  """Point the cc crate at the engine's clang for a cross build to Linux.
+
+  Cargo builds a staticlib without linking, so only the C dependencies
+  (compiled by the cc crate in build scripts) need a target compiler. The
+  cc crate reads CC_<target>, AR_<target> and CFLAGS_<target>, which leave
+  build scripts themselves, compiled for the host, on the host compiler.
+  """
+  clang_dir = os.path.abspath(clang_dir)
+  # aarch64-unknown-linux-gnu -> aarch64-linux-gnu, clang's spelling.
+  arch, _, rest = rust_target.partition('-unknown-')
+  clang_target = f'{arch}-{rest}'
+  flags = [f'--target={clang_target}']
+  if sysroot:
+    flags.append(f'--sysroot={os.path.abspath(sysroot)}')
+  triple = rust_target.replace('-', '_')
+  env[f'CC_{triple}'] = os.path.join(clang_dir, 'clang')
+  env[f'AR_{triple}'] = os.path.join(clang_dir, 'llvm-ar')
+  env[f'CFLAGS_{triple}'] = ' '.join(flags)
 
 
 if __name__ == '__main__':
