@@ -115,8 +115,7 @@ public class ShorebirdHttpClientTest {
         // Chunked: a chunked body ends cleanly when the client's deadline
         // closes it, so this fails if the client doesn't report that as a
         // timeout. A body that runs until close makes the read throw instead.
-        String head =
-            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
+        String head = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
         out.write(head.getBytes(StandardCharsets.UTF_8));
         byte[] chunk = new byte[15];
         System.arraycopy("a\r\n".getBytes(StandardCharsets.UTF_8), 0, chunk, 0, 3);
