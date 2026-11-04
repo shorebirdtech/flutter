@@ -221,7 +221,13 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   // there is no booting without it.
   SetBaseSnapshot(ResolveBaseVMSnapshot(base_settings));
 #else
-  vm_snapshot = DartSnapshot::VMSnapshotFromSettings(base_settings);
+  // Resolved once per process. The base image doesn't change, and the first
+  // engine's update thread reads vm_snapshot (FileCallbacksImpl::Open) while a
+  // second engine (desktop multi-window) configures, so replacing it here
+  // would race that read.
+  if (!vm_snapshot) {
+    vm_snapshot = DartSnapshot::VMSnapshotFromSettings(base_settings);
+  }
   if (!vm_snapshot) {
     FML_LOG(ERROR) << "Shorebird updater: failed to resolve the base snapshot";
   }
