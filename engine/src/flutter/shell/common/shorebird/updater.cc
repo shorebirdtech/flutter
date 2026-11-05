@@ -55,6 +55,10 @@ bool Updater::Init(const AppConfig& config) {
   return result;
 }
 
+bool Updater::IsInitialized() const {
+  return initialized_.load();
+}
+
 AppConfig Updater::GetAppConfig() const {
   std::lock_guard<std::mutex> lock(app_config_mutex_);
   return app_config_;
@@ -293,6 +297,10 @@ bool RealUpdater::ShouldAutoUpdate() {
 void RealUpdater::StartUpdateThread() {
   shorebird_start_update_thread();
 }
+
+void RealUpdater::ProtectedDataAvailable() {
+  shorebird_protected_data_available();
+}
 #endif  // SHOREBIRD_PLATFORM_SUPPORTED
 
 // MockUpdater implementation - for testing
@@ -301,6 +309,7 @@ bool MockUpdater::DoInit(const AppConfig& config) {
   init_count_++;
   last_release_version_ = config.release_version;
   last_yaml_config_ = config.yaml_config;
+  last_config_ = config;
   call_log_.push_back("Init");
   return init_result_;
 }
@@ -359,6 +368,7 @@ void MockUpdater::Reset() {
   next_boot_patch_path_.clear();
   last_release_version_.clear();
   last_yaml_config_.clear();
+  last_config_ = AppConfig();
   call_log_.clear();
 }
 

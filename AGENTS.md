@@ -36,6 +36,20 @@ on a future upstream merge.
   runs or what it outputs). Follow precedents such as `shorebirdTraceFile` in
   `BaseFlutterTask`. Call out the future-conflict cost in the PR description.
 
+## Test engine changes on the shards they touch
+
+Don't run a full engine build to test a change unless the change touches every
+shard; a full build costs about 5,000 vCPU-min. Name the shards the change
+touches, with `<platform>/<shard>` names from `shorebird/ci/shards/*.json`:
+
+```bash
+gh workflow run --repo shorebirdtech/_build_engine build_engine.yaml \
+  -f engine_revision=<sha> -f shards=macos/ios,linux/host
+```
+
+A build with `shards` publishes nothing. See "Test a change on the shards it
+touches" in `_build_engine`'s `AGENTS.md`.
+
 ## There are two `shorebird.yaml` files
 
 - **Source** (in the app's repo, listed as an asset): `app_id`, an optional

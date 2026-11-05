@@ -1226,8 +1226,8 @@ No file or variants found for asset: images/a_dot_burr.jpeg.
   testUsingContext(
     'shorebird.yaml is updated when SHOREBIRD_PUBLIC_KEY env var is set',
     () async {
-      final FakeVisualStudio fakeVisualStudio = FakeVisualStudio();
-      final BuildWindowsCommand command = BuildWindowsCommand(
+      final fakeVisualStudio = FakeVisualStudio();
+      final command = BuildWindowsCommand(
         logger: BufferLogger.test(),
         operatingSystemUtils: FakeOperatingSystemUtils(),
       )..visualStudioOverride = fakeVisualStudio;

@@ -118,6 +118,11 @@ class Updater {
   /// @return true if initialization succeeded
   bool Init(const AppConfig& config);
 
+  /// Whether any `Init` on this Updater has succeeded. A later `Init` (one
+  /// per engine) fails with AlreadyInitialized while the updater is still
+  /// configured, so callers ask this rather than trusting that result alone.
+  bool IsInitialized() const;
+
   /// A copy of the configuration passed to the most recent `Init` call. Hot
   /// restart uses `original_libapp_paths` to fall back to the base release
   /// when the running patch has been rolled back. Returned by value rather
@@ -216,6 +221,13 @@ class Updater {
   virtual bool ShouldAutoUpdate() = 0;
   virtual void StartUpdateThread() = 0;
 
+  /// Tells the updater the app's protected files are readable (iOS posted
+  /// UIApplicationProtectedDataDidBecomeAvailable, or the app entered the
+  /// foreground). If it couldn't read its state earlier in this process, as
+  /// on a launch before the device's first unlock, it reports that now.
+  /// Cheap when there is nothing to report.
+  virtual void ProtectedDataAvailable() {}
+
   /// Returns the Updater instance carried on `settings.shorebird_updater` when
   /// set, or the process-default Updater instance otherwise.
   static std::shared_ptr<Updater> FromSettings(const Settings& settings);
@@ -306,6 +318,7 @@ class RealUpdater : public Updater {
   void DoReportRestartFailure() override;
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
+  void ProtectedDataAvailable() override;
 };
 #endif  // SHOREBIRD_PLATFORM_SUPPORTED
 
@@ -341,6 +354,7 @@ class MockUpdater : public Updater {
     return last_release_version_;
   }
   const std::string& last_yaml_config() const { return last_yaml_config_; }
+  const AppConfig& last_config() const { return last_config_; }
 
   // Test configuration
   void set_init_result(bool value) { init_result_ = value; }
@@ -365,6 +379,7 @@ class MockUpdater : public Updater {
   std::string next_boot_patch_path_;
   std::string last_release_version_;
   std::string last_yaml_config_;
+  AppConfig last_config_;
   std::vector<std::string> call_log_;
 };
 
