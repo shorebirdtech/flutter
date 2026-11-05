@@ -15,6 +15,7 @@
 #include "flutter/fml/build_config.h"
 #include "flutter/fml/paths.h"
 #include "flutter/shell/common/shorebird/shorebird.h"
+#include "flutter/shell/common/shorebird/updater.h"
 #include "flutter/shell/common/switches.h"
 #import "flutter/shell/platform/darwin/common/InternalFlutterSwiftCommon/InternalFlutterSwiftCommon.h"
 #include "flutter/shell/platform/darwin/common/command_line.h"
@@ -48,6 +49,33 @@ NSNumber* _Nullable FLTEnableWideGamutFromBundle(NSBundle* _Nullable bundle,
     nsEnableWideGamut = [mainBundle objectForInfoDictionaryKey:@"FLTEnableWideGamut"];
   }
   return nsEnableWideGamut;
+}
+
+// A launch before the device's first unlock (a push, a background fetch)
+// can't read the updater's files, which iOS protects until then, so it runs
+// the base release and can't report why. Tell the updater once the files
+// unlock so it can report it from this process. Entering the foreground also
+// counts: it needs an unlocked device, and a process suspended at the unlock
+// may not see the notification. Observed once per process; the updater does
+// disk I/O, so it runs off the main thread.
+static void ObserveShorebirdProtectedData() {
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    void (^notify)(NSNotification*) = ^(NSNotification* note) {
+      dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        shorebird::Updater::Instance().ProtectedDataAvailable();
+      });
+    };
+    NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
+    [center addObserverForName:UIApplicationProtectedDataDidBecomeAvailable
+                        object:nil
+                         queue:nil
+                    usingBlock:notify];
+    [center addObserverForName:UIApplicationWillEnterForegroundNotification
+                        object:nil
+                         queue:nil
+                    usingBlock:notify];
+  });
 }
 
 flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* processInfoOrNil) {
@@ -194,6 +222,7 @@ flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* p
     std::string patch_path;
     flutter::ConfigureShorebird(shorebird_args, patch_path);
     flutter::ApplyPatchToSettings(patch_path, settings);
+    ObserveShorebirdProtectedData();
   } else {
     NSLog(@"Failed to find shorebird.yaml, not starting updater.");
   }

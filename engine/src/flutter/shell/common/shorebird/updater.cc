@@ -199,6 +199,10 @@ bool RealUpdater::ShouldAutoUpdate() {
 void RealUpdater::StartUpdateThread() {
   shorebird_start_update_thread();
 }
+
+void RealUpdater::ProtectedDataAvailable() {
+  shorebird_protected_data_available();
+}
 #endif  // SHOREBIRD_PLATFORM_SUPPORTED
 
 // MockUpdater implementation - for testing
