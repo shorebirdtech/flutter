@@ -6,8 +6,11 @@ These hooks are described in detail in git's
 
 `git` looks for an executables by name in the directory specified by
 the `core.hooksPath` `git config` setting. The script `setup.py` here points
-`core.hooksPath` at this directory. It runs during a `gclient sync` or a
-`gclient runhooks`.
+`core.hooksPath` at this directory, as a path relative to the repository root
+so that each `git worktree` runs its own copy of the hooks. It runs during a
+`gclient sync` or a `gclient runhooks`. In a worktree that hasn't been synced
+the hooks have no Dart SDK to run with, so they do nothing and `pre-push` says
+it skipped its checks.
 
 The hooks here are implemented in Dart by the program with
 entrypoint `bin/main.dart` in this directory. The commands of the program
