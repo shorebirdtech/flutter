@@ -112,6 +112,11 @@ class Updater {
   /// @return true if initialization succeeded
   bool Init(const AppConfig& config);
 
+  /// Whether any `Init` in this process has succeeded. A later `Init` (one
+  /// per engine) fails with AlreadyInitialized while the updater is still
+  /// configured, so callers ask this rather than trusting that result alone.
+  static bool IsInitialized();
+
   /// Validate the next boot patch. If invalid, falls back to last good state.
   virtual void ValidateNextBootPatch() = 0;
 
