@@ -38,11 +38,8 @@ TEST_F(DartState, CurrentWithNullDataDoesNotSegfault) {
   char* error;
   Dart_CreateIsolateGroup(
       "main.dart", "main", vm_data->GetIsolateSnapshot()->GetDataMapping(),
-      vm_data->GetIsolateSnapshot()->GetInstructionsMapping(),
-      /*base_snapshot_data=*/nullptr,
-      /*base_snapshot_instructions=*/nullptr,
-      /*link_header=*/nullptr,
-      /*link_header_size=*/0, &isolate_flags, nullptr, nullptr, &error);
+      vm_data->GetIsolateSnapshot()->GetInstructionsMapping(), &isolate_flags,
+      nullptr, nullptr, &error);
   ASSERT_FALSE(error) << error;
   ::free(error);
 
