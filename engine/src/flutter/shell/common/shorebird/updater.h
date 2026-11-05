@@ -136,6 +136,13 @@ class Updater {
   virtual bool ShouldAutoUpdate() = 0;
   virtual void StartUpdateThread() = 0;
 
+  /// Tells the updater the app's protected files are readable (iOS posted
+  /// UIApplicationProtectedDataDidBecomeAvailable, or the app entered the
+  /// foreground). If it couldn't read its state earlier in this process, as
+  /// on a launch before the device's first unlock, it reports that now.
+  /// Cheap when there is nothing to report.
+  virtual void ProtectedDataAvailable() {}
+
   // Singleton access
   static Updater& Instance();
 
@@ -209,6 +216,7 @@ class RealUpdater : public Updater {
   void DoReportLaunchFailure() override;
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
+  void ProtectedDataAvailable() override;
 };
 #endif  // SHOREBIRD_PLATFORM_SUPPORTED
 
