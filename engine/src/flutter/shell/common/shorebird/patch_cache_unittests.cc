@@ -198,7 +198,7 @@ std::vector<uint8_t> BuildMinimalVmcodeBytes(bool with_link_header) {
 #if defined(__aarch64__)
   ehdr.machine = 183;  // EM_AARCH64
 #elif defined(__x86_64__)
-  ehdr.machine = 62;   // EM_X86_64
+  ehdr.machine = 62;  // EM_X86_64
 #endif
   ehdr.version = 1;
   ehdr.program_table_offset = kPhdrOffset;
@@ -219,11 +219,7 @@ std::vector<uint8_t> BuildMinimalVmcodeBytes(bool with_link_header) {
   // Shorebird .link header format: int32_t sim_to_cpu_count followed by
   // `sim_to_cpu_count` pairs of (int32_t sim_offset, int32_t cpu_offset).
   const int32_t kHeader[] = {
-      2,
-      16,
-      32,
-      48,
-      64,
+      2, 16, 32, 48, 64,
   };
   std::memcpy(vmcode.data(), kHeader, sizeof(kHeader));
   std::memcpy(vmcode.data() + kPageSize, elf.data(), elf.size());
@@ -339,9 +335,9 @@ TEST_F(LoadedPatchTest, UnloadsWhenLastPatchMappingAndSnapshotDrop) {
   std::vector<uint8_t> instr_bytes = {'I', 'N', 'S', 'T', 'R'};
   std::vector<uint8_t> link_bytes = {1, 0, 0, 0, 16, 0, 0, 0, 32, 0, 0, 0};
 
-  auto patch = LoadedPatch::CreateForTesting(
-      MakeBytesMapping(data_bytes), MakeBytesMapping(instr_bytes),
-      MakeBytesMapping(link_bytes));
+  auto patch = LoadedPatch::CreateForTesting(MakeBytesMapping(data_bytes),
+                                             MakeBytesMapping(instr_bytes),
+                                             MakeBytesMapping(link_bytes));
   ASSERT_NE(patch, nullptr);
   EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 1u);
   EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 0u);

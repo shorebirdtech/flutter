@@ -128,11 +128,11 @@ static std::shared_ptr<const fml::Mapping> ResolveVMData(
   );
 #else   // DART_SNAPSHOT_STATIC_LINK
   return SearchMapping(
-      settings.vm_snapshot_data,             // embedder_mapping_callback
-      settings.vm_snapshot_data_path,        // file_path
-      BaseApplicationLibraryPaths(settings), // native_library_paths
-      DartSnapshot::kVMDataSymbol,           // native_library_symbol_name
-      false                                  // is_executable
+      settings.vm_snapshot_data,              // embedder_mapping_callback
+      settings.vm_snapshot_data_path,         // file_path
+      BaseApplicationLibraryPaths(settings),  // native_library_paths
+      DartSnapshot::kVMDataSymbol,            // native_library_symbol_name
+      false                                   // is_executable
   );
 #endif  // DART_SNAPSHOT_STATIC_LINK
 }
@@ -147,11 +147,11 @@ static std::shared_ptr<const fml::Mapping> ResolveVMInstructions(
   );
 #else   // DART_SNAPSHOT_STATIC_LINK
   return SearchMapping(
-      settings.vm_snapshot_instr,            // embedder_mapping_callback
-      settings.vm_snapshot_instr_path,       // file_path
-      BaseApplicationLibraryPaths(settings), // native_library_paths
-      DartSnapshot::kVMInstructionsSymbol,   // native_library_symbol_name
-      true                                   // is_executable
+      settings.vm_snapshot_instr,             // embedder_mapping_callback
+      settings.vm_snapshot_instr_path,        // file_path
+      BaseApplicationLibraryPaths(settings),  // native_library_paths
+      DartSnapshot::kVMInstructionsSymbol,    // native_library_symbol_name
+      true                                    // is_executable
   );
 #endif  // DART_SNAPSHOT_STATIC_LINK
 }
@@ -166,11 +166,11 @@ static std::shared_ptr<const fml::Mapping> ResolveBaseIsolateData(
   );
 #else   // DART_SNAPSHOT_STATIC_LINK
   return SearchMapping(
-      settings.isolate_snapshot_data,        // embedder_mapping_callback
-      settings.isolate_snapshot_data_path,   // file_path
-      BaseApplicationLibraryPaths(settings), // native_library_paths
-      DartSnapshot::kIsolateDataSymbol,      // native_library_symbol_name
-      false                                  // is_executable
+      settings.isolate_snapshot_data,         // embedder_mapping_callback
+      settings.isolate_snapshot_data_path,    // file_path
+      BaseApplicationLibraryPaths(settings),  // native_library_paths
+      DartSnapshot::kIsolateDataSymbol,       // native_library_symbol_name
+      false                                   // is_executable
   );
 #endif  // DART_SNAPSHOT_STATIC_LINK
 }
@@ -202,7 +202,7 @@ static std::shared_ptr<const fml::Mapping> ResolveIsolateData(
                                                 nullptr,  // release_func
                                                 true      // dontneed_safe
   );
-#else  // DART_SNAPSHOT_STATIC_LINK
+#else   // DART_SNAPSHOT_STATIC_LINK
   return SearchMapping(
       settings.isolate_snapshot_data,       // embedder_mapping_callback
       settings.isolate_snapshot_data_path,  // file_path
@@ -221,7 +221,7 @@ static std::shared_ptr<const fml::Mapping> ResolveIsolateInstructions(
                                                 nullptr,  // release_func
                                                 true      // dontneed_safe
   );
-#else  // DART_SNAPSHOT_STATIC_LINK
+#else   // DART_SNAPSHOT_STATIC_LINK
   return SearchMapping(
       settings.isolate_snapshot_instr,           // embedder_mapping_callback
       settings.isolate_snapshot_instr_path,      // file_path
@@ -265,12 +265,12 @@ fml::RefPtr<DartSnapshot> DartSnapshot::IsolateSnapshotFromLoadedPatch(
   if (!patch) {
     return nullptr;
   }
-  auto snapshot = fml::MakeRefCounted<DartSnapshot>(
-      patch->CreateDataMapping(),          //
-      patch->CreateInstructionsMapping(),  //
-      std::move(base_snapshot),            //
-      patch->link_header()                 //
-  );
+  auto snapshot =
+      fml::MakeRefCounted<DartSnapshot>(patch->CreateDataMapping(),          //
+                                        patch->CreateInstructionsMapping(),  //
+                                        std::move(base_snapshot),            //
+                                        patch->link_header()                 //
+      );
   if (snapshot->IsValid()) {
     return snapshot;
   }

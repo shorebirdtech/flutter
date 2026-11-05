@@ -7,8 +7,8 @@
 #include <atomic>
 #include <utility>
 
-#include "flutter/fml/logging.h"
 #include <third_party/dart/runtime/bin/elf_loader.h>  // nogncheck
+#include "flutter/fml/logging.h"
 #include "third_party/dart/runtime/include/dart_api.h"
 #include "third_party/dart/runtime/include/dart_native_api.h"
 

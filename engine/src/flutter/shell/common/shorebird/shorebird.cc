@@ -234,8 +234,8 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   // boot. Fail only when no Init in this process has succeeded.
   // https://github.com/shorebirdtech/shorebird/issues/3888
   auto& active_updater = updater ? *updater : *shorebird::Updater::Default();
-  bool init_result = active_updater.Init(config) ||
-                     active_updater.IsInitialized();
+  bool init_result =
+      active_updater.Init(config) || active_updater.IsInitialized();
 
   FML_LOG(INFO) << "Checking for active patch";
   active_updater.ValidateNextBootPatch();
