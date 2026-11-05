@@ -261,6 +261,7 @@ TEST_F(UpdaterTest, InitSuccessIsLatchedAcrossLaterFailure) {
   EXPECT_TRUE(mock_.Init(AppConfig{}));
   mock_.set_init_result(false);
   EXPECT_FALSE(mock_.Init(AppConfig{}));
+  EXPECT_TRUE(mock_.IsInitialized());
   mock_.ReportLaunchStart();
   mock_.ReportLaunchSuccess();
 
@@ -317,6 +318,7 @@ TEST_F(UpdaterTest, ResetClearsUpdateThreadAndInitGuards) {
   ASSERT_EQ(mock_.start_update_thread_count(), 1);
 
   mock_.Reset();
+  EXPECT_FALSE(mock_.IsInitialized());
   mock_.set_should_auto_update(true);
   mock_.ReportLaunchSuccess();
   EXPECT_EQ(mock_.start_update_thread_count(), 0);

@@ -548,7 +548,7 @@ abstract final class LinkSupplement {
     }
 
     void maybeCopy(String name) {
-      final path = environment.fileSystem.path.join(inputBuildDir, name);
+      final String path = environment.fileSystem.path.join(inputBuildDir, name);
       final File file = environment.fileSystem.file(path);
       if (file.existsSync()) {
         file.copySync(environment.fileSystem.path.join(shorebirdDir.path, name));

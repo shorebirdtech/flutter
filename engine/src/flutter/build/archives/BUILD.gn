@@ -61,12 +61,6 @@ if (build_engine_artifacts) {
     deps = [
       "$dart_src/runtime/bin:analyze_snapshot",
       "$dart_src/runtime/bin:gen_snapshot",
-      "//flutter/flutter_frontend_server:frontend_server",
-      "//flutter/impeller/compiler:impellerc",
-      "//flutter/impeller/tessellator:tessellator_shared",
-      "//flutter/lib/snapshot:generate_snapshot_bin",
-      "//flutter/shell/testing",
-      "//flutter/tools/path_ops",
     ]
     if (is_mac) {
       # TODO(godofredoc): Remove after paths are standardized flutter/flutter#105351.
@@ -103,6 +97,14 @@ if (build_engine_artifacts) {
     # Host tooling/libraries that are used only in debug builds, or which are
     # identical across all runtime modes.
     if (flutter_runtime_mode == "debug") {
+      deps += [
+        "//flutter/flutter_frontend_server:frontend_server",
+        "//flutter/impeller/compiler:impellerc",
+        "//flutter/impeller/tessellator:tessellator_shared",
+        "//flutter/lib/snapshot:generate_snapshot_bin",
+        "//flutter/shell/testing",
+        "//flutter/tools/path_ops",
+      ]
       dll = ".so"
       lib_prefix = "lib"
       if (host_os == "win") {
@@ -393,24 +395,13 @@ if (is_mac) {
 }
 
 if (host_os == "win") {
-  # This rule archives both gen_snapshot *and* analyze_snapshot. The name is
-  # misleading. We (shorebird) have updated this rule to include
-  # analyze_snapshot but did not update the name because it is referenced
-  # elsewhere in the tooling.
   zip_bundle("archive_win_gen_snapshot") {
-    deps = [
-      "//flutter:analyze_snapshot",
-      "//flutter:gen_snapshot",
-    ]
+    deps = [ "//flutter:gen_snapshot" ]
     output = "$full_target_platform_name-$flutter_runtime_mode/windows-x64.zip"
     files = [
       {
         source = "$root_out_dir/gen_snapshot/gen_snapshot.exe"
         destination = "gen_snapshot.exe"
-      },
-      {
-        source = "$root_out_dir/analyze_snapshot/analyze_snapshot.exe"
-        destination = "analyze_snapshot.exe"
       },
     ]
   }
