@@ -275,6 +275,7 @@ TEST_F(UpdaterTest, InitSuccessIsLatchedAcrossLaterFailure) {
   EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
   mock_->set_init_result(false);
   EXPECT_FALSE(Updater::Instance().Init(AppConfig{}));
+  EXPECT_TRUE(Updater::IsInitialized());
   Updater::Instance().ReportLaunchStart();
   Updater::Instance().ReportLaunchSuccess();
 
@@ -343,6 +344,7 @@ TEST_F(UpdaterTest, ResetLaunchStateForgetsInit) {
   mock_->set_should_auto_update(true);
   EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
   Updater::ResetLaunchStateForTesting();
+  EXPECT_FALSE(Updater::IsInitialized());
   Updater::Instance().ReportLaunchSuccess();
 
   EXPECT_EQ(mock_->start_update_thread_count(), 0);

@@ -196,5 +196,28 @@ TEST(ApplyPatchToSettings, ReplacesTheLibraryWithThePatch) {
             std::vector<std::string>({"patch.vmcode"}));
 }
 
+// Desktop multi-window: a second engine in the same process gets
+// AlreadyInitialized from the updater. It still boots the patch.
+// https://github.com/shorebirdtech/shorebird/issues/3888
+TEST_F(ConfigureShorebirdTest, SecondEngineStillBootsThePatch) {
+  mock_->set_next_boot_patch_path("patch.vmcode");
+  std::string first_path;
+  ASSERT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), first_path));
+
+  mock_->set_init_result(false);
+  std::string second_path;
+  EXPECT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), second_path));
+  EXPECT_EQ(second_path, "patch.vmcode");
+}
+
+TEST_F(ConfigureShorebirdTest, FailsWhenNoInitSucceeded) {
+  mock_->set_init_result(false);
+  std::string patch_path;
+  EXPECT_FALSE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
+}
+
 }  // namespace testing
 }  // namespace flutter
