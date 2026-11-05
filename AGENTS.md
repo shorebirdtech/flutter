@@ -43,8 +43,11 @@ on a future upstream merge.
   `auto_update`, `patch_verification`.
 - **Compiled** (bundled into the app, what the engine and updater read): a flat
   `app_id` for the active flavor, `base_url`/`auto_update`/`patch_verification`
-  copied through when set, `patch_public_key` from the `SHOREBIRD_PUBLIC_KEY`
-  environment variable when set, and no `flavors:` map. It is written over the
+  copied through when set, `patch_public_key` when set (read from the
+  `SHOREBIRD_PUBLIC_KEY` environment variable by `flutter build`, which passes
+  it to `flutter assemble` as the `ShorebirdPublicKey` define and records it
+  in the generated Xcode and CMake configs; `flutter assemble` itself
+  ignores the variable), and no `flavors:` map. It is written over the
   copied asset under the same name, `shorebird.yaml`.
 
 The engine and the Rust updater have no concept of flavors; flavor resolution

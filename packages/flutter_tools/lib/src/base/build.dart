@@ -8,10 +8,8 @@ import '../artifacts.dart';
 import '../build_info.dart';
 import '../darwin/darwin.dart';
 import '../macos/xcode.dart';
-import '../shorebird/shorebird_dd.dart';
 import 'file_system.dart';
 import 'logger.dart';
-import 'platform.dart';
 import 'process.dart';
 
 /// A snapshot build configuration.
@@ -165,12 +163,9 @@ class AOTSnapshotter {
     required Xcode xcode,
     required ProcessManager processManager,
     required Artifacts artifacts,
-    // Shorebird: the environment SHOREBIRD_DD_MAX_BYTES is read from.
-    Platform platform = const LocalPlatform(),
   }) : _logger = logger,
        _fileSystem = fileSystem,
        _xcode = xcode,
-       _platform = platform,
        _processUtils = ProcessUtils(logger: logger, processManager: processManager),
        _genSnapshot = GenSnapshot(
          artifacts: artifacts,
@@ -182,7 +177,6 @@ class AOTSnapshotter {
   final Logger _logger;
   final FileSystem _fileSystem;
   final Xcode _xcode;
-  final Platform _platform;
   final ProcessUtils _processUtils;
   final GenSnapshot _genSnapshot;
 
@@ -198,6 +192,9 @@ class AOTSnapshotter {
     String? splitDebugInfo,
     required bool dartObfuscation,
     bool quiet = false,
+    // Shorebird: the cap on the DD table, from kShorebirdDdMaxBytes. 0 means
+    // no DD pass.
+    int ddMaxBytes = 0,
   }) async {
     assert(platform != TargetPlatform.ios || darwinArch != null);
 
@@ -238,6 +235,13 @@ class AOTSnapshotter {
     final bool extractAppleDebugSymbols =
         buildMode == BuildMode.profile || buildMode == BuildMode.release;
     _logger.printTrace('extractAppleDebugSymbols = $extractAppleDebugSymbols');
+
+    final bool targetingAndroidPlatform =
+        platform == TargetPlatform.android ||
+        platform == TargetPlatform.android_arm ||
+        platform == TargetPlatform.android_arm64 ||
+        platform == TargetPlatform.android_x64;
+    _logger.printTrace('targetingAndroidPlatform = $targetingAndroidPlatform');
 
     final bool shouldSplitDebugInfo = splitDebugInfo?.isNotEmpty ?? false;
 
@@ -281,6 +285,9 @@ class AOTSnapshotter {
       if (stripAfterBuild) {
         _logger.printTrace('Will strip AOT snapshot manually after build and dSYM generation.');
       }
+    } else if (targetingAndroidPlatform) {
+      stripAfterBuild = false;
+      // When building for Android, we let AGP handle stripping of debug symbols.
     } else {
       stripAfterBuild = false;
       if (shouldStrip) {
@@ -325,7 +332,6 @@ class AOTSnapshotter {
 
     final snapshotType = SnapshotType(platform, buildMode);
 
-    final int ddMaxBytes = _readDdMaxBytes();
     // DD pass requires:
     //   1. an analyze_snapshot binary whose --sdk_version matches gen_snapshot's
     //      --version, and
@@ -389,9 +395,6 @@ class AOTSnapshotter {
       return 0;
     }
   }
-
-  /// Reads the SHOREBIRD_DD_MAX_BYTES env var. See [shorebirdDdMaxBytes].
-  int _readDdMaxBytes() => shorebirdDdMaxBytes(_platform.environment);
 
   /// The files a DD pass leaves next to the snapshot's output directory, which
   /// LinkSupplement copies into the release's supplement.

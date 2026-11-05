@@ -17,7 +17,7 @@ vars = {
   'llvm_git': 'https://llvm.googlesource.com',
   'dart_ai_rev': '9c96bfe5f091c9451eff5b59c9bffeb2e806b875',
   'skia_revision': '8df24be66531469e576a806749a0202ae26b8d08',
-  "dart_sdk_revision": "c8cbe6f6478fb058e8e22b9e6d9be8508fe01d20",
+  "dart_sdk_revision": "674ffd6606e86c3de25f77c4c248f93d5f48f8c6",
   "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
   "updater_git": "https://github.com/shorebirdtech/updater.git",
   "updater_rev": "b3e2b63b87767741aaa7a4aa14ab54bb2d1a0f84",
@@ -411,9 +411,9 @@ deps = {
     'objects': [
       {
         'object_name': Var('dart_sdk_revision') + '/dart-sdk-darwin-arm64.tar.gz',
-        'sha256sum': 'b032ce0430426268dd2fbfb3962f24711dca6c90065b2d32f79373d76900f889',
-        'size_bytes': 215270125,
-        'generation': 1793049601435556,
+        'sha256sum': 'c9cddd6a669295e8d71529d1f15ac872c571fb24145072a4cb59576772de6480',
+        'size_bytes': 215269841,
+        'generation': 1793598901382839,
       }
     ],
     'dep_type': 'gcs',
