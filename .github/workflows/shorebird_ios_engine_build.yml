@@ -76,10 +76,12 @@ jobs:
           echo "CIPD_CACHE_DIR=$HOME/cipd_cache" >> "$GITHUB_ENV"
 
       # The updater's cargo build is an action the Shorebird sources'
-      # generated headers can wait on.
+      # generated headers can wait on. Pinned to the release build's
+      # toolchain (_build_engine shard-build.yaml).
       - name: 🦀 Setup Rust
-        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master 2026-10-16
         with:
+          toolchain: 1.99.1
           targets: aarch64-apple-ios
 
       # DEPS pulls shorebirdtech/dart-sdk (private) over SSH.
@@ -146,8 +148,11 @@ jobs:
       - name: 🔨 Compile the iOS and Shorebird sources
         working-directory: engine/src
         run: |
+          # The DEPS-pinned gn that tools/gn runs; depot_tools' gn wrapper
+          # looks for it under buildtools/, which the engine doesn't use.
+          gn=flutter/third_party/gn/gn
           out=out/ios_release
-          targets=$(gn ls "$out" --type=source_set --testonly=false \
+          targets=$("$gn" ls "$out" --type=source_set --testonly=false \
             '//flutter/shell/platform/darwin/*' \
             '//flutter/shell/common/shorebird/*' \
             '//flutter/runtime/shorebird/*')
@@ -161,7 +166,7 @@ jobs:
               case "$src" in
                 *.c|*.cc|*.cpp|*.m|*.mm) files+=("../../${src#//}^") ;;
               esac
-            done < <(gn desc "$out" "$t" sources)
+            done < <("$gn" desc "$out" "$t" sources)
           done
           echo "Compiling ${#files[@]} files"
           ninja -C "$out" "${files[@]}"
