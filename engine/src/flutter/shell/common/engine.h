@@ -1106,6 +1106,11 @@ class Engine final : public RuntimeDelegate, PointerDataDispatcher::Delegate {
   std::unique_ptr<Animator> animator_;
   std::unique_ptr<RuntimeController> runtime_controller_;
 
+  // Shorebird: whether this engine's Run opened the process's launch window.
+  bool shorebird_owns_launch_window_ = false;
+  // Shorebird: whether the last lifecycle message left the foreground.
+  bool shorebird_in_background_ = false;
+
   // The pointer_data_dispatcher_ depends on animator_ and runtime_controller_.
   // So it should be defined after them to ensure that pointer_data_dispatcher_
   // is destructed first.
