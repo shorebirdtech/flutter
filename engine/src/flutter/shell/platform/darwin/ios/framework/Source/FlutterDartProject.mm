@@ -63,7 +63,7 @@ static void ObserveShorebirdProtectedData() {
   dispatch_once(&once, ^{
     void (^notify)(NSNotification*) = ^(NSNotification* note) {
       dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-        shorebird::Updater::Instance().ProtectedDataAvailable();
+        flutter::shorebird::Updater::Instance().ProtectedDataAvailable();
       });
     };
     NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
