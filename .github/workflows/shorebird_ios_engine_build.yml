@@ -1,0 +1,168 @@
+name: shorebird_ios_engine_build
+
+# Builds the iOS engine's Shorebird sources on engine PRs, so a break shows
+# on the PR instead of in the release's engine build.
+# Before this, iOS engine code was first compiled by _build_engine's macos/ios
+# shard after merge: #243 landed code that failed `gn check` and didn't
+# compile, and the 3.47.9 release couldn't build until #285 fixed it.
+#
+# What it does: `flutter/tools/gn` for the configuration a release ships
+# (ios_release with shorebird_runtime, macos.json's `ios` shard), which runs
+# `gn gen --check` over //flutter/shell/* and //flutter/runtime/*, then builds
+# the non-test source sets under shell/platform/darwin/{common,ios},
+# shell/common/shorebird and runtime/shorebird. That builds what those
+# sources depend on (Skia, Dart, the updater, the shell: most of the engine's
+# objects) but doesn't link or package the framework, so a link error still
+# shows only in the release build. Not covered here: debug and profile iOS
+# (code under their #ifs), and macOS (darwin/macos isn't built).
+#
+# The sync mirrors shorebird_engine_tests.yml (a Namespace runner whose
+# persistent volume holds the gclient git mirrors, depot_tools and the CIPD
+# cache), on its own cache tag for the same reason: PR code runs with it
+# mounted, and must not be able to plant anything a release build later runs.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths:
+      - DEPS
+      - engine/**
+      - .github/workflows/shorebird_ios_engine_build.yml
+  push:
+    branches:
+      - shorebird/dev
+    paths:
+      - DEPS
+      - engine/**
+      - .github/workflows/shorebird_ios_engine_build.yml
+
+permissions:
+  contents: read
+
+jobs:
+  ios-engine-build:
+    name: 🍎 Shorebird iOS Engine Build
+    # Fork PRs get no secrets (the sync needs the dart-sdk deploy key) and
+    # must not run on our Namespace runners.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on:
+      - nscloud-macos-sequoia-arm64-12x28-with-cache
+      - nscloud-cache-tag-shorebird-ios-engine-build
+      - nscloud-cache-size-100gb
+    timeout-minutes: 45
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: 📦 Setup namespace cache
+        uses: namespacelabs/nscloud-cache-action@1124a6f3ce44e5cf84cc22111530961f4d2a15f9 # v1.7.0
+        with:
+          path: |
+            ~/git_cache
+            ~/depot_tools
+            ~/cipd_cache
+
+      # CIPD_CACHE_DIR must be absolute; ~ doesn't expand in `env:`.
+      - name: 📦 Configure CIPD cache
+        run: |
+          mkdir -p "$HOME/cipd_cache"
+          echo "CIPD_CACHE_DIR=$HOME/cipd_cache" >> "$GITHUB_ENV"
+
+      # The updater's cargo build is an action the Shorebird sources'
+      # generated headers can wait on. Pinned to the release build's
+      # toolchain (_build_engine shard-build.yaml).
+      - name: 🦀 Setup Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master 2026-10-16
+        with:
+          toolchain: 1.99.1
+          targets: aarch64-apple-ios
+
+      # DEPS pulls shorebirdtech/dart-sdk (private) over SSH.
+      - name: 🔑 Setup SSH
+        uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DART_SDK_DEPLOY_KEY }}
+
+      - name: 🧰 Setup depot_tools
+        run: |
+          if [[ ! -d $HOME/depot_tools/.git ]]; then
+            git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git $HOME/depot_tools
+          else
+            cd $HOME/depot_tools
+            git checkout main 2>/dev/null || git checkout -b main origin/main
+            git pull --quiet
+          fi
+          echo "$HOME/depot_tools" >> "$GITHUB_PATH"
+
+      # As in shorebird_engine_tests.yml: an unmanaged solution rooted at
+      # this checkout. No Android or Fuchsia deps, and no prebuilt Dart SDK
+      # (gn below passes --no-prebuilt-dart-sdk).
+      - name: ⚙️ Setup gclient config
+        run: |
+          cat > .gclient << EOF
+          solutions = [
+            {
+              "managed": False,
+              "name": ".",
+              "url": "git@github.com:shorebirdtech/flutter.git",
+              "custom_deps": {},
+              "custom_vars": {
+                "download_android_deps": False,
+                "download_dart_sdk": False,
+                "download_fuchsia_deps": False,
+              },
+              "deps_file": "DEPS",
+              "safesync_url": "",
+            },
+          ]
+          cache_dir = "$HOME/git_cache"
+          EOF
+
+      - name: 🔄 Sync engine dependencies (gclient)
+        run: |
+          for attempt in 1 2 3; do
+            gclient sync --delete_unversioned_trees --with_tags && exit 0
+            echo "gclient sync failed (attempt $attempt), retrying in $((attempt * 30))s"
+            sleep $((attempt * 30))
+          done
+          exit 1
+
+      # Only the sync needs the deploy key; drop it before gn and ninja.
+      # gclient sync has already run the PR's DEPS hooks with it loaded, which
+      # is why fork PRs don't run this job.
+      - name: 🔑 Remove deploy key
+        run: ssh-add -D
+
+      # macos.json's ios_release step, which is what ships. tools/gn runs
+      # `gn gen --check`, so a source including a header its target doesn't
+      # depend on fails here.
+      - name: ⚙️ Generate build files (gn gen --check)
+        run: ./flutter/tools/gn --ios --runtime-mode release --gn-arg=shorebird_runtime=true --no-prebuilt-dart-sdk --no-rbe
+        working-directory: engine/src
+
+      # Every non-test source set in those directories, as ninja targets.
+      # set -o pipefail: a gn ls failure must fail the step, and an empty list
+      # must not reach ninja, which would build the default (all) target.
+      - name: 🔨 Build the iOS and Shorebird source sets
+        working-directory: engine/src
+        run: |
+          set -o pipefail
+          # The DEPS-pinned gn that tools/gn runs; depot_tools' gn wrapper
+          # looks for it under buildtools/, which the engine doesn't use.
+          gn=flutter/third_party/gn/gn
+          out=out/ios_release
+          targets=$("$gn" ls "$out" --type=source_set --testonly=false \
+            '//flutter/shell/platform/darwin/*' \
+            '//flutter/shell/common/shorebird/*' \
+            '//flutter/runtime/shorebird/*' | sed 's|^//||')
+          if [[ -z "$targets" ]]; then
+            echo "::error::gn ls found no source sets"
+            exit 1
+          fi
+          echo "$targets"
+          # shellcheck disable=SC2086 # one target per word
+          ninja -C "$out" $targets
