@@ -221,14 +221,26 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   // there is no booting without it.
   SetBaseSnapshot(ResolveBaseVMSnapshot(base_settings));
 #else
-  vm_snapshot = DartSnapshot::VMSnapshotFromSettings(base_settings);
+  // Resolved once per process. The base image doesn't change, and the first
+  // engine's update thread reads vm_snapshot (FileCallbacksImpl::Open) while a
+  // second engine (desktop multi-window) configures, so replacing it here
+  // would race that read.
+  if (!vm_snapshot) {
+    vm_snapshot = DartSnapshot::VMSnapshotFromSettings(base_settings);
+  }
   if (!vm_snapshot) {
     FML_LOG(ERROR) << "Shorebird updater: failed to resolve the base snapshot";
   }
 #endif  // SHOREBIRD_USE_INTERPRETER
 #endif  // FML_OS_MACOSX
 
-  bool init_result = shorebird::Updater::Instance().Init(config);
+  // A second engine in the same process (desktop multi-window) gets
+  // AlreadyInitialized here, which the updater documents as safe to ignore:
+  // the process is still configured, and the patch path below is the one to
+  // boot. Fail only when no Init in this process has succeeded.
+  // https://github.com/shorebirdtech/shorebird/issues/3888
+  bool init_result = shorebird::Updater::Instance().Init(config) ||
+                     shorebird::Updater::IsInitialized();
 
   FML_LOG(INFO) << "Checking for active patch";
   shorebird::Updater::Instance().ValidateNextBootPatch();
