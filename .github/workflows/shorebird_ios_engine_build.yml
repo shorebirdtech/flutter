@@ -1,19 +1,20 @@
 name: shorebird_ios_engine_build
 
-# Compiles the iOS engine's Shorebird-touched sources on PRs that change
-# them, so a break shows on the PR instead of in the release's engine build.
+# Builds the iOS engine's Shorebird sources on engine PRs, so a break shows
+# on the PR instead of in the release's engine build.
 # Before this, iOS engine code was first compiled by _build_engine's macos/ios
 # shard after merge: #243 landed code that failed `gn check` and didn't
 # compile, and the 3.47.9 release couldn't build until #285 fixed it.
 #
 # What it does: `flutter/tools/gn` for the configuration a release ships
 # (ios_release with shorebird_runtime, macos.json's `ios` shard), which runs
-# `gn gen --check`, then compiles every source file of the non-test source
-# sets under shell/platform/darwin, shell/common/shorebird and
-# runtime/shorebird. It compiles those files (ninja's `<file>^`), not the
-# framework: building flutter_framework would build the whole engine and Dart
-# for iOS, which is the release shard's job. A link error or a fault in code
-# outside these directories still shows only in the release build.
+# `gn gen --check` over //flutter/shell/* and //flutter/runtime/*, then builds
+# the non-test source sets under shell/platform/darwin/{common,ios},
+# shell/common/shorebird and runtime/shorebird. That builds what those
+# sources depend on (Skia, Dart, the updater, the shell: most of the engine's
+# objects) but doesn't link or package the framework, so a link error still
+# shows only in the release build. Not covered here: debug and profile iOS
+# (code under their #ifs), and macOS (darwin/macos isn't built).
 #
 # The sync mirrors shorebird_engine_tests.yml (a Namespace runner whose
 # persistent volume holds the gclient git mirrors, depot_tools and the CIPD
@@ -28,18 +29,14 @@ on:
   pull_request:
     paths:
       - DEPS
-      - engine/src/flutter/shell/platform/darwin/**
-      - engine/src/flutter/shell/common/shorebird/**
-      - engine/src/flutter/runtime/shorebird/**
+      - engine/**
       - .github/workflows/shorebird_ios_engine_build.yml
   push:
     branches:
       - shorebird/dev
     paths:
       - DEPS
-      - engine/src/flutter/shell/platform/darwin/**
-      - engine/src/flutter/shell/common/shorebird/**
-      - engine/src/flutter/runtime/shorebird/**
+      - engine/**
       - .github/workflows/shorebird_ios_engine_build.yml
 
 permissions:
@@ -134,7 +131,9 @@ jobs:
           done
           exit 1
 
-      # Only the sync needs the deploy key; drop it before running PR code.
+      # Only the sync needs the deploy key; drop it before gn and ninja.
+      # gclient sync has already run the PR's DEPS hooks with it loaded, which
+      # is why fork PRs don't run this job.
       - name: 🔑 Remove deploy key
         run: ssh-add -D
 
@@ -145,9 +144,13 @@ jobs:
         run: ./flutter/tools/gn --ios --runtime-mode release --gn-arg=shorebird_runtime=true --no-prebuilt-dart-sdk --no-rbe
         working-directory: engine/src
 
-      - name: 🔨 Compile the iOS and Shorebird sources
+      # Every non-test source set in those directories, as ninja targets.
+      # set -o pipefail: a gn ls failure must fail the step, and an empty list
+      # must not reach ninja, which would build the default (all) target.
+      - name: 🔨 Build the iOS and Shorebird source sets
         working-directory: engine/src
         run: |
+          set -o pipefail
           # The DEPS-pinned gn that tools/gn runs; depot_tools' gn wrapper
           # looks for it under buildtools/, which the engine doesn't use.
           gn=flutter/third_party/gn/gn
@@ -155,18 +158,11 @@ jobs:
           targets=$("$gn" ls "$out" --type=source_set --testonly=false \
             '//flutter/shell/platform/darwin/*' \
             '//flutter/shell/common/shorebird/*' \
-            '//flutter/runtime/shorebird/*')
-          echo "Source sets:"
+            '//flutter/runtime/shorebird/*' | sed 's|^//||')
+          if [[ -z "$targets" ]]; then
+            echo "::error::gn ls found no source sets"
+            exit 1
+          fi
           echo "$targets"
-          # `gn desc` lists sources as //-paths; ninja's `<path>^` builds the
-          # object compiled from that file, relative to the out dir.
-          files=()
-          for t in $targets; do
-            while read -r src; do
-              case "$src" in
-                *.c|*.cc|*.cpp|*.m|*.mm) files+=("../../${src#//}^") ;;
-              esac
-            done < <("$gn" desc "$out" "$t" sources)
-          done
-          echo "Compiling ${#files[@]} files"
-          ninja -C "$out" "${files[@]}"
+          # shellcheck disable=SC2086 # one target per word
+          ninja -C "$out" $targets
