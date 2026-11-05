@@ -1,0 +1,167 @@
+name: shorebird_ios_engine_build
+
+# Compiles the iOS engine's Shorebird-touched sources on PRs that change
+# them, so a break shows on the PR instead of in the release's engine build.
+# Before this, iOS engine code was first compiled by _build_engine's macos/ios
+# shard after merge: #243 landed code that failed `gn check` and didn't
+# compile, and the 3.47.9 release couldn't build until #285 fixed it.
+#
+# What it does: `flutter/tools/gn` for the configuration a release ships
+# (ios_release with shorebird_runtime, macos.json's `ios` shard), which runs
+# `gn gen --check`, then compiles every source file of the non-test source
+# sets under shell/platform/darwin, shell/common/shorebird and
+# runtime/shorebird. It compiles those files (ninja's `<file>^`), not the
+# framework: building flutter_framework would build the whole engine and Dart
+# for iOS, which is the release shard's job. A link error or a fault in code
+# outside these directories still shows only in the release build.
+#
+# The sync mirrors shorebird_engine_tests.yml (a Namespace runner whose
+# persistent volume holds the gclient git mirrors, depot_tools and the CIPD
+# cache), on its own cache tag for the same reason: PR code runs with it
+# mounted, and must not be able to plant anything a release build later runs.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths:
+      - DEPS
+      - engine/src/flutter/shell/platform/darwin/**
+      - engine/src/flutter/shell/common/shorebird/**
+      - engine/src/flutter/runtime/shorebird/**
+      - .github/workflows/shorebird_ios_engine_build.yml
+  push:
+    branches:
+      - shorebird/dev
+    paths:
+      - DEPS
+      - engine/src/flutter/shell/platform/darwin/**
+      - engine/src/flutter/shell/common/shorebird/**
+      - engine/src/flutter/runtime/shorebird/**
+      - .github/workflows/shorebird_ios_engine_build.yml
+
+permissions:
+  contents: read
+
+jobs:
+  ios-engine-build:
+    name: 🍎 Shorebird iOS Engine Build
+    # Fork PRs get no secrets (the sync needs the dart-sdk deploy key) and
+    # must not run on our Namespace runners.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on:
+      - nscloud-macos-sequoia-arm64-12x28-with-cache
+      - nscloud-cache-tag-shorebird-ios-engine-build
+      - nscloud-cache-size-100gb
+    timeout-minutes: 45
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: 📦 Setup namespace cache
+        uses: namespacelabs/nscloud-cache-action@1124a6f3ce44e5cf84cc22111530961f4d2a15f9 # v1.7.0
+        with:
+          path: |
+            ~/git_cache
+            ~/depot_tools
+            ~/cipd_cache
+
+      # CIPD_CACHE_DIR must be absolute; ~ doesn't expand in `env:`.
+      - name: 📦 Configure CIPD cache
+        run: |
+          mkdir -p "$HOME/cipd_cache"
+          echo "CIPD_CACHE_DIR=$HOME/cipd_cache" >> "$GITHUB_ENV"
+
+      # The updater's cargo build is an action the Shorebird sources'
+      # generated headers can wait on.
+      - name: 🦀 Setup Rust
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          targets: aarch64-apple-ios
+
+      # DEPS pulls shorebirdtech/dart-sdk (private) over SSH.
+      - name: 🔑 Setup SSH
+        uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DART_SDK_DEPLOY_KEY }}
+
+      - name: 🧰 Setup depot_tools
+        run: |
+          if [[ ! -d $HOME/depot_tools/.git ]]; then
+            git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git $HOME/depot_tools
+          else
+            cd $HOME/depot_tools
+            git checkout main 2>/dev/null || git checkout -b main origin/main
+            git pull --quiet
+          fi
+          echo "$HOME/depot_tools" >> "$GITHUB_PATH"
+
+      # As in shorebird_engine_tests.yml: an unmanaged solution rooted at
+      # this checkout. No Android or Fuchsia deps, and no prebuilt Dart SDK
+      # (gn below passes --no-prebuilt-dart-sdk).
+      - name: ⚙️ Setup gclient config
+        run: |
+          cat > .gclient << EOF
+          solutions = [
+            {
+              "managed": False,
+              "name": ".",
+              "url": "git@github.com:shorebirdtech/flutter.git",
+              "custom_deps": {},
+              "custom_vars": {
+                "download_android_deps": False,
+                "download_dart_sdk": False,
+                "download_fuchsia_deps": False,
+              },
+              "deps_file": "DEPS",
+              "safesync_url": "",
+            },
+          ]
+          cache_dir = "$HOME/git_cache"
+          EOF
+
+      - name: 🔄 Sync engine dependencies (gclient)
+        run: |
+          for attempt in 1 2 3; do
+            gclient sync --delete_unversioned_trees --with_tags && exit 0
+            echo "gclient sync failed (attempt $attempt), retrying in $((attempt * 30))s"
+            sleep $((attempt * 30))
+          done
+          exit 1
+
+      # Only the sync needs the deploy key; drop it before running PR code.
+      - name: 🔑 Remove deploy key
+        run: ssh-add -D
+
+      # macos.json's ios_release step, which is what ships. tools/gn runs
+      # `gn gen --check`, so a source including a header its target doesn't
+      # depend on fails here.
+      - name: ⚙️ Generate build files (gn gen --check)
+        run: ./flutter/tools/gn --ios --runtime-mode release --gn-arg=shorebird_runtime=true --no-prebuilt-dart-sdk --no-rbe
+        working-directory: engine/src
+
+      - name: 🔨 Compile the iOS and Shorebird sources
+        working-directory: engine/src
+        run: |
+          out=out/ios_release
+          targets=$(gn ls "$out" --type=source_set --testonly=false \
+            '//flutter/shell/platform/darwin/*' \
+            '//flutter/shell/common/shorebird/*' \
+            '//flutter/runtime/shorebird/*')
+          echo "Source sets:"
+          echo "$targets"
+          # `gn desc` lists sources as //-paths; ninja's `<path>^` builds the
+          # object compiled from that file, relative to the out dir.
+          files=()
+          for t in $targets; do
+            while read -r src; do
+              case "$src" in
+                *.c|*.cc|*.cpp|*.m|*.mm) files+=("../../${src#//}^") ;;
+              esac
+            done < <(gn desc "$out" "$t" sources)
+          done
+          echo "Compiling ${#files[@]} files"
+          ninja -C "$out" "${files[@]}"
