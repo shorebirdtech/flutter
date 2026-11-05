@@ -191,11 +191,7 @@ std::vector<uint8_t> BuildMinimalVmcodeBytes() {
 
   std::vector<uint8_t> vmcode(kPageSize + elf.size(), 0);
   const int32_t kHeader[] = {
-      2,
-      16,
-      32,
-      48,
-      64,
+      2, 16, 32, 48, 64,
   };
   std::memcpy(vmcode.data(), kHeader, sizeof(kHeader));
   std::memcpy(vmcode.data() + kPageSize, elf.data(), elf.size());
@@ -269,7 +265,8 @@ TEST(HotRestart, TogglesPatchSnapshotOnAndOff10xWithoutLeakingLoadedPatch) {
         fml::MallocMapping::Copy(base_instrs.data(), base_instrs.size()));
   };
 
-  auto active_snapshot = DartSnapshot::IsolateSnapshotFromSettings(base_settings);
+  auto active_snapshot =
+      DartSnapshot::IsolateSnapshotFromSettings(base_settings);
   ASSERT_TRUE(active_snapshot);
   EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 0u);
 

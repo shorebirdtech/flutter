@@ -5795,7 +5795,7 @@ std::vector<uint8_t> BuildRunnableVmcodeBytes(const uint8_t* snapshot_data,
 #if defined(__aarch64__)
   ehdr.machine = 183;  // EM_AARCH64
 #elif defined(__x86_64__)
-  ehdr.machine = 62;   // EM_X86_64
+  ehdr.machine = 62;  // EM_X86_64
 #endif
   ehdr.version = 1;
   ehdr.program_table_offset = kPhdrOffset;
@@ -5810,11 +5810,7 @@ std::vector<uint8_t> BuildRunnableVmcodeBytes(const uint8_t* snapshot_data,
 
   std::vector<uint8_t> vmcode(kPageSize + elf.size(), 0);
   const int32_t kHeader[] = {
-      2,
-      16,
-      32,
-      48,
-      64,
+      2, 16, 32, 48, 64,
   };
   std::memcpy(vmcode.data(), kHeader, sizeof(kHeader));
   std::memcpy(vmcode.data() + kPageSize, elf.data(), elf.size());
@@ -5866,18 +5862,18 @@ TEST_F(ShellTest, ShorebirdHotRestartTerminatesChildAndPlatformIsolates) {
   fml::AutoResetWaitableEvent worker_latch;
   fml::AutoResetWaitableEvent platform_isolate_latch;
 
-  AddNativeCallback(
-      "ShorebirdIsPatchActive",
-      CREATE_NATIVE_ENTRY([](Dart_NativeArguments args) {
-        Dart_SetBooleanReturnValue(args, LoadedPatch::LiveCountForTesting() > 0);
-      }));
-  AddNativeCallback(
-      "ShorebirdNotifyState",
-      CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
-        reported_state = tonic::DartConverter<std::string>::FromDart(
-            Dart_GetNativeArgument(args, 0));
-        state_latch.Signal();
-      }));
+  AddNativeCallback("ShorebirdIsPatchActive",
+                    CREATE_NATIVE_ENTRY([](Dart_NativeArguments args) {
+                      Dart_SetBooleanReturnValue(
+                          args, LoadedPatch::LiveCountForTesting() > 0);
+                    }));
+  AddNativeCallback("ShorebirdNotifyState",
+                    CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
+                      reported_state =
+                          tonic::DartConverter<std::string>::FromDart(
+                              Dart_GetNativeArgument(args, 0));
+                      state_latch.Signal();
+                    }));
   AddNativeCallback("ShorebirdNotifyWorkerSpawned",
                     CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
                       worker_latch.Signal();
@@ -5907,8 +5903,8 @@ TEST_F(ShellTest, ShorebirdHotRestartTerminatesChildAndPlatformIsolates) {
     ASSERT_TRUE(root_isolate);
     tonic::DartState::Scope scope(root_isolate.get());
     Dart_Handle lib = Dart_RootLibrary();
-    Dart_Handle entry_point = Dart_GetField(
-        lib, tonic::ToDart("shorebirdPlatformIsolateEntrypoint"));
+    Dart_Handle entry_point =
+        Dart_GetField(lib, tonic::ToDart("shorebirdPlatformIsolateEntrypoint"));
     char* error = nullptr;
     first_platform_isolate =
         root_isolate->CreatePlatformIsolate(entry_point, &error);
@@ -5948,8 +5944,8 @@ TEST_F(ShellTest, ShorebirdHotRestartTerminatesChildAndPlatformIsolates) {
     ASSERT_TRUE(root_isolate);
     tonic::DartState::Scope scope(root_isolate.get());
     Dart_Handle lib = Dart_RootLibrary();
-    Dart_Handle entry_point = Dart_GetField(
-        lib, tonic::ToDart("shorebirdPlatformIsolateEntrypoint"));
+    Dart_Handle entry_point =
+        Dart_GetField(lib, tonic::ToDart("shorebirdPlatformIsolateEntrypoint"));
     char* error = nullptr;
     second_platform_isolate =
         root_isolate->CreatePlatformIsolate(entry_point, &error);
@@ -5988,27 +5984,28 @@ TEST_F(ShellTest, ShorebirdPatchToggle10xAcross20RestartsDoesNotLeak) {
   const int64_t base_data_size = Dart_SnapshotDataSize(base_data);
   ASSERT_GT(base_data_size, 0);
 
-  auto vmcode_bytes = BuildRunnableVmcodeBytes(
-      base_data, static_cast<size_t>(base_data_size));
+  auto vmcode_bytes =
+      BuildRunnableVmcodeBytes(base_data, static_cast<size_t>(base_data_size));
   fml::NonOwnedMapping vmcode_mapping(vmcode_bytes.data(), vmcode_bytes.size());
-  ASSERT_TRUE(fml::WriteAtomically(temp_dir.fd(), "dlc.vmcode", vmcode_mapping));
+  ASSERT_TRUE(
+      fml::WriteAtomically(temp_dir.fd(), "dlc.vmcode", vmcode_mapping));
 
   std::string reported_state;
   fml::AutoResetWaitableEvent state_latch;
   fml::AutoResetWaitableEvent worker_latch;
 
-  AddNativeCallback(
-      "ShorebirdIsPatchActive",
-      CREATE_NATIVE_ENTRY([](Dart_NativeArguments args) {
-        Dart_SetBooleanReturnValue(args, LoadedPatch::LiveCountForTesting() > 0);
-      }));
-  AddNativeCallback(
-      "ShorebirdNotifyState",
-      CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
-        reported_state = tonic::DartConverter<std::string>::FromDart(
-            Dart_GetNativeArgument(args, 0));
-        state_latch.Signal();
-      }));
+  AddNativeCallback("ShorebirdIsPatchActive",
+                    CREATE_NATIVE_ENTRY([](Dart_NativeArguments args) {
+                      Dart_SetBooleanReturnValue(
+                          args, LoadedPatch::LiveCountForTesting() > 0);
+                    }));
+  AddNativeCallback("ShorebirdNotifyState",
+                    CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
+                      reported_state =
+                          tonic::DartConverter<std::string>::FromDart(
+                              Dart_GetNativeArgument(args, 0));
+                      state_latch.Signal();
+                    }));
   AddNativeCallback("ShorebirdNotifyWorkerSpawned",
                     CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
                       worker_latch.Signal();
