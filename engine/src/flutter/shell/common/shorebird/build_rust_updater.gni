@@ -10,6 +10,8 @@
 #   shorebird_updater_rust_target - Rust target triple for the current platform.
 #   shorebird_updater_rs_sources - List of .rs source files (for GN inputs).
 
+import("//flutter/common/config.gni")
+
 if (is_android) {
   import("//build/config/android/config.gni")
 }
@@ -69,7 +71,11 @@ if (is_android) {
   }
 }
 
-shorebird_updater_supported = shorebird_updater_rust_target != ""
+# Debug engines don't link the updater (see SHOREBIRD_PLATFORM_SUPPORTED in
+# //flutter/common/config.gni): they use NoOpUpdater and export no
+# shorebird_* symbols, so the Dart package falls back as on stock Flutter.
+shorebird_updater_supported =
+    shorebird_updater_rust_target != "" && flutter_runtime_mode != "debug"
 
 if (shorebird_updater_supported) {
   if (is_win) {
