@@ -4,6 +4,7 @@
 
 assert(is_win)
 
+import("//flutter/common/config.gni")
 import("//flutter/shell/platform/glfw/config.gni")
 import("//flutter/testing/testing.gni")
 
