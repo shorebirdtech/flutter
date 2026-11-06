@@ -154,9 +154,11 @@ jobs:
         run: ssh-add -D
 
       # --no-prebuilt-dart-sdk: build with our Dart fork, as the release
-      # build does, rather than Google's prebuilt upstream SDK.
+      # build does, rather than Google's prebuilt upstream SDK. Profile, not
+      # debug: debug engines leave the Rust updater out (build_rust_updater.gni),
+      # and this is the only PR check that builds and links it.
       - name: ⚙️ Generate build files (gn)
-        run: ./flutter/tools/gn --runtime-mode debug --unoptimized --enable-unittests --no-prebuilt-dart-sdk --no-rbe
+        run: ./flutter/tools/gn --runtime-mode profile --unoptimized --enable-unittests --no-prebuilt-dart-sdk --no-rbe
         working-directory: engine/src
 
       # shorebird_unittests covers shell/common/shorebird, runtime/shorebird
@@ -164,7 +166,7 @@ jobs:
       # Shorebird code (fl_shorebird.cc, fl_engine.cc), and shell_unittests
       # holds the Shell's Shorebird boot-flow tests.
       - name: 🔨 Build
-        run: ninja -C out/host_debug_unopt shorebird_unittests shell_unittests flutter/shell/platform/linux:flutter_linux_sources
+        run: ninja -C out/host_profile_unopt shorebird_unittests shell_unittests flutter/shell/platform/linux:flutter_linux_sources
         working-directory: engine/src
 
       # From exe.unstripped/, where run_tests.py (the release's engine tests)
@@ -172,11 +174,11 @@ jobs:
       # own binary fails here too. shell_unittests stays at the top of out/:
       # its SwiftShader setup looks for the Vulkan ICD beside the binary.
       - name: 🧪 Run shorebird_unittests
-        run: ./out/host_debug_unopt/exe.unstripped/shorebird_unittests
+        run: ./out/host_profile_unopt/exe.unstripped/shorebird_unittests
         working-directory: engine/src
 
       - name: 🧪 Run Shorebird shell_unittests
-        run: ./out/host_debug_unopt/shell_unittests '--gtest_filter=*Shorebird*'
+        run: ./out/host_profile_unopt/shell_unittests '--gtest_filter=*Shorebird*'
         working-directory: engine/src
 
       # ci/format.sh is what `et format` and the engine pre-push hook run.
