@@ -257,17 +257,23 @@ std::weak_ptr<DartIsolate> DartIsolate::CreateRootIsolate(
                 isolate_shutdown_callback,        // isolate shutdown callback
                 std::move(native_assets_manager)  //
                 )));
-    isolate_maker = [](std::shared_ptr<DartIsolateGroupData>*
-                           isolate_group_data,
-                       std::shared_ptr<DartIsolate>* isolate_data,
-                       Dart_IsolateFlags* flags, char** error) {
-      return Dart_CreateIsolateGroup(
-          (*isolate_group_data)->GetAdvisoryScriptURI().c_str(),
-          (*isolate_group_data)->GetAdvisoryScriptEntrypoint().c_str(),
-          (*isolate_group_data)->GetIsolateSnapshot()->GetDataMapping(),
-          (*isolate_group_data)->GetIsolateSnapshot()->GetInstructionsMapping(),
-          flags, isolate_group_data, isolate_data, error);
-    };
+    isolate_maker =
+        [](std::shared_ptr<DartIsolateGroupData>* isolate_group_data,
+           std::shared_ptr<DartIsolate>* isolate_data, Dart_IsolateFlags* flags,
+           char** error) {
+          const auto& snapshot = (*isolate_group_data)->GetIsolateSnapshot();
+          flags->base_snapshot_data = snapshot->GetBaseDataMapping();
+          flags->base_snapshot_instructions =
+              snapshot->GetBaseInstructionsMapping();
+          flags->link_header = snapshot->GetLinkHeaderMapping();
+          flags->link_header_size =
+              static_cast<intptr_t>(snapshot->GetLinkHeaderSize());
+          return Dart_CreateIsolateGroup(
+              (*isolate_group_data)->GetAdvisoryScriptURI().c_str(),
+              (*isolate_group_data)->GetAdvisoryScriptEntrypoint().c_str(),
+              snapshot->GetDataMapping(), snapshot->GetInstructionsMapping(),
+              flags, isolate_group_data, isolate_data, error);
+        };
   }
 
   vm_isolate = CreateDartIsolateGroup(std::move(isolate_group_data),
@@ -968,6 +974,21 @@ bool DartIsolate::Shutdown() {
   return true;
 }
 
+void DartIsolate::ShutdownChildIsolates() {
+  TRACE_EVENT0("flutter", "DartIsolate::ShutdownChildIsolates");
+  if (phase_ == Phase::Shutdown || !IsRootIsolate()) {
+    return;
+  }
+  Dart_Isolate vm_isolate = isolate();
+  if (vm_isolate != nullptr) {
+    FML_DCHECK(Dart_CurrentIsolate() == nullptr);
+    Dart_EnterIsolate(vm_isolate);
+    Dart_KillIsolateGroupChildren();
+    Dart_ExitIsolate();
+    FML_DCHECK(Dart_CurrentIsolate() == nullptr);
+  }
+}
+
 Dart_Isolate DartIsolate::DartCreateAndStartServiceIsolate(
     const char* package_root,
     const char* package_config,
@@ -1133,13 +1154,22 @@ Dart_Isolate DartIsolate::DartIsolateGroupCreateCallback(
       [](std::shared_ptr<DartIsolateGroupData>* isolate_group_data,
          std::shared_ptr<DartIsolate>* isolate_data, Dart_IsolateFlags* flags,
          char** error) {
+        const auto& snapshot = (*isolate_group_data)->GetIsolateSnapshot();
+        Dart_IsolateFlags api_flags;
+        if (flags == nullptr) {
+          Dart_IsolateFlagsInitialize(&api_flags);
+          flags = &api_flags;
+        }
+        flags->base_snapshot_data = snapshot->GetBaseDataMapping();
+        flags->base_snapshot_instructions =
+            snapshot->GetBaseInstructionsMapping();
+        flags->link_header = snapshot->GetLinkHeaderMapping();
+        flags->link_header_size =
+            static_cast<intptr_t>(snapshot->GetLinkHeaderSize());
         return Dart_CreateIsolateGroup(
             (*isolate_group_data)->GetAdvisoryScriptURI().c_str(),
             (*isolate_group_data)->GetAdvisoryScriptEntrypoint().c_str(),
-            (*isolate_group_data)->GetIsolateSnapshot()->GetDataMapping(),
-            (*isolate_group_data)
-                ->GetIsolateSnapshot()
-                ->GetInstructionsMapping(),
+            snapshot->GetDataMapping(), snapshot->GetInstructionsMapping(),
             flags, isolate_group_data, isolate_data, error);
       });
 

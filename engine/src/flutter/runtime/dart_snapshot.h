@@ -13,6 +13,8 @@
 
 namespace flutter {
 
+class LoadedPatch;
+
 //------------------------------------------------------------------------------
 /// @brief      A read-only Dart heap snapshot, or, read-executable mapping of
 ///             AOT compiled Dart code.
@@ -101,6 +103,26 @@ class DartSnapshot : public fml::RefCountedThreadSafe<DartSnapshot> {
   static fml::RefPtr<const DartSnapshot> IsolateSnapshotFromSettings(
       const Settings& settings);
 
+  using PatchSnapshotResolver =
+      fml::RefPtr<const DartSnapshot> (*)(const Settings& settings);
+  static void SetPatchSnapshotResolverForTesting(
+      PatchSnapshotResolver resolver);
+
+  //----------------------------------------------------------------------------
+  /// @brief      Infer the unpatched base isolate snapshot from the given
+  ///             settings object, ignoring any `.vmcode` patch paths.
+  ///
+  static fml::RefPtr<const DartSnapshot> BaseIsolateSnapshotFromSettings(
+      const Settings& settings);
+
+  //----------------------------------------------------------------------------
+  /// @brief      Create a patched isolate snapshot backed by `patch` and paired
+  ///             with `base_snapshot`.
+  ///
+  static fml::RefPtr<DartSnapshot> IsolateSnapshotFromLoadedPatch(
+      const std::shared_ptr<LoadedPatch>& patch,
+      fml::RefPtr<const DartSnapshot> base_snapshot = nullptr);
+
   //----------------------------------------------------------------------------
   /// @brief      Create an isolate snapshot from existing fml::Mappings.
   ///
@@ -111,7 +133,9 @@ class DartSnapshot : public fml::RefCountedThreadSafe<DartSnapshot> {
   /// @return     A valid isolate snapshot or nullptr.
   static fml::RefPtr<DartSnapshot> IsolateSnapshotFromMappings(
       const std::shared_ptr<const fml::Mapping>& snapshot_data,
-      const std::shared_ptr<const fml::Mapping>& snapshot_instructions);
+      const std::shared_ptr<const fml::Mapping>& snapshot_instructions,
+      fml::RefPtr<const DartSnapshot> base_snapshot = nullptr,
+      std::shared_ptr<const fml::Mapping> link_header = nullptr);
 
   //----------------------------------------------------------------------------
   /// @brief      Create an isolate snapshot specialized for launching the
@@ -159,6 +183,24 @@ class DartSnapshot : public fml::RefCountedThreadSafe<DartSnapshot> {
   ///
   const uint8_t* GetInstructionsMapping() const;
 
+  const std::shared_ptr<const fml::Mapping>& GetData() const { return data_; }
+
+  const std::shared_ptr<const fml::Mapping>& GetInstructions() const {
+    return instructions_;
+  }
+
+  const fml::RefPtr<const DartSnapshot>& GetBaseSnapshot() const {
+    return base_snapshot_;
+  }
+
+  const uint8_t* GetBaseDataMapping() const;
+
+  const uint8_t* GetBaseInstructionsMapping() const;
+
+  const uint8_t* GetLinkHeaderMapping() const;
+
+  size_t GetLinkHeaderSize() const;
+
   //----------------------------------------------------------------------------
   /// @brief      Returns whether both the data and instructions mappings are
   ///             safe to use with madvise(DONTNEED).
@@ -170,9 +212,13 @@ class DartSnapshot : public fml::RefCountedThreadSafe<DartSnapshot> {
  private:
   std::shared_ptr<const fml::Mapping> data_;
   std::shared_ptr<const fml::Mapping> instructions_;
+  fml::RefPtr<const DartSnapshot> base_snapshot_;
+  std::shared_ptr<const fml::Mapping> link_header_;
 
   DartSnapshot(std::shared_ptr<const fml::Mapping> data,
-               std::shared_ptr<const fml::Mapping> instructions);
+               std::shared_ptr<const fml::Mapping> instructions,
+               fml::RefPtr<const DartSnapshot> base_snapshot = nullptr,
+               std::shared_ptr<const fml::Mapping> link_header = nullptr);
 
   ~DartSnapshot();
 

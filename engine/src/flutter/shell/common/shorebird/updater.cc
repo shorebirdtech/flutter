@@ -14,44 +14,59 @@
 namespace flutter {
 namespace shorebird {
 
-// Static member definitions
-std::unique_ptr<Updater> Updater::instance_;
-std::mutex Updater::instance_mutex_;
+namespace {
+constexpr int64_t kDefaultRestartWindowNanos = 5LL * 1000 * 1000 * 1000;
+std::unique_ptr<Updater> g_test_instance;
+}  // namespace
+
 std::atomic<bool> Updater::launch_started_{false};
 std::atomic<bool> Updater::launch_completed_{false};
+std::atomic<bool> Updater::patch_load_failed_{false};
+std::atomic<bool> Updater::patch_load_failed_for_testing_{false};
 std::atomic<bool> Updater::initialized_{false};
 std::atomic<bool> Updater::update_thread_started_{false};
+std::atomic<uint64_t> Updater::restart_generation_{0};
+std::atomic<int64_t> Updater::restart_window_nanos_{kDefaultRestartWindowNanos};
+std::mutex Updater::restart_hosts_mutex_;
+std::map<uintptr_t, std::function<bool()>> Updater::restart_hosts_;
+std::atomic<bool> Updater::hot_restart_supported_{false};
 
 Updater& Updater::Instance() {
-  std::lock_guard<std::mutex> lock(instance_mutex_);
-  if (!instance_) {
-#if SHOREBIRD_PLATFORM_SUPPORTED
-    instance_ = std::make_unique<RealUpdater>();
-#else
-    instance_ = std::make_unique<NoOpUpdater>();
-#endif
+  if (g_test_instance) {
+    return *g_test_instance;
   }
-  return *instance_;
+#if SHOREBIRD_PLATFORM_SUPPORTED
+  static RealUpdater instance;
+#else
+  static NoOpUpdater instance;
+#endif
+  return instance;
 }
 
-void Updater::SetInstanceForTesting(std::unique_ptr<Updater> instance) {
-  std::lock_guard<std::mutex> lock(instance_mutex_);
-  instance_ = std::move(instance);
+void Updater::SetInstanceForTesting(std::unique_ptr<Updater> updater) {
+  g_test_instance = std::move(updater);
 }
 
 void Updater::ResetInstanceForTesting() {
-  std::lock_guard<std::mutex> lock(instance_mutex_);
-  instance_.reset();
+  g_test_instance.reset();
 }
 
 void Updater::ResetLaunchStateForTesting() {
   launch_started_.store(false);
   launch_completed_.store(false);
+  patch_load_failed_.store(false);
+  patch_load_failed_for_testing_.store(false);
   initialized_.store(false);
   update_thread_started_.store(false);
+  restart_generation_.store(0);
+  restart_window_nanos_.store(kDefaultRestartWindowNanos);
 }
 
 bool Updater::Init(const AppConfig& config) {
+  {
+    std::lock_guard<std::mutex> lock(app_config_mutex_);
+    app_config_ = config;
+  }
   bool result = DoInit(config);
   // Latch rather than assign: add-to-app calls Init once per engine, and a
   // later failure must not forget that the process already configured.
@@ -65,9 +80,57 @@ bool Updater::IsInitialized() {
   return initialized_.load();
 }
 
+AppConfig Updater::GetAppConfig() const {
+  std::lock_guard<std::mutex> lock(app_config_mutex_);
+  return app_config_;
+}
+
+void Updater::RegisterRestartHost(uintptr_t host_id,
+                                  std::function<bool()> request_restart) {
+  std::lock_guard<std::mutex> lock(restart_hosts_mutex_);
+  restart_hosts_[host_id] = std::move(request_restart);
+}
+
+void Updater::UnregisterRestartHost(uintptr_t host_id) {
+  // Blocks while RequestRestart is invoking this host's callback, so no
+  // callback is still scheduling work as its host goes away. It does not
+  // cover the scheduled work itself; a restart already posted is guarded by
+  // the engine weak pointer the posted task holds. Host callbacks must only
+  // schedule work (never restart synchronously), both to keep this window
+  // short and because the request arrives on an arbitrary thread.
+  std::lock_guard<std::mutex> lock(restart_hosts_mutex_);
+  restart_hosts_.erase(host_id);
+}
+
+bool Updater::RequestRestart() {
+  std::lock_guard<std::mutex> lock(restart_hosts_mutex_);
+  if (restart_hosts_.empty()) {
+    FML_LOG(WARNING) << "Shorebird restart requested, but no engine capable "
+                        "of hot restart is running.";
+    return false;
+  }
+  if (restart_hosts_.size() > 1) {
+    FML_LOG(WARNING)
+        << "Shorebird restart requested, but multiple Flutter engines are "
+           "running in this process. Hot restart is not supported with "
+           "multiple engines; the patch will boot on the next app launch.";
+    return false;
+  }
+  return restart_hosts_.begin()->second();
+}
+
+void Updater::SetHotRestartSupported(bool supported) {
+  hot_restart_supported_.store(supported);
+}
+
+bool Updater::HotRestartSupported() {
+  return hot_restart_supported_.load();
+}
+
 void Updater::ReportLaunchStart() {
-  // Guard: only the first engine in a process should promote next_boot →
-  // current_boot in the Rust updater. See class-level comment for rationale.
+  // Guard: only the first engine in a process should promote
+  // next_boot → current_boot in the Rust updater. See class-level comment
+  // for rationale.
   bool expected = false;
   if (!launch_started_.compare_exchange_strong(expected, true)) {
     return;
@@ -76,17 +139,19 @@ void Updater::ReportLaunchStart() {
 }
 
 void Updater::ReportLaunchSuccess() {
-  // Guard: only report success once per process. Subsequent engines reuse
-  // the same patch and don't need to re-confirm the boot. A boot already
-  // reported as failed keeps that outcome, so the success is not forwarded.
+  // Guard: only report success once per process. Subsequent engines
+  // reuse the same patch and don't need to re-confirm the boot. A boot
+  // already reported as failed keeps that outcome, so the success is not
+  // forwarded.
   bool expected = false;
   if (launch_completed_.compare_exchange_strong(expected, true)) {
     DoReportLaunchSuccess();
   }
 
   // Outside the guard above: a patch that failed to load already claimed it
-  // from TryLoadFromPatch, and the base-code boot reaching here is the launch
-  // that most needs a replacement patch. See the class comment.
+  // from DartSnapshot::IsolateSnapshotFromSettings, and the base-code boot
+  // reaching here is the launch that most needs a replacement patch. See the
+  // class comment.
   MaybeStartUpdateThread();
 }
 
@@ -134,8 +199,59 @@ void Updater::ReportLaunchFailure() {
   DoReportLaunchFailure();
 }
 
+uint64_t Updater::ReportRestartStart() {
+  patch_load_failed_.store(false);
+  uint64_t generation = restart_generation_.fetch_add(1) + 1;
+  DoReportRestartStart();
+  return generation;
+}
+
+void Updater::ReportRestartSuccess(uint64_t generation) {
+  if (generation != 0 && generation != restart_generation_.load()) {
+    return;
+  }
+  DoReportRestartSuccess();
+}
+
+void Updater::ReportRestartFailure() {
+  restart_generation_.fetch_add(1);
+  DoReportRestartFailure();
+}
+
+fml::TimeDelta Updater::RestartWindow() {
+  return fml::TimeDelta::FromNanoseconds(restart_window_nanos_.load());
+}
+
+void Updater::SetRestartWindowForTesting(fml::TimeDelta window) {
+  restart_window_nanos_.store(window.ToNanoseconds());
+}
+
+void Updater::ReportPatchLoadFailure() {
+  // Outside ReportLaunchFailure's guard so a hot restart (where the cold-boot
+  // launch guard is already claimed) still records the load failure for
+  // HotRestartEngine to observe via PatchLoadFailed().
+  patch_load_failed_.store(true);
+  ReportLaunchFailure();
+}
+
+bool Updater::PatchLoadFailed() const {
+  return patch_load_failed_.load() || patch_load_failed_for_testing_.load();
+}
+
+void Updater::SetPatchLoadFailedForTesting(bool failed) {
+  patch_load_failed_for_testing_.store(failed);
+}
+
 #if SHOREBIRD_PLATFORM_SUPPORTED
 // RealUpdater implementation - wraps the Rust C API
+
+namespace {
+// Registered with the Rust updater; invoked (on an arbitrary thread) when
+// Dart calls shorebird_restart_app.
+bool RestartHandlerTrampoline() {
+  return Updater::RequestRestart();
+}
+}  // namespace
 
 bool RealUpdater::DoInit(const AppConfig& config) {
   // Convert paths to C strings
@@ -163,7 +279,15 @@ bool RealUpdater::DoInit(const AppConfig& config) {
   // Android no HTTP client: it uses the engine's, so they must be in place
   // before init.
   shorebird_set_engine_callbacks(&UpdaterEngineCallbacks());
-  return shorebird_init(&params, rust_callbacks, config.yaml_config.c_str());
+  bool result =
+      shorebird_init(&params, rust_callbacks, config.yaml_config.c_str());
+  if (result) {
+    // Let package:shorebird_code_push request hot restarts via
+    // shorebird_restart_app. Whether a restart can actually be serviced is
+    // decided per-request by RequestRestart (a single registered host).
+    shorebird_set_restart_handler(&RestartHandlerTrampoline);
+  }
+  return result;
 }
 
 void RealUpdater::ValidateNextBootPatch() {
@@ -190,6 +314,18 @@ void RealUpdater::DoReportLaunchSuccess() {
 
 void RealUpdater::DoReportLaunchFailure() {
   shorebird_report_launch_failure();
+}
+
+void RealUpdater::DoReportRestartStart() {
+  shorebird_report_restart_start();
+}
+
+void RealUpdater::DoReportRestartSuccess() {
+  shorebird_report_restart_success();
+}
+
+void RealUpdater::DoReportRestartFailure() {
+  shorebird_report_restart_failure();
 }
 
 bool RealUpdater::ShouldAutoUpdate() {
@@ -241,6 +377,21 @@ void MockUpdater::DoReportLaunchFailure() {
   call_log_.push_back("ReportLaunchFailure");
 }
 
+void MockUpdater::DoReportRestartStart() {
+  restart_start_count_++;
+  call_log_.push_back("ReportRestartStart");
+}
+
+void MockUpdater::DoReportRestartSuccess() {
+  restart_success_count_++;
+  call_log_.push_back("ReportRestartSuccess");
+}
+
+void MockUpdater::DoReportRestartFailure() {
+  restart_failure_count_++;
+  call_log_.push_back("ReportRestartFailure");
+}
+
 bool MockUpdater::ShouldAutoUpdate() {
   call_log_.push_back("ShouldAutoUpdate");
   return should_auto_update_;
@@ -257,6 +408,9 @@ void MockUpdater::Reset() {
   launch_start_count_ = 0;
   launch_success_count_ = 0;
   launch_failure_count_ = 0;
+  restart_start_count_ = 0;
+  restart_success_count_ = 0;
+  restart_failure_count_ = 0;
   start_update_thread_count_ = 0;
   init_result_ = true;
   should_auto_update_ = false;

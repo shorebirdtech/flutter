@@ -77,6 +77,8 @@ class DartIsolateGroupData : public PlatformMessageHandlerStorage {
   std::weak_ptr<PlatformMessageHandler> GetPlatformMessageHandler(
       int64_t root_isolate_token) const override;
 
+  static size_t ApplicationIsolateGroupCountForTesting();
+
  private:
   std::vector<std::shared_ptr<const fml::Mapping>> kernel_buffers_;
   const Settings settings_;
