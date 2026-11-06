@@ -4,7 +4,6 @@
 
 #include "flutter/shell/common/shorebird/updater.h"
 
-#include "flutter/common/settings.h"
 #include "flutter/fml/logging.h"
 
 #if SHOREBIRD_PLATFORM_SUPPORTED
@@ -15,30 +14,52 @@
 namespace flutter {
 namespace shorebird {
 
+namespace {
+constexpr int64_t kDefaultRestartWindowNanos = 5LL * 1000 * 1000 * 1000;
+std::unique_ptr<Updater> g_test_instance;
+}  // namespace
+
+std::atomic<bool> Updater::launch_started_{false};
+std::atomic<bool> Updater::launch_completed_{false};
+std::atomic<bool> Updater::patch_load_failed_{false};
+std::atomic<bool> Updater::patch_load_failed_for_testing_{false};
+std::atomic<bool> Updater::initialized_{false};
+std::atomic<bool> Updater::update_thread_started_{false};
+std::atomic<uint64_t> Updater::restart_generation_{0};
+std::atomic<int64_t> Updater::restart_window_nanos_{kDefaultRestartWindowNanos};
 std::mutex Updater::restart_hosts_mutex_;
 std::map<uintptr_t, std::function<bool()>> Updater::restart_hosts_;
 std::atomic<bool> Updater::hot_restart_supported_{false};
 
-std::shared_ptr<Updater> Updater::Default() {
+Updater& Updater::Instance() {
+  if (g_test_instance) {
+    return *g_test_instance;
+  }
 #if SHOREBIRD_PLATFORM_SUPPORTED
-  static std::shared_ptr<Updater> instance = std::make_shared<RealUpdater>();
+  static RealUpdater instance;
 #else
-  static std::shared_ptr<Updater> instance = std::make_shared<NoOpUpdater>();
+  static NoOpUpdater instance;
 #endif
   return instance;
 }
 
-std::shared_ptr<Updater> Updater::FromSettings(const Settings& settings) {
-  if (settings.shorebird_updater) {
-    return settings.shorebird_updater;
-  }
-  return Default();
+void Updater::SetInstanceForTesting(std::unique_ptr<Updater> updater) {
+  g_test_instance = std::move(updater);
 }
 
-void Updater::ResetLaunchState() {
-  BeginNewLaunchCycle();
+void Updater::ResetInstanceForTesting() {
+  g_test_instance.reset();
+}
+
+void Updater::ResetLaunchStateForTesting() {
+  launch_started_.store(false);
+  launch_completed_.store(false);
+  patch_load_failed_.store(false);
+  patch_load_failed_for_testing_.store(false);
   initialized_.store(false);
   update_thread_started_.store(false);
+  restart_generation_.store(0);
+  restart_window_nanos_.store(kDefaultRestartWindowNanos);
 }
 
 bool Updater::Init(const AppConfig& config) {
@@ -55,28 +76,13 @@ bool Updater::Init(const AppConfig& config) {
   return result;
 }
 
-bool Updater::IsInitialized() const {
+bool Updater::IsInitialized() {
   return initialized_.load();
 }
 
 AppConfig Updater::GetAppConfig() const {
   std::lock_guard<std::mutex> lock(app_config_mutex_);
   return app_config_;
-}
-
-// A hot restart re-runs the launch lifecycle, so only the per-cycle guards
-// clear. The process stays configured and its update thread stays running,
-// so `initialized_` and `update_thread_started_` deliberately survive.
-void Updater::BeginNewLaunchCycle() {
-  launch_started_.store(false);
-  launch_completed_.store(false);
-  patch_load_failed_.store(false);
-  restart_cycle_.store(false);
-}
-
-void Updater::BeginRestartLaunchCycle() {
-  BeginNewLaunchCycle();
-  restart_cycle_.store(true);
 }
 
 void Updater::RegisterRestartHost(uintptr_t host_id,
@@ -122,7 +128,7 @@ bool Updater::HotRestartSupported() {
 }
 
 void Updater::ReportLaunchStart() {
-  // Guard: only the first engine in a launch cycle should promote
+  // Guard: only the first engine in a process should promote
   // next_boot → current_boot in the Rust updater. See class-level comment
   // for rationale.
   bool expected = false;
@@ -133,7 +139,7 @@ void Updater::ReportLaunchStart() {
 }
 
 void Updater::ReportLaunchSuccess() {
-  // Guard: only report success once per launch cycle. Subsequent engines
+  // Guard: only report success once per process. Subsequent engines
   // reuse the same patch and don't need to re-confirm the boot. A boot
   // already reported as failed keeps that outcome, so the success is not
   // forwarded.
@@ -185,21 +191,45 @@ void Updater::MaybeStartUpdateThread() {
 }
 
 void Updater::ReportLaunchFailure() {
-  // Guard: only report failure once per launch cycle.
+  // Guard: only report failure once per process.
   bool expected = false;
   if (!launch_completed_.compare_exchange_strong(expected, true)) {
-    return;
-  }
-  if (restart_cycle_.load()) {
-    DoReportRestartFailure();
     return;
   }
   DoReportLaunchFailure();
 }
 
+uint64_t Updater::ReportRestartStart() {
+  patch_load_failed_.store(false);
+  uint64_t generation = restart_generation_.fetch_add(1) + 1;
+  DoReportRestartStart();
+  return generation;
+}
+
+void Updater::ReportRestartSuccess(uint64_t generation) {
+  if (generation != 0 && generation != restart_generation_.load()) {
+    return;
+  }
+  DoReportRestartSuccess();
+}
+
+void Updater::ReportRestartFailure() {
+  restart_generation_.fetch_add(1);
+  DoReportRestartFailure();
+}
+
+fml::TimeDelta Updater::RestartWindow() {
+  return fml::TimeDelta::FromNanoseconds(restart_window_nanos_.load());
+}
+
+void Updater::SetRestartWindowForTesting(fml::TimeDelta window) {
+  restart_window_nanos_.store(window.ToNanoseconds());
+}
+
 void Updater::ReportPatchLoadFailure() {
-  // Outside ReportLaunchFailure's guard, so the second symbol lookup in the
-  // same cycle still records the fact even though its report is dropped.
+  // Outside ReportLaunchFailure's guard so a hot restart (where the cold-boot
+  // launch guard is already claimed) still records the load failure for
+  // HotRestartEngine to observe via PatchLoadFailed().
   patch_load_failed_.store(true);
   ReportLaunchFailure();
 }
@@ -286,6 +316,14 @@ void RealUpdater::DoReportLaunchFailure() {
   shorebird_report_launch_failure();
 }
 
+void RealUpdater::DoReportRestartStart() {
+  shorebird_report_restart_start();
+}
+
+void RealUpdater::DoReportRestartSuccess() {
+  shorebird_report_restart_success();
+}
+
 void RealUpdater::DoReportRestartFailure() {
   shorebird_report_restart_failure();
 }
@@ -339,6 +377,16 @@ void MockUpdater::DoReportLaunchFailure() {
   call_log_.push_back("ReportLaunchFailure");
 }
 
+void MockUpdater::DoReportRestartStart() {
+  restart_start_count_++;
+  call_log_.push_back("ReportRestartStart");
+}
+
+void MockUpdater::DoReportRestartSuccess() {
+  restart_success_count_++;
+  call_log_.push_back("ReportRestartSuccess");
+}
+
 void MockUpdater::DoReportRestartFailure() {
   restart_failure_count_++;
   call_log_.push_back("ReportRestartFailure");
@@ -355,12 +403,13 @@ void MockUpdater::StartUpdateThread() {
 }
 
 void MockUpdater::Reset() {
-  ResetLaunchState();
   init_count_ = 0;
   validate_count_ = 0;
   launch_start_count_ = 0;
   launch_success_count_ = 0;
   launch_failure_count_ = 0;
+  restart_start_count_ = 0;
+  restart_success_count_ = 0;
   restart_failure_count_ = 0;
   start_update_thread_count_ = 0;
   init_result_ = true;

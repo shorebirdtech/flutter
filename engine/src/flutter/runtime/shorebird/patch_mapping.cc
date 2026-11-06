@@ -9,6 +9,7 @@
 
 #include <third_party/dart/runtime/bin/elf_loader.h>  // nogncheck
 #include "flutter/fml/logging.h"
+#include "flutter/runtime/dart_snapshot.h"  // nogncheck
 #include "third_party/dart/runtime/include/dart_api.h"
 #include "third_party/dart/runtime/include/dart_native_api.h"
 
@@ -173,6 +174,17 @@ const uint8_t* PatchMapping::GetMapping() const {
 bool PatchMapping::IsDontNeedSafe() const {
   // Patch mappings are file-backed and safe for madvise(DONTNEED).
   return true;
+}
+
+fml::RefPtr<DartSnapshot> DartSnapshot::IsolateSnapshotFromLoadedPatch(
+    const std::shared_ptr<LoadedPatch>& patch,
+    fml::RefPtr<const DartSnapshot> base_snapshot) {
+  if (!patch) {
+    return nullptr;
+  }
+  return IsolateSnapshotFromMappings(
+      patch->CreateDataMapping(), patch->CreateInstructionsMapping(),
+      std::move(base_snapshot), patch->link_header());
 }
 
 }  // namespace flutter

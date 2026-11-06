@@ -226,6 +226,22 @@ bool Engine::RestartWithSnapshot(
     return false;
   }
   delegate_.OnPreEngineRestart();
+  if (auto platform_isolate_manager =
+          runtime_controller_->GetPlatformIsolateManager()) {
+    fml::AutoResetWaitableEvent platiso_latch;
+    fml::TaskRunner::RunNowOrPostTask(
+        task_runners_.GetPlatformTaskRunner(),
+        [platform_isolate_manager = std::move(platform_isolate_manager),
+         &platiso_latch]() {
+          platform_isolate_manager->ShutdownPlatformIsolates();
+          platiso_latch.Signal();
+        });
+    platiso_latch.Wait();
+  }
+  if (auto root_isolate = std::const_pointer_cast<DartIsolate>(
+          runtime_controller_->GetRootIsolate().lock())) {
+    root_isolate->ShutdownChildIsolates();
+  }
   runtime_controller_ =
       runtime_controller_->CloneWithSnapshot(std::move(isolate_snapshot));
   UpdateAssetManager(nullptr);

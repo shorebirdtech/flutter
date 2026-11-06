@@ -194,6 +194,7 @@ int _checkAndroid(String outPath, String nmPath, Iterable<String> builds) {
       'shorebird_next_boot_patch_number': 'T',
       'shorebird_current_boot_patch_number': 'T',
       'shorebird_validate_next_boot_patch': 'T',
+      'shorebird_restart_app': 'T',
     };
     final badSymbols = <String, String>{};
     for (final String key in entryMap.keys) {

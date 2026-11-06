@@ -25,6 +25,15 @@ std::shared_ptr<const DartVMData> DartVMData::Create(
 
   if (isolate_snapshot && isolate_snapshot->GetBaseSnapshot()) {
     isolate_snapshot = isolate_snapshot->GetBaseSnapshot();
+  } else if (isolate_snapshot &&
+             !settings.base_application_library_paths.empty()) {
+    // On Android (!SHOREBIRD_USE_INTERPRETER), a cold-booted .vmcode patch
+    // snapshot does not attach GetBaseSnapshot(); resolve the base isolate
+    // snapshot explicitly so process-lifetime DartVMData never pins a patch.
+    if (auto base_snapshot =
+            DartSnapshot::BaseIsolateSnapshotFromSettings(settings)) {
+      isolate_snapshot = std::move(base_snapshot);
+    }
   }
 
   if (!isolate_snapshot || !isolate_snapshot->IsValid()) {

@@ -10,9 +10,11 @@
 
 #include "flutter/assets/asset_manager.h"
 #include "flutter/fml/logging.h"
+#include "flutter/runtime/dart_isolate.h"
 #include "flutter/runtime/dart_snapshot.h"
 #include "flutter/runtime/dart_vm.h"
 #include "flutter/runtime/isolate_configuration.h"
+#include "flutter/runtime/runtime_controller.h"
 #include "flutter/shell/common/engine.h"
 #include "flutter/shell/common/run_configuration.h"
 #include "flutter/shell/common/shell.h"
@@ -51,7 +53,7 @@ std::vector<std::string> LibraryPathsForNextBoot(
 }
 
 bool HotRestartEngine(Engine& engine, const Settings& settings) {
-  auto updater = Updater::FromSettings(settings);
+  auto& updater = Updater::Instance();
 
   // Whether any attempt reached `Engine::RestartWithSnapshot`, which tears
   // the running isolate down before it can fail. Snapshot resolution fails
@@ -69,29 +71,29 @@ bool HotRestartEngine(Engine& engine, const Settings& settings) {
   // base-release attempt has nothing to fall back to, so it ends the loop
   // rather than repeating itself.
   for (int attempt = 0; attempt < 2; ++attempt) {
-    updater->ValidateNextBootPatch();
-    const std::string patch_path = updater->NextBootPatchPath();
+    updater.ValidateNextBootPatch();
+    const std::string patch_path = updater.NextBootPatchPath();
     FML_LOG(INFO) << "Shorebird hot restart: relaunching from "
                   << (patch_path.empty() ? std::string("the base release")
                                          : patch_path);
 
     Settings restart_settings = settings;
     restart_settings.application_library_paths = LibraryPathsForNextBoot(
-        patch_path, updater->GetAppConfig().original_libapp_paths,
+        patch_path, updater.GetAppConfig().original_libapp_paths,
         kUseInterpreter);
 
     // A restart re-resolves only the isolate snapshot and reuses the running
     // DartVM, so the VM snapshot it booted with cannot change here whatever
     // the patch library contains. There is nothing to validate.
 
-    // Begin a fresh launch cycle: ReportLaunchStart is re-armed and fires
-    // during isolate snapshot resolution below (in ResolveIsolateData),
-    // exactly as it does on a cold boot. Flagged as a restart's cycle so a
-    // failure reported in it — including the snapshot loader's own report,
-    // which cannot know who asked it to load — rolls the boot target back
-    // without condemning the patch. If the process dies mid-restart, the
-    // next cold boot's crash recovery handles the breadcrumb instead.
-    updater->BeginRestartLaunchCycle();
+    // Record the restart attempt in the updater before resolving the snapshot:
+    // this writes the restart crash marker on disk and clears any prior
+    // per-attempt patch load failure flag. If the process crashes during
+    // isolate snapshot resolution, isolate startup, `main()`, or the post-
+    // restart launch window, the next cold boot detects the marker, disables
+    // future hot restarts for this release, and leaves the patch intact for
+    // cold boot to evaluate.
+    const uint64_t restart_generation = updater.ReportRestartStart();
     auto isolate_snapshot =
         DartSnapshot::IsolateSnapshotFromSettings(restart_settings);
     // A patch that fails to load does not always resolve to null. On iOS the
@@ -100,14 +102,14 @@ bool HotRestartEngine(Engine& engine, const Settings& settings) {
     // process and hands back a valid snapshot of base code. Relaunching that
     // would report success while running the code the patch was meant to
     // replace, and the retry below would never fire.
-    const bool patch_load_failed = updater->PatchLoadFailed();
+    const bool patch_load_failed = updater.PatchLoadFailed();
     if (!isolate_snapshot || patch_load_failed) {
       FML_LOG(ERROR) << "Shorebird hot restart: "
                      << (patch_load_failed
                              ? "the patch failed to load; the isolate "
                                "snapshot resolved to base code."
                              : "failed to resolve the isolate snapshot.");
-      updater->ReportLaunchFailure();
+      updater.ReportRestartFailure();
       if (patch_path.empty()) {
         break;
       }
@@ -137,13 +139,39 @@ bool HotRestartEngine(Engine& engine, const Settings& settings) {
     isolate_torn_down = true;
     if (engine.RestartWithSnapshot(std::move(configuration),
                                    std::move(isolate_snapshot))) {
-      updater->ReportLaunchSuccess();
+      // `Engine::RestartWithSnapshot` posts `main()` to the UI task runner /
+      // Dart event loop and returns before `main()` has executed. Defer
+      // `ReportRestartSuccess` until after the restart launch window on the UI
+      // task runner so the restart crash marker stays active through `main()`,
+      // `runApp()`, and the initial frames. Passing `restart_generation`
+      // ensures an earlier timer is a no-op if another restart or failure
+      // occurs before the window elapses.
+      std::weak_ptr<const DartIsolate> weak_isolate =
+          engine.GetRuntimeController()->GetRootIsolate();
+      auto root_isolate = weak_isolate.lock();
+      auto ui_task_runner =
+          root_isolate ? root_isolate->GetTaskRunners().GetUITaskRunner()
+                       : nullptr;
+      if (ui_task_runner) {
+        ui_task_runner->PostDelayedTask(
+            [weak_isolate, restart_generation]() {
+              auto isolate = weak_isolate.lock();
+              if (!isolate ||
+                  isolate->GetPhase() != DartIsolate::Phase::Running) {
+                return;
+              }
+              Updater::Instance().ReportRestartSuccess(restart_generation);
+            },
+            Updater::RestartWindow());
+      } else {
+        updater.ReportRestartSuccess(restart_generation);
+      }
       FML_LOG(INFO) << "Shorebird hot restart succeeded.";
       return true;
     }
 
     FML_LOG(ERROR) << "Shorebird hot restart: relaunch failed.";
-    updater->ReportLaunchFailure();
+    updater.ReportRestartFailure();
     if (patch_path.empty()) {
       break;
     }

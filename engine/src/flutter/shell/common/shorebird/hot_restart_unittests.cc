@@ -14,6 +14,7 @@
 #include "flutter/fml/mapping.h"
 #include "flutter/fml/paths.h"
 #include "flutter/runtime/dart_snapshot.h"
+#include "flutter/runtime/shorebird/patch_cache.h"
 #include "flutter/runtime/shorebird/patch_mapping.h"
 #include "flutter/shell/common/shorebird/updater.h"
 #include "gtest/gtest.h"
@@ -240,6 +241,9 @@ TEST(HotRestart, LibraryPathsWithoutPatchOrOriginalsAreEmpty) {
 
 TEST(HotRestart, TogglesPatchSnapshotOnAndOff10xWithoutLeakingLoadedPatch) {
   LoadedPatch::ResetCountsForTesting();
+  PatchCache::Instance().PruneExpired();
+  DartSnapshot::SetPatchSnapshotResolverForTesting(
+      &TryLoadIsolateSnapshotFromPatch);
 
   fml::ScopedTemporaryDirectory temp_dir;
   ASSERT_TRUE(temp_dir.fd().is_valid());
@@ -249,12 +253,13 @@ TEST(HotRestart, TogglesPatchSnapshotOnAndOff10xWithoutLeakingLoadedPatch) {
   fml::NonOwnedMapping mapping(vmcode.data(), vmcode.size());
   ASSERT_TRUE(fml::WriteAtomically(temp_dir.fd(), "dlc.vmcode", mapping));
 
-  auto mock = std::make_shared<MockUpdater>();
+  auto mock = std::make_unique<MockUpdater>();
+  Updater::SetInstanceForTesting(std::move(mock));
+  Updater::ResetLaunchStateForTesting();
   const std::vector<uint8_t> base_bytes = {10, 20, 30, 40};
   const std::vector<uint8_t> base_instrs = {50, 60, 70, 80};
 
   Settings base_settings;
-  base_settings.shorebird_updater = mock;
   base_settings.base_application_library_paths = {"/app/Frameworks/App"};
   base_settings.isolate_snapshot_data = [base_bytes]() {
     return std::make_unique<fml::MallocMapping>(
@@ -292,7 +297,11 @@ TEST(HotRestart, TogglesPatchSnapshotOnAndOff10xWithoutLeakingLoadedPatch) {
     EXPECT_EQ(active_snapshot->GetLinkHeaderSize(), 0u) << "cycle " << i;
   }
 
+  DartSnapshot::SetPatchSnapshotResolverForTesting(nullptr);
+  PatchCache::Instance().PruneExpired();
   LoadedPatch::ResetCountsForTesting();
+  Updater::ResetLaunchStateForTesting();
+  Updater::ResetInstanceForTesting();
 }
 
 }  // namespace testing

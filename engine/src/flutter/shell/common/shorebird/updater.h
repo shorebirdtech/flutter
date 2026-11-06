@@ -15,10 +15,9 @@
 #include <string>
 #include <vector>
 
+#include "flutter/fml/time/time_delta.h"
+
 namespace flutter {
-
-struct Settings;
-
 namespace shorebird {
 
 /// File callbacks for iOS patch loading.
@@ -61,14 +60,13 @@ struct AppConfig {
 ///
 /// ## Launch lifecycle (start/success/failure)
 ///
-/// The Rust updater uses a start/success/failure protocol to detect crashes:
+/// The Rust updater uses a start/success/failure protocol to detect crashes on
+/// cold boot:
 /// - `ReportLaunchStart` copies `next_boot` → `current_boot` in the Rust
 ///   state. If the app crashes before `ReportLaunchSuccess`, the updater
 ///   assumes the patch caused the crash and rolls back on the next launch.
 ///
-/// These calls are guarded to execute at most once per launch cycle. A
-/// process has exactly one cycle unless a hot restart begins another via
-/// `BeginNewLaunchCycle`. Within a cycle the guard is needed because:
+/// These calls are guarded to execute at most once per process because:
 /// 1. The Rust updater is a process-global singleton — calling
 ///    `report_launch_start` multiple times would repeatedly copy `next_boot`
 ///    → `current_boot`, which could promote a newly-downloaded (but not yet
@@ -81,6 +79,17 @@ struct AppConfig {
 ///    background update that completes between engine creations would get
 ///    promoted to "current" by the second engine's `ReportLaunchStart`,
 ///    even though that engine is still running the old snapshot.
+///
+/// ## Hot restart lifecycle
+///
+/// Only a cold boot judges a patch (`ReportLaunchStart` / `ReportLaunchSuccess`
+/// / `ReportLaunchFailure`). A hot restart uses its own separate reporting
+/// methods (`ReportRestartStart` / `ReportRestartSuccess` /
+/// `ReportRestartFailure`) so restarting into a newly downloaded patch does not
+/// promote it to `last_booted_patch`, delete older patches, or send
+/// `PatchInstallSuccess`, and a failed or crashed restart disables future hot
+/// restarts for this release while leaving the patch installed for the next
+/// cold boot to validate cleanly.
 ///
 /// ## Update thread
 ///
@@ -96,7 +105,7 @@ struct AppConfig {
 ///   patch) and mislabels the boot breadcrumb. After `ReportLaunchSuccess`
 ///   the booted patch is the last booted patch, and installs are safe.
 ///
-/// The start carries its own per-instance guard rather than riding on
+/// The start carries its own process-global guard rather than riding on
 /// the success report's. A patch that fails to load reports launch failure
 /// from `DartSnapshot::IsolateSnapshotFromSettings`, before any Shell exists,
 /// and that claims the shared report guard. The base-code boot that follows
@@ -118,10 +127,10 @@ class Updater {
   /// @return true if initialization succeeded
   bool Init(const AppConfig& config);
 
-  /// Whether any `Init` on this Updater has succeeded. A later `Init` (one
+  /// Whether any `Init` in this process has succeeded. A later `Init` (one
   /// per engine) fails with AlreadyInitialized while the updater is still
   /// configured, so callers ask this rather than trusting that result alone.
-  bool IsInitialized() const;
+  static bool IsInitialized();
 
   /// A copy of the configuration passed to the most recent `Init` call. Hot
   /// restart uses `original_libapp_paths` to fall back to the base release
@@ -138,23 +147,38 @@ class Updater {
   /// @return Path to patch, or empty string if no patch available
   virtual std::string NextBootPatchPath() = 0;
 
-  // Boot lifecycle methods, guarded to run at most once per launch cycle.
+  // Cold-boot lifecycle methods, guarded to run at most once per process.
   // Callers may call these freely; subsequent calls after the first are
-  // silently ignored. A process normally has exactly one launch cycle; hot
-  // restart begins another via `BeginNewLaunchCycle`. `ReportLaunchSuccess`
-  // still attempts the update-thread start on every call, which carries its
-  // own guard. See the class comment.
+  // silently ignored. `ReportLaunchSuccess` still attempts the update-thread
+  // start on every call, which carries its own guard. See the class comment.
   void ReportLaunchStart();
   void ReportLaunchSuccess();
   void ReportLaunchFailure();
 
-  /// Reports a patch the snapshot loader could not load: a failed launch,
-  /// plus the fact that the process is about to run base code. Call this
-  /// rather than `ReportLaunchFailure` from the loader, so a hot restart can
-  /// tell the two apart — see `PatchLoadFailed`.
+  // Hot-restart lifecycle methods. Unlike cold boot, these can run on each
+  // restart attempt and never promote a patch to `last_booted_patch` or
+  // tombstone a patch. `ReportRestartStart` returns a generation token that
+  // `ReportRestartSuccess` checks when the launch window closes on the UI
+  // task runner so a timer from an earlier attempt is ignored if a subsequent
+  // attempt or failure intervened.
+  uint64_t ReportRestartStart();
+  void ReportRestartSuccess(uint64_t generation = 0);
+  void ReportRestartFailure();
+
+  /// How long a hot-restarted isolate must survive on the UI task runner after
+  /// `Engine::RestartWithSnapshot` returns before `ReportRestartSuccess`
+  /// clears the restart crash marker on disk.
+  static fml::TimeDelta RestartWindow();
+  static void SetRestartWindowForTesting(fml::TimeDelta window);
+
+  /// Reports a patch the snapshot loader could not load: records
+  /// `PatchLoadFailed()` and, on cold boot, forwards `ReportLaunchFailure()`.
+  /// Call this rather than `ReportLaunchFailure` from the loader, so a hot
+  /// restart can tell the two apart — see `PatchLoadFailed`.
   void ReportPatchLoadFailure();
 
-  /// Whether this launch cycle reported a patch that failed to load.
+  /// Whether the most recent snapshot load attempt reported a patch that
+  /// failed to load.
   ///
   /// A failed load is not always visible in the snapshot that comes back. A
   /// patch carries only the code it rewrote, so on iOS the base library
@@ -165,32 +189,11 @@ class Updater {
   bool PatchLoadFailed() const;
 
   /// Testing only: reports a patch load failure that survives
-  /// `BeginNewLaunchCycle`. The real flag is set by the loader while it
+  /// `ReportRestartStart`. The real flag is set by the loader while it
   /// resolves the isolate snapshot, which a test cannot drive, and is cleared
   /// at the start of every restart attempt, so a test has no other way to
   /// reach the paths that react to a failed load.
-  void SetPatchLoadFailedForTesting(bool failed);
-
-  /// Re-arms the launch lifecycle guards so a hot restart can report a new
-  /// launch cycle (start, then success/failure) to the Rust updater —
-  /// exactly like a fresh process boot. Only the hot restart host may call
-  /// this, immediately before re-resolving the isolate snapshot.
-  void BeginNewLaunchCycle();
-
-  /// `BeginNewLaunchCycle`, and marks the cycle as a hot restart's.
-  ///
-  /// A failure reported in a restart cycle does not condemn the patch:
-  /// `ReportLaunchFailure` routes to the Rust updater's restart-failure
-  /// path, which rolls the boot target back for this process but leaves
-  /// the patch installed. The restart mechanism can fail for reasons the
-  /// patch has no part in, and a cold boot onto the same patch is how we
-  /// find out; tombstoning here would delete the artifacts and make that
-  /// retry impossible.
-  ///
-  /// The routing is per cycle rather than per call site because the
-  /// snapshot loader reports its own failures (`ReportPatchLoadFailure`)
-  /// and has no way to know a restart is what asked it to load.
-  void BeginRestartLaunchCycle();
+  static void SetPatchLoadFailedForTesting(bool failed);
 
   // Hot restart hosts.
   //
@@ -200,9 +203,11 @@ class Updater {
   // arbitrary thread) when Dart calls `shorebird_restart_app`; the host's
   // callback must schedule the restart asynchronously and return whether it
   // was scheduled. Restarting is only supported with exactly one live host:
-  // with multiple engines in one process (add-to-app, FlutterEngineGroup)
-  // there is no safe way to restart them all against a shared updater
-  // state, so the request is rejected.
+  // with multiple engines in one process (add-to-app, FlutterEngineGroup, or
+  // while a plugin is running a headless background FlutterEngine such as
+  // workmanager, firebase_messaging, or flutter_background_service) there is
+  // no safe way to restart them all against a shared updater state, so the
+  // request is rejected.
   static void RegisterRestartHost(uintptr_t host_id,
                                   std::function<bool()> request_restart);
   static void UnregisterRestartHost(uintptr_t host_id);
@@ -228,12 +233,17 @@ class Updater {
   /// Cheap when there is nothing to report.
   virtual void ProtectedDataAvailable() {}
 
-  /// Returns the Updater instance carried on `settings.shorebird_updater` when
-  /// set, or the process-default Updater instance otherwise.
-  static std::shared_ptr<Updater> FromSettings(const Settings& settings);
+  // Singleton access
+  static Updater& Instance();
 
-  /// Returns the process-default Updater instance.
-  static std::shared_ptr<Updater> Default();
+  // Testing support: inject a custom Updater implementation.
+  static void SetInstanceForTesting(std::unique_ptr<Updater> updater);
+  static void ResetInstanceForTesting();
+
+  /// Reset the per-process launch lifecycle guards. Must be called in test
+  /// TearDown when testing launch start/success/failure across multiple
+  /// test cases.
+  static void ResetLaunchStateForTesting();
 
  protected:
   Updater() = default;
@@ -243,39 +253,42 @@ class Updater {
   virtual void DoReportLaunchStart() = 0;
   virtual void DoReportLaunchSuccess() = 0;
   virtual void DoReportLaunchFailure() = 0;
+  virtual void DoReportRestartStart() = 0;
+  virtual void DoReportRestartSuccess() = 0;
   virtual void DoReportRestartFailure() = 0;
 
-  void ResetLaunchState();
-
  private:
-  // Starts the update thread at most once per Updater instance, if the updater
-  // is configured and auto-update is on. Called from `ReportLaunchSuccess`.
+  // Starts the update thread at most once per process, if the updater is
+  // configured and auto-update is on. Called from `ReportLaunchSuccess`.
   void MaybeStartUpdateThread();
 
   // Guards `app_config_` against a concurrent `Init`. See `GetAppConfig`.
   mutable std::mutex app_config_mutex_;
   AppConfig app_config_;
 
-  // Per-instance guards for launch lifecycle. See `BeginNewLaunchCycle`.
-  std::atomic<bool> launch_started_{false};
-  std::atomic<bool> launch_completed_{false};
-  // Whether this cycle is a hot restart's rather than a process boot's.
-  // Decides which failure a report becomes. See
-  // `BeginRestartLaunchCycle`.
-  std::atomic<bool> restart_cycle_{false};
-  // Set when the loader reports a patch it could not load, and cleared with
-  // the guards above. Read by the hot restart host, which cannot see that
-  // failure in the snapshot it gets back. See `PatchLoadFailed`.
-  std::atomic<bool> patch_load_failed_{false};
+  // Process-global guards for launch lifecycle. Static so that they persist
+  // across Updater::Instance() calls within the same process, and can be
+  // reset via ResetLaunchStateForTesting() between test cases.
+  static std::atomic<bool> launch_started_;
+  static std::atomic<bool> launch_completed_;
+  // Set when the loader reports a patch it could not load, and cleared at the
+  // start of each restart attempt. Read by the hot restart host, which cannot
+  // see that failure in the snapshot it gets back. See `PatchLoadFailed`.
+  static std::atomic<bool> patch_load_failed_;
   // Stands in for the loader's report, which a test cannot produce. Kept
-  // apart from the flag above so the launch-cycle reset does not clear it.
-  std::atomic<bool> patch_load_failed_for_testing_{false};
+  // apart from the flag above so `ReportRestartStart` does not clear it.
+  static std::atomic<bool> patch_load_failed_for_testing_;
   // Whether any `Init` succeeded; the update thread needs a configured
-  // updater. Latched for the lifetime of this Updater instance.
-  std::atomic<bool> initialized_{false};
+  // updater. Latched for the life of the process.
+  static std::atomic<bool> initialized_;
   // Separate from the launch guards above: a reported failure must not stop
   // a later successful boot from starting the thread. See the class comment.
-  std::atomic<bool> update_thread_started_{false};
+  static std::atomic<bool> update_thread_started_;
+  // Monotonic counter incremented on each `ReportRestartStart` and
+  // `ReportRestartFailure` so delayed `ReportRestartSuccess` tasks from
+  // superseded restart attempts are ignored.
+  static std::atomic<uint64_t> restart_generation_;
+  static std::atomic<int64_t> restart_window_nanos_;
 
   // Hot restart host registry.
   static std::mutex restart_hosts_mutex_;
@@ -296,6 +309,8 @@ class NoOpUpdater : public Updater {
   void DoReportLaunchStart() override {}
   void DoReportLaunchSuccess() override {}
   void DoReportLaunchFailure() override {}
+  void DoReportRestartStart() override {}
+  void DoReportRestartSuccess() override {}
   void DoReportRestartFailure() override {}
   bool ShouldAutoUpdate() override { return false; }
   void StartUpdateThread() override {}
@@ -315,6 +330,8 @@ class RealUpdater : public Updater {
   void DoReportLaunchStart() override;
   void DoReportLaunchSuccess() override;
   void DoReportLaunchFailure() override;
+  void DoReportRestartStart() override;
+  void DoReportRestartSuccess() override;
   void DoReportRestartFailure() override;
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
@@ -335,6 +352,8 @@ class MockUpdater : public Updater {
   void DoReportLaunchStart() override;
   void DoReportLaunchSuccess() override;
   void DoReportLaunchFailure() override;
+  void DoReportRestartStart() override;
+  void DoReportRestartSuccess() override;
   void DoReportRestartFailure() override;
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
@@ -345,6 +364,8 @@ class MockUpdater : public Updater {
   int launch_start_count() const { return launch_start_count_; }
   int launch_success_count() const { return launch_success_count_; }
   int launch_failure_count() const { return launch_failure_count_; }
+  int restart_start_count() const { return restart_start_count_; }
+  int restart_success_count() const { return restart_success_count_; }
   int restart_failure_count() const { return restart_failure_count_; }
   int start_update_thread_count() const { return start_update_thread_count_; }
   const std::vector<std::string>& call_log() const { return call_log_; }
@@ -372,6 +393,8 @@ class MockUpdater : public Updater {
   int launch_start_count_ = 0;
   int launch_success_count_ = 0;
   int launch_failure_count_ = 0;
+  int restart_start_count_ = 0;
+  int restart_success_count_ = 0;
   int restart_failure_count_ = 0;
   int start_update_thread_count_ = 0;
   bool init_result_ = true;

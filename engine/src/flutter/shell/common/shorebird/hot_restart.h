@@ -28,6 +28,14 @@ namespace shorebird {
 /// HotRestartEngine to its UI task runner. Everything below runs on the UI
 /// thread, like the debug-mode hot restart in
 /// Shell::OnServiceProtocolRunInView.
+///
+/// Multi-engine caveat: Once ConfigureShorebird enables hot restart for the
+/// process, every Shell registers as a restart host at setup and unregisters at
+/// destruction. Restarting is only supported when exactly one host is live: if
+/// multiple Shells exist simultaneously (e.g. add-to-app, FlutterEngineGroup,
+/// or a plugin running a headless background FlutterEngine),
+/// Updater::RequestRestart rejects the restart rather than restarting only one
+/// engine against shared updater state.
 
 /// The Settings::application_library_paths list to resolve the next boot's
 /// snapshots from, mirroring how ConfigureShorebird builds the list at cold
@@ -44,19 +52,26 @@ std::vector<std::string> LibraryPathsForNextBoot(
 
 /// Tears down `engine`'s root isolate and relaunches it from the current
 /// next-boot patch. Must run on the UI thread. `settings` is the Shell's
-/// settings. When a relaunch fails, reports launch failure to the updater,
-/// which rolls the patch back, and retries once against the rolled-back
-/// selection (the last good patch or the base release). If the failed attempt
-/// was already booting the base release there is nothing to roll back, so no
-/// retry happens.
+/// settings.
 ///
-/// Returns true once a relaunch has succeeded, and false when no attempt got
-/// as far as relaunching: the isolate was never torn down, so the app keeps
-/// running the code it had and the next cold boot takes the rolled-back
-/// selection. It does not return at all when an attempt did tear the isolate
-/// down and every attempt then failed, because that would leave a live Shell
-/// with a frozen UI; the process is terminated instead and the updater's
-/// crash handling rolls the patch back on the next cold boot.
+/// Uses the updater's dedicated restart lifecycle (`ReportRestartStart`,
+/// `ReportRestartSuccess`, `ReportRestartFailure`) rather than the cold-boot
+/// launch lifecycle: a failure during hot restart drops the candidate patch
+/// from this process's in-memory boot target (and disables further hot
+/// restarts for this release) without condemning the patch on disk, and
+/// retries once against the fallback selection (the last booted patch or the
+/// base release). When `Engine::RestartWithSnapshot` succeeds,
+/// `ReportRestartSuccess` is posted to the UI task runner after the restart
+/// launch window (`Updater::RestartWindow()`) so a synchronous or early async
+/// crash in `main()` / `runApp()` leaves the restart crash marker on disk for
+/// the next cold boot to detect.
+///
+/// Returns true once `Engine::RestartWithSnapshot` has succeeded, and false
+/// when no attempt got as far as relaunching: the isolate was never torn down,
+/// so the app keeps running the code it had. It does not return at all when an
+/// attempt did tear the isolate down and every attempt then failed, because
+/// that would leave a live Shell with a frozen UI; the process is terminated
+/// instead.
 bool HotRestartEngine(Engine& engine, const Settings& settings);
 
 }  // namespace shorebird

@@ -120,8 +120,7 @@ source_set("runtime") {
     "//flutter/txt",
   ]
 
-  if (is_ios || enable_unittests) {
-    defines = [ "SHOREBIRD_ENABLE_PATCH_MAPPING=1" ]
+  if (is_ios) {
     deps += [ "//flutter/runtime/shorebird:patch_cache" ]
   }
 }

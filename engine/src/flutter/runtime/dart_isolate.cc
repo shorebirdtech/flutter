@@ -976,7 +976,7 @@ bool DartIsolate::Shutdown() {
 
 void DartIsolate::ShutdownChildIsolates() {
   TRACE_EVENT0("flutter", "DartIsolate::ShutdownChildIsolates");
-  if (phase_ == Phase::Shutdown || !IsRootIsolate() || is_spawning_in_group_) {
+  if (phase_ == Phase::Shutdown || !IsRootIsolate()) {
     return;
   }
   Dart_Isolate vm_isolate = isolate();
