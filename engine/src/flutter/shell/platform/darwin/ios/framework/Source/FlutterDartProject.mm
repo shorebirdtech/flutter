@@ -51,6 +51,7 @@ NSNumber* _Nullable FLTEnableWideGamutFromBundle(NSBundle* _Nullable bundle,
   return nsEnableWideGamut;
 }
 
+#if !FLUTTER_JIT_RUNTIME
 // A launch before the device's first unlock (a push, a background fetch)
 // can't read the updater's files, which iOS protects until then, so it runs
 // the base release and can't report why. Tell the updater once the files
@@ -77,6 +78,7 @@ static void ObserveShorebirdProtectedData() {
                     usingBlock:notify];
   });
 }
+#endif  // !FLUTTER_JIT_RUNTIME
 
 flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* processInfoOrNil) {
   auto command_line = flutter::CommandLineFromNSProcessInfo(processInfoOrNil);
@@ -198,6 +200,13 @@ flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* p
   NSString* assetsPath = [NSString stringWithUTF8String:settings.assets_path.c_str()];
   NSLog(@"ASSET PATH %@", assetsPath);
 
+  // Debug (JIT) builds never start the updater: patches are AOT code, and a
+  // debug session must not check for, download or report on a release's
+  // patches. The tool bundles shorebird.yaml in every build mode. (Android
+  // skips it outside FLUTTER_RELEASE; iOS keeps it in profile.)
+#if FLUTTER_JIT_RUNTIME
+  NSLog(@"Debug build, not starting the Shorebird updater.");
+#else
   // FIXME: This may not be the correct path (e.g., should it include the organization id?)
   // See
   // https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html#//apple_ref/doc/uid/TP40010672-CH2-SW13
@@ -226,6 +235,7 @@ flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* p
   } else {
     NSLog(@"Failed to find shorebird.yaml, not starting updater.");
   }
+#endif  // FLUTTER_JIT_RUNTIME
 
   // Domain network configuration
   // Disabled in https://github.com/flutter/flutter/issues/72723.
