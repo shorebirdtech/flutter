@@ -103,6 +103,11 @@ class DartSnapshot : public fml::RefCountedThreadSafe<DartSnapshot> {
   static fml::RefPtr<const DartSnapshot> IsolateSnapshotFromSettings(
       const Settings& settings);
 
+  using PatchSnapshotResolver =
+      fml::RefPtr<const DartSnapshot> (*)(const Settings& settings);
+  static void SetPatchSnapshotResolverForTesting(
+      PatchSnapshotResolver resolver);
+
   //----------------------------------------------------------------------------
   /// @brief      Infer the unpatched base isolate snapshot from the given
   ///             settings object, ignoring any `.vmcode` patch paths.
@@ -128,7 +133,9 @@ class DartSnapshot : public fml::RefCountedThreadSafe<DartSnapshot> {
   /// @return     A valid isolate snapshot or nullptr.
   static fml::RefPtr<DartSnapshot> IsolateSnapshotFromMappings(
       const std::shared_ptr<const fml::Mapping>& snapshot_data,
-      const std::shared_ptr<const fml::Mapping>& snapshot_instructions);
+      const std::shared_ptr<const fml::Mapping>& snapshot_instructions,
+      fml::RefPtr<const DartSnapshot> base_snapshot = nullptr,
+      std::shared_ptr<const fml::Mapping> link_header = nullptr);
 
   //----------------------------------------------------------------------------
   /// @brief      Create an isolate snapshot specialized for launching the

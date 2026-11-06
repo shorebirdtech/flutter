@@ -206,23 +206,16 @@ bool ValidateViewportMetrics(const ViewportMetrics& metrics) {
 
 std::pair<DartVMRef, fml::RefPtr<const DartSnapshot>>
 Shell::InferVmInitDataFromSettings(Settings& settings) {
-  if (!settings.shorebird_updater) {
-    settings.shorebird_updater = shorebird::Updater::Default();
-  }
-  // Launch the VM with the unpatched base isolate snapshot so process-lifetime
-  // DartVMData never pins a patch mapping. The returned isolate_snapshot is the
-  // active snapshot for the Shell's root isolate.
+  // Always use the `vm_snapshot` and `isolate_snapshot` provided by the
+  // settings to launch the VM.  If the VM is already running, the snapshot
+  // arguments are ignored.
   auto vm_snapshot = DartSnapshot::VMSnapshotFromSettings(settings);
   auto isolate_snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
-  auto base_isolate_snapshot =
-      (isolate_snapshot && isolate_snapshot->GetBaseSnapshot())
-          ? isolate_snapshot->GetBaseSnapshot()
-          : DartSnapshot::BaseIsolateSnapshotFromSettings(settings);
-  auto vm = DartVMRef::Create(settings, vm_snapshot, base_isolate_snapshot);
+  auto vm = DartVMRef::Create(settings, vm_snapshot, isolate_snapshot);
 
   // If the settings did not specify an `isolate_snapshot`, fall back to the
   // one the VM was launched with.
-  if (!isolate_snapshot && vm) {
+  if (!isolate_snapshot) {
     isolate_snapshot = vm->GetVMData()->GetIsolateSnapshot();
   }
   return {std::move(vm), isolate_snapshot};
@@ -538,11 +531,10 @@ Shell::Shell(DartVMRef vm,
   // In add-to-app, subsequent engines are silently ignored since they
   // boot from the same snapshot that was already reported on.
   // On unsupported platforms, NoOpUpdater handles these calls gracefully.
-  auto updater = shorebird::Updater::FromSettings(settings_);
   if (!vm_) {
-    updater->ReportLaunchFailure();
+    shorebird::Updater::Instance().ReportLaunchFailure();
   } else {
-    updater->ReportLaunchSuccess();
+    shorebird::Updater::Instance().ReportLaunchSuccess();
   }
   FML_CHECK(!settings.enable_software_rendering || !settings.enable_impeller)
       << "Software rendering is incompatible with Impeller.";
@@ -730,8 +722,8 @@ std::unique_ptr<Shell> Shell::Spawn(
   std::unique_ptr<Shell> result = CreateWithSnapshot(
       PlatformData{}, task_runners_, rasterizer_->GetRasterThreadMerger(),
       io_manager_, resource_cache_limit_calculator_, GetSettings(), vm_,
-      engine_->GetRuntimeController()->GetIsolateSnapshot(),
-      on_create_platform_view, on_create_rasterizer,
+      vm_->GetVMData()->GetIsolateSnapshot(), on_create_platform_view,
+      on_create_rasterizer,
       [engine = this->engine_.get(), initial_route](
           Engine::Delegate& delegate,
           const PointerDataDispatcherMaker& dispatcher_maker, DartVM& vm,

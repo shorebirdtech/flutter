@@ -1,7 +1,3 @@
-// Copyright 2013 The Flutter Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 #include "flutter/shell/common/shorebird/shorebird.h"
 
 #include <algorithm>
@@ -15,7 +11,6 @@
 
 namespace flutter {
 namespace testing {
-
 TEST(Shorebird, GetValueFromYamlValueExists) {
   std::string yaml = "appid: com.example.app\nversion: 1.0.0\n";
   std::string key = "appid";
@@ -32,6 +27,19 @@ TEST(Shorebird, GetValueFromYamlValueDoesNotExist) {
 
 class LoadPatchOrBaseTest : public ::testing::Test {
  protected:
+  void SetUp() override {
+    auto mock = std::make_unique<shorebird::MockUpdater>();
+    mock_ = mock.get();
+    shorebird::Updater::SetInstanceForTesting(std::move(mock));
+    shorebird::Updater::ResetLaunchStateForTesting();
+  }
+
+  void TearDown() override {
+    mock_ = nullptr;
+    shorebird::Updater::ResetInstanceForTesting();
+    shorebird::Updater::ResetLaunchStateForTesting();
+  }
+
   // Loads only the paths in |loadable|, recording every attempt.
   bool Load(const std::string& path) {
     attempts_.push_back(path);
@@ -42,10 +50,10 @@ class LoadPatchOrBaseTest : public ::testing::Test {
   bool Run(const std::string& patch_path) {
     return LoadPatchOrBase(
         patch_path, "base.so",
-        [this](const std::string& path) { return Load(path); }, &mock_);
+        [this](const std::string& path) { return Load(path); });
   }
 
-  shorebird::MockUpdater mock_;
+  shorebird::MockUpdater* mock_ = nullptr;
   std::vector<std::string> loadable_;
   std::vector<std::string> attempts_;
 };
@@ -55,7 +63,7 @@ TEST_F(LoadPatchOrBaseTest, LoadsBaseWithoutAPatch) {
 
   EXPECT_TRUE(Run(""));
   EXPECT_EQ(attempts_, std::vector<std::string>({"base.so"}));
-  EXPECT_TRUE(mock_.call_log().empty());
+  EXPECT_TRUE(mock_->call_log().empty());
 }
 
 TEST_F(LoadPatchOrBaseTest, LoadsPatchWithoutReporting) {
@@ -64,7 +72,7 @@ TEST_F(LoadPatchOrBaseTest, LoadsPatchWithoutReporting) {
   EXPECT_TRUE(Run("patch.vmcode"));
   EXPECT_EQ(attempts_, std::vector<std::string>({"patch.vmcode"}));
   // The Shell reports the boot once it exists.
-  EXPECT_TRUE(mock_.call_log().empty());
+  EXPECT_TRUE(mock_->call_log().empty());
 }
 
 TEST_F(LoadPatchOrBaseTest, ReportsAFailedPatchAndLoadsBase) {
@@ -72,7 +80,7 @@ TEST_F(LoadPatchOrBaseTest, ReportsAFailedPatchAndLoadsBase) {
 
   EXPECT_TRUE(Run("patch.vmcode"));
   EXPECT_EQ(attempts_, std::vector<std::string>({"patch.vmcode", "base.so"}));
-  const auto& log = mock_.call_log();
+  const auto& log = mock_->call_log();
   ASSERT_EQ(log.size(), 2u);
   EXPECT_EQ(log[0], "ReportLaunchStart");
   EXPECT_EQ(log[1], "ReportLaunchFailure");
@@ -84,43 +92,53 @@ TEST_F(LoadPatchOrBaseTest, BaseBootAfterAFailedPatchIsNotReportedAsSuccess) {
   loadable_ = {"base.so"};
   ASSERT_TRUE(Run("patch.vmcode"));
 
-  mock_.ReportLaunchStart();
-  mock_.ReportLaunchSuccess();
+  shorebird::Updater::Instance().ReportLaunchStart();
+  shorebird::Updater::Instance().ReportLaunchSuccess();
 
-  EXPECT_EQ(mock_.launch_start_count(), 1);
-  EXPECT_EQ(mock_.launch_failure_count(), 1);
-  EXPECT_EQ(mock_.launch_success_count(), 0);
+  EXPECT_EQ(mock_->launch_start_count(), 1);
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  EXPECT_EQ(mock_->launch_success_count(), 0);
 }
 
 TEST_F(LoadPatchOrBaseTest, FailsWhenNeitherLoads) {
   EXPECT_FALSE(Run("patch.vmcode"));
   EXPECT_EQ(attempts_, std::vector<std::string>({"patch.vmcode", "base.so"}));
-  EXPECT_EQ(mock_.launch_failure_count(), 1);
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
 }
 
 class ConfigureShorebirdTest : public ::testing::Test {
  protected:
+  void SetUp() override {
+    auto mock = std::make_unique<shorebird::MockUpdater>();
+    mock_ = mock.get();
+    shorebird::Updater::SetInstanceForTesting(std::move(mock));
+    shorebird::Updater::ResetLaunchStateForTesting();
+  }
+
+  void TearDown() override {
+    mock_ = nullptr;
+    shorebird::Updater::ResetInstanceForTesting();
+    shorebird::Updater::ResetLaunchStateForTesting();
+  }
+
   static ShorebirdConfigArgs Args(std::string yaml,
                                   ReleaseVersion release_version) {
     return ShorebirdConfigArgs("cache", "storage", {"base.so"}, std::move(yaml),
                                std::move(release_version));
   }
 
-  bool Run(const ShorebirdConfigArgs& args, std::string& patch_path) {
-    return ConfigureShorebird(args, patch_path, &mock_);
-  }
-
-  shorebird::MockUpdater mock_;
+  shorebird::MockUpdater* mock_ = nullptr;
 };
 
 TEST_F(ConfigureShorebirdTest, InitializesTheUpdaterAndReturnsThePatch) {
-  mock_.set_next_boot_patch_path("patch.vmcode");
+  mock_->set_next_boot_patch_path("patch.vmcode");
   std::string patch_path = "stale";
 
-  EXPECT_TRUE(Run(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
+  EXPECT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
 
   EXPECT_EQ(patch_path, "patch.vmcode");
-  const auto& config = mock_.last_config();
+  const auto& config = mock_->last_config();
   EXPECT_EQ(config.release_version, "1.0.0+3");
   EXPECT_EQ(config.original_libapp_paths,
             std::vector<std::string>({"base.so"}));
@@ -131,31 +149,33 @@ TEST_F(ConfigureShorebirdTest, InitializesTheUpdaterAndReturnsThePatch) {
             fml::paths::JoinPaths({"cache", "shorebird_updater", "abc"}));
   EXPECT_EQ(config.app_storage_dir,
             fml::paths::JoinPaths({"storage", "shorebird_updater", "abc"}));
-  EXPECT_EQ(mock_.validate_count(), 1);
+  EXPECT_EQ(mock_->validate_count(), 1);
   // The Shell reports the boot once it exists.
-  EXPECT_EQ(mock_.launch_start_count(), 0);
+  EXPECT_EQ(mock_->launch_start_count(), 0);
 }
 
 TEST_F(ConfigureShorebirdTest, OmitsAnEmptyBuildNumber) {
   std::string patch_path;
-  Run(Args("app_id: abc\n", {"1.0.0", ""}), patch_path);
-  EXPECT_EQ(mock_.last_config().release_version, "1.0.0");
+  ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", ""}), patch_path);
+  EXPECT_EQ(mock_->last_config().release_version, "1.0.0");
 }
 
 TEST_F(ConfigureShorebirdTest, ClearsThePatchPathWithoutAPatch) {
   std::string patch_path = "stale";
-  EXPECT_TRUE(Run(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
+  EXPECT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
   EXPECT_EQ(patch_path, "");
 }
 
 TEST_F(ConfigureShorebirdTest, StopsWithoutAnAppId) {
-  mock_.set_next_boot_patch_path("patch.vmcode");
+  mock_->set_next_boot_patch_path("patch.vmcode");
   std::string patch_path = "stale";
 
-  EXPECT_FALSE(Run(Args("base_url: x\n", {"1.0.0", "3"}), patch_path));
+  EXPECT_FALSE(
+      ConfigureShorebird(Args("base_url: x\n", {"1.0.0", "3"}), patch_path));
 
   EXPECT_EQ(patch_path, "");
-  EXPECT_TRUE(mock_.call_log().empty());
+  EXPECT_TRUE(mock_->call_log().empty());
 }
 
 TEST(ApplyPatchToSettings, LeavesSettingsAloneWithoutAPatch) {
@@ -180,20 +200,23 @@ TEST(ApplyPatchToSettings, ReplacesTheLibraryWithThePatch) {
 // AlreadyInitialized from the updater. It still boots the patch.
 // https://github.com/shorebirdtech/shorebird/issues/3888
 TEST_F(ConfigureShorebirdTest, SecondEngineStillBootsThePatch) {
-  mock_.set_next_boot_patch_path("patch.vmcode");
+  mock_->set_next_boot_patch_path("patch.vmcode");
   std::string first_path;
-  ASSERT_TRUE(Run(Args("app_id: abc\n", {"1.0.0", "3"}), first_path));
+  ASSERT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), first_path));
 
-  mock_.set_init_result(false);
+  mock_->set_init_result(false);
   std::string second_path;
-  EXPECT_TRUE(Run(Args("app_id: abc\n", {"1.0.0", "3"}), second_path));
+  EXPECT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), second_path));
   EXPECT_EQ(second_path, "patch.vmcode");
 }
 
 TEST_F(ConfigureShorebirdTest, FailsWhenNoInitSucceeded) {
-  mock_.set_init_result(false);
+  mock_->set_init_result(false);
   std::string patch_path;
-  EXPECT_FALSE(Run(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
+  EXPECT_FALSE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
 }
 
 }  // namespace testing

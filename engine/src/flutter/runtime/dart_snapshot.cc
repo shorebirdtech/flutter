@@ -13,12 +13,22 @@
 #include "flutter/runtime/dart_vm.h"
 #include "third_party/dart/runtime/include/dart_api.h"
 
-#if defined(SHOREBIRD_ENABLE_PATCH_MAPPING)
-#include "flutter/runtime/shorebird/patch_mapping.h"
-#endif  // defined(SHOREBIRD_ENABLE_PATCH_MAPPING)
+#if SHOREBIRD_USE_INTERPRETER
+#include "flutter/runtime/shorebird/patch_cache.h"  // nogncheck
+#endif
 #include "flutter/shell/common/shorebird/updater.h"  // nogncheck
 
 namespace flutter {
+
+namespace {
+DartSnapshot::PatchSnapshotResolver g_patch_snapshot_resolver_for_testing =
+    nullptr;
+}  // namespace
+
+void DartSnapshot::SetPatchSnapshotResolverForTesting(
+    PatchSnapshotResolver resolver) {
+  g_patch_snapshot_resolver_for_testing = resolver;
+}
 
 const char* DartSnapshot::kVMDataSymbol = "kDartSnapshotData";
 const char* DartSnapshot::kVMInstructionsSymbol = "kDartSnapshotText";
@@ -258,48 +268,27 @@ fml::RefPtr<const DartSnapshot> DartSnapshot::BaseIsolateSnapshotFromSettings(
   return nullptr;
 }
 
-#if defined(SHOREBIRD_ENABLE_PATCH_MAPPING)
-fml::RefPtr<DartSnapshot> DartSnapshot::IsolateSnapshotFromLoadedPatch(
-    const std::shared_ptr<LoadedPatch>& patch,
-    fml::RefPtr<const DartSnapshot> base_snapshot) {
-  if (!patch) {
-    return nullptr;
-  }
-  auto snapshot =
-      fml::MakeRefCounted<DartSnapshot>(patch->CreateDataMapping(),          //
-                                        patch->CreateInstructionsMapping(),  //
-                                        std::move(base_snapshot),            //
-                                        patch->link_header()                 //
-      );
-  if (snapshot->IsValid()) {
-    return snapshot;
-  }
-  return nullptr;
-}
-#endif  // defined(SHOREBIRD_ENABLE_PATCH_MAPPING)
-
 fml::RefPtr<const DartSnapshot> DartSnapshot::IsolateSnapshotFromSettings(
     const Settings& settings) {
   TRACE_EVENT0("flutter", "DartSnapshot::IsolateSnapshotFromSettings");
 #if !DART_SNAPSHOT_STATIC_LINK
-  shorebird::Updater::FromSettings(settings)->ReportLaunchStart();
-#if defined(SHOREBIRD_ENABLE_PATCH_MAPPING)
-  if (!settings.application_library_paths.empty()) {
-    const auto& first_path = settings.application_library_paths.front();
-    if (first_path.find(".vmcode") != std::string::npos) {
-      auto patch = LoadedPatch::Load(first_path);
-      if (patch) {
-        auto base_snapshot = BaseIsolateSnapshotFromSettings(settings);
-        return IsolateSnapshotFromLoadedPatch(patch, std::move(base_snapshot));
-      }
-      FML_LOG(ERROR) << "Shorebird: patch load failed, running base code from "
-                        "the app image instead of "
-                     << first_path;
-      shorebird::Updater::FromSettings(settings)->ReportLaunchFailure();
-      return BaseIsolateSnapshotFromSettings(settings);
+  // Tell the Rust updater we're booting from whatever patch it selected.
+  // This copies next_boot → current_boot in the Rust state. The call is
+  // guarded inside Updater to execute at most once per process — see the
+  // Updater class comment for why this matters in add-to-app and
+  // FlutterEngineGroup scenarios.
+  shorebird::Updater::Instance().ReportLaunchStart();
+#if SHOREBIRD_USE_INTERPRETER
+  if (auto patch_snapshot = TryLoadIsolateSnapshotFromPatch(settings)) {
+    return patch_snapshot;
+  }
+#else
+  if (g_patch_snapshot_resolver_for_testing != nullptr) {
+    if (auto patch_snapshot = g_patch_snapshot_resolver_for_testing(settings)) {
+      return patch_snapshot;
     }
   }
-#endif  // defined(SHOREBIRD_ENABLE_PATCH_MAPPING)
+#endif  // SHOREBIRD_USE_INTERPRETER
 #endif  // !DART_SNAPSHOT_STATIC_LINK
   auto snapshot =
       fml::MakeRefCounted<DartSnapshot>(ResolveIsolateData(settings),         //
@@ -308,14 +297,29 @@ fml::RefPtr<const DartSnapshot> DartSnapshot::IsolateSnapshotFromSettings(
   if (snapshot->IsValid()) {
     return snapshot;
   }
+#if !DART_SNAPSHOT_STATIC_LINK && !SHOREBIRD_USE_INTERPRETER
+  if (!settings.base_application_library_paths.empty() &&
+      !settings.application_library_paths.empty() &&
+      settings.application_library_paths.front().find(".vmcode") !=
+          std::string::npos) {
+    FML_LOG(ERROR) << "Shorebird: patch load failed, running base code from "
+                      "the app image instead of "
+                   << settings.application_library_paths.front();
+    shorebird::Updater::Instance().ReportLaunchFailure();
+    return BaseIsolateSnapshotFromSettings(settings);
+  }
+#endif
   return nullptr;
 }
 
 fml::RefPtr<DartSnapshot> DartSnapshot::IsolateSnapshotFromMappings(
     const std::shared_ptr<const fml::Mapping>& snapshot_data,
-    const std::shared_ptr<const fml::Mapping>& snapshot_instructions) {
-  auto snapshot =
-      fml::MakeRefCounted<DartSnapshot>(snapshot_data, snapshot_instructions);
+    const std::shared_ptr<const fml::Mapping>& snapshot_instructions,
+    fml::RefPtr<const DartSnapshot> base_snapshot,
+    std::shared_ptr<const fml::Mapping> link_header) {
+  auto snapshot = fml::MakeRefCounted<DartSnapshot>(
+      snapshot_data, snapshot_instructions, std::move(base_snapshot),
+      std::move(link_header));
   if (snapshot->IsValid()) {
     return snapshot;
   }

@@ -15,7 +15,7 @@
 
 namespace flutter {
 
-/// Non-cached RAII wrapper around a loaded Shorebird `.vmcode` patch ELF.
+/// RAII wrapper around a loaded Shorebird `.vmcode` patch ELF.
 ///
 /// The loaded ELF is unloaded deterministically in `~LoadedPatch()` when the
 /// last `PatchMapping` (or `DartSnapshot`) holding a `std::shared_ptr` to this

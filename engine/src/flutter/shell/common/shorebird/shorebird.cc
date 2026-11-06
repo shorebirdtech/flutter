@@ -156,8 +156,7 @@ std::string GetValueFromYaml(const std::string& yaml, const std::string& key) {
 }
 
 bool ConfigureShorebird(const ShorebirdConfigArgs& args,
-                        std::string& patch_path,
-                        shorebird::Updater* updater) {
+                        std::string& patch_path) {
   patch_path.clear();
   auto shorebird_updater_dir_name = "shorebird_updater";
 
@@ -233,13 +232,12 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   // the process is still configured, and the patch path below is the one to
   // boot. Fail only when no Init in this process has succeeded.
   // https://github.com/shorebirdtech/shorebird/issues/3888
-  auto& active_updater = updater ? *updater : *shorebird::Updater::Default();
-  bool init_result =
-      active_updater.Init(config) || active_updater.IsInitialized();
+  bool init_result = shorebird::Updater::Instance().Init(config) ||
+                     shorebird::Updater::IsInitialized();
 
   FML_LOG(INFO) << "Checking for active patch";
-  active_updater.ValidateNextBootPatch();
-  std::string active_path = active_updater.NextBootPatchPath();
+  shorebird::Updater::Instance().ValidateNextBootPatch();
+  std::string active_path = shorebird::Updater::Instance().NextBootPatchPath();
   if (!active_path.empty()) {
     patch_path = active_path;
     FML_LOG(INFO) << "Shorebird updater: patch path: " << patch_path;
@@ -258,8 +256,7 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
 
 bool LoadPatchOrBase(const std::string& patch_path,
                      const std::string& base_path,
-                     const std::function<bool(const std::string&)>& load,
-                     shorebird::Updater* updater) {
+                     const std::function<bool(const std::string&)>& load) {
   if (patch_path.empty()) {
     return load(base_path);
   }
@@ -268,16 +265,22 @@ bool LoadPatchOrBase(const std::string& patch_path,
   }
   FML_LOG(ERROR) << "Shorebird: patch load failed, running base code from "
                  << base_path << " instead of " << patch_path;
-  auto& active_updater = updater ? *updater : *shorebird::Updater::Default();
-  active_updater.ReportLaunchStart();
-  active_updater.ReportLaunchFailure();
+  // The failure report marks the booting patch bad, and a patch is only
+  // booting once the start is reported. Both are guarded once per process,
+  // so the Shell's own start report (IsolateSnapshotFromSettings) is a no-op,
+  // and its success report does not record the base-code boot as a patch boot.
+  shorebird::Updater::Instance().ReportLaunchStart();
+  shorebird::Updater::Instance().ReportLaunchFailure();
   return load(base_path);
 }
 
 void ApplyPatchToSettings(const std::string& patch_path, Settings& settings) {
-  settings.base_application_library_paths = settings.application_library_paths;
-  if (!settings.shorebird_updater) {
-    settings.shorebird_updater = shorebird::Updater::Default();
+  if (settings.base_application_library_paths.empty()) {
+    settings.base_application_library_paths =
+        settings.application_library_paths;
+  } else {
+    settings.application_library_paths =
+        settings.base_application_library_paths;
   }
   if (patch_path.empty()) {
     return;

@@ -53,8 +53,7 @@ struct ShorebirdConfigArgs {
 /// Desktop embedders load |patch_path| with LoadPatchOrBase. Android and iOS
 /// hand it to the Shell with ApplyPatchToSettings.
 bool ConfigureShorebird(const ShorebirdConfigArgs& args,
-                        std::string& patch_path,
-                        shorebird::Updater* updater = nullptr);
+                        std::string& patch_path);
 
 /// Loads the AOT code for this boot with |load|, which returns whether it
 /// loaded the library at the path it is given. Tries |patch_path| first,
@@ -65,8 +64,7 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
 /// library themselves before any Shell exists.
 bool LoadPatchOrBase(const std::string& patch_path,
                      const std::string& base_path,
-                     const std::function<bool(const std::string&)>& load,
-                     shorebird::Updater* updater = nullptr);
+                     const std::function<bool(const std::string&)>& load);
 
 /// Points |settings| at |patch_path|, unless it is empty, so the Shell boots
 /// the patch. Used by Android and iOS, whose Shell resolves the AOT code from

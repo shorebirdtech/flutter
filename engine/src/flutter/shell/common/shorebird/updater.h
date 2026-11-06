@@ -14,9 +14,6 @@
 #include <vector>
 
 namespace flutter {
-
-struct Settings;
-
 namespace shorebird {
 
 /// File callbacks for iOS patch loading.
@@ -92,14 +89,16 @@ struct AppConfig {
 ///   patch) and mislabels the boot breadcrumb. After `ReportLaunchSuccess`
 ///   the booted patch is the last booted patch, and installs are safe.
 ///
-/// The start carries its own per-instance guard rather than riding on
+/// The start carries its own once-per-process guard rather than riding on
 /// the success report's. A patch that fails to load reports launch failure
-/// from `DartSnapshot::IsolateSnapshotFromSettings`, before any Shell exists,
-/// and that claims the shared report guard. The base-code boot that follows
-/// still reports success, and that launch is precisely the one that needs a
-/// replacement patch. The failure report itself does not start the thread,
-/// because the boot is still in progress at that point, which the bullets above
-/// rule out.
+/// from `TryLoadFromPatch`, before any Shell exists, and that claims the
+/// shared report guard. The base-code boot that follows still reports
+/// success, and that launch is precisely the one that needs a replacement
+/// patch. The failure report itself does not start the thread, because the
+/// boot is still in progress at that point, which the bullets above rule
+/// out.
+///
+/// Tests can call `ResetLaunchStateForTesting()` to re-enable the guards.
 class Updater {
  public:
   virtual ~Updater() = default;
@@ -113,10 +112,10 @@ class Updater {
   /// @return true if initialization succeeded
   bool Init(const AppConfig& config);
 
-  /// Whether any `Init` on this Updater has succeeded. A later `Init` (one
+  /// Whether any `Init` in this process has succeeded. A later `Init` (one
   /// per engine) fails with AlreadyInitialized while the updater is still
   /// configured, so callers ask this rather than trusting that result alone.
-  bool IsInitialized() const;
+  static bool IsInitialized();
 
   /// Validate the next boot patch. If invalid, falls back to last good state.
   virtual void ValidateNextBootPatch() = 0;
@@ -144,12 +143,17 @@ class Updater {
   /// Cheap when there is nothing to report.
   virtual void ProtectedDataAvailable() {}
 
-  /// Returns the Updater instance carried on `settings.shorebird_updater` when
-  /// set, or the process-default Updater instance otherwise.
-  static std::shared_ptr<Updater> FromSettings(const Settings& settings);
+  // Singleton access
+  static Updater& Instance();
 
-  /// Returns the process-default Updater instance.
-  static std::shared_ptr<Updater> Default();
+  // Test support - allows injecting a mock implementation
+  static void SetInstanceForTesting(std::unique_ptr<Updater> instance);
+  static void ResetInstanceForTesting();
+
+  /// Resets the once-per-process launch guards, the update-thread guard, and
+  /// the remembered `Init` outcome so tests can verify start/success/failure
+  /// calls on fresh Updater instances.
+  static void ResetLaunchStateForTesting();
 
  protected:
   Updater() = default;
@@ -160,22 +164,23 @@ class Updater {
   virtual void DoReportLaunchSuccess() = 0;
   virtual void DoReportLaunchFailure() = 0;
 
-  void ResetLaunchState();
-
  private:
-  // Starts the update thread at most once per Updater instance, if the updater
-  // is configured and auto-update is on. Called from `ReportLaunchSuccess`.
+  // Starts the update thread at most once per process, if the updater is
+  // configured and auto-update is on. Called from `ReportLaunchSuccess`.
   void MaybeStartUpdateThread();
 
-  // Per-instance guards for launch lifecycle.
-  std::atomic<bool> launch_started_{false};
-  std::atomic<bool> launch_completed_{false};
+  static std::unique_ptr<Updater> instance_;
+  static std::mutex instance_mutex_;
+
+  // Once-per-process guards for launch lifecycle.
+  static std::atomic<bool> launch_started_;
+  static std::atomic<bool> launch_completed_;
   // Whether any `Init` succeeded; the update thread needs a configured
-  // updater. Latched for the lifetime of this Updater instance.
-  std::atomic<bool> initialized_{false};
+  // updater. Latched, never cleared outside tests.
+  static std::atomic<bool> initialized_;
   // Separate from the launch guards above: a reported failure must not stop
   // a later successful boot from starting the thread. See the class comment.
-  std::atomic<bool> update_thread_started_{false};
+  static std::atomic<bool> update_thread_started_;
 };
 
 /// No-op implementation for unsupported platforms.
