@@ -200,10 +200,10 @@ flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* p
   NSString* assetsPath = [NSString stringWithUTF8String:settings.assets_path.c_str()];
   NSLog(@"ASSET PATH %@", assetsPath);
 
-  // Debug (JIT) builds never start the updater, as on Android (flutter_main.cc
-  // configures it only under FLUTTER_RELEASE): patches are AOT code, and a
+  // Debug (JIT) builds never start the updater: patches are AOT code, and a
   // debug session must not check for, download or report on a release's
-  // patches. The tool bundles shorebird.yaml in every build mode.
+  // patches. The tool bundles shorebird.yaml in every build mode. (Android
+  // skips it outside FLUTTER_RELEASE; iOS keeps it in profile.)
 #if FLUTTER_JIT_RUNTIME
   NSLog(@"Debug build, not starting the Shorebird updater.");
 #else
