@@ -830,11 +830,6 @@ static void SetThreadPriority(FlutterThreadPriority priority) {
   };
   flutterArguments.custom_task_runners = &custom_task_runners;
 
-  NSString* patchPath = nil;
-  if (![self configureShorebird:&patchPath]) {
-    // No patch exists, or we failed to configure shorebird.
-    patchPath = nil;
-  }
   // Without a patch, upstream's -(void)loadAOTData: path. This is the location
   // where the test fixture places the snapshot file. For applications built by
   // Flutter tool there is no file here, and the snapshot is resolved from the
@@ -842,7 +837,15 @@ static void SetThreadPriority(FlutterThreadPriority priority) {
   NSString* baseElfPath =
       [NSString pathWithComponents:@[ _project.assetsPath, @"app_elf_snapshot.so" ]];
   // A patch that fails to load is reported, and the release's own code boots.
+  // Debug (JIT) builds never start the updater: patches are AOT code, and a
+  // debug session must not check for, download or report on a release's
+  // patches. The tool bundles shorebird.yaml in every build mode.
   if (_embedderAPI.RunsAOTCompiledDartCode()) {
+    NSString* patchPath = nil;
+    if (![self configureShorebird:&patchPath]) {
+      // No patch exists, or we failed to configure shorebird.
+      patchPath = nil;
+    }
     flutter::LoadPatchOrBase(patchPath ? patchPath.UTF8String : "", baseElfPath.UTF8String,
                              [self](const std::string& path) {
                                [self loadAOTData:@(path.c_str())];

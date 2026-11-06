@@ -420,15 +420,18 @@ bool FlutterWindowsEngine::Run(std::string_view entrypoint) {
   std::string assets_path_string = fml::PathToUtf8(project_->assets_path());
   std::string icu_path_string = fml::PathToUtf8(project_->icu_path());
 
-  std::string patch_path;
-  if (!SetUpShorebird(assets_path_string, patch_path)) {
-    FML_LOG(ERROR) << "Failed to configure Shorebird.";
-    patch_path.clear();
-  }
-
   // This loads AOT data from the project_'s aot_library_path_. A patch that
   // fails to load is reported and replaced by the release's own library.
+  // Debug (JIT) builds never start the updater: patches are AOT code, and a
+  // debug session must not check for, download or report on a release's
+  // patches. The tool bundles shorebird.yaml in every build mode.
   if (embedder_api_.RunsAOTCompiledDartCode()) {
+    std::string patch_path;
+    if (!SetUpShorebird(assets_path_string, patch_path)) {
+      FML_LOG(ERROR) << "Failed to configure Shorebird.";
+      patch_path.clear();
+    }
+
     const std::filesystem::path base_path = project_->aot_library_path();
     LoadPatchOrBase(
         patch_path, fml::PathToUtf8(base_path), [&](const std::string& path) {
