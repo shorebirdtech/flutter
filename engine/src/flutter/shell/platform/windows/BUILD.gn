@@ -4,6 +4,7 @@
 
 assert(is_win)
 
+import("//flutter/common/config.gni")
 import("//flutter/shell/platform/glfw/config.gni")
 import("//flutter/testing/testing.gni")
 
@@ -332,9 +333,14 @@ group("windows") {
   deps = [
     ":flutter_windows",
     ":publish_headers_windows",
-    ":updater_exports_windows",
     "//flutter/shell/platform/windows/client_wrapper:publish_wrapper_windows",
   ]
+
+  # Debug engines have no updater to export (build_rust_updater.gni), and the
+  # .def would name symbols that aren't there.
+  if (flutter_runtime_mode != "debug") {
+    deps += [ ":updater_exports_windows" ]
+  }
 
   if (build_glfw_shell) {
     deps += [ ":windows_glfw" ]
