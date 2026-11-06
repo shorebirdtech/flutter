@@ -4,6 +4,7 @@
 
 assert(is_win)
 
+import("//flutter/common/config.gni")
 import("//flutter/shell/platform/glfw/config.gni")
 import("//flutter/testing/testing.gni")
 
@@ -212,7 +213,13 @@ copy("updater_exports_windows") {
 }
 
 shared_library("flutter_windows") {
-  deps = [ ":flutter_windows_source" ]
+  # The toolchain links with /DEF:<root_out_dir>/flutter_windows.dll.def and
+  # silently drops the flag if that file is missing, so the copy must run
+  # before the link or the DLL ships without the shorebird_* exports.
+  deps = [
+    ":flutter_windows_source",
+    ":updater_exports_windows",
+  ]
 
   public_configs = [ "//flutter:config" ]
 }
@@ -326,9 +333,14 @@ group("windows") {
   deps = [
     ":flutter_windows",
     ":publish_headers_windows",
-    ":updater_exports_windows",
     "//flutter/shell/platform/windows/client_wrapper:publish_wrapper_windows",
   ]
+
+  # Debug engines have no updater to export (build_rust_updater.gni), and the
+  # .def would name symbols that aren't there.
+  if (flutter_runtime_mode != "debug") {
+    deps += [ ":updater_exports_windows" ]
+  }
 
   if (build_glfw_shell) {
     deps += [ ":windows_glfw" ]
