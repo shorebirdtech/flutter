@@ -1098,11 +1098,14 @@ class GitTagVersion {
         ], workingDirectory: workingDirectory)
         .stdout
         .trim();
-    final stableVersionPattern = RegExp(r'^\d+\.\d+\.\d+$');
+    // A stable branch, X.Y.Z, or a side version, X.Y.Z-sb.N (X.Y.Z with
+    // fixes picked onto it), which reports X.Y.Z: pub checks SDK
+    // constraints against it. rc branches fall through.
+    final releaseVersionPattern = RegExp(r'^(\d+\.\d+\.\d+)(?:-sb\.\d+)?$');
     final String? shorebirdFlutterVersion = LineSplitter.split(shorebirdFlutterReleases)
         .map((e) => e.replaceFirst('origin/flutter_release/', ''))
-        .where((e) => stableVersionPattern.hasMatch(e))
-        .toList()
+        .map((e) => releaseVersionPattern.firstMatch(e)?[1])
+        .nonNulls
         .firstOrNull;
     if (shorebirdFlutterVersion != null) {
       return parse(shorebirdFlutterVersion);
