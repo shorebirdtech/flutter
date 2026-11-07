@@ -1099,8 +1099,8 @@ class GitTagVersion {
         .stdout
         .trim();
     // A stable branch, X.Y.Z, or a side version, X.Y.Z-sb.N (X.Y.Z with
-    // fixes picked onto it), which reports X.Y.Z: pub checks SDK
-    // constraints against it. rc branches fall through.
+    // fixes picked onto it). X.Y.Z-sb.N reports X.Y.Z, since pub checks SDK
+    // constraints against the framework version. rc branches fall through.
     final releaseVersionPattern = RegExp(r'^(\d+\.\d+\.\d+)(?:-sb\.\d+)?$');
     final String? shorebirdFlutterVersion = LineSplitter.split(shorebirdFlutterReleases)
         .map((e) => e.replaceFirst('origin/flutter_release/', ''))

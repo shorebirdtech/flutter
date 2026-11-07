@@ -1609,36 +1609,47 @@ void main() {
     expect(processManager, hasNoRemainingExpectations);
   });
 
-  testUsingContext('determine maps a shorebird side version branch to its stable version', () {
-    processManager.addCommands(<FakeCommand>[
-      const FakeCommand(
-        command: <String>['git', 'tag', '--points-at', 'HEAD'],
-        // No tag at HEAD.
-      ),
-      const FakeCommand(
-        command: <String>[
-          'git',
-          'for-each-ref',
-          '--contains',
-          'HEAD',
-          '--format',
-          '%(refname:short)',
-          'refs/remotes/origin/flutter_release/*',
-        ],
-        // Only the side branch has the picked fixes.
-        stdout: 'origin/flutter_release/3.47.9-sb.12',
-      ),
-    ]);
-    final platform = FakePlatform();
+  for (final (String why, String branches) in <(String, String)>[
+    ('only the side branch holds HEAD', 'origin/flutter_release/3.47.9-sb.12'),
+    (
+      'the stable and side branches hold HEAD',
+      'origin/flutter_release/3.47.9\norigin/flutter_release/3.47.9-sb.12',
+    ),
+    (
+      'an rc and the side branch hold HEAD',
+      'origin/flutter_release/3.47.9-rc1\norigin/flutter_release/3.47.9-sb.1',
+    ),
+  ]) {
+    testUsingContext('determine maps a shorebird side version to its stable version: $why', () {
+      processManager.addCommands(<FakeCommand>[
+        const FakeCommand(
+          command: <String>['git', 'tag', '--points-at', 'HEAD'],
+          // No tag at HEAD.
+        ),
+        FakeCommand(
+          command: const <String>[
+            'git',
+            'for-each-ref',
+            '--contains',
+            'HEAD',
+            '--format',
+            '%(refname:short)',
+            'refs/remotes/origin/flutter_release/*',
+          ],
+          stdout: branches,
+        ),
+      ]);
+      final platform = FakePlatform();
 
-    final GitTagVersion gitTagVersion = GitTagVersion.determine(
-      platform,
-      git: git,
-      workingDirectory: '.',
-    );
-    expect(gitTagVersion.frameworkVersionFor('abcd1234'), '3.47.9');
-    expect(processManager, hasNoRemainingExpectations);
-  });
+      final GitTagVersion gitTagVersion = GitTagVersion.determine(
+        platform,
+        git: git,
+        workingDirectory: '.',
+      );
+      expect(gitTagVersion.frameworkVersionFor('abcd1234'), '3.47.9');
+      expect(processManager, hasNoRemainingExpectations);
+    });
+  }
 
   testUsingContext(
     'determine picks stable branch over rc branch from shorebird flutter_release',
