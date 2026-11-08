@@ -9,14 +9,18 @@
 ///
 /// Only the scheme, host, port and path are compared, so the URL may carry
 /// credentials (`https://shorebird:<token>@download.shorebird.dev`), which the
-/// Shorebird CLI adds for signed-in downloads.
+/// Shorebird CLI adds for signed-in downloads. The URL must be written in
+/// normal form (lower-case host, no port, no trailing slash): the download
+/// allow-list compares the string as written against parsed URLs, so any
+/// other spelling would fail it and print the URL, credentials included.
 bool isShorebirdStorageUrl(String url) {
   final Uri? uri = Uri.tryParse(url);
   return uri != null &&
+      uri.toString() == url &&
       uri.scheme == 'https' &&
       uri.host == 'download.shorebird.dev' &&
       !uri.hasPort &&
-      (uri.path.isEmpty || uri.path == '/') &&
+      uri.path.isEmpty &&
       !uri.hasQuery &&
       !uri.hasFragment;
 }
