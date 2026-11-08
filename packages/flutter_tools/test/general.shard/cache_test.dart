@@ -381,6 +381,19 @@ void main() {
       expect(logger.statusText, isEmpty);
     });
 
+    testWithoutContext('Shorebird storage url with credentials does not print warning', () async {
+      final logger = BufferLogger.test();
+      const baseUrl = 'https://shorebird:token@download.shorebird.dev';
+      final cache = Cache.test(
+        platform: FakePlatform(environment: <String, String>{'FLUTTER_STORAGE_BASE_URL': baseUrl}),
+        processManager: FakeProcessManager.any(),
+        logger: logger,
+      );
+
+      expect(cache.storageBaseUrl, baseUrl);
+      expect(logger.warningText, isEmpty);
+    });
+
     testWithoutContext('a non-empty realm is included in the storage url', () async {
       final fileSystem = MemoryFileSystem.test();
       final Directory cacheDir = fileSystem.currentDirectory

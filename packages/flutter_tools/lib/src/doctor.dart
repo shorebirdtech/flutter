@@ -33,6 +33,7 @@ import 'linux/linux_workflow.dart';
 import 'macos/macos_workflow.dart';
 import 'macos/xcode_validator.dart';
 import 'proxy_validator.dart';
+import 'shorebird/shorebird_storage_url.dart';
 import 'tester/flutter_tester.dart';
 import 'version.dart';
 import 'web/chrome.dart';
@@ -555,7 +556,8 @@ class FlutterValidator extends DoctorValidator {
         messages.add(ValidationMessage(pubMirrorURL(pubUrl)));
       }
       final String? storageBaseUrl = _platform.environment[kFlutterStorageBaseUrl];
-      if (storageBaseUrl != null) {
+      // Shorebird's artifact proxy is the default, not a mirror.
+      if (storageBaseUrl != null && !isShorebirdStorageUrl(storageBaseUrl)) {
         messages.add(ValidationMessage(flutterMirrorURL(storageBaseUrl)));
       }
       // Add feature flags that are either enabled, or disabled compared to the default setting.

@@ -213,6 +213,34 @@ void main() {
     );
   });
 
+  testWithoutContext('FlutterValidator does not show Shorebird storage as a mirror', () async {
+    final flutterVersion = FakeFlutterVersion(frameworkVersion: '1.0.0', branch: 'beta');
+    final Platform platform = FakePlatform(
+      operatingSystem: 'windows',
+      localeName: 'en_US.UTF-8',
+      environment: <String, String>{
+        'FLUTTER_STORAGE_BASE_URL': 'https://shorebird:token@download.shorebird.dev',
+      },
+    );
+    final flutterValidator = FlutterValidator(
+      platform: platform,
+      flutterVersion: () => flutterVersion,
+      devToolsVersion: () => '2.8.0',
+      artifacts: Artifacts.test(),
+      fileSystem: MemoryFileSystem.test(),
+      processManager: FakeProcessManager.any(),
+      operatingSystemUtils: FakeOperatingSystemUtils(name: 'Windows'),
+      flutterRoot: () => '/sdk/flutter',
+      featureFlags: TestFeatureFlags(),
+    );
+
+    final ValidationResult result = await flutterValidator.validate();
+    expect(
+      result.messages.map((ValidationMessage message) => message.message),
+      isNot(contains(contains('download mirror'))),
+    );
+  });
+
   testWithoutContext('FlutterValidator shows enabled (by default) feature flags', () async {
     final flutterVersion = FakeFlutterVersion(frameworkVersion: '1.0.0');
     final Platform platform = FakePlatform(operatingSystem: 'windows', localeName: 'en_US.UTF-8');

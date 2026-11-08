@@ -39,6 +39,7 @@ import 'base/user_messages.dart';
 import 'base/utils.dart' show getElapsedAsSeconds, getSizeAsPlatformMB;
 import 'convert.dart';
 import 'features.dart';
+import 'shorebird/shorebird_storage_url.dart';
 
 const kShorebirdStorageUrl = 'https://download.shorebird.dev';
 const kFlutterRootEnvironmentVariableName =
@@ -547,8 +548,9 @@ class Cache {
           ? 'https://download.shorebird.dev'
           : 'https://storage.googleapis.com/$storageRealm';
     }
-    // Shorebird's artifact proxy is a trusted source.
-    if (overrideUrl == kShorebirdStorageUrl) {
+    // Shorebird's artifact proxy is a trusted source, with or without
+    // credentials in the URL.
+    if (isShorebirdStorageUrl(overrideUrl)) {
       return overrideUrl;
     }
     // verify that this is a valid URI.
