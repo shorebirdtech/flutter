@@ -110,7 +110,12 @@ class IosFrameworkBuildTraceSession {
   /// (one App.framework slice) as `assemble` events, exactly as a
   /// `flutter assemble` child would have written them.
   void addAssembleResult(BuildResult result) {
-    addAssembleTraceEvents(_tracer, result.performance.values, pid: _flutterPid, tid: _assembleTid);
+    addAssembleTraceEvents(
+      _tracer,
+      result.performance.values,
+      pid: _flutterPid,
+      tid: _assembleTid,
+    );
   }
 
   /// Clears [BuildTracer.current] without writing the trace. Use on
