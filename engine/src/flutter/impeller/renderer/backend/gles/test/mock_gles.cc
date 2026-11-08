@@ -317,6 +317,34 @@ GLboolean mockIsProgram(GLuint program) {
 static_assert(CheckSameSignature<decltype(mockIsProgram),  //
                                  decltype(glIsProgram)>::value);
 
+void mockGetProgramiv(GLuint program, GLenum pname, GLint* params) {
+  CallMockMethod(&IMockGLESImpl::GetProgramiv, program, pname, params);
+}
+
+static_assert(CheckSameSignature<decltype(mockGetProgramiv),  //
+                                 decltype(glGetProgramiv)>::value);
+
+GLuint mockCreateShader(GLenum type) {
+  return CallMockMethod(&IMockGLESImpl::CreateShader, type);
+}
+
+static_assert(CheckSameSignature<decltype(mockCreateShader),  //
+                                 decltype(glCreateShader)>::value);
+
+GLuint mockCreateProgram() {
+  return CallMockMethod(&IMockGLESImpl::CreateProgram);
+}
+
+static_assert(CheckSameSignature<decltype(mockCreateProgram),  //
+                                 decltype(glCreateProgram)>::value);
+
+void mockGetShaderiv(GLuint shader, GLenum pname, GLint* params) {
+  CallMockMethod(&IMockGLESImpl::GetShaderiv, shader, pname, params);
+}
+
+static_assert(CheckSameSignature<decltype(mockGetShaderiv),  //
+                                 decltype(glGetShaderiv)>::value);
+
 GLenum mockCheckFramebufferStatus(GLenum target) {
   return CallMockMethod(&IMockGLESImpl::CheckFramebufferStatus, target);
 }
@@ -522,6 +550,14 @@ const ProcTableGLES::Resolver kMockResolverGLES = [](const char* name) {
     return reinterpret_cast<void*>(mockIsTexture);
   } else if (strcmp(name, "glIsProgram") == 0) {
     return reinterpret_cast<void*>(mockIsProgram);
+  } else if (strcmp(name, "glGetProgramiv") == 0) {
+    return reinterpret_cast<void*>(mockGetProgramiv);
+  } else if (strcmp(name, "glCreateShader") == 0) {
+    return reinterpret_cast<void*>(mockCreateShader);
+  } else if (strcmp(name, "glCreateProgram") == 0) {
+    return reinterpret_cast<void*>(mockCreateProgram);
+  } else if (strcmp(name, "glGetShaderiv") == 0) {
+    return reinterpret_cast<void*>(mockGetShaderiv);
   } else if (strcmp(name, "glCheckFramebufferStatus") == 0) {
     return reinterpret_cast<void*>(mockCheckFramebufferStatus);
   } else if (strcmp(name, "glReadPixels") == 0) {
