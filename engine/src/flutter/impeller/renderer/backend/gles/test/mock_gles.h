@@ -103,6 +103,10 @@ class IMockGLESImpl {
                              const void* data) {}
   virtual GLboolean IsTexture(GLuint texture) { return true; }
   virtual GLboolean IsProgram(GLuint program) { return true; }
+  virtual void GetProgramiv(GLuint program, GLenum pname, GLint* params) {}
+  virtual GLuint CreateShader(GLenum type) { return 0; }
+  virtual GLuint CreateProgram() { return 0; }
+  virtual void GetShaderiv(GLuint shader, GLenum pname, GLint* params) {}
   virtual void DiscardFramebufferEXT(GLenum target,
                                      GLsizei numAttachments,
                                      const GLenum* attachments) {};
@@ -260,6 +264,16 @@ class MockGLESImpl : public IMockGLESImpl {
       (override));
   MOCK_METHOD(GLboolean, IsTexture, (GLuint texture), (override));
   MOCK_METHOD(GLboolean, IsProgram, (GLuint program), (override));
+  MOCK_METHOD(void,
+              GetProgramiv,
+              (GLuint program, GLenum pname, GLint* params),
+              (override));
+  MOCK_METHOD(GLuint, CreateShader, (GLenum type), (override));
+  MOCK_METHOD(GLuint, CreateProgram, (), (override));
+  MOCK_METHOD(void,
+              GetShaderiv,
+              (GLuint shader, GLenum pname, GLint* params),
+              (override));
   MOCK_METHOD(void,
               DiscardFramebufferEXT,
               (GLenum target,
