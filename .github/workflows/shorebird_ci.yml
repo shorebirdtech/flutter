@@ -10,12 +10,51 @@ on:
     branches:
       - shorebird/dev
 
+permissions:
+  contents: read
+  # The changes job lists the PR's files.
+  pull-requests: read
+
 jobs:
+  # These tests build apps with the flutter tool against the prebuilt engine
+  # named in bin/internal/engine.version, so a PR that changes nothing under
+  # packages/ or bin/ (engine sources, DEPS and Dart rolls, other workflows,
+  # shorebird/ci) can't change their result. Such PRs skip them; pushes to
+  # shorebird/dev always run them. The iOS job's xlarge runner is this
+  # repo's only billed Actions minutes (the repo is public, so standard
+  # runners are free).
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      tests: ${{ steps.filter.outputs.tests }}
+    steps:
+      - id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -o pipefail
+          if [[ "$EVENT" != pull_request ]]; then
+            echo "tests=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename')
+          if grep -qE '^(packages/|bin/|pubspec\.(yaml|lock)$|\.github/workflows/shorebird_ci\.yml$)' <<< "$files"; then
+            echo "tests=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No changes under packages/ or bin/; skipping the tests."
+            echo "tests=false" >> "$GITHUB_OUTPUT"
+          fi
+
   # NOTE: Windows is not included because shorebird_tests depends on
   # flutter_flavorizr which requires Xcode. Additionally, flutter_tools
   # tests on Windows would need additional setup work.
 
   flutter-tools-tests:
+    needs: changes
+    if: needs.changes.outputs.tests == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -39,6 +78,8 @@ jobs:
         working-directory: packages/flutter_tools
 
   shorebird-android-tests:
+    needs: changes
+    if: needs.changes.outputs.tests == 'true'
     # Android tests run on Ubuntu (faster runners, no macOS needed)
     runs-on: ubuntu-latest
 
@@ -73,6 +114,8 @@ jobs:
         working-directory: packages/shorebird_tests
 
   shorebird-ios-tests:
+    needs: changes
+    if: needs.changes.outputs.tests == 'true'
     # iOS tests require macOS for Xcode. Five sequential iOS builds make this
     # the slowest check, so it gets the 5-core xlarge runner.
     runs-on: macos-latest-xlarge
@@ -110,6 +153,8 @@ jobs:
         working-directory: packages/shorebird_tests
 
   shorebird-macos-android-smoke-test:
+    needs: changes
+    if: needs.changes.outputs.tests == 'true'
     # Quick sanity check that Android builds work on macOS too. Its own job so
     # it runs alongside the iOS tests instead of after them.
     runs-on: macos-latest
@@ -149,9 +194,11 @@ jobs:
 
   # Aggregator required by branch protection on shorebird/dev so the rule can
   # list a single context ("ci") instead of every matrix-expanded job above.
+  # Skipped jobs (see changes) pass it.
   ci:
     if: always()
     needs:
+      - changes
       - flutter-tools-tests
       - shorebird-android-tests
       - shorebird-ios-tests
