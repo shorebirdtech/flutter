@@ -20,7 +20,7 @@ jobs:
   # named in bin/internal/engine.version, so a PR that changes nothing under
   # packages/ or bin/ (engine sources, DEPS and Dart rolls, other workflows,
   # shorebird/ci) can't change their result. Such PRs skip them; pushes to
-  # shorebird/dev always run them. The iOS job's xlarge runner is this
+  # shorebird/dev always run them (release branches get no push run). The iOS job's xlarge runner is this
   # repo's only billed Actions minutes (the repo is public, so standard
   # runners are free).
   changes:
@@ -34,9 +34,11 @@ jobs:
           EVENT: ${{ github.event_name }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
+          CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
         run: |
-          set -o pipefail
-          if [[ "$EVENT" != pull_request ]]; then
+          # pulls/N/files stops at 3,000 files without saying so; a PR that
+          # big (an upstream merge) runs the tests.
+          if [[ "$EVENT" != pull_request || "$CHANGED_FILES" -ge 3000 ]]; then
             echo "tests=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
