@@ -15,7 +15,8 @@
 #include "third_party/dart/runtime/include/dart_api.h"
 
 #if SHOREBIRD_USE_INTERPRETER
-#include "flutter/runtime/shorebird/patch_cache.h"  // nogncheck
+#include "flutter/runtime/shorebird/patch_cache.h"    // nogncheck
+#include "flutter/runtime/shorebird/patch_mapping.h"  // nogncheck
 #endif
 #include "flutter/shell/common/shorebird/updater.h"  // nogncheck
 
@@ -150,20 +151,7 @@ static std::shared_ptr<const fml::Mapping> ResolveIsolateData(
                                                 nullptr,  // release_func
                                                 true      // dontneed_safe
   );
-#else  // DART_SNAPSHOT_STATIC_LINK
-  // Tell the Rust updater we're booting from whatever patch it selected.
-  // This copies next_boot → current_boot in the Rust state. The call is
-  // guarded inside Updater to execute at most once per process — see the
-  // Updater class comment for why this matters in add-to-app and
-  // FlutterEngineGroup scenarios.
-  shorebird::Updater::Instance().ReportLaunchStart();
-#if SHOREBIRD_USE_INTERPRETER
-  // Try loading from a Shorebird patch first.
-  if (auto mapping = TryLoadFromPatch(settings.application_library_paths,
-                                      PatchSymbol::kIsolateData)) {
-    return mapping;
-  }
-#endif  // SHOREBIRD_USE_INTERPRETER
+#else   // DART_SNAPSHOT_STATIC_LINK
   return SearchMapping(
       settings.isolate_snapshot_data,       // embedder_mapping_callback
       settings.isolate_snapshot_data_path,  // file_path
@@ -182,14 +170,7 @@ static std::shared_ptr<const fml::Mapping> ResolveIsolateInstructions(
                                                 nullptr,  // release_func
                                                 true      // dontneed_safe
   );
-#else  // DART_SNAPSHOT_STATIC_LINK
-#if SHOREBIRD_USE_INTERPRETER
-  // Try loading from a Shorebird patch first.
-  if (auto mapping = TryLoadFromPatch(settings.application_library_paths,
-                                      PatchSymbol::kIsolateInstructions)) {
-    return mapping;
-  }
-#endif  // SHOREBIRD_USE_INTERPRETER
+#else   // DART_SNAPSHOT_STATIC_LINK
   return SearchMapping(
       settings.isolate_snapshot_instr,           // embedder_mapping_callback
       settings.isolate_snapshot_instr_path,      // file_path
@@ -216,6 +197,30 @@ fml::RefPtr<const DartSnapshot> DartSnapshot::VMSnapshotFromSettings(
 fml::RefPtr<const DartSnapshot> DartSnapshot::IsolateSnapshotFromSettings(
     const Settings& settings) {
   TRACE_EVENT0("flutter", "DartSnapshot::IsolateSnapshotFromSettings");
+#if !DART_SNAPSHOT_STATIC_LINK
+  // Tell the Rust updater we're booting from whatever patch it selected.
+  // This copies next_boot → current_boot in the Rust state. The call is
+  // guarded inside Updater to execute at most once per process — see the
+  // Updater class comment for why this matters in add-to-app and
+  // FlutterEngineGroup scenarios.
+  shorebird::Updater::Instance().ReportLaunchStart();
+#if SHOREBIRD_USE_INTERPRETER
+  // Try loading from a Shorebird patch first. The patch links against the
+  // unpatched app snapshot, which the VM and isolate symbols both name (see
+  // kVMDataSymbol), so the VM snapshot is the base. The snapshot holds the
+  // base and the patch's link header, and DartIsolate hands both to the VM
+  // for each isolate group it creates from this snapshot.
+  if (auto patch = TryLoadPatch(settings.application_library_paths)) {
+    auto patch_snapshot = IsolateSnapshotFromMappings(
+        PatchMapping::CreateIsolateData(patch),
+        PatchMapping::CreateIsolateInstructions(patch),
+        VMSnapshotFromSettings(settings), patch->link_header());
+    if (patch_snapshot) {
+      return patch_snapshot;
+    }
+  }
+#endif  // SHOREBIRD_USE_INTERPRETER
+#endif  // !DART_SNAPSHOT_STATIC_LINK
   auto snapshot =
       fml::MakeRefCounted<DartSnapshot>(ResolveIsolateData(settings),         //
                                         ResolveIsolateInstructions(settings)  //
@@ -228,9 +233,12 @@ fml::RefPtr<const DartSnapshot> DartSnapshot::IsolateSnapshotFromSettings(
 
 fml::RefPtr<DartSnapshot> DartSnapshot::IsolateSnapshotFromMappings(
     const std::shared_ptr<const fml::Mapping>& snapshot_data,
-    const std::shared_ptr<const fml::Mapping>& snapshot_instructions) {
-  auto snapshot =
-      fml::MakeRefCounted<DartSnapshot>(snapshot_data, snapshot_instructions);
+    const std::shared_ptr<const fml::Mapping>& snapshot_instructions,
+    fml::RefPtr<const DartSnapshot> base_snapshot,
+    std::shared_ptr<const fml::Mapping> link_header) {
+  auto snapshot = fml::MakeRefCounted<DartSnapshot>(
+      snapshot_data, snapshot_instructions, std::move(base_snapshot),
+      std::move(link_header));
   if (snapshot->IsValid()) {
     return snapshot;
   }
@@ -258,8 +266,13 @@ fml::RefPtr<DartSnapshot> DartSnapshot::VMServiceIsolateSnapshotFromSettings(
 }
 
 DartSnapshot::DartSnapshot(std::shared_ptr<const fml::Mapping> data,
-                           std::shared_ptr<const fml::Mapping> instructions)
-    : data_(std::move(data)), instructions_(std::move(instructions)) {}
+                           std::shared_ptr<const fml::Mapping> instructions,
+                           fml::RefPtr<const DartSnapshot> base_snapshot,
+                           std::shared_ptr<const fml::Mapping> link_header)
+    : data_(std::move(data)),
+      instructions_(std::move(instructions)),
+      base_snapshot_(std::move(base_snapshot)),
+      link_header_(std::move(link_header)) {}
 
 DartSnapshot::~DartSnapshot() = default;
 
@@ -277,6 +290,22 @@ const uint8_t* DartSnapshot::GetDataMapping() const {
 
 const uint8_t* DartSnapshot::GetInstructionsMapping() const {
   return instructions_ ? instructions_->GetMapping() : nullptr;
+}
+
+const uint8_t* DartSnapshot::GetBaseDataMapping() const {
+  return base_snapshot_ ? base_snapshot_->GetDataMapping() : nullptr;
+}
+
+const uint8_t* DartSnapshot::GetBaseInstructionsMapping() const {
+  return base_snapshot_ ? base_snapshot_->GetInstructionsMapping() : nullptr;
+}
+
+const uint8_t* DartSnapshot::GetLinkHeaderMapping() const {
+  return link_header_ ? link_header_->GetMapping() : nullptr;
+}
+
+size_t DartSnapshot::GetLinkHeaderSize() const {
+  return link_header_ ? link_header_->GetSize() : 0;
 }
 
 bool DartSnapshot::IsDontNeedSafe() const {

@@ -17,7 +17,12 @@ vars = {
   'llvm_git': 'https://llvm.googlesource.com',
   'dart_ai_rev': '9c96bfe5f091c9451eff5b59c9bffeb2e806b875',
   'skia_revision': '8df24be66531469e576a806749a0202ae26b8d08',
-  "dart_sdk_revision": "7623f50874a1f5b5f54f0fdb579ee12a3bd6dac6",
+  # TEMPORARY: shorebirdtech/dart-sdk branch vm/per-group-link-oracle, which
+  # has no published prebuilt. The prebuilt SDK objects below stay pinned to
+  # 7623f50874a1, whose host tooling is unaffected; the engine builds
+  # third_party/dart from this revision. Replaced by a roll_dart roll to the
+  # dart-sdk PR's merge commit before this lands.
+  "dart_sdk_revision": "4801b7a23a2d8de380a05e8477fbe7fdcd645510",
   "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
   "updater_git": "https://github.com/shorebirdtech/updater.git",
   "updater_rev": "ca91f4b313e5ff1ddb0471af0442ed2bad983bfe",
@@ -370,7 +375,7 @@ deps = {
     'bucket': 'shorebird-dart-sdk-prebuilt',
     'objects': [
       {
-        'object_name': Var('dart_sdk_revision') + '/dart-sdk-linux-x64.tar.gz',
+        'object_name': '7623f50874a1f5b5f54f0fdb579ee12a3bd6dac6/dart-sdk-linux-x64.tar.gz',
         'sha256sum': '0cde7f511d068db2431e46c56e71c3dd592091a4d5d29b9c756194ac8f980e9c',
         'size_bytes': 236355917,
         'generation': 1794234749852548,
@@ -383,7 +388,7 @@ deps = {
     'bucket': 'shorebird-dart-sdk-prebuilt',
     'objects': [
       {
-        'object_name': Var('dart_sdk_revision') + '/dart-sdk-linux-arm64.tar.gz',
+        'object_name': '7623f50874a1f5b5f54f0fdb579ee12a3bd6dac6/dart-sdk-linux-arm64.tar.gz',
         'sha256sum': 'b653c24a93001b978328f9a59f67d3f05f8cf5b4751c57f87fb3fb6eec55c5c4',
         'size_bytes': 233698136,
         'generation': 1794235286956131,
@@ -396,7 +401,7 @@ deps = {
     'bucket': 'shorebird-dart-sdk-prebuilt',
     'objects': [
       {
-        'object_name': Var('dart_sdk_revision') + '/dart-sdk-darwin-x64.tar.gz',
+        'object_name': '7623f50874a1f5b5f54f0fdb579ee12a3bd6dac6/dart-sdk-darwin-x64.tar.gz',
         'sha256sum': 'cbe4585afded5f8c3f9ea2068cdc6cfaea270c2dbf69f9c60d9449c0838b1203',
         'size_bytes': 225535615,
         'generation': 1794234727554594,
@@ -419,7 +424,7 @@ deps = {
     'bucket': 'shorebird-dart-sdk-prebuilt',
     'objects': [
       {
-        'object_name': Var('dart_sdk_revision') + '/dart-sdk-darwin-arm64.tar.gz',
+        'object_name': '7623f50874a1f5b5f54f0fdb579ee12a3bd6dac6/dart-sdk-darwin-arm64.tar.gz',
         'sha256sum': '49ab949d2ba3ab81b4aa8f79c6293435d86be8026a6472322ef0e5995891e616',
         'size_bytes': 222609250,
         'generation': 1794226144365898,
@@ -432,7 +437,7 @@ deps = {
     'bucket': 'shorebird-dart-sdk-prebuilt',
     'objects': [
       {
-        'object_name': Var('dart_sdk_revision') + '/dart-sdk-windows-x64.tar.gz',
+        'object_name': '7623f50874a1f5b5f54f0fdb579ee12a3bd6dac6/dart-sdk-windows-x64.tar.gz',
         'sha256sum': 'fa7a98836a0ac56d1896611d2b17736a60385f58e8016117a903d60e552d537d',
         'size_bytes': 219256295,
         'generation': 1794234489464758,
@@ -445,7 +450,7 @@ deps = {
     'bucket': 'shorebird-dart-sdk-prebuilt',
     'objects': [
       {
-        'object_name': Var('dart_sdk_revision') + '/dart-sdk-windows-arm64.tar.gz',
+        'object_name': '7623f50874a1f5b5f54f0fdb579ee12a3bd6dac6/dart-sdk-windows-arm64.tar.gz',
         'sha256sum': '1e8bd457f36ddca6dc8b3ffb6f5f2ede591deaf549b12f80da50ef8c452f7abd',
         'size_bytes': 161051132,
         'generation': 1794234424891758,
