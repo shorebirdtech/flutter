@@ -103,7 +103,10 @@ int _checkIos(String outPath, String nmPath, Iterable<String> builds) {
     }
     final Iterable<NmEntry> unexpectedEntries = NmEntry.parse(nmResult.stdout as String).where(
       (NmEntry entry) =>
-          !entry.isCInternalSymbol && !entry.isAllowedCSymbol && !entry.isAllowedObjCSymbol,
+          !entry.isCInternalSymbol &&
+          !entry.isAllowedCSymbol &&
+          !entry.isAllowedObjCSymbol &&
+          !entry.isShorebirdUpdaterSymbol,
     );
     if (unexpectedEntries.isNotEmpty) {
       print('ERROR: $libFlutter exports unexpected symbols:');
@@ -140,16 +143,8 @@ int _checkAndroid(String outPath, String nmPath, Iterable<String> builds) {
       'JNI_OnLoad': 'T',
       '_binary_icudtl_dat_size': 'R',
       '_binary_icudtl_dat_start': 'R',
-      // Shorebird: the updater's C API, which package:shorebird_code_push
-      // looks up at runtime (shell/platform/android/android_exports.lst).
-      'shorebird_init': 'T',
-      'shorebird_free_string': 'T',
-      'shorebird_free_update_result': 'T',
-      'shorebird_check_for_downloadable_update': 'T',
-      'shorebird_update_with_result': 'T',
-      'shorebird_next_boot_patch_number': 'T',
-      'shorebird_current_boot_patch_number': 'T',
-      'shorebird_validate_next_boot_patch': 'T',
+      // Shorebird: the updater's C API (shell/platform/android/android_exports.lst).
+      for (final String name in shorebirdUpdaterExports) name: 'T',
     };
     final badSymbols = <String, String>{};
     for (final String key in entryMap.keys) {
@@ -209,6 +204,22 @@ int _checkLinux(String outPath, String nmPath, Iterable<String> builds) {
   return failures;
 }
 
+/// Shorebird: the updater's C API that package:shorebird_code_push looks up
+/// at runtime, the only updater symbols a release engine may export. Android
+/// exports them through shell/platform/android/android_exports.lst; iOS hides
+/// the rest of the updater through
+/// shell/common/shorebird/updater_unexported_symbols.txt.
+const Set<String> shorebirdUpdaterExports = <String>{
+  'shorebird_init',
+  'shorebird_free_string',
+  'shorebird_free_update_result',
+  'shorebird_check_for_downloadable_update',
+  'shorebird_update_with_result',
+  'shorebird_next_boot_patch_number',
+  'shorebird_current_boot_patch_number',
+  'shorebird_validate_next_boot_patch',
+};
+
 final class NmEntry {
   NmEntry._(this.type, this.name);
 
@@ -241,6 +252,14 @@ final class NmEntry {
                 name.contains('InternalFlutterSwift'))),
       _ => false,
     };
+  }
+
+  /// Shorebird: the updater's C API, by exact name. Mach-O prefixes C names
+  /// with an underscore.
+  bool get isShorebirdUpdaterSymbol {
+    return type == '(__TEXT,__text)' &&
+        name.startsWith('_') &&
+        shorebirdUpdaterExports.contains(name.substring(1));
   }
 
   bool get isCInternalSymbol {
