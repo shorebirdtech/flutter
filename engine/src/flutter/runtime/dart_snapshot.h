@@ -107,11 +107,17 @@ class DartSnapshot : public fml::RefCountedThreadSafe<DartSnapshot> {
   /// @param[in]  snapshot_data          The mapping for the heap snapshot.
   /// @param[in]  snapshot_instructions  The mapping for the instructions
   ///                                    snapshot.
+  /// @param[in]  base_snapshot          For a Shorebird patch, the unpatched
+  ///                                    app snapshot the patch links against.
+  /// @param[in]  link_header            For a Shorebird patch, its link
+  ///                                    header.
   ///
   /// @return     A valid isolate snapshot or nullptr.
   static fml::RefPtr<DartSnapshot> IsolateSnapshotFromMappings(
       const std::shared_ptr<const fml::Mapping>& snapshot_data,
-      const std::shared_ptr<const fml::Mapping>& snapshot_instructions);
+      const std::shared_ptr<const fml::Mapping>& snapshot_instructions,
+      fml::RefPtr<const DartSnapshot> base_snapshot = nullptr,
+      std::shared_ptr<const fml::Mapping> link_header = nullptr);
 
   //----------------------------------------------------------------------------
   /// @brief      Create an isolate snapshot specialized for launching the
@@ -160,6 +166,30 @@ class DartSnapshot : public fml::RefCountedThreadSafe<DartSnapshot> {
   const uint8_t* GetInstructionsMapping() const;
 
   //----------------------------------------------------------------------------
+  /// @brief      For a Shorebird patch snapshot, the unpatched app snapshot
+  ///             the patch links against; otherwise null. Held here so the
+  ///             base stays mapped for as long as an isolate group can run
+  ///             this snapshot.
+  ///
+  const fml::RefPtr<const DartSnapshot>& GetBaseSnapshot() const {
+    return base_snapshot_;
+  }
+
+  //----------------------------------------------------------------------------
+  /// @brief      The base snapshot's data and instructions, or null. Passed to
+  ///             Dart_CreateIsolateGroup in Dart_IsolateFlags.
+  ///
+  const uint8_t* GetBaseDataMapping() const;
+  const uint8_t* GetBaseInstructionsMapping() const;
+
+  //----------------------------------------------------------------------------
+  /// @brief      For a Shorebird patch snapshot, its link header, or null.
+  ///             Passed to Dart_CreateIsolateGroup in Dart_IsolateFlags.
+  ///
+  const uint8_t* GetLinkHeaderMapping() const;
+  size_t GetLinkHeaderSize() const;
+
+  //----------------------------------------------------------------------------
   /// @brief      Returns whether both the data and instructions mappings are
   ///             safe to use with madvise(DONTNEED).
   bool IsDontNeedSafe() const;
@@ -170,9 +200,13 @@ class DartSnapshot : public fml::RefCountedThreadSafe<DartSnapshot> {
  private:
   std::shared_ptr<const fml::Mapping> data_;
   std::shared_ptr<const fml::Mapping> instructions_;
+  fml::RefPtr<const DartSnapshot> base_snapshot_;
+  std::shared_ptr<const fml::Mapping> link_header_;
 
   DartSnapshot(std::shared_ptr<const fml::Mapping> data,
-               std::shared_ptr<const fml::Mapping> instructions);
+               std::shared_ptr<const fml::Mapping> instructions,
+               fml::RefPtr<const DartSnapshot> base_snapshot = nullptr,
+               std::shared_ptr<const fml::Mapping> link_header = nullptr);
 
   ~DartSnapshot();
 
