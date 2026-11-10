@@ -181,9 +181,12 @@ executable("shorebird_http_probe") {
 }
 
 if (shorebird_updater_supported && is_apple) {
-  # Keeps the Rust updater's internals out of Flutter.framework's export
-  # table. Without it the framework exports ~9,500 Rust symbols, which costs
-  # several MiB of symbol table and stops the linker dead-stripping them.
+  # Keeps the Rust updater's internals out of Flutter.framework's and
+  # FlutterMacOS.framework's export tables. Without it the framework exports
+  # thousands of Rust symbols, which costs MiBs of symbol table and stops the
+  # linker dead-stripping them. Only the framework dylibs take it: macOS test
+  # executables pass -exported_symbols_list (//flutter:export_dynamic_symbols),
+  # which the linker refuses to combine with -unexported_symbols_list.
   config("updater_unexported_symbols") {
     _list = "updater_unexported_symbols.txt"
     inputs = [ _list ]
@@ -211,10 +214,6 @@ source_set("updater") {
   if (shorebird_updater_supported) {
     deps += [ ":build_rust_updater" ]
     libs = [ shorebird_updater_output_lib ]
-
-    if (is_apple) {
-      all_dependent_configs = [ ":updater_unexported_symbols" ]
-    }
 
     if (is_win) {
       libs += [ "userenv.lib" ]
