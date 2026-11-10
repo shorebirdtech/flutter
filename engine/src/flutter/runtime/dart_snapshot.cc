@@ -211,13 +211,30 @@ fml::RefPtr<const DartSnapshot> DartSnapshot::IsolateSnapshotFromSettings(
   // base and the patch's link header, and DartIsolate hands both to the VM
   // for each isolate group it creates from this snapshot.
   if (auto patch = TryLoadPatch(settings.application_library_paths)) {
-    auto patch_snapshot = IsolateSnapshotFromMappings(
-        PatchMapping::CreateIsolateData(patch),
-        PatchMapping::CreateIsolateInstructions(patch),
-        VMSnapshotFromSettings(settings), patch->link_header());
-    if (patch_snapshot) {
-      return patch_snapshot;
+    // Resolve the base from the app's own libraries, without the .vmcode
+    // TryLoadPatch found at the front: the same paths SetBaseSnapshot
+    // resolves from.
+    Settings base_settings = settings;
+    base_settings.application_library_paths.erase(
+        base_settings.application_library_paths.begin());
+    auto base = VMSnapshotFromSettings(base_settings);
+    // The patch is mapped read-only and runs out of the base, so without
+    // both base blobs the VM would refuse the group at boot. IsValid() checks
+    // only the data half; check both, and boot base code instead.
+    if (base && base->IsValidForAOT()) {
+      auto patch_snapshot = IsolateSnapshotFromMappings(
+          PatchMapping::CreateIsolateData(patch),
+          PatchMapping::CreateIsolateInstructions(patch), std::move(base),
+          patch->link_header());
+      if (patch_snapshot) {
+        return patch_snapshot;
+      }
     }
+    FML_LOG(ERROR) << "Shorebird: no usable patch snapshot, running base "
+                      "code from the app image";
+    // ReportLaunchStart already promoted this patch to current_boot; without
+    // a failure report the next launch retries it. Guarded once per process.
+    shorebird::Updater::Instance().ReportLaunchFailure();
   }
 #endif  // SHOREBIRD_USE_INTERPRETER
 #endif  // !DART_SNAPSHOT_STATIC_LINK
