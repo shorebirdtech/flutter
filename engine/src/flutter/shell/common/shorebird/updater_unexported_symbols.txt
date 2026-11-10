@@ -3,7 +3,19 @@
 # result from shell/platform/android/android_exports.lst.
 #
 # The Dart-facing shorebird_* C API stays exported: package:shorebird_code_push
-# looks those up at runtime.
+# looks those up at runtime. testing/symbols/verify_exported.dart checks the
+# framework exports exactly those, as android_exports.lst does on Android.
+#
+# The engine-facing shorebird_* C API (third_party/updater/library/include/
+# updater_engine.h), which the engine calls directly.
+_shorebird_set_engine_callbacks
+_shorebird_should_auto_update
+_shorebird_next_boot_patch_path
+_shorebird_start_update_thread
+_shorebird_report_launch_start
+_shorebird_report_launch_failure
+_shorebird_report_launch_success
+_shorebird_protected_data_available
 #
 # Rust mangled symbols, v0 mangling (_R...) and legacy mangling
 # (_ZN...17h<16 hex digits>E), depending on the Rust toolchain.
