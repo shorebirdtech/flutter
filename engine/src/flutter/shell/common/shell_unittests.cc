@@ -5187,8 +5187,8 @@ TEST_F(ShellTest, ShoulDiscardLayerTreeIfFrameIsSizedIncorrectly) {
 }
 
 // Test the full boot flow: ReportLaunchStart is called from
-// ResolveIsolateData, then ReportLaunchSuccess from the Shell constructor.
-// Both are guarded to run at most once per process.
+// IsolateSnapshotFromSettings, then ReportLaunchSuccess from the Shell
+// constructor. Both are guarded to run at most once per process.
 TEST_F(ShellTest, ShorebirdBootFlowCallsLaunchStartThenSuccess) {
   auto mock = std::make_unique<shorebird::MockUpdater>();
   auto* mock_ptr = mock.get();
