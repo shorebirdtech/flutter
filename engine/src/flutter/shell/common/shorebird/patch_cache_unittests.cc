@@ -219,7 +219,7 @@ std::vector<uint8_t> BuildMinimalVmcodeBytes(bool with_link_header) {
 }
 
 // Writes `bytes` to `name` in `dir` and returns the file's path.
-std::string WriteFile(const fml::ScopedTemporaryDirectory& dir,
+std::string WriteFile(fml::ScopedTemporaryDirectory& dir,
                       const std::string& name,
                       const std::vector<uint8_t>& bytes) {
   fml::DataMapping mapping(bytes);
