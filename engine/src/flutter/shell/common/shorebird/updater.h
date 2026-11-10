@@ -91,7 +91,7 @@ struct AppConfig {
 ///
 /// The start carries its own once-per-process guard rather than riding on
 /// the success report's. A patch that fails to load reports launch failure
-/// from `TryLoadFromPatch`, before any Shell exists, and that claims the
+/// from `TryLoadPatch`, before any Shell exists, and that claims the
 /// shared report guard. The base-code boot that follows still reports
 /// success, and that launch is precisely the one that needs a replacement
 /// patch. The failure report itself does not start the thread, because the
