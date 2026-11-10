@@ -6,6 +6,7 @@ assert(is_mac)
 
 import("//build/config/darwin/darwin_sdk.gni")
 import("//flutter/build/zip_bundle.gni")
+import("//flutter/shell/common/shorebird/build_rust_updater.gni")
 import("//flutter/shell/gpu/gpu.gni")
 import("//flutter/shell/platform/darwin/common/framework_common.gni")
 import("//flutter/shell/platform/glfw/config.gni")
@@ -188,6 +189,11 @@ shared_library("flutter_framework_dylib") {
   ]
 
   deps = [ ":flutter_framework_source" ]
+
+  # Shorebird: hide the Rust updater's internals from the framework's exports.
+  if (shorebird_updater_supported) {
+    configs += [ "//flutter/shell/common/shorebird:updater_unexported_symbols" ]
+  }
 }
 
 test_fixtures("flutter_desktop_darwin_fixtures") {

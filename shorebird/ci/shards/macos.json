@@ -55,6 +55,7 @@
         "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
         "out_dir": "ios_release"
       },
+      {"type": "verify_exported"},
       {
         "type": "gn_ninja",
         "gn_args": ["--ios", "--runtime-mode=debug", "--simulator"],

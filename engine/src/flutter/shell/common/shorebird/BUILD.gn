@@ -180,6 +180,21 @@ executable("shorebird_http_probe") {
   deps = [ ":engine_callbacks" ]
 }
 
+if (shorebird_updater_supported && is_apple) {
+  # Keeps the Rust updater's internals out of Flutter.framework's and
+  # FlutterMacOS.framework's export tables. Without it the framework exports
+  # thousands of Rust symbols, which costs MiBs of symbol table and stops the
+  # linker dead-stripping them. Only the framework dylibs take it: macOS test
+  # executables pass -exported_symbols_list (//flutter:export_dynamic_symbols),
+  # which the linker refuses to combine with -unexported_symbols_list.
+  config("updater_unexported_symbols") {
+    _list = "updater_unexported_symbols.txt"
+    inputs = [ _list ]
+    ldflags =
+        [ "-Wl,-unexported_symbols_list," + rebase_path(_list, root_build_dir) ]
+  }
+}
+
 # C++ wrapper around the Rust updater C API.
 # This provides a testable abstraction layer that can be mocked for testing.
 source_set("updater") {
