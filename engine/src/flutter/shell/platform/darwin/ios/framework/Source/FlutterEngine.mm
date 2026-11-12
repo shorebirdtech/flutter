@@ -1528,8 +1528,7 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
       task = UIBackgroundTaskInvalid;
     }
   };
-  task = [application beginBackgroundTaskWithName:@"Shorebird launch window"
-                                 expirationHandler:end];
+  task = [application beginBackgroundTaskWithName:@"Shorebird launch window" expirationHandler:end];
   // The window opens when the root isolate launches, just after this.
   int64_t until = (flutter::shorebird::Updater::LaunchWindow() + fml::TimeDelta::FromSeconds(2))
                       .ToNanoseconds();
@@ -1548,8 +1547,7 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
   for (UIScene* scene in application.connectedScenes) {
     [sceneStates addObject:@(scene.activationState)];
   }
-  return FLTShorebirdLaunchIsInBackground(application.applicationState, usesScenes,
-                                              sceneStates);
+  return FLTShorebirdLaunchIsInBackground(application.applicationState, usesScenes, sceneStates);
 }
 
 - (void)flutterWillEnterForeground:(NSNotification*)notification {

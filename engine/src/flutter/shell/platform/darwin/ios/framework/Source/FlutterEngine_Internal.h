@@ -142,8 +142,8 @@ NS_ASSUME_NONNULL_BEGIN
  * a connected scene in the background, with none in the foreground, says so.
  */
 BOOL FLTShorebirdLaunchIsInBackground(UIApplicationState appState,
-                                          BOOL usesScenes,
-                                          NSArray<NSNumber*>* sceneStates);
+                                      BOOL usesScenes,
+                                      NSArray<NSNumber*>* sceneStates);
 
 NS_ASSUME_NONNULL_END
 
