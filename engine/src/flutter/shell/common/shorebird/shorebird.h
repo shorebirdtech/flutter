@@ -69,7 +69,20 @@ bool LoadPatchOrBase(const std::string& patch_path,
 /// Points |settings| at |patch_path|, unless it is empty, so the Shell boots
 /// the patch. Used by Android and iOS, whose Shell resolves the AOT code from
 /// Settings::application_library_paths.
+///
+/// On Android, where the patch replaces the release's library, the patch is
+/// first checked with |can_load| (by default PatchHasSnapshots). If it can't
+/// be loaded, |settings| keep the release's code and the launch is reported
+/// failed, as LoadPatchOrBase does on desktop. |can_load| is unused on iOS.
 void ApplyPatchToSettings(const std::string& patch_path, Settings& settings);
+void ApplyPatchToSettings(
+    const std::string& patch_path,
+    Settings& settings,
+    const std::function<bool(const std::string&)>& can_load);
+
+/// Whether |patch_path| opens as a library exporting all four Dart AOT
+/// snapshot symbols.
+bool PatchHasSnapshots(const std::string& patch_path);
 
 /// Used for reading app_id from shorebird.yaml.
 /// Exposed for testing.
