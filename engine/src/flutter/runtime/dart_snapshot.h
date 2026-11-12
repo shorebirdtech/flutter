@@ -193,18 +193,6 @@ class DartSnapshot : public fml::RefCountedThreadSafe<DartSnapshot> {
     return instructions_;
   }
 
-  const fml::RefPtr<const DartSnapshot>& GetBaseSnapshot() const {
-    return base_snapshot_;
-  }
-
-  const uint8_t* GetBaseDataMapping() const;
-
-  const uint8_t* GetBaseInstructionsMapping() const;
-
-  const uint8_t* GetLinkHeaderMapping() const;
-
-  size_t GetLinkHeaderSize() const;
-
   //----------------------------------------------------------------------------
   /// @brief      For a Shorebird patch snapshot, the unpatched app snapshot
   ///             the patch links against; otherwise null. Held here so the
