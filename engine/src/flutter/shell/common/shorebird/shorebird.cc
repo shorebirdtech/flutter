@@ -280,11 +280,14 @@ bool PatchHasSnapshots(const std::string& patch_path) {
   if (!library) {
     return false;
   }
+  // Resolve the way the Shell will (DartSnapshot's SearchMapping): through
+  // SymbolMapping, which also tries the "_"-prefixed name that Android
+  // patches export.
   for (const char* symbol :
        {DartSnapshot::kVMDataSymbol, DartSnapshot::kVMInstructionsSymbol,
         DartSnapshot::kIsolateDataSymbol,
         DartSnapshot::kIsolateInstructionsSymbol}) {
-    if (library->ResolveSymbol(symbol) == nullptr) {
+    if (fml::SymbolMapping(library, symbol).GetMapping() == nullptr) {
       return false;
     }
   }
