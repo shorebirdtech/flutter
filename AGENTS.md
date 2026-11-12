@@ -76,10 +76,10 @@ wasn't a stale cached one, and what the bundled `shorebird.yaml` actually says.
 
 ## Shaping a PR
 
-One change per PR; split a PR that does several things before asking for review.
-A refactor with no behavior change is its own PR, apart from any PR that changes
-behavior. General improvements (fixes, cleanups, tests of existing code,
-simplifications) go in their own PRs ahead of a feature and land first: we
+Keep PRs reviewable. A small PR can carry a little cleanup next to its change;
+once a PR gets large, split it along its seams: a refactor with no behavior
+change, general improvements (fixes, cleanups, tests of existing code,
+simplifications), and each separate behavior change. Improvements land first: we
 always want them, and may not want the feature. A change keeps its own tests and
 fixture updates in its PR; a feature that needs an improvement builds on that
 PR's branch. This holds for Shorebird-owned files; an improvement to an upstream
