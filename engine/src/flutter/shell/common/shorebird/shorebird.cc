@@ -283,6 +283,14 @@ void ApplyPatchToSettings(const std::string& patch_path, Settings& settings) {
     settings.application_library_paths =
         settings.base_application_library_paths;
   }
+  // On the mobile path, snapshots resolve through
+  // Settings::application_library_paths, which hot restart can re-resolve to
+  // pick up a newly installed patch. Desktop embedders wire AOT data through
+  // the embedder API via LoadPatchOrBase instead, so they do not call
+  // ApplyPatchToSettings.
+  if (shorebird::Updater::IsInitialized()) {
+    shorebird::Updater::SetHotRestartSupported(true);
+  }
   if (patch_path.empty()) {
     return;
   }

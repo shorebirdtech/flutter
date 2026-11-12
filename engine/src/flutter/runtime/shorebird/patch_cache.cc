@@ -84,7 +84,7 @@ fml::RefPtr<const DartSnapshot> TryLoadIsolateSnapshotFromPatch(
   // ReportLaunchStart already promoted this patch to current_boot, so without
   // a failure report it stays "running" in the updater's books while base code
   // executes, and the next launch retries the same patch.
-  shorebird::Updater::Instance().ReportLaunchFailure();
+  shorebird::Updater::Instance().ReportPatchLoadFailure();
   return DartSnapshot::BaseIsolateSnapshotFromSettings(settings);
 }
 

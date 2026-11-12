@@ -506,6 +506,20 @@ class Engine final : public RuntimeDelegate, PointerDataDispatcher::Delegate {
   [[nodiscard]] bool Restart(RunConfiguration configuration);
 
   //----------------------------------------------------------------------------
+  /// @brief      Shorebird: like |Restart|, but relaunches the root isolate
+  ///             from the given isolate snapshot instead of the one this
+  ///             engine booted with. Used by the production hot restart to
+  ///             boot a newly installed patch; see
+  ///             shell/common/shorebird/hot_restart.h.
+  ///
+  /// @attention  Like |Restart|, a non-successful restart still tears down
+  ///             the existing root isolate.
+  ///
+  [[nodiscard]] bool RestartWithSnapshot(
+      RunConfiguration configuration,
+      fml::RefPtr<const DartSnapshot> isolate_snapshot);
+
+  //----------------------------------------------------------------------------
   /// @brief      Setup default font manager according to specific platform.
   ///
   void SetupDefaultFontManager();

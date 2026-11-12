@@ -214,6 +214,40 @@ bool Engine::Restart(RunConfiguration configuration) {
   return Run(std::move(configuration)) == Engine::RunStatus::Success;
 }
 
+// Shorebird: |Restart|, but the relaunched isolate boots from
+// |isolate_snapshot| (a newly installed patch) instead of the snapshot this
+// engine booted with.
+bool Engine::RestartWithSnapshot(
+    RunConfiguration configuration,
+    fml::RefPtr<const DartSnapshot> isolate_snapshot) {
+  TRACE_EVENT0("flutter", "Engine::RestartWithSnapshot");
+  if (!configuration.IsValid()) {
+    FML_LOG(ERROR) << "Engine run configuration was invalid.";
+    return false;
+  }
+  delegate_.OnPreEngineRestart();
+  if (auto platform_isolate_manager =
+          runtime_controller_->GetPlatformIsolateManager()) {
+    fml::AutoResetWaitableEvent platiso_latch;
+    fml::TaskRunner::RunNowOrPostTask(
+        task_runners_.GetPlatformTaskRunner(),
+        [platform_isolate_manager = std::move(platform_isolate_manager),
+         &platiso_latch]() {
+          platform_isolate_manager->ShutdownPlatformIsolates();
+          platiso_latch.Signal();
+        });
+    platiso_latch.Wait();
+  }
+  if (auto root_isolate = std::const_pointer_cast<DartIsolate>(
+          runtime_controller_->GetRootIsolate().lock())) {
+    root_isolate->ShutdownChildIsolates();
+  }
+  runtime_controller_ =
+      runtime_controller_->CloneWithSnapshot(std::move(isolate_snapshot));
+  UpdateAssetManager(nullptr);
+  return Run(std::move(configuration)) == Engine::RunStatus::Success;
+}
+
 Engine::RunStatus Engine::Run(RunConfiguration configuration) {
   if (!configuration.IsValid()) {
     FML_LOG(ERROR) << "Engine run configuration was invalid.";
@@ -222,8 +256,12 @@ Engine::RunStatus Engine::Run(RunConfiguration configuration) {
 
   last_entry_point_ = configuration.GetEntrypoint();
   last_entry_point_library_ = configuration.GetEntrypointLibrary();
-#if (FLUTTER_RUNTIME_MODE == FLUTTER_RUNTIME_MODE_DEBUG)
-  // This is only used to support restart.
+// This is only used to support restart. Shorebird: also retained in every
+// release build with the updater compiled in, so a production hot restart can
+// relaunch the isolate with the arguments it booted with. The macro covers
+// desktop too, which retains them and never restarts.
+#if (FLUTTER_RUNTIME_MODE == FLUTTER_RUNTIME_MODE_DEBUG) || \
+    SHOREBIRD_PLATFORM_SUPPORTED
   last_entry_point_args_ = configuration.GetEntrypointArgs();
 #endif
 

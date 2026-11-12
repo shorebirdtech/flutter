@@ -67,6 +67,56 @@ TEST_F(UpdaterTest, ReportLaunchFailureOnlyCallsOnce) {
   EXPECT_EQ(mock_->launch_failure_count(), 1);
 }
 
+// A patch that fails to load sets PatchLoadFailed() and, on cold boot,
+// forwards to ReportLaunchFailure once. During hot restart (after cold boot
+// has already reported), PatchLoadFailed() is still set so HotRestartEngine
+// can call ReportRestartFailure().
+TEST_F(UpdaterTest, ReportPatchLoadFailureRecordsAndReportsTheFailure) {
+  EXPECT_FALSE(Updater::Instance().PatchLoadFailed());
+
+  Updater::Instance().ReportPatchLoadFailure();
+  EXPECT_TRUE(Updater::Instance().PatchLoadFailed());
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+
+  // The loader asks for two symbols, so it reports twice in one load.
+  Updater::Instance().ReportPatchLoadFailure();
+  EXPECT_TRUE(Updater::Instance().PatchLoadFailed());
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+}
+
+// The flag means "the patch could not be loaded", not "the launch failed".
+// A relaunch that fails for any other reason must not look like a base-code
+// boot to the next attempt.
+TEST_F(UpdaterTest, ReportLaunchFailureDoesNotRecordAPatchLoadFailure) {
+  Updater::Instance().ReportLaunchFailure();
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  EXPECT_FALSE(Updater::Instance().PatchLoadFailed());
+}
+
+// The hot restart retry depends on this: attempt two calls ReportRestartStart()
+// and must not inherit attempt one's failed load, or the app never recovers.
+TEST_F(UpdaterTest, ReportRestartStartClearsThePatchLoadFailure) {
+  Updater::Instance().ReportPatchLoadFailure();
+  ASSERT_TRUE(Updater::Instance().PatchLoadFailed());
+
+  Updater::Instance().ReportRestartStart();
+  EXPECT_FALSE(Updater::Instance().PatchLoadFailed());
+}
+
+// After cold boot has already reported its launch outcome, a patch load
+// failure during hot restart still sets PatchLoadFailed() without reporting a
+// second cold-boot launch failure.
+TEST_F(UpdaterTest, PatchLoadFailureSurvivesCompletedColdBootLaunch) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+  ASSERT_EQ(mock_->launch_success_count(), 1);
+
+  Updater::Instance().ReportRestartStart();
+  Updater::Instance().ReportPatchLoadFailure();
+  EXPECT_EQ(mock_->launch_failure_count(), 0);
+  EXPECT_TRUE(Updater::Instance().PatchLoadFailed());
+}
+
 TEST_F(UpdaterTest, MockUpdaterTracksShouldAutoUpdate) {
   mock_->set_should_auto_update(false);
   EXPECT_FALSE(Updater::Instance().ShouldAutoUpdate());
@@ -348,6 +398,142 @@ TEST_F(UpdaterTest, ResetLaunchStateForgetsInit) {
   Updater::Instance().ReportLaunchSuccess();
 
   EXPECT_EQ(mock_->start_update_thread_count(), 0);
+  EXPECT_FALSE(Updater::Instance().IsInitialized());
+  Updater::Instance().ReportLaunchSuccess();
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchSuccess();
+  EXPECT_EQ(mock_->start_update_thread_count(), 2);
+}
+
+// Hot restart uses its own lifecycle methods (ReportRestartStart,
+// ReportRestartSuccess, ReportRestartFailure) that are not gated by the
+// once-per-process cold-boot launch guards.
+TEST_F(UpdaterTest, RestartLifecycleIsIndependentOfColdBootLaunchCycle) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchSuccess();
+
+  const uint64_t gen1 = Updater::Instance().ReportRestartStart();
+  Updater::Instance().ReportRestartSuccess(gen1);
+
+  const uint64_t gen2 = Updater::Instance().ReportRestartStart();
+  EXPECT_GT(gen2, gen1);
+  Updater::Instance().ReportRestartFailure();
+
+  EXPECT_EQ(mock_->launch_start_count(), 1);
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+  EXPECT_EQ(mock_->launch_failure_count(), 0);
+  EXPECT_EQ(mock_->restart_start_count(), 2);
+  EXPECT_EQ(mock_->restart_success_count(), 1);
+  EXPECT_EQ(mock_->restart_failure_count(), 1);
+}
+
+// Delayed ReportRestartSuccess callbacks carry a generation token so an earlier
+// restart's timer is ignored if a subsequent restart or failure occurred before
+// the timer fired.
+TEST_F(UpdaterTest, StaleRestartSuccessGenerationIsIgnored) {
+  const uint64_t gen1 = Updater::Instance().ReportRestartStart();
+  const uint64_t gen2 = Updater::Instance().ReportRestartStart();
+
+  // Stale timer from gen1 fires after gen2 started: ignored.
+  Updater::Instance().ReportRestartSuccess(gen1);
+  EXPECT_EQ(mock_->restart_success_count(), 0);
+
+  // Current generation succeeds.
+  Updater::Instance().ReportRestartSuccess(gen2);
+  EXPECT_EQ(mock_->restart_success_count(), 1);
+
+  // If a failure occurs after ReportRestartStart, a delayed success for that
+  // generation is also ignored.
+  const uint64_t gen3 = Updater::Instance().ReportRestartStart();
+  Updater::Instance().ReportRestartFailure();
+  Updater::Instance().ReportRestartSuccess(gen3);
+  EXPECT_EQ(mock_->restart_success_count(), 1);
+}
+
+// Init retains the configuration so the hot restart can fall back to the
+// original libapp paths when no patch is installed.
+TEST_F(UpdaterTest, InitRetainsAppConfig) {
+  AppConfig config;
+  config.release_version = "1.2.3+4";
+  config.original_libapp_paths = {"/data/app/libapp.so"};
+  config.yaml_config = "app_id: foo";
+
+  EXPECT_TRUE(Updater::Instance().Init(config));
+
+  const AppConfig stored = Updater::Instance().GetAppConfig();
+  EXPECT_EQ(stored.release_version, "1.2.3+4");
+  ASSERT_EQ(stored.original_libapp_paths.size(), 1u);
+  EXPECT_EQ(stored.original_libapp_paths[0], "/data/app/libapp.so");
+  EXPECT_EQ(mock_->init_count(), 1);
+}
+
+class RestartHostTest : public ::testing::Test {
+ protected:
+  void TearDown() override {
+    // The registry is process-global; leave it empty for other tests.
+    Updater::UnregisterRestartHost(1);
+    Updater::UnregisterRestartHost(2);
+    Updater::SetHotRestartSupported(false);
+  }
+};
+
+// With no registered host (no shell capable of restarting), a restart
+// request is rejected.
+TEST_F(RestartHostTest, RequestRestartWithoutHostIsRejected) {
+  EXPECT_FALSE(Updater::RequestRestart());
+}
+
+// With exactly one host, the request is forwarded and its result relayed.
+TEST_F(RestartHostTest, RequestRestartForwardsToSingleHost) {
+  int requests = 0;
+  Updater::RegisterRestartHost(1, [&requests]() {
+    requests++;
+    return true;
+  });
+  EXPECT_TRUE(Updater::RequestRestart());
+  EXPECT_EQ(requests, 1);
+
+  Updater::RegisterRestartHost(1, []() { return false; });
+  EXPECT_FALSE(Updater::RequestRestart());
+  EXPECT_EQ(requests, 1);
+}
+
+// With more than one live host (add-to-app / FlutterEngineGroup), restart
+// is unsupported and the request is rejected without invoking any host.
+TEST_F(RestartHostTest, RequestRestartWithMultipleHostsIsRejected) {
+  int requests = 0;
+  auto host = [&requests]() {
+    requests++;
+    return true;
+  };
+  Updater::RegisterRestartHost(1, host);
+  Updater::RegisterRestartHost(2, host);
+  EXPECT_FALSE(Updater::RequestRestart());
+  EXPECT_EQ(requests, 0);
+
+  // Back to one host (e.g. the other engine was destroyed): supported again.
+  Updater::UnregisterRestartHost(2);
+  EXPECT_TRUE(Updater::RequestRestart());
+  EXPECT_EQ(requests, 1);
+}
+
+// Unregistering an unknown host is a no-op (a shell that never registered
+// still unregisters in its destructor).
+TEST_F(RestartHostTest, UnregisterUnknownHostIsNoOp) {
+  Updater::UnregisterRestartHost(42);
+  EXPECT_FALSE(Updater::RequestRestart());
+}
+
+// The hot-restart-supported flag is process-global, set only by the mobile
+// ConfigureShorebird path.
+TEST_F(RestartHostTest, HotRestartSupportedFlag) {
+  EXPECT_FALSE(Updater::HotRestartSupported());
+  Updater::SetHotRestartSupported(true);
+  EXPECT_TRUE(Updater::HotRestartSupported());
+  Updater::SetHotRestartSupported(false);
+  EXPECT_FALSE(Updater::HotRestartSupported());
 }
 
 }  // namespace testing

@@ -984,6 +984,21 @@ bool DartIsolate::Shutdown() {
   return true;
 }
 
+void DartIsolate::ShutdownChildIsolates() {
+  TRACE_EVENT0("flutter", "DartIsolate::ShutdownChildIsolates");
+  if (phase_ == Phase::Shutdown || !IsRootIsolate()) {
+    return;
+  }
+  Dart_Isolate vm_isolate = isolate();
+  if (vm_isolate != nullptr) {
+    FML_DCHECK(Dart_CurrentIsolate() == nullptr);
+    Dart_EnterIsolate(vm_isolate);
+    Dart_KillIsolateGroupChildren();
+    Dart_ExitIsolate();
+    FML_DCHECK(Dart_CurrentIsolate() == nullptr);
+  }
+}
+
 Dart_Isolate DartIsolate::DartCreateAndStartServiceIsolate(
     const char* package_root,
     const char* package_config,

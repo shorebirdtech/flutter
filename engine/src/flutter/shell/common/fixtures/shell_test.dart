@@ -655,3 +655,33 @@ void hitTestOutsidePlatformViewMain() {
     return HitTestResponse.empty;
   };
 }
+
+@pragma('vm:external-name', 'ShorebirdIsPatchActive')
+external bool shorebirdIsPatchActive();
+
+@pragma('vm:external-name', 'ShorebirdNotifyState')
+external void shorebirdNotifyState(String state);
+
+@pragma('vm:external-name', 'ShorebirdNotifyWorkerSpawned')
+external void shorebirdNotifyWorkerSpawned();
+
+@pragma('vm:external-name', 'ShorebirdNotifyPlatformIsolate')
+external void shorebirdNotifyPlatformIsolate();
+
+Future<void> _shorebirdPersistentWorker(void _) async {
+  final keepAlive = ReceivePort();
+  shorebirdNotifyWorkerSpawned();
+  await keepAlive.first;
+}
+
+@pragma('vm:entry-point')
+void shorebirdToggleMain() {
+  final state = shorebirdIsPatchActive() ? 'patched' : 'base';
+  shorebirdNotifyState(state);
+  Isolate.spawn(_shorebirdPersistentWorker, null);
+}
+
+@pragma('vm:entry-point')
+void shorebirdPlatformIsolateEntrypoint() {
+  shorebirdNotifyPlatformIsolate();
+}

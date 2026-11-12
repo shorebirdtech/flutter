@@ -262,6 +262,7 @@ const Set<String> shorebirdUpdaterExports = <String>{
   'shorebird_next_boot_patch_number',
   'shorebird_current_boot_patch_number',
   'shorebird_validate_next_boot_patch',
+  'shorebird_restart_app',
 };
 
 final class NmEntry {

@@ -306,7 +306,7 @@ fml::RefPtr<const DartSnapshot> DartSnapshot::IsolateSnapshotFromSettings(
     FML_LOG(ERROR) << "Shorebird: patch load failed, running base code from "
                       "the app image instead of "
                    << settings.application_library_paths.front();
-    shorebird::Updater::Instance().ReportLaunchFailure();
+    shorebird::Updater::Instance().ReportPatchLoadFailure();
     return BaseIsolateSnapshotFromSettings(settings);
   }
 #endif
