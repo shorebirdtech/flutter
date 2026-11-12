@@ -194,8 +194,8 @@ NSString* const kFlutterApplicationRegistrarKey = @"io.flutter.flutter.applicati
 @end
 
 BOOL FLTShorebirdLaunchIsInBackground(UIApplicationState appState,
-                                          BOOL usesScenes,
-                                          NSArray<NSNumber*>* sceneStates) {
+                                      BOOL usesScenes,
+                                      NSArray<NSNumber*>* sceneStates) {
   if (appState != UIApplicationStateBackground) {
     return NO;
   }
