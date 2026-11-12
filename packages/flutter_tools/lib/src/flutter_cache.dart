@@ -20,6 +20,7 @@ import 'dart/package_map.dart';
 import 'dart/pub.dart';
 import 'globals.dart' as globals;
 import 'project.dart';
+import 'shorebird/shorebird_aot_tools.dart';
 
 /// An implementation of the [Cache] which provides all of Flutter's default artifacts.
 class FlutterCache extends Cache {
@@ -51,6 +52,8 @@ class FlutterCache extends Cache {
       registerArtifact(IosUsbArtifacts(artifactName, this, platform: platform));
     }
     registerArtifact(FontSubsetArtifacts(this, platform: platform));
+    // Shorebird-specific.
+    registerArtifact(ShorebirdAotTools(this, platform: platform));
     registerArtifact(
       PubDependencies(
         logger: logger,

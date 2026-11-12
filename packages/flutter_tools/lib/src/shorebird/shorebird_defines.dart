@@ -8,10 +8,6 @@ import '../convert.dart';
 /// [encodeShorebirdPublicKey].
 const kShorebirdPublicKey = 'ShorebirdPublicKey';
 
-/// The define for the cap on the iOS DD table in bytes. Absent means no DD
-/// pass.
-const kShorebirdDdMaxBytes = 'ShorebirdDdMaxBytes';
-
 /// Encodes the patch public key for [kShorebirdPublicKey].
 ///
 /// The key is base64, and an xcconfig reads `//` as the start of a comment,
