@@ -41,8 +41,11 @@ jobs:
     # Fork PRs get no secrets (the sync needs the dart-sdk deploy key) and
     # must not run on our Namespace runners.
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    # A release PR's run (release/<version>, a check the release waits on)
+    # starts ahead of queued Namespace jobs without a priority: on 3.47.9-rc7
+    # it queued over an hour behind the release's own Dart SDK full CI.
     runs-on:
-      - nscloud-ubuntu-22.04-amd64-16x64-with-cache
+      - nscloud-ubuntu-22.04-amd64-16x64-with-cache${{ startsWith(github.head_ref, 'release/') && ';job.priority=1' || '' }}
       - nscloud-cache-tag-shorebird-engine-tests
       - nscloud-cache-size-100gb
     # 16 vCPU: the build is the job's critical path (8.5 min on 8 vCPU).
