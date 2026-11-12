@@ -10,6 +10,7 @@
 
 #if SHOREBIRD_PLATFORM_SUPPORTED
 #include "flutter/shell/common/shorebird/engine_callbacks.h"
+#include "third_party/dart/runtime/bin/process.h"
 #include "third_party/updater/library/include/updater_engine.h"
 #endif
 
@@ -169,6 +170,10 @@ void Updater::OpenLaunchWindow(bool in_background) {
   bool expected = false;
   if (exit_handler_registered_.compare_exchange_strong(expected, true)) {
     std::atexit(&Updater::OnProcessExit);
+    // Dart's exit() runs the embedder's exit hook and then _exit(), which
+    // skips atexit handlers (dart:io Process_Exit). Flutter sets no other
+    // hook.
+    dart::bin::Process::SetExitHook(&Updater::OnDartExit);
   }
   if (in_background || app_in_background_.load()) {
     CloseLaunchWindow();
@@ -191,6 +196,10 @@ void Updater::SetAppInBackground(bool in_background) {
 
 void Updater::NoteAppInBackground(bool in_background) {
   app_in_background_.store(in_background);
+}
+
+void Updater::OnDartExit(int64_t exit_code) {
+  OnProcessExit();
 }
 
 void Updater::OnProcessExit() {

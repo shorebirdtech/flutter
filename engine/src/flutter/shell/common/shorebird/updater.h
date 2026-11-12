@@ -197,6 +197,11 @@ class Updater {
   /// `OpenLaunchWindow`.
   static void OnProcessExit();
 
+  /// Dart's `exit()`: the same clean exit as `OnProcessExit`, from the
+  /// dart:io exit hook, since Dart ends the process with `_exit()`, which
+  /// skips `atexit` handlers. Registered by `OpenLaunchWindow`.
+  static void OnDartExit(int64_t exit_code);
+
   /// How long after the root isolate launches a death still counts against
   /// the patch when no frame is drawn first: the cap on the window, and the
   /// only close for a headless engine.

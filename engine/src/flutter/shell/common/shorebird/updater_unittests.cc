@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "flutter/shell/common/shorebird/updater.h"
+#include "third_party/dart/runtime/bin/process.h"
 
 #include <algorithm>
 #include <string>
@@ -266,6 +267,18 @@ TEST_F(UpdaterTest, ProcessExitInTheWindowReportsSuccess) {
   // The window's own close afterwards reports nothing more.
   Updater::Instance().CloseLaunchWindow();
   EXPECT_EQ(mock_->launch_success_count(), 1);
+}
+
+// Dart's exit() ends the process with _exit(), which skips atexit handlers,
+// so the window registers the dart:io exit hook too.
+TEST_F(UpdaterTest, DartExitInTheWindowReportsSuccess) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().OpenLaunchWindow(false);
+  dart::bin::Process::RunExitHook(0);
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+  EXPECT_EQ(mock_->start_update_thread_count(), 0);
 }
 
 // An exit after a failed launch reports nothing.
