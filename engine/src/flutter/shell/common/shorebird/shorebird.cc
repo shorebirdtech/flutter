@@ -269,13 +269,20 @@ bool LoadPatchOrBase(const std::string& patch_path,
   // booting once the start is reported. Both are guarded once per process,
   // so the Shell's own start report (IsolateSnapshotFromSettings) is a no-op,
   // and its success report does not record the base-code boot as the patch's.
-  // This is the same sequence TryLoadPatch runs on iOS.
+  // This is the same sequence TryLoadIsolateSnapshotFromPatch runs on iOS.
   shorebird::Updater::Instance().ReportLaunchStart();
   shorebird::Updater::Instance().ReportLaunchFailure();
   return load(base_path);
 }
 
 void ApplyPatchToSettings(const std::string& patch_path, Settings& settings) {
+  if (settings.base_application_library_paths.empty()) {
+    settings.base_application_library_paths =
+        settings.application_library_paths;
+  } else {
+    settings.application_library_paths =
+        settings.base_application_library_paths;
+  }
   if (patch_path.empty()) {
     return;
   }

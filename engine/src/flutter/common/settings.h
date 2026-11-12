@@ -384,6 +384,11 @@ struct Settings {
 
   MergedPlatformUIThread merged_platform_ui_thread =
       MergedPlatformUIThread::kEnabled;
+
+  // Unpatched application library paths recorded before ConfigureShorebird
+  // rewrites application_library_paths. Used by DartSnapshot and DartVMData
+  // to resolve base VM and base isolate snapshots without touching patch files.
+  std::vector<std::string> base_application_library_paths;
 };
 
 }  // namespace flutter

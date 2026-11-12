@@ -9,73 +9,34 @@
 #include <memory>
 #include <mutex>
 #include <string>
-#include <vector>
 
-#include <third_party/dart/runtime/bin/elf_loader.h>
-
+#include "flutter/common/settings.h"  // nogncheck
 #include "flutter/fml/macros.h"
-#include "flutter/fml/mapping.h"
+#include "flutter/fml/memory/ref_ptr.h"
+#include "flutter/runtime/dart_snapshot.h"  // nogncheck
+#include "flutter/runtime/shorebird/patch_mapping.h"
 
 namespace flutter {
 
-/// A cache entry that holds a loaded patch file and its extracted snapshot
-/// pointers. The patch is automatically unloaded when the last reference to
-/// this entry is released.
-class PatchCacheEntry {
- public:
-  /// Creates a new cache entry by loading the patch file at the given path.
-  /// Returns nullptr if loading fails.
-  static std::shared_ptr<PatchCacheEntry> Create(const std::string& path);
-
-  ~PatchCacheEntry();
-
-  /// Returns the isolate snapshot data pointer.
-  const uint8_t* isolate_data() const { return isolate_data_; }
-
-  /// Returns the isolate snapshot instructions pointer.
-  const uint8_t* isolate_instructions() const { return isolate_instrs_; }
-
-  /// Returns a copy of the Shorebird link header that precedes the ELF in
-  /// the patch file, or nullptr if the file has none. The VM reads it when an
-  /// isolate group is created from this patch (Dart_IsolateFlags::link_header).
-  const std::shared_ptr<const fml::Mapping>& link_header() const {
-    return link_header_;
-  }
-
-  /// Returns the path this entry was loaded from.
-  const std::string& path() const { return path_; }
-
- private:
-  PatchCacheEntry(const std::string& path,
-                  Dart_LoadedElf* elf,
-                  const uint8_t* isolate_data,
-                  const uint8_t* isolate_instrs,
-                  std::shared_ptr<const fml::Mapping> link_header);
-
-  std::string path_;
-  Dart_LoadedElf* elf_;
-  const uint8_t* isolate_data_;
-  const uint8_t* isolate_instrs_;
-  std::shared_ptr<const fml::Mapping> link_header_;
-
-  FML_DISALLOW_COPY_AND_ASSIGN(PatchCacheEntry);
-};
-
-/// A thread-safe cache for loaded patch files. Cache entries are automatically
-/// removed when all references to them are released.
+/// A thread-safe cache for loaded `.vmcode` patch files.
+///
+/// Cache entries are held via `std::weak_ptr<LoadedPatch>` so concurrent
+/// engines running the same patch share a single `Dart_LoadELF` mapping, while
+/// tearing down the last engine (or replacing the isolate group during a hot
+/// restart into a new patch) drops the last `std::shared_ptr<LoadedPatch>` and
+/// unloads the ELF deterministically in `~LoadedPatch()`.
 class PatchCache {
  public:
   /// Returns the singleton instance of the cache.
   static PatchCache& Instance();
 
   /// Gets or loads a patch file at the given path. If the file is already
-  /// cached and the entry is still alive, returns the existing entry.
-  /// Otherwise, loads the file and creates a new cache entry.
-  /// Returns nullptr if loading fails.
-  std::shared_ptr<PatchCacheEntry> GetOrLoad(const std::string& path);
+  /// cached and the `LoadedPatch` is still alive, returns the existing entry.
+  /// Otherwise, loads the file via `LoadedPatch::Load` and caches a weak
+  /// reference to it. Returns `nullptr` if loading fails.
+  std::shared_ptr<LoadedPatch> GetOrLoad(const std::string& path);
 
-  /// Removes expired entries from the cache. This is called automatically
-  /// by GetOrLoad, but can also be called explicitly.
+  /// Removes expired entries from the cache.
   void PruneExpired();
 
  private:
@@ -83,25 +44,24 @@ class PatchCache {
   ~PatchCache() = default;
 
   std::mutex mutex_;
-  // We store weak references so entries are automatically cleaned up when
-  // all ElfMapping instances release their references.
-  std::map<std::string, std::weak_ptr<PatchCacheEntry>> cache_;
+  std::map<std::string, std::weak_ptr<LoadedPatch>> cache_;
 
   FML_DISALLOW_COPY_AND_ASSIGN(PatchCache);
 };
 
-/// Checks if the first path in native_library_paths is a Shorebird patch
-/// (.vmcode file) and if so, loads it through the cache.
+/// Checks if the first path in `settings.application_library_paths` is a
+/// Shorebird patch (`.vmcode` file) and if so, resolves an isolate
+/// `DartSnapshot` backed by `PatchCache` and paired with the unpatched base
+/// isolate snapshot from `settings`.
 ///
-/// If the patch fails to load, reports the launch as failed to the updater and
-/// returns nullptr, so the caller boots the base app instead.
+/// If the front path is a `.vmcode` file that fails to load, reports launch
+/// failure to `shorebird::Updater::Instance()` and falls back to the unpatched
+/// base isolate snapshot from `settings`.
 ///
-/// @param native_library_paths The list of library paths to check. The first
-///        path is checked for the .vmcode extension.
-/// @return The loaded patch, or nullptr if there is no patch or it failed to
-///         load, which leaves the caller to fall back to the base app.
-std::shared_ptr<PatchCacheEntry> TryLoadPatch(
-    const std::vector<std::string>& native_library_paths);
+/// Returns `nullptr` when `settings.application_library_paths` does not start
+/// with a `.vmcode` path, leaving the caller to resolve the base app snapshot.
+fml::RefPtr<const DartSnapshot> TryLoadIsolateSnapshotFromPatch(
+    const Settings& settings);
 
 }  // namespace flutter
 

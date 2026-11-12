@@ -23,10 +23,24 @@ std::shared_ptr<const DartVMData> DartVMData::Create(
     }
   }
 
+  if (isolate_snapshot && isolate_snapshot->GetBaseSnapshot()) {
+    isolate_snapshot = isolate_snapshot->GetBaseSnapshot();
+  } else if (isolate_snapshot &&
+             !settings.base_application_library_paths.empty()) {
+    // On Android (!SHOREBIRD_USE_INTERPRETER), a cold-booted .vmcode patch
+    // snapshot does not attach GetBaseSnapshot(); resolve the base isolate
+    // snapshot explicitly so process-lifetime DartVMData never pins a patch.
+    if (auto base_snapshot =
+            DartSnapshot::BaseIsolateSnapshotFromSettings(settings)) {
+      isolate_snapshot = std::move(base_snapshot);
+    }
+  }
+
   if (!isolate_snapshot || !isolate_snapshot->IsValid()) {
-    // Caller did not provide a valid isolate snapshot. Attempt to infer one
-    // from the settings.
-    isolate_snapshot = DartSnapshot::IsolateSnapshotFromSettings(settings);
+    // Caller did not provide a valid isolate snapshot. Infer the base isolate
+    // snapshot from settings so process-lifetime DartVMData never pins a patch
+    // mapping.
+    isolate_snapshot = DartSnapshot::BaseIsolateSnapshotFromSettings(settings);
     if (!isolate_snapshot) {
       FML_LOG(ERROR) << "Isolate snapshot invalid and could not be inferred "
                         "from settings.";

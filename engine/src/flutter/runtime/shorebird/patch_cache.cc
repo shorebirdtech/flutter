@@ -4,111 +4,33 @@
 
 #include "flutter/runtime/shorebird/patch_cache.h"
 
-#include <mutex>
 #include <utility>
 
 #include "flutter/fml/logging.h"
-#include "flutter/fml/mapping.h"
 #include "flutter/shell/common/shorebird/updater.h"
-#include "third_party/dart/runtime/include/dart_api.h"
 
 namespace flutter {
-
-// PatchCacheEntry implementation
-
-std::shared_ptr<PatchCacheEntry> PatchCacheEntry::Create(
-    const std::string& path) {
-  // vmcode files currently use ELF internally after a prefix of a Shorebird
-  // linker header.
-  auto elf_mapping = fml::FileMapping::CreateReadOnly(path);
-  if (!elf_mapping) {
-    FML_LOG(ERROR) << "Failed to map file: " << path;
-    return nullptr;
-  }
-
-  // The offset is the link header's size rounded up to a page. The header
-  // itself is copied out here and handed to the VM per isolate group, so the
-  // file mapping can be dropped once the ELF is loaded.
-  int elf_file_offset = Shorebird_LinkHeaderOffset(
-      elf_mapping->GetMapping(), static_cast<intptr_t>(elf_mapping->GetSize()));
-  if (elf_file_offset < 0 ||
-      static_cast<size_t>(elf_file_offset) >= elf_mapping->GetSize()) {
-    FML_LOG(ERROR) << "Invalid link header offset in patch at " << path;
-    return nullptr;
-  }
-  std::shared_ptr<const fml::Mapping> link_header;
-  if (elf_file_offset > 0) {
-    link_header = std::make_shared<fml::MallocMapping>(fml::MallocMapping::Copy(
-        elf_mapping->GetMapping(), static_cast<size_t>(elf_file_offset)));
-  }
-
-  const char* error = nullptr;
-  // One data blob and one text blob. The VM isolate folded into the isolate
-  // group, so the VM and isolate symbols now name the same buffers and
-  // Dart_LoadELF resolves a single pair.
-  const uint8_t* isolate_data = nullptr;
-  const uint8_t* isolate_instrs = nullptr;
-
-  Dart_LoadedElf* elf =
-      Dart_LoadELF(path.c_str(), elf_file_offset, &error, &isolate_data,
-                   &isolate_instrs, dart::bin::kReadOnly);
-
-  if (elf == nullptr) {
-    FML_LOG(ERROR) << "Failed to load patch at " << path
-                   << " error: " << (error != nullptr ? error : "unknown");
-    return nullptr;
-  }
-
-  FML_LOG(INFO) << "Loaded patch from " << path;
-
-  return std::shared_ptr<PatchCacheEntry>(new PatchCacheEntry(
-      path, elf, isolate_data, isolate_instrs, std::move(link_header)));
-}
-
-PatchCacheEntry::PatchCacheEntry(
-    const std::string& path,
-    Dart_LoadedElf* elf,
-    const uint8_t* isolate_data,
-    const uint8_t* isolate_instrs,
-    std::shared_ptr<const fml::Mapping> link_header)
-    : path_(path),
-      elf_(elf),
-      isolate_data_(isolate_data),
-      isolate_instrs_(isolate_instrs),
-      link_header_(std::move(link_header)) {}
-
-PatchCacheEntry::~PatchCacheEntry() {
-  if (elf_ != nullptr) {
-    FML_LOG(INFO) << "Unloading patch from " << path_;
-    Dart_UnloadELF(elf_);
-    elf_ = nullptr;
-  }
-}
 
 PatchCache& PatchCache::Instance() {
   static PatchCache instance;
   return instance;
 }
 
-std::shared_ptr<PatchCacheEntry> PatchCache::GetOrLoad(
-    const std::string& path) {
+std::shared_ptr<LoadedPatch> PatchCache::GetOrLoad(const std::string& path) {
   std::lock_guard<std::mutex> lock(mutex_);
 
-  // Check if we have a cached entry that's still alive
   auto it = cache_.find(path);
   if (it != cache_.end()) {
     if (auto entry = it->second.lock()) {
       FML_LOG(INFO) << "PatchCache hit for " << path;
       return entry;
     }
-    // Entry expired, remove it
     cache_.erase(it);
   }
 
-  // Load a new entry
-  auto entry = PatchCacheEntry::Create(path);
+  auto entry = LoadedPatch::Load(path);
   if (entry) {
-    cache_[path] = entry;  // Store weak_ptr
+    cache_[path] = entry;
   }
 
   return entry;
@@ -126,36 +48,44 @@ void PatchCache::PruneExpired() {
   }
 }
 
-std::shared_ptr<PatchCacheEntry> TryLoadPatch(
-    const std::vector<std::string>& native_library_paths) {
-  if (native_library_paths.empty()) {
+fml::RefPtr<const DartSnapshot> TryLoadIsolateSnapshotFromPatch(
+    const Settings& settings) {
+  if (settings.application_library_paths.empty()) {
     return nullptr;
   }
 
-  // Check if the first path is a Shorebird patch (.vmcode file)
-  const auto& patch_path = native_library_paths.front();
-  bool is_patch = patch_path.find(".vmcode") != std::string::npos;
-  if (!is_patch) {
+  const auto& first_path = settings.application_library_paths.front();
+  if (first_path.find(".vmcode") == std::string::npos) {
     return nullptr;
   }
 
-  // Load the patch using the cache.
-  auto cache_entry = PatchCache::Instance().GetOrLoad(patch_path);
-  if (!cache_entry) {
-    // Boot the base image rather than aborting. PatchCacheEntry::Create has
-    // already logged why the load failed.
+  auto patch = PatchCache::Instance().GetOrLoad(first_path);
+  if (patch) {
+    auto base_snapshot =
+        DartSnapshot::BaseIsolateSnapshotFromSettings(settings);
+    // The patch is mapped read-only and runs out of the base, so without both
+    // base blobs the VM would refuse the group at boot. IsValid() checks only
+    // the data half; check both, and boot base code instead (#310's guard).
+    if (base_snapshot && base_snapshot->IsValidForAOT()) {
+      if (auto patch_snapshot = DartSnapshot::IsolateSnapshotFromLoadedPatch(
+              patch, base_snapshot)) {
+        return patch_snapshot;
+      }
+    }
+    FML_LOG(ERROR) << "Shorebird: no usable patch snapshot, running base "
+                      "code from the app image";
+  } else {
+    // Boot the base image rather than aborting. LoadedPatch::Load has already
+    // logged why the load failed.
     FML_LOG(ERROR) << "Shorebird: patch load failed, running base code from "
                       "the app image instead of "
-                   << patch_path;
-    // ReportLaunchStart already promoted this patch to current_boot, so
-    // without a failure report it stays "running" in the updater's books
-    // while base code executes, and the next launch retries the same patch.
-    // Guarded once per process.
-    shorebird::Updater::Instance().ReportLaunchFailure();
-    return nullptr;
+                   << first_path;
   }
-
-  return cache_entry;
+  // ReportLaunchStart already promoted this patch to current_boot, so without
+  // a failure report it stays "running" in the updater's books while base code
+  // executes, and the next launch retries the same patch.
+  shorebird::Updater::Instance().ReportLaunchFailure();
+  return DartSnapshot::BaseIsolateSnapshotFromSettings(settings);
 }
 
 }  // namespace flutter

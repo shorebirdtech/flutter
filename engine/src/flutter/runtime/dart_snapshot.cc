@@ -6,7 +6,6 @@
 
 #include <sstream>
 
-#include <third_party/dart/runtime/bin/elf_loader.h>
 #include "flutter/fml/native_library.h"
 #include "flutter/fml/paths.h"
 #include "flutter/fml/trace_event.h"
@@ -21,6 +20,16 @@
 #include "flutter/shell/common/shorebird/updater.h"  // nogncheck
 
 namespace flutter {
+
+namespace {
+DartSnapshot::PatchSnapshotResolver g_patch_snapshot_resolver_for_testing =
+    nullptr;
+}  // namespace
+
+void DartSnapshot::SetPatchSnapshotResolverForTesting(
+    PatchSnapshotResolver resolver) {
+  g_patch_snapshot_resolver_for_testing = resolver;
+}
 
 const char* DartSnapshot::kVMDataSymbol = "kDartSnapshotData";
 const char* DartSnapshot::kVMInstructionsSymbol = "kDartSnapshotText";
@@ -105,6 +114,21 @@ static std::shared_ptr<const fml::Mapping> SearchMapping(
 
 #endif  // !DART_SNAPSHOT_STATIC_LINK
 
+static std::vector<std::string> BaseApplicationLibraryPaths(
+    const Settings& settings) {
+  const auto& source = !settings.base_application_library_paths.empty()
+                           ? settings.base_application_library_paths
+                           : settings.application_library_paths;
+  std::vector<std::string> result;
+  result.reserve(source.size());
+  for (const auto& path : source) {
+    if (path.find(".vmcode") == std::string::npos) {
+      result.push_back(path);
+    }
+  }
+  return result;
+}
+
 static std::shared_ptr<const fml::Mapping> ResolveVMData(
     const Settings& settings) {
 #if DART_SNAPSHOT_STATIC_LINK
@@ -115,11 +139,11 @@ static std::shared_ptr<const fml::Mapping> ResolveVMData(
   );
 #else   // DART_SNAPSHOT_STATIC_LINK
   return SearchMapping(
-      settings.vm_snapshot_data,           // embedder_mapping_callback
-      settings.vm_snapshot_data_path,      // file_path
-      settings.application_library_paths,  // native_library_paths
-      DartSnapshot::kVMDataSymbol,         // native_library_symbol_name
-      false                                // is_executable
+      settings.vm_snapshot_data,              // embedder_mapping_callback
+      settings.vm_snapshot_data_path,         // file_path
+      BaseApplicationLibraryPaths(settings),  // native_library_paths
+      DartSnapshot::kVMDataSymbol,            // native_library_symbol_name
+      false                                   // is_executable
   );
 #endif  // DART_SNAPSHOT_STATIC_LINK
 }
@@ -134,11 +158,49 @@ static std::shared_ptr<const fml::Mapping> ResolveVMInstructions(
   );
 #else   // DART_SNAPSHOT_STATIC_LINK
   return SearchMapping(
-      settings.vm_snapshot_instr,           // embedder_mapping_callback
-      settings.vm_snapshot_instr_path,      // file_path
-      settings.application_library_paths,   // native_library_paths
-      DartSnapshot::kVMInstructionsSymbol,  // native_library_symbol_name
-      true                                  // is_executable
+      settings.vm_snapshot_instr,             // embedder_mapping_callback
+      settings.vm_snapshot_instr_path,        // file_path
+      BaseApplicationLibraryPaths(settings),  // native_library_paths
+      DartSnapshot::kVMInstructionsSymbol,    // native_library_symbol_name
+      true                                    // is_executable
+  );
+#endif  // DART_SNAPSHOT_STATIC_LINK
+}
+
+static std::shared_ptr<const fml::Mapping> ResolveBaseIsolateData(
+    const Settings& settings) {
+#if DART_SNAPSHOT_STATIC_LINK
+  return std::make_unique<fml::NonOwnedMapping>(kDartSnapshotData,
+                                                0,        // size
+                                                nullptr,  // release_func
+                                                true      // dontneed_safe
+  );
+#else   // DART_SNAPSHOT_STATIC_LINK
+  return SearchMapping(
+      settings.isolate_snapshot_data,         // embedder_mapping_callback
+      settings.isolate_snapshot_data_path,    // file_path
+      BaseApplicationLibraryPaths(settings),  // native_library_paths
+      DartSnapshot::kIsolateDataSymbol,       // native_library_symbol_name
+      false                                   // is_executable
+  );
+#endif  // DART_SNAPSHOT_STATIC_LINK
+}
+
+static std::shared_ptr<const fml::Mapping> ResolveBaseIsolateInstructions(
+    const Settings& settings) {
+#if DART_SNAPSHOT_STATIC_LINK
+  return std::make_unique<fml::NonOwnedMapping>(kDartSnapshotText,
+                                                0,        // size
+                                                nullptr,  // release_func
+                                                true      // dontneed_safe
+  );
+#else   // DART_SNAPSHOT_STATIC_LINK
+  return SearchMapping(
+      settings.isolate_snapshot_instr,           // embedder_mapping_callback
+      settings.isolate_snapshot_instr_path,      // file_path
+      BaseApplicationLibraryPaths(settings),     // native_library_paths
+      DartSnapshot::kIsolateInstructionsSymbol,  // native_library_symbol_name
+      true                                       // is_executable
   );
 #endif  // DART_SNAPSHOT_STATIC_LINK
 }
@@ -194,6 +256,19 @@ fml::RefPtr<const DartSnapshot> DartSnapshot::VMSnapshotFromSettings(
   return nullptr;
 }
 
+fml::RefPtr<const DartSnapshot> DartSnapshot::BaseIsolateSnapshotFromSettings(
+    const Settings& settings) {
+  TRACE_EVENT0("flutter", "DartSnapshot::BaseIsolateSnapshotFromSettings");
+  auto snapshot = fml::MakeRefCounted<DartSnapshot>(
+      ResolveBaseIsolateData(settings),         //
+      ResolveBaseIsolateInstructions(settings)  //
+  );
+  if (snapshot->IsValid()) {
+    return snapshot;
+  }
+  return nullptr;
+}
+
 fml::RefPtr<const DartSnapshot> DartSnapshot::IsolateSnapshotFromSettings(
     const Settings& settings) {
   TRACE_EVENT0("flutter", "DartSnapshot::IsolateSnapshotFromSettings");
@@ -205,36 +280,14 @@ fml::RefPtr<const DartSnapshot> DartSnapshot::IsolateSnapshotFromSettings(
   // FlutterEngineGroup scenarios.
   shorebird::Updater::Instance().ReportLaunchStart();
 #if SHOREBIRD_USE_INTERPRETER
-  // Try loading from a Shorebird patch first. The patch links against the
-  // unpatched app snapshot, which the VM and isolate symbols both name (see
-  // kVMDataSymbol), so the VM snapshot is the base. The snapshot holds the
-  // base and the patch's link header, and DartIsolate hands both to the VM
-  // for each isolate group it creates from this snapshot.
-  if (auto patch = TryLoadPatch(settings.application_library_paths)) {
-    // Resolve the base from the app's own libraries, without the .vmcode
-    // TryLoadPatch found at the front: the same paths SetBaseSnapshot
-    // resolves from.
-    Settings base_settings = settings;
-    base_settings.application_library_paths.erase(
-        base_settings.application_library_paths.begin());
-    auto base = VMSnapshotFromSettings(base_settings);
-    // The patch is mapped read-only and runs out of the base, so without
-    // both base blobs the VM would refuse the group at boot. IsValid() checks
-    // only the data half; check both, and boot base code instead.
-    if (base && base->IsValidForAOT()) {
-      auto patch_snapshot = IsolateSnapshotFromMappings(
-          PatchMapping::CreateIsolateData(patch),
-          PatchMapping::CreateIsolateInstructions(patch), std::move(base),
-          patch->link_header());
-      if (patch_snapshot) {
-        return patch_snapshot;
-      }
+  if (auto patch_snapshot = TryLoadIsolateSnapshotFromPatch(settings)) {
+    return patch_snapshot;
+  }
+#else
+  if (g_patch_snapshot_resolver_for_testing != nullptr) {
+    if (auto patch_snapshot = g_patch_snapshot_resolver_for_testing(settings)) {
+      return patch_snapshot;
     }
-    FML_LOG(ERROR) << "Shorebird: no usable patch snapshot, running base "
-                      "code from the app image";
-    // ReportLaunchStart already promoted this patch to current_boot; without
-    // a failure report the next launch retries it. Guarded once per process.
-    shorebird::Updater::Instance().ReportLaunchFailure();
   }
 #endif  // SHOREBIRD_USE_INTERPRETER
 #endif  // !DART_SNAPSHOT_STATIC_LINK
@@ -245,6 +298,18 @@ fml::RefPtr<const DartSnapshot> DartSnapshot::IsolateSnapshotFromSettings(
   if (snapshot->IsValid()) {
     return snapshot;
   }
+#if !DART_SNAPSHOT_STATIC_LINK && !SHOREBIRD_USE_INTERPRETER
+  if (!settings.base_application_library_paths.empty() &&
+      !settings.application_library_paths.empty() &&
+      settings.application_library_paths.front().find(".vmcode") !=
+          std::string::npos) {
+    FML_LOG(ERROR) << "Shorebird: patch load failed, running base code from "
+                      "the app image instead of "
+                   << settings.application_library_paths.front();
+    shorebird::Updater::Instance().ReportLaunchFailure();
+    return BaseIsolateSnapshotFromSettings(settings);
+  }
+#endif
   return nullptr;
 }
 

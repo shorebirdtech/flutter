@@ -3,17 +3,20 @@
 // found in the LICENSE file.
 
 #include "flutter/runtime/shorebird/patch_cache.h"
+#include "flutter/runtime/shorebird/patch_mapping.h"
 
 #include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "flutter/common/settings.h"
 #include "flutter/fml/file.h"
 #include "flutter/fml/mapping.h"
 #include "flutter/fml/paths.h"
 #include "flutter/runtime/dart_snapshot.h"
-#include "flutter/runtime/shorebird/patch_mapping.h"
+#include "flutter/runtime/dart_vm_data.h"
+#include "flutter/shell/common/shorebird/updater.h"
 #include "gtest/gtest.h"
 
 namespace flutter {
@@ -24,6 +27,12 @@ namespace {
 std::shared_ptr<const fml::Mapping> MakeBytesMapping(
     const std::vector<uint8_t>& bytes) {
   return std::make_shared<fml::MallocMapping>(
+      fml::MallocMapping::Copy(bytes.data(), bytes.size()));
+}
+
+std::unique_ptr<fml::Mapping> MakeUniqueBytesMapping(
+    const std::vector<uint8_t>& bytes) {
+  return std::make_unique<fml::MallocMapping>(
       fml::MallocMapping::Copy(bytes.data(), bytes.size()));
 }
 
@@ -218,170 +227,274 @@ std::vector<uint8_t> BuildMinimalVmcodeBytes(bool with_link_header) {
   return vmcode;
 }
 
-// Writes `bytes` to `name` in `dir` and returns the file's path.
-std::string WriteFile(fml::ScopedTemporaryDirectory& dir,
-                      const std::string& name,
-                      const std::vector<uint8_t>& bytes) {
-  fml::DataMapping mapping(bytes);
-  EXPECT_TRUE(fml::WriteAtomically(dir.fd(), name.c_str(), mapping));
-  return fml::paths::JoinPaths({dir.path(), name});
-}
-
 }  // namespace
 
-TEST(PatchCache, InstanceReturnsSameInstance) {
+class LoadedPatchTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    LoadedPatch::ResetCountsForTesting();
+    PatchCache::Instance().PruneExpired();
+    DartSnapshot::SetPatchSnapshotResolverForTesting(
+        &TryLoadIsolateSnapshotFromPatch);
+    auto mock = std::make_unique<shorebird::MockUpdater>();
+    mock_updater_ = mock.get();
+    shorebird::Updater::SetInstanceForTesting(std::move(mock));
+    shorebird::Updater::ResetLaunchStateForTesting();
+  }
+
+  void TearDown() override {
+    DartSnapshot::SetPatchSnapshotResolverForTesting(nullptr);
+    LoadedPatch::ResetCountsForTesting();
+    PatchCache::Instance().PruneExpired();
+    shorebird::Updater::ResetLaunchStateForTesting();
+    shorebird::Updater::ResetInstanceForTesting();
+  }
+
+  shorebird::MockUpdater* mock_updater_ = nullptr;
+};
+
+TEST_F(LoadedPatchTest, PatchCacheInstanceReturnsSameInstance) {
   PatchCache& instance1 = PatchCache::Instance();
   PatchCache& instance2 = PatchCache::Instance();
   EXPECT_EQ(&instance1, &instance2);
 }
 
-// Every TryLoadPatch case below keeps a non-patch path at the front. A .vmcode
-// front path commits to loading the file and reports a failed load to the
-// updater, which the PatchCache cases exercise directly instead.
-
-TEST(TryLoadPatch, ReturnsNullptrForEmptyPaths) {
-  std::vector<std::string> empty_paths;
-  EXPECT_EQ(TryLoadPatch(empty_paths), nullptr);
-}
-
-TEST(TryLoadPatch, ReturnsNullptrForNonVmcodePath) {
-  std::vector<std::string> paths = {"/path/to/some/file.so"};
-  EXPECT_EQ(TryLoadPatch(paths), nullptr);
-}
-
-TEST(TryLoadPatch, ChecksOnlyFirstPath) {
-  // Only the first path should be checked for .vmcode extension
-  std::vector<std::string> paths = {"/path/to/regular.so",
-                                    "/path/to/patch.vmcode"};
-  EXPECT_EQ(TryLoadPatch(paths), nullptr);
-}
-
-TEST(PatchCache, GetOrLoadReturnsNullptrForNonexistentFile) {
-  auto result =
+TEST_F(LoadedPatchTest, LoadReturnsNullptrForNonexistentFile) {
+  auto patch =
       PatchCache::Instance().GetOrLoad("/nonexistent/path/to/file.vmcode");
-  EXPECT_EQ(result, nullptr);
+  EXPECT_EQ(patch, nullptr);
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 0u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 0u);
 }
 
-TEST(PatchCache, GetOrLoadReturnsNullptrForNonElfFile) {
+TEST_F(LoadedPatchTest, LoadReturnsNullptrForNonElfFile) {
   fml::ScopedTemporaryDirectory temp_dir;
   ASSERT_TRUE(temp_dir.fd().is_valid());
   const std::string bad_data = "not an elf or link header";
-  auto path = WriteFile(temp_dir, "bad.vmcode",
-                        std::vector<uint8_t>(bad_data.begin(), bad_data.end()));
-  EXPECT_EQ(PatchCache::Instance().GetOrLoad(path), nullptr);
+  fml::DataMapping mapping(
+      std::vector<uint8_t>(bad_data.begin(), bad_data.end()));
+  ASSERT_TRUE(fml::WriteAtomically(temp_dir.fd(), "bad.vmcode", mapping));
+
+  std::string path = fml::paths::JoinPaths({temp_dir.path(), "bad.vmcode"});
+  auto patch = PatchCache::Instance().GetOrLoad(path);
+  EXPECT_EQ(patch, nullptr);
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 0u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 0u);
 }
 
-// The link header ahead of the ELF is copied out of the file, page-padded as
-// Shorebird_LinkHeaderOffset reports it, and the snapshot pair comes from the
-// ELF behind it.
-TEST(PatchCache, LoadsLinkHeaderAndSnapshotsFromVmcode) {
+TEST_F(LoadedPatchTest, LoadAndUnloadRealVmcodeElfWithLinkHeader) {
   fml::ScopedTemporaryDirectory temp_dir;
   ASSERT_TRUE(temp_dir.fd().is_valid());
-  auto path = WriteFile(temp_dir, "patch.vmcode",
-                        BuildMinimalVmcodeBytes(/*with_link_header=*/true));
+  auto vmcode_bytes = BuildMinimalVmcodeBytes(/*with_link_header=*/true);
+  fml::DataMapping mapping(vmcode_bytes);
+  ASSERT_TRUE(fml::WriteAtomically(temp_dir.fd(), "patch.vmcode", mapping));
+  std::string path = fml::paths::JoinPaths({temp_dir.path(), "patch.vmcode"});
 
-  auto entry = PatchCache::Instance().GetOrLoad(path);
-  ASSERT_NE(entry, nullptr);
-  ASSERT_NE(entry->link_header(), nullptr);
-  EXPECT_EQ(entry->link_header()->GetSize(), 16384u);
-  const int32_t* header =
-      reinterpret_cast<const int32_t*>(entry->link_header()->GetMapping());
-  EXPECT_EQ(header[0], 2);  // sim_to_cpu_count
+  auto patch = PatchCache::Instance().GetOrLoad(path);
+  ASSERT_NE(patch, nullptr);
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 1u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 0u);
+  EXPECT_EQ(patch->isolate_data_size(), 128u);
+  EXPECT_EQ(patch->isolate_instructions_size(), 256u);
+  ASSERT_NE(patch->link_header(), nullptr);
+  EXPECT_EQ(patch->link_header()->GetSize(), 16384u);
 
-  auto data = PatchMapping::CreateIsolateData(entry);
-  auto instructions = PatchMapping::CreateIsolateInstructions(entry);
-  ASSERT_NE(data, nullptr);
-  ASSERT_NE(instructions, nullptr);
-  EXPECT_EQ(data->GetSize(), 128u);
-  EXPECT_EQ(instructions->GetSize(), 256u);
+  auto data_mapping = patch->CreateDataMapping();
+  auto instr_mapping = patch->CreateInstructionsMapping();
+  ASSERT_NE(data_mapping, nullptr);
+  ASSERT_NE(instr_mapping, nullptr);
+  EXPECT_EQ(data_mapping->GetSize(), 128u);
+  EXPECT_EQ(instr_mapping->GetSize(), 256u);
+
+  patch.reset();
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 1u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 0u);
+
+  data_mapping.reset();
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 1u);
+  instr_mapping.reset();
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 0u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 1u);
 }
 
-TEST(PatchCache, VmcodeWithoutLinkHeaderHasNone) {
+TEST_F(
+    LoadedPatchTest,
+    ConcurrentEnginesShareCachedLoadedPatchAndReloadAfterLastEngineTeardown) {
   fml::ScopedTemporaryDirectory temp_dir;
   ASSERT_TRUE(temp_dir.fd().is_valid());
-  auto path = WriteFile(temp_dir, "patch.vmcode",
-                        BuildMinimalVmcodeBytes(/*with_link_header=*/false));
+  auto vmcode_bytes = BuildMinimalVmcodeBytes(/*with_link_header=*/true);
+  fml::DataMapping mapping(vmcode_bytes);
+  ASSERT_TRUE(fml::WriteAtomically(temp_dir.fd(), "patch.vmcode", mapping));
+  std::string path = fml::paths::JoinPaths({temp_dir.path(), "patch.vmcode"});
 
-  auto entry = PatchCache::Instance().GetOrLoad(path);
-  ASSERT_NE(entry, nullptr);
-  EXPECT_EQ(entry->link_header(), nullptr);
-}
+  std::vector<uint8_t> base_iso_data = {'B', 'A', 'S', 'E', '_', 'D'};
+  std::vector<uint8_t> base_iso_instr = {'B', 'A', 'S', 'E', '_', 'I'};
 
-// Engines running the same patch share one loaded ELF. The cache holds it
-// weakly, so the ELF is unloaded when the last snapshot using it is dropped,
-// and a later engine loads it afresh.
-TEST(PatchCache, SnapshotsShareOnePatchAndTheLastOneUnloadsIt) {
-  fml::ScopedTemporaryDirectory temp_dir;
-  ASSERT_TRUE(temp_dir.fd().is_valid());
-  auto path = WriteFile(temp_dir, "patch.vmcode",
-                        BuildMinimalVmcodeBytes(/*with_link_header=*/true));
-
-  auto snapshot_for = [&path]() {
-    auto entry = PatchCache::Instance().GetOrLoad(path);
-    EXPECT_NE(entry, nullptr);
-    return DartSnapshot::IsolateSnapshotFromMappings(
-        PatchMapping::CreateIsolateData(entry),
-        PatchMapping::CreateIsolateInstructions(entry), nullptr,
-        entry->link_header());
+  Settings settings;
+  settings.application_library_paths = {path};
+  settings.isolate_snapshot_data = [base_iso_data]() {
+    return MakeUniqueBytesMapping(base_iso_data);
+  };
+  settings.isolate_snapshot_instr = [base_iso_instr]() {
+    return MakeUniqueBytesMapping(base_iso_instr);
   };
 
-  auto first = snapshot_for();
-  ASSERT_TRUE(first);
-  std::weak_ptr<PatchCacheEntry> loaded =
-      PatchCache::Instance().GetOrLoad(path);
-  ASSERT_FALSE(loaded.expired());
+  // First engine resolves the patch snapshot.
+  auto snapshot1 = TryLoadIsolateSnapshotFromPatch(settings);
+  ASSERT_TRUE(snapshot1);
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 1u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 0u);
 
-  auto second = snapshot_for();
-  ASSERT_TRUE(second);
-  EXPECT_EQ(first->GetDataMapping(), second->GetDataMapping());
-  EXPECT_EQ(first->GetInstructionsMapping(), second->GetInstructionsMapping());
-  EXPECT_EQ(first->GetLinkHeaderMapping(), second->GetLinkHeaderMapping());
+  // Second concurrent engine resolves the same patch and shares the cached ELF.
+  auto snapshot2 = TryLoadIsolateSnapshotFromPatch(settings);
+  ASSERT_TRUE(snapshot2);
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 1u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 0u);
+  EXPECT_EQ(snapshot1->GetDataMapping(), snapshot2->GetDataMapping());
+  EXPECT_EQ(snapshot1->GetInstructionsMapping(),
+            snapshot2->GetInstructionsMapping());
 
-  first = nullptr;
-  EXPECT_FALSE(loaded.expired());
+  // Tearing down the first engine keeps the patch alive for the second.
+  snapshot1 = nullptr;
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 1u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 0u);
 
-  second = nullptr;
-  EXPECT_TRUE(loaded.expired());
+  // Tearing down the last engine unloads the ELF deterministically.
+  snapshot2 = nullptr;
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 0u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 1u);
 
-  auto third = snapshot_for();
-  ASSERT_TRUE(third);
-  EXPECT_EQ(third->GetLinkHeaderSize(), 16384u);
+  // Re-creating an engine in the same process after last-engine teardown
+  // reloads the patch cleanly from settings.
+  auto snapshot3 = TryLoadIsolateSnapshotFromPatch(settings);
+  ASSERT_TRUE(snapshot3);
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 1u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 1u);
+  ASSERT_NE(snapshot3->GetBaseSnapshot().get(), nullptr);
+  EXPECT_EQ(snapshot3->GetLinkHeaderSize(), 16384u);
+
+  snapshot3 = nullptr;
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 0u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 2u);
 }
 
-// What DartIsolate hands Dart_CreateIsolateGroup in Dart_IsolateFlags for a
-// patch: the base snapshot's two blobs and the patch's link header.
-TEST(DartSnapshotShorebird, PatchSnapshotCarriesBaseAndLinkHeader) {
-  auto base = DartSnapshot::IsolateSnapshotFromMappings(
-      MakeBytesMapping({'B', 'D'}), MakeBytesMapping({'B', 'I'}));
-  ASSERT_TRUE(base);
-  auto link_header = MakeBytesMapping({1, 0, 0, 0, 16, 0, 0, 0, 32, 0, 0, 0});
+TEST_F(LoadedPatchTest,
+       TryLoadIsolateSnapshotFromPatchReportsFailureAndFallsBackToBase) {
+  std::vector<uint8_t> base_iso_data = {'B', 'A', 'S', 'E', '_', 'D'};
+  std::vector<uint8_t> base_iso_instr = {'B', 'A', 'S', 'E', '_', 'I'};
 
-  auto patch = DartSnapshot::IsolateSnapshotFromMappings(
-      MakeBytesMapping({'P', 'D'}), MakeBytesMapping({'P', 'I'}), base,
-      link_header);
-  ASSERT_TRUE(patch);
-  EXPECT_EQ(patch->GetBaseSnapshot().get(), base.get());
-  EXPECT_EQ(patch->GetBaseDataMapping(), base->GetDataMapping());
-  EXPECT_EQ(patch->GetBaseInstructionsMapping(),
-            base->GetInstructionsMapping());
-  EXPECT_EQ(patch->GetLinkHeaderMapping(), link_header->GetMapping());
-  EXPECT_EQ(patch->GetLinkHeaderSize(), 12u);
+  Settings settings;
+  settings.application_library_paths = {"/nonexistent/patch.vmcode"};
+  settings.isolate_snapshot_data = [base_iso_data]() {
+    return MakeUniqueBytesMapping(base_iso_data);
+  };
+  settings.isolate_snapshot_instr = [base_iso_instr]() {
+    return MakeUniqueBytesMapping(base_iso_instr);
+  };
 
-  // Holding the patch keeps its base alive.
-  const uint8_t* base_data = base->GetDataMapping();
-  base = nullptr;
-  EXPECT_EQ(patch->GetBaseDataMapping(), base_data);
-}
-
-TEST(DartSnapshotShorebird, UnpatchedSnapshotCarriesNoBaseOrLinkHeader) {
-  auto snapshot = DartSnapshot::IsolateSnapshotFromMappings(
-      MakeBytesMapping({'D'}), MakeBytesMapping({'I'}));
+  shorebird::Updater::Instance().ReportLaunchStart();
+  auto snapshot = TryLoadIsolateSnapshotFromPatch(settings);
   ASSERT_TRUE(snapshot);
   EXPECT_EQ(snapshot->GetBaseSnapshot().get(), nullptr);
-  EXPECT_EQ(snapshot->GetBaseDataMapping(), nullptr);
-  EXPECT_EQ(snapshot->GetBaseInstructionsMapping(), nullptr);
-  EXPECT_EQ(snapshot->GetLinkHeaderMapping(), nullptr);
-  EXPECT_EQ(snapshot->GetLinkHeaderSize(), 0u);
+  EXPECT_EQ(mock_updater_->launch_start_count(), 1);
+  EXPECT_EQ(mock_updater_->launch_failure_count(), 1);
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 0u);
+}
+
+TEST_F(LoadedPatchTest, UnloadsWhenLastPatchMappingAndSnapshotDrop) {
+  std::vector<uint8_t> data_bytes = {'D', 'A', 'T', 'A'};
+  std::vector<uint8_t> instr_bytes = {'I', 'N', 'S', 'T', 'R'};
+  std::vector<uint8_t> link_bytes = {1, 0, 0, 0, 16, 0, 0, 0, 32, 0, 0, 0};
+
+  auto patch = LoadedPatch::CreateForTesting(MakeBytesMapping(data_bytes),
+                                             MakeBytesMapping(instr_bytes),
+                                             MakeBytesMapping(link_bytes));
+  ASSERT_NE(patch, nullptr);
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 1u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 0u);
+
+  auto base_snapshot = DartSnapshot::IsolateSnapshotFromMappings(
+      MakeBytesMapping({'B', 'D'}), MakeBytesMapping({'B', 'I'}));
+  ASSERT_TRUE(base_snapshot);
+
+  auto snapshot =
+      DartSnapshot::IsolateSnapshotFromLoadedPatch(patch, base_snapshot);
+  ASSERT_TRUE(snapshot);
+  EXPECT_EQ(snapshot->GetBaseSnapshot().get(), base_snapshot.get());
+  EXPECT_EQ(snapshot->GetLinkHeaderSize(), link_bytes.size());
+
+  // Dropping our local shared_ptr leaves the PatchMappings inside `snapshot`
+  // as the sole owners of `LoadedPatch`.
+  patch.reset();
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 1u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 0u);
+
+  // Dropping `snapshot` releases both `PatchMapping` instances and destroys
+  // `LoadedPatch` synchronously.
+  snapshot = nullptr;
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 0u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 1u);
+}
+
+TEST_F(LoadedPatchTest, DartVMDataResolvesBaseSnapshotsAndIgnoresVmcodePaths) {
+  std::vector<uint8_t> base_vm_data = {'V', 'M', 'D'};
+  std::vector<uint8_t> base_vm_instr = {'V', 'M', 'I'};
+  std::vector<uint8_t> base_iso_data = {'I', 'S', 'O', 'D'};
+  std::vector<uint8_t> base_iso_instr = {'I', 'S', 'O', 'I'};
+
+  Settings settings;
+  // Front path is a nonexistent .vmcode patch. If DartVMData::Create attempted
+  // to resolve through IsolateSnapshotFromSettings instead of
+  // BaseIsolateSnapshotFromSettings, it would attempt to load the nonexistent
+  // .vmcode file and report a launch failure on mock_updater_.
+  settings.application_library_paths = {"/nonexistent/patch.vmcode",
+                                        "/nonexistent/base.so"};
+  settings.base_application_library_paths = {"/nonexistent/base.so"};
+  settings.vm_snapshot_data = [base_vm_data]() {
+    return MakeUniqueBytesMapping(base_vm_data);
+  };
+  settings.vm_snapshot_instr = [base_vm_instr]() {
+    return MakeUniqueBytesMapping(base_vm_instr);
+  };
+  settings.isolate_snapshot_data = [base_iso_data]() {
+    return MakeUniqueBytesMapping(base_iso_data);
+  };
+  settings.isolate_snapshot_instr = [base_iso_instr]() {
+    return MakeUniqueBytesMapping(base_iso_instr);
+  };
+
+  auto vm_data = DartVMData::Create(settings, nullptr, nullptr);
+  ASSERT_NE(vm_data, nullptr);
+  ASSERT_NE(vm_data->GetIsolateSnapshot().get(), nullptr);
+  EXPECT_EQ(vm_data->GetIsolateSnapshot()->GetBaseSnapshot().get(), nullptr);
+  EXPECT_EQ(mock_updater_->launch_start_count(), 0);
+  EXPECT_EQ(mock_updater_->launch_failure_count(), 0);
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 0u);
+}
+
+TEST_F(LoadedPatchTest, DartVMDataUnwrapsBaseSnapshotFromPatchedSnapshot) {
+  auto base_vm_snapshot = DartSnapshot::IsolateSnapshotFromMappings(
+      MakeBytesMapping({'V', 'D'}), MakeBytesMapping({'V', 'I'}));
+  auto base_iso_snapshot = DartSnapshot::IsolateSnapshotFromMappings(
+      MakeBytesMapping({'B', 'D'}), MakeBytesMapping({'B', 'I'}));
+  auto patch = LoadedPatch::CreateForTesting(MakeBytesMapping({'P', 'D'}),
+                                             MakeBytesMapping({'P', 'I'}));
+  auto patched_snapshot =
+      DartSnapshot::IsolateSnapshotFromLoadedPatch(patch, base_iso_snapshot);
+  patch.reset();
+  ASSERT_EQ(LoadedPatch::LiveCountForTesting(), 1u);
+
+  Settings settings;
+  auto vm_data =
+      DartVMData::Create(settings, base_vm_snapshot, patched_snapshot);
+  ASSERT_NE(vm_data, nullptr);
+  EXPECT_EQ(vm_data->GetIsolateSnapshot().get(), base_iso_snapshot.get());
+
+  // Releasing `patched_snapshot` while `vm_data` stays alive must unload the
+  // patch immediately, proving `DartVMData` does not retain the patch.
+  patched_snapshot = nullptr;
+  EXPECT_EQ(LoadedPatch::LiveCountForTesting(), 0u);
+  EXPECT_EQ(LoadedPatch::UnloadCountForTesting(), 1u);
 }
 
 }  // namespace testing
