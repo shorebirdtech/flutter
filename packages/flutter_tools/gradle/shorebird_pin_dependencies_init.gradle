@@ -1,0 +1,39 @@
+// Forces the app's Maven dependencies to the versions its Shorebird release
+// was built with, so a patch build resolves the same libraries as the
+// release even when a dependency uses a dynamic version (`1.+`, a range) or
+// a newer version was published since.
+//
+// This file is Shorebird-specific: it exists in the Shorebird fork of
+// Flutter and has no equivalent upstream. flutter_tools passes it with `-I=`
+// only when `-Pshorebird.pinned-dependencies=<path>` is set
+// (lib/src/shorebird/shorebird_pinned_dependencies.dart). `<path>` lists one
+// `group:artifact:version` per line; blank lines and lines starting with `#`
+// are skipped.
+//
+// Only the classpaths that decide what ships in the app (`*RuntimeClasspath`)
+// and what it compiles against (`*CompileClasspath`) are pinned. Tool
+// classpaths such as the Kotlin compiler's or lint's are left alone: forcing
+// the app's kotlin-stdlib onto the compiler, for example, could break the
+// build. `force` only changes the version of a module that is already in a
+// graph; it never adds one.
+
+def pinsPath = gradle.startParameter.projectProperties['shorebird.pinned-dependencies']
+if (!pinsPath) {
+    return
+}
+
+def pins = new File(pinsPath).readLines()
+        .collect { it.trim() }
+        .findAll { it && !it.startsWith('#') }
+if (pins.isEmpty()) {
+    return
+}
+
+gradle.allprojects { project ->
+    project.configurations.configureEach { configuration ->
+        if (configuration.name.endsWith('RuntimeClasspath') ||
+                configuration.name.endsWith('CompileClasspath')) {
+            configuration.resolutionStrategy.force(*pins)
+        }
+    }
+}
