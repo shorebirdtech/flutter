@@ -23,15 +23,15 @@ name: shorebird_ios_engine_build
 # mounted, and must not be able to plant anything a release build later runs.
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Named, not ${{ github.workflow }}: called from shorebird_ci.yml, that
+  # is the caller's name, and sharing the caller's group deadlocks.
+  group: shorebird_ios_engine_build-${{ github.ref }}
   cancel-in-progress: true
 
 on:
-  pull_request:
-    paths:
-      - DEPS
-      - engine/**
-      - .github/workflows/shorebird_ios_engine_build.yml
+  # PRs run this through shorebird_ci.yml, so the required `ci` check waits
+  # on it; its `changes` job holds the path filter for PRs.
+  workflow_call:
   push:
     branches:
       - shorebird/dev

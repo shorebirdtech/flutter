@@ -13,17 +13,17 @@ name: shorebird_engine_tests
 # mounted, and must not be able to plant anything a release build later runs.
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Named, not ${{ github.workflow }}: called from shorebird_ci.yml, that
+  # is the caller's name, and sharing the caller's group deadlocks.
+  group: shorebird_engine_tests-${{ github.ref }}
   # Cancel superseded runs, PRs and pushes to shorebird/dev alike: these run
   # on Namespace runners, and a newer push's result covers the older one.
   cancel-in-progress: true
 
 on:
-  pull_request:
-    paths:
-      - DEPS
-      - engine/**
-      - .github/workflows/shorebird_engine_tests.yml
+  # PRs run this through shorebird_ci.yml, so the required `ci` check waits
+  # on it; its `changes` job holds the path filter for PRs.
+  workflow_call:
   push:
     branches:
       - shorebird/dev
