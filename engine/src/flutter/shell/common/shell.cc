@@ -531,10 +531,14 @@ Shell::Shell(DartVMRef vm,
   // In add-to-app, subsequent engines are silently ignored since they
   // boot from the same snapshot that was already reported on.
   // On unsupported platforms, NoOpUpdater handles these calls gracefully.
+  // A built Shell isn't a launch: an engine can be created and never run.
+  // So the breadcrumb is paused here and armed again when the root isolate
+  // launches (Engine::Run), and success waits for the launch window to close.
+  // See the "Launch window" section of the Updater class comment.
   if (!vm_) {
     shorebird::Updater::Instance().ReportLaunchFailure();
   } else {
-    shorebird::Updater::Instance().ReportLaunchSuccess();
+    shorebird::Updater::Instance().ReportLaunchPaused();
   }
   FML_CHECK(!settings.enable_software_rendering || !settings.enable_impeller)
       << "Software rendering is incompatible with Impeller.";
@@ -1761,6 +1765,23 @@ size_t Shell::UnreportedFramesCount() const {
 void Shell::OnFrameRasterized(const FrameTiming& timing) {
   FML_DCHECK(is_set_up_);
   FML_DCHECK(task_runners_.GetRasterTaskRunner()->RunsTasksOnCurrentThread());
+
+  // Shorebird: the first frame rasterized ends the launch window if this
+  // Shell's engine owns it. By then the patch's snapshot loaded and linked,
+  // main ran and a frame was built: the failures the rollback is for show
+  // before this. The owner check runs on the UI thread, where the engine
+  // lives; the close writes to disk, so it runs on the platform thread.
+  if (!shorebird_first_frame_drawn_) {
+    shorebird_first_frame_drawn_ = true;
+    task_runners_.GetUITaskRunner()->PostTask(
+        [engine = weak_engine_,
+         platform = task_runners_.GetPlatformTaskRunner()] {
+          if (engine && engine->ShorebirdOwnsLaunchWindow()) {
+            platform->PostTask(
+                [] { shorebird::Updater::Instance().CloseLaunchWindow(); });
+          }
+        });
+  }
 
   // The C++ callback defined in settings.h and set by Flutter runner. This is
   // independent of the timings report to the Dart side.

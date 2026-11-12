@@ -1,3 +1,4 @@
+import("//flutter/build/dart/dart.gni")
 import("//flutter/common/config.gni")
 import("//flutter/shell/common/shorebird/build_rust_updater.gni")
 import("//flutter/testing/testing.gni")
@@ -205,8 +206,13 @@ source_set("updater") {
 
   deps = [
     ":engine_callbacks",
+    "$dart_src/runtime/bin:common_embedder_dart_io",
     "//flutter/fml",
   ]
+
+  # For dart::bin::Process::SetExitHook: the include paths only, not
+  # dart_config's warning flags and defines.
+  configs += [ "$dart_src/runtime:dart_public_config" ]
 
   # For the Rust updater C API (shorebird_report_launch_start, etc.)
   include_dirs = [ "//flutter" ]
@@ -309,10 +315,14 @@ if (enable_unittests) {
       ":shorebird_fixtures",
       ":snapshots_data_handle",
       ":updater",
+      "$dart_src/runtime/bin:common_embedder_dart_io",
       "//flutter/runtime",
       "//flutter/runtime/shorebird:patch_cache",
       "//flutter/testing",
       "//flutter/testing:fixture_test",
     ]
+
+    # updater_unittests.cc runs the dart:io exit hook.
+    configs += [ "$dart_src/runtime:dart_public_config" ]
   }
 }

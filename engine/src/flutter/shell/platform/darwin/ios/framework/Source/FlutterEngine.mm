@@ -18,6 +18,7 @@
 #include "flutter/shell/common/engine.h"
 #include "flutter/shell/common/platform_view.h"
 #include "flutter/shell/common/shell.h"
+#include "flutter/shell/common/shorebird/updater.h"
 #include "flutter/shell/common/switches.h"
 #include "flutter/shell/common/thread_host.h"
 #include "flutter/shell/common/variable_refresh_rate_display.h"
@@ -191,6 +192,34 @@ NSString* const kFlutterApplicationRegistrarKey = @"io.flutter.flutter.applicati
   return _appRegistrar;
 }
 @end
+
+BOOL FLTShorebirdLaunchIsInBackground(UIApplicationState appState,
+                                      BOOL usesScenes,
+                                      NSArray<NSNumber*>* sceneStates) {
+  if (appState != UIApplicationStateBackground) {
+    return NO;
+  }
+  if (!usesScenes) {
+    return YES;
+  }
+  BOOL sceneInBackground = NO;
+  for (NSNumber* state in sceneStates) {
+    switch (static_cast<UISceneActivationState>(state.integerValue)) {
+      case UISceneActivationStateForegroundActive:
+      case UISceneActivationStateForegroundInactive:
+        return NO;
+      case UISceneActivationStateBackground:
+        sceneInBackground = YES;
+        break;
+      case UISceneActivationStateUnattached:
+        break;
+    }
+  }
+  // No scene connected yet: a cold launch whose scene comes forward next, or
+  // a launch with no UI. Either way the scene's notifications or the
+  // window's cap end the window.
+  return sceneInBackground;
+}
 
 @implementation FlutterEngine {
   std::shared_ptr<flutter::ThreadHost> _threadHost;
@@ -944,6 +973,17 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
                            : FlutterSharedApplication.application &&
                                  FlutterSharedApplication.application.applicationState ==
                                      UIApplicationStateBackground;
+  // Shorebird: a launch in the background ends the launch window at once.
+  // Lifecycle messages only come from a view controller in a window, so an
+  // engine without one (background launch, add-to-app) would never close it.
+  // Not from applicationState alone: a scene-based app (the implicit engine
+  // of today's template) reads background here on every cold launch.
+  BOOL shorebirdInBackground = self.viewController ? self.viewController.stateIsBackground
+                                                   : [self shorebirdLaunchIsInBackground];
+  flutter::shorebird::Updater::Instance().SetAppInBackground(shorebirdInBackground);
+  if (!self.viewController && !shorebirdInBackground) {
+    [self shorebirdKeepRunningThroughTheLaunchWindow];
+  }
 
   // Create the shell. This is a blocking operation.
   std::unique_ptr<flutter::Shell> shell = flutter::Shell::Create(
@@ -1470,12 +1510,54 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
   [self flutterDidEnterBackground:notification];
 }
 
+// Shorebird: a scene-based app with no scene in the foreground yet (a cold
+// launch before its scene connects, or a background launch: a silent push,
+// background fetch) keeps the launch window open until its cap. iOS can
+// suspend a background app before then, so the cap never fires and a later
+// kill would blame the patch. A background task keeps the app running until
+// the window has had its time.
+- (void)shorebirdKeepRunningThroughTheLaunchWindow {
+  UIApplication* application = FlutterSharedApplication.application;
+  if (!application || application.applicationState != UIApplicationStateBackground) {
+    return;
+  }
+  __block UIBackgroundTaskIdentifier task = UIBackgroundTaskInvalid;
+  void (^end)(void) = ^{
+    if (task != UIBackgroundTaskInvalid) {
+      [application endBackgroundTask:task];
+      task = UIBackgroundTaskInvalid;
+    }
+  };
+  task = [application beginBackgroundTaskWithName:@"Shorebird launch window" expirationHandler:end];
+  // The window opens when the root isolate launches, just after this.
+  int64_t until = (flutter::shorebird::Updater::LaunchWindow() + fml::TimeDelta::FromSeconds(2))
+                      .ToNanoseconds();
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, until), dispatch_get_main_queue(), end);
+}
+
+- (BOOL)shorebirdLaunchIsInBackground {
+  UIApplication* application = FlutterSharedApplication.application;
+  if (!application) {
+    // An app extension: no app state to read; the window's cap ends it.
+    return NO;
+  }
+  BOOL usesScenes =
+      [NSBundle.mainBundle objectForInfoDictionaryKey:@"UIApplicationSceneManifest"] != nil;
+  NSMutableArray<NSNumber*>* sceneStates = [NSMutableArray array];
+  for (UIScene* scene in application.connectedScenes) {
+    [sceneStates addObject:@(scene.activationState)];
+  }
+  return FLTShorebirdLaunchIsInBackground(application.applicationState, usesScenes, sceneStates);
+}
+
 - (void)flutterWillEnterForeground:(NSNotification*)notification {
   [self setIsGpuDisabled:NO];
+  flutter::shorebird::Updater::Instance().SetAppInBackground(false);
 }
 
 - (void)flutterDidEnterBackground:(NSNotification*)notification {
   [self setIsGpuDisabled:YES];
+  flutter::shorebird::Updater::Instance().SetAppInBackground(true);
   [self notifyLowMemory];
 }
 

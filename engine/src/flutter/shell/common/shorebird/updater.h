@@ -7,11 +7,14 @@
 
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
+
+#include "flutter/fml/time/time_delta.h"
 
 namespace flutter {
 namespace shorebird {
@@ -98,6 +101,26 @@ struct AppConfig {
 /// boot is still in progress at that point, which the bullets above rule
 /// out.
 ///
+/// ## Launch window
+///
+/// A launch is reported in phases, so that a patch is blamed only for deaths
+/// while it runs:
+/// - `ReportLaunchStart` where the patch's snapshot is first resolved arms
+///   the updater's boot breadcrumb.
+/// - `ReportLaunchPaused` when the Shell is built clears it without
+///   promoting the patch: an engine that is built and never run must not
+///   leave the patch armed.
+/// - `ReportLaunchResumed` when the first engine launches its root isolate
+///   arms it again. That engine owns the launch window, and opens it with
+///   `OpenLaunchWindow` once the root isolate has launched.
+/// - `CloseLaunchWindow` reports success when the owning engine draws its
+///   first frame, or `LaunchWindow()` after the root isolate launches if no
+///   frame came first (a headless engine never draws), or earlier when the
+///   app leaves the foreground or the owning engine shuts down. A death
+///   before then, a crash in loading or linking the patch, building the
+///   isolate, main or the first frame, rolls the patch back on the next
+///   launch.
+///
 /// Tests can call `ResetLaunchStateForTesting()` to re-enable the guards.
 class Updater {
  public:
@@ -130,7 +153,61 @@ class Updater {
   // own guard. See the class comment.
   void ReportLaunchStart();
   void ReportLaunchSuccess();
+  /// A patch failed to load, or the first Shell got no VM. Ignored once a
+  /// Shell has been built: a later engine's failure says nothing about the
+  /// patch this process is running.
   void ReportLaunchFailure();
+  /// The owner's root isolate failed to launch.
+  void ReportRootIsolateLaunchFailure();
+
+  /// The Shell is built. Clears the boot breadcrumb without promoting the
+  /// patch. Once per process.
+  void ReportLaunchPaused();
+
+  /// An engine is launching its root isolate. Arms the boot breadcrumb again
+  /// for the patch this process loaded. Returns true for the first caller in
+  /// the process, which owns the launch window: it reports a failed isolate
+  /// launch, or opens the window and schedules `CloseLaunchWindow`.
+  bool ReportLaunchResumed();
+
+  /// The owner's root isolate launched. Opens the launch window, closing it
+  /// at once if the app is already in the background (`in_background` is
+  /// what the owning engine's lifecycle messages said).
+  void OpenLaunchWindow(bool in_background);
+
+  /// Ends the launch window: reports success if a launch was resumed and
+  /// nothing has been reported yet, and starts the update thread. Safe to
+  /// call any number of times, from any thread.
+  void CloseLaunchWindow();
+
+  /// Whether the app is in the background, from embedders that know it
+  /// independently of any view (iOS). Going to the background, or a window
+  /// opened while in it, closes the launch window: iOS suspends a
+  /// background app without running the window's timer and may terminate it
+  /// later, and that isn't the patch crashing.
+  void SetAppInBackground(bool in_background);
+
+  /// Records what an engine's lifecycle message said about the foreground,
+  /// for a window opened later, without closing it. Lifecycle is app-wide,
+  /// so any engine's message counts. The engine posts the close itself.
+  void NoteAppInBackground(bool in_background);
+
+  /// Runs at a clean process exit (`exit()`, a return from `main`), which
+  /// runs `atexit` handlers where a crash or a kill doesn't. Ends the window
+  /// with a success report and starts no update thread. Registered by
+  /// `OpenLaunchWindow`.
+  static void OnProcessExit();
+
+  /// Dart's `exit()`: the same clean exit as `OnProcessExit`, from the
+  /// dart:io exit hook, since Dart ends the process with `_exit()`, which
+  /// skips `atexit` handlers. Registered by `OpenLaunchWindow`.
+  static void OnDartExit(int64_t exit_code);
+
+  /// How long after the root isolate launches a death still counts against
+  /// the patch when no frame is drawn first: the cap on the window, and the
+  /// only close for a headless engine.
+  static fml::TimeDelta LaunchWindow();
+  static void SetLaunchWindowForTesting(fml::TimeDelta window);
 
   // Update checking
   virtual bool ShouldAutoUpdate() = 0;
@@ -163,6 +240,8 @@ class Updater {
   virtual void DoReportLaunchStart() = 0;
   virtual void DoReportLaunchSuccess() = 0;
   virtual void DoReportLaunchFailure() = 0;
+  virtual void DoReportLaunchPaused() = 0;
+  virtual void DoReportLaunchResumed() = 0;
 
  private:
   // Starts the update thread at most once per process, if the updater is
@@ -171,10 +250,21 @@ class Updater {
 
   static std::unique_ptr<Updater> instance_;
   static std::mutex instance_mutex_;
+  // Held while a success report is written; a clean exit waits on it.
+  static std::mutex launch_report_mutex_;
 
   // Once-per-process guards for launch lifecycle.
   static std::atomic<bool> launch_started_;
   static std::atomic<bool> launch_completed_;
+  static std::atomic<bool> launch_paused_;
+  static std::atomic<bool> launch_resumed_;
+  // Set once the owner's root isolate launched, so a close racing the launch
+  // can't report success before the breadcrumb is armed again, or before a
+  // failed isolate launch is reported.
+  static std::atomic<bool> launch_window_open_;
+  static std::atomic<bool> app_in_background_;
+  static std::atomic<bool> exit_handler_registered_;
+  static std::atomic<int64_t> launch_window_micros_;
   // Whether any `Init` succeeded; the update thread needs a configured
   // updater. Latched, never cleared outside tests.
   static std::atomic<bool> initialized_;
@@ -196,6 +286,8 @@ class NoOpUpdater : public Updater {
   void DoReportLaunchStart() override {}
   void DoReportLaunchSuccess() override {}
   void DoReportLaunchFailure() override {}
+  void DoReportLaunchPaused() override {}
+  void DoReportLaunchResumed() override {}
   bool ShouldAutoUpdate() override { return false; }
   void StartUpdateThread() override {}
 };
@@ -214,6 +306,8 @@ class RealUpdater : public Updater {
   void DoReportLaunchStart() override;
   void DoReportLaunchSuccess() override;
   void DoReportLaunchFailure() override;
+  void DoReportLaunchPaused() override;
+  void DoReportLaunchResumed() override;
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
   void ProtectedDataAvailable() override;
@@ -233,6 +327,8 @@ class MockUpdater : public Updater {
   void DoReportLaunchStart() override;
   void DoReportLaunchSuccess() override;
   void DoReportLaunchFailure() override;
+  void DoReportLaunchPaused() override;
+  void DoReportLaunchResumed() override;
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
 
@@ -255,6 +351,10 @@ class MockUpdater : public Updater {
   // Test configuration
   void set_init_result(bool value) { init_result_ = value; }
   void set_should_auto_update(bool value) { should_auto_update_ = value; }
+  /// Runs inside DoReportLaunchSuccess, before it records the call.
+  void set_on_report_launch_success(std::function<void()> callback) {
+    on_report_launch_success_ = std::move(callback);
+  }
   void set_next_boot_patch_path(const std::string& path) {
     next_boot_patch_path_ = path;
   }
@@ -267,6 +367,7 @@ class MockUpdater : public Updater {
   int validate_count_ = 0;
   int launch_start_count_ = 0;
   int launch_success_count_ = 0;
+  std::function<void()> on_report_launch_success_;
   int launch_failure_count_ = 0;
   int start_update_thread_count_ = 0;
   bool init_result_ = true;

@@ -133,6 +133,18 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
+/**
+ * Shorebird: whether an engine with no view controller is launching in the
+ * background, which ends the launch window at once. `sceneStates` holds the
+ * `UISceneActivationState` of each connected scene. A scene-based app reads
+ * `UIApplicationStateBackground` from launch until its first scene comes
+ * forward, on every cold launch the user starts too, so for such an app only
+ * a connected scene in the background, with none in the foreground, says so.
+ */
+BOOL FLTShorebirdLaunchIsInBackground(UIApplicationState appState,
+                                      BOOL usesScenes,
+                                      NSArray<NSNumber*>* sceneStates);
+
 NS_ASSUME_NONNULL_END
 
 #endif  // FLUTTER_SHELL_PLATFORM_DARWIN_IOS_FRAMEWORK_SOURCE_FLUTTERENGINE_INTERNAL_H_
