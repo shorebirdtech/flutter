@@ -23,10 +23,14 @@ jobs:
   # shorebird/dev always run them (release branches get no push run). The iOS job's xlarge runner is this
   # repo's only billed Actions minutes (the repo is public, so standard
   # runners are free).
+  #
+  # It also decides whether a PR runs the engine jobs (engine-tests,
+  # ios-engine-build): only when it touches DEPS, engine/ or their workflows.
   changes:
     runs-on: ubuntu-latest
     outputs:
       tests: ${{ steps.filter.outputs.tests }}
+      engine: ${{ steps.filter.outputs.engine }}
     steps:
       - id: filter
         env:
@@ -38,11 +42,24 @@ jobs:
         run: |
           # pulls/N/files stops at 3,000 files without saying so; a PR that
           # big (an upstream merge) runs the tests.
-          if [[ "$EVENT" != pull_request || "$CHANGED_FILES" -ge 3000 ]]; then
+          # The engine workflows run on pushes by their own push triggers.
+          if [[ "$EVENT" != pull_request ]]; then
             echo "tests=true" >> "$GITHUB_OUTPUT"
+            echo "engine=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$CHANGED_FILES" -ge 3000 ]]; then
+            echo "tests=true" >> "$GITHUB_OUTPUT"
+            echo "engine=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename')
+          if grep -qE '^(DEPS$|engine/|\.github/workflows/shorebird_(engine_tests|ios_engine_build)\.yml$)' <<< "$files"; then
+            echo "engine=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No changes to DEPS or engine/; skipping the engine jobs."
+            echo "engine=false" >> "$GITHUB_OUTPUT"
+          fi
           if grep -qE '^(packages/|bin/|pubspec\.(yaml|lock)$|\.github/workflows/shorebird_ci\.yml$)' <<< "$files"; then
             echo "tests=true" >> "$GITHUB_OUTPUT"
           else
@@ -194,6 +211,21 @@ jobs:
           # Enables streaming subprocess output for debugging timeouts.
           VERBOSE: "1"
 
+  # The engine workflows, here rather than on their own pull_request
+  # triggers so the required `ci` check below waits on them: before, engine
+  # PRs could land with them pending or red (#316).
+  engine-tests:
+    needs: changes
+    if: needs.changes.outputs.engine == 'true'
+    uses: ./.github/workflows/shorebird_engine_tests.yml
+    secrets: inherit
+
+  ios-engine-build:
+    needs: changes
+    if: needs.changes.outputs.engine == 'true'
+    uses: ./.github/workflows/shorebird_ios_engine_build.yml
+    secrets: inherit
+
   # Aggregator required by branch protection on shorebird/dev so the rule can
   # list a single context ("ci") instead of every matrix-expanded job above.
   # Skipped jobs (see changes) pass it.
@@ -205,6 +237,8 @@ jobs:
       - shorebird-android-tests
       - shorebird-ios-tests
       - shorebird-macos-android-smoke-test
+      - engine-tests
+      - ios-engine-build
     runs-on: ubuntu-latest
     steps:
       - if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
