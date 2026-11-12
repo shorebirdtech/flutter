@@ -314,6 +314,7 @@ if (enable_unittests) {
       ":shorebird_fixtures",
       ":snapshots_data_handle",
       ":updater",
+      "$dart_src/runtime/bin:common_embedder_dart_io",
       "//flutter/runtime",
       "//flutter/runtime/shorebird:patch_cache",
       "//flutter/testing",
