@@ -5221,9 +5221,10 @@ TEST_F(ShellTest, ShorebirdBootFlowCallsLaunchStartThenSuccess) {
 // A patch whose snapshot aborts the process while the root isolate group is
 // created must not already be recorded as booted, or every later launch
 // boots it again (shorebirdtech/shorebird#4407). Creating the Shell is not
-// enough to report success, and neither is a run whose root isolate never
-// comes up: the launch stays unreported, which the updater treats as a
-// failed boot on the next launch.
+// enough to report success, and neither is a run that fails to launch the
+// root isolate (here, after the snapshot loads, at the entrypoint lookup):
+// the launch stays unreported, which the updater treats as a failed boot on
+// the next launch.
 TEST_F(ShellTest, ShorebirdLaunchSuccessWaitsForRootIsolate) {
   auto mock = std::make_unique<shorebird::MockUpdater>();
   auto* mock_ptr = mock.get();
