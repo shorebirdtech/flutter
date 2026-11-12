@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -249,6 +250,8 @@ class Updater {
 
   static std::unique_ptr<Updater> instance_;
   static std::mutex instance_mutex_;
+  // Held while a success report is written; a clean exit waits on it.
+  static std::mutex launch_report_mutex_;
 
   // Once-per-process guards for launch lifecycle.
   static std::atomic<bool> launch_started_;
@@ -348,6 +351,10 @@ class MockUpdater : public Updater {
   // Test configuration
   void set_init_result(bool value) { init_result_ = value; }
   void set_should_auto_update(bool value) { should_auto_update_ = value; }
+  /// Runs inside DoReportLaunchSuccess, before it records the call.
+  void set_on_report_launch_success(std::function<void()> callback) {
+    on_report_launch_success_ = std::move(callback);
+  }
   void set_next_boot_patch_path(const std::string& path) {
     next_boot_patch_path_ = path;
   }
@@ -360,6 +367,7 @@ class MockUpdater : public Updater {
   int validate_count_ = 0;
   int launch_start_count_ = 0;
   int launch_success_count_ = 0;
+  std::function<void()> on_report_launch_success_;
   int launch_failure_count_ = 0;
   int start_update_thread_count_ = 0;
   bool init_result_ = true;

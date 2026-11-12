@@ -3,13 +3,16 @@
 // found in the LICENSE file.
 
 #include "flutter/shell/common/shorebird/updater.h"
-#include "third_party/dart/runtime/bin/process.h"
 
 #include <algorithm>
+#include <atomic>
 #include <string>
+#include <thread>
 #include <vector>
 
+#include "flutter/fml/synchronization/waitable_event.h"
 #include "gtest/gtest.h"
+#include "third_party/dart/runtime/bin/process.h"
 
 namespace flutter {
 namespace shorebird {
@@ -279,6 +282,34 @@ TEST_F(UpdaterTest, DartExitInTheWindowReportsSuccess) {
   dart::bin::Process::RunExitHook(0);
   EXPECT_EQ(mock_->launch_success_count(), 1);
   EXPECT_EQ(mock_->start_update_thread_count(), 0);
+}
+
+// A clean exit while another thread writes the success (the first frame, the
+// cap) waits for it, so the process doesn't end with the patch still armed.
+TEST_F(UpdaterTest, ProcessExitWaitsForASuccessBeingWritten) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().OpenLaunchWindow(false);
+
+  std::atomic<bool> write_done{false};
+  std::atomic<bool> exit_saw_write_done{false};
+  std::thread exiter;
+  mock_->set_on_report_launch_success([&] {
+    fml::AutoResetWaitableEvent exiting;
+    exiter = std::thread([&] {
+      exiting.Signal();
+      Updater::OnProcessExit();
+      exit_saw_write_done = write_done.load();
+    });
+    exiting.Wait();
+    write_done = true;
+  });
+  Updater::Instance().CloseLaunchWindow();
+  exiter.join();
+
+  EXPECT_TRUE(exit_saw_write_done);
+  EXPECT_EQ(mock_->launch_success_count(), 1);
 }
 
 // An exit after a failed launch reports nothing.

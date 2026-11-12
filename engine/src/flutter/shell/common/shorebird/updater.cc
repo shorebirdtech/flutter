@@ -20,6 +20,7 @@ namespace shorebird {
 // Static member definitions
 std::unique_ptr<Updater> Updater::instance_;
 std::mutex Updater::instance_mutex_;
+std::mutex Updater::launch_report_mutex_;
 std::atomic<bool> Updater::launch_started_{false};
 std::atomic<bool> Updater::launch_completed_{false};
 std::atomic<bool> Updater::launch_paused_{false};
@@ -94,9 +95,14 @@ void Updater::ReportLaunchSuccess() {
   // Guard: only report success once per process. Subsequent engines reuse
   // the same patch and don't need to re-confirm the boot. A boot already
   // reported as failed keeps that outcome, so the success is not forwarded.
-  bool expected = false;
-  if (launch_completed_.compare_exchange_strong(expected, true)) {
-    DoReportLaunchSuccess();
+  {
+    // Held through the write, so a clean exit racing it waits for the
+    // success to reach disk (OnProcessExit).
+    std::lock_guard<std::mutex> lock(launch_report_mutex_);
+    bool expected = false;
+    if (launch_completed_.compare_exchange_strong(expected, true)) {
+      DoReportLaunchSuccess();
+    }
   }
 
   // Outside the guard above: a patch that failed to load already claimed it
@@ -206,7 +212,10 @@ void Updater::OnProcessExit() {
   if (!launch_window_open_.load()) {
     return;
   }
-  // No update thread: the process is exiting.
+  // No update thread: the process is exiting. Waits for a success report
+  // another thread is writing (the first frame, the cap), so the process
+  // doesn't end with the breadcrumb still armed.
+  std::lock_guard<std::mutex> lock(launch_report_mutex_);
   bool expected = false;
   if (launch_completed_.compare_exchange_strong(expected, true)) {
     Instance().DoReportLaunchSuccess();
@@ -349,6 +358,9 @@ void MockUpdater::DoReportLaunchStart() {
 }
 
 void MockUpdater::DoReportLaunchSuccess() {
+  if (on_report_launch_success_) {
+    on_report_launch_success_();
+  }
   launch_success_count_++;
   call_log_.push_back("ReportLaunchSuccess");
 }

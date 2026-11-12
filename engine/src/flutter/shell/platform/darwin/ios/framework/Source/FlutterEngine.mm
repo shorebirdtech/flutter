@@ -978,9 +978,12 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
   // engine without one (background launch, add-to-app) would never close it.
   // Not from applicationState alone: a scene-based app (the implicit engine
   // of today's template) reads background here on every cold launch.
-  flutter::shorebird::Updater::Instance().SetAppInBackground(
-      self.viewController ? self.viewController.stateIsBackground
-                          : [self shorebirdLaunchIsInBackground]);
+  BOOL shorebirdInBackground = self.viewController ? self.viewController.stateIsBackground
+                                                   : [self shorebirdLaunchIsInBackground];
+  flutter::shorebird::Updater::Instance().SetAppInBackground(shorebirdInBackground);
+  if (!self.viewController && !shorebirdInBackground) {
+    [self shorebirdKeepRunningThroughTheLaunchWindow];
+  }
 
   // Create the shell. This is a blocking operation.
   std::unique_ptr<flutter::Shell> shell = flutter::Shell::Create(
@@ -1505,6 +1508,32 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
 
 - (void)applicationDidEnterBackground:(NSNotification*)notification {
   [self flutterDidEnterBackground:notification];
+}
+
+// Shorebird: a scene-based app with no scene in the foreground yet (a cold
+// launch before its scene connects, or a background launch: a silent push,
+// background fetch) keeps the launch window open until its cap. iOS can
+// suspend a background app before then, so the cap never fires and a later
+// kill would blame the patch. A background task keeps the app running until
+// the window has had its time.
+- (void)shorebirdKeepRunningThroughTheLaunchWindow {
+  UIApplication* application = FlutterSharedApplication.application;
+  if (!application || application.applicationState != UIApplicationStateBackground) {
+    return;
+  }
+  __block UIBackgroundTaskIdentifier task = UIBackgroundTaskInvalid;
+  void (^end)(void) = ^{
+    if (task != UIBackgroundTaskInvalid) {
+      [application endBackgroundTask:task];
+      task = UIBackgroundTaskInvalid;
+    }
+  };
+  task = [application beginBackgroundTaskWithName:@"Shorebird launch window"
+                                 expirationHandler:end];
+  // The window opens when the root isolate launches, just after this.
+  int64_t until = (flutter::shorebird::Updater::LaunchWindow() + fml::TimeDelta::FromSeconds(2))
+                      .ToNanoseconds();
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, until), dispatch_get_main_queue(), end);
 }
 
 - (BOOL)shorebirdLaunchIsInBackground {
