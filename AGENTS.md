@@ -38,7 +38,15 @@ on a future upstream merge.
 
 ## Shorebird is a guest in the app
 
-The engine and updater run inside every customer's app, beside code and plugins we can't see. Shorebird never claims a resource that has one slot per process or app where the last writer wins, such as Android's process state summary (`setProcessStateSummary`): we'd overwrite the app's or a plugin's, or they ours, and neither would know. A design that needs one finds another way or drops the feature, and says so. Signal handlers and uncaught-exception or crash handlers can be shared, as crash reporters share them: keep the previous handler and call it, never replace it. Any we add must chain.
+The engine and updater run inside every customer's app, beside code and plugins
+we can't see. Shorebird never claims a resource that has one slot per process or
+app where the last writer wins, such as Android's process state summary
+(`setProcessStateSummary`): we'd overwrite the app's or a plugin's, or they
+ours, and neither would know. A design that needs one finds another way or drops
+the feature, and says so in the design. Signal handlers and uncaught-exception
+or crash handlers have one slot too, but by convention they're chained, as crash
+reporters do: keep the previous handler and call it, never replace it. Any we
+add must chain.
 
 ## Test engine changes on the shards they touch
 
