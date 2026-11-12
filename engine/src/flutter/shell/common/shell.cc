@@ -524,17 +524,12 @@ Shell::Shell(DartVMRef vm,
       is_gpu_disabled_sync_switch_(new fml::SyncSwitch(is_gpu_disabled)),
       weak_factory_gpu_(nullptr),
       weak_factory_(this) {
-  // Report launch outcome to the Shorebird updater for crash recovery.
-  // If the VM failed to start, we report failure so the updater can roll
-  // back the patch. These calls are guarded inside Updater to execute at
-  // most once per process — only the first Shell's outcome is reported.
-  // In add-to-app, subsequent engines are silently ignored since they
-  // boot from the same snapshot that was already reported on.
-  // On unsupported platforms, NoOpUpdater handles these calls gracefully.
+  // Shorebird: if the VM failed to start, report the launch as failed so the
+  // updater rolls back the patch. Success is reported from RunEngine, once
+  // the root isolate is running: the isolate snapshot is not deserialized
+  // until then. Guarded inside Updater to run at most once per process.
   if (!vm_) {
     shorebird::Updater::Instance().ReportLaunchFailure();
-  } else {
-    shorebird::Updater::Instance().ReportLaunchSuccess();
   }
   FML_CHECK(!settings.enable_software_rendering || !settings.enable_impeller)
       << "Software rendering is incompatible with Impeller.";
@@ -811,6 +806,14 @@ void Shell::RunEngine(
             auto run_result = weak_engine->Run(std::move(run_configuration));
             if (run_result == flutter::Engine::RunStatus::Failure) {
               FML_LOG(ERROR) << "Could not launch engine with configuration.";
+            }
+            // Shorebird: the root isolate group was created from the
+            // (possibly patched) snapshot and its entrypoint invoked, so the
+            // snapshot loaded. A crash before this point leaves the launch
+            // unreported, and the updater rolls the patch back on the next
+            // launch. Guarded inside Updater to run at most once per process.
+            if (run_result == flutter::Engine::RunStatus::Success) {
+              shorebird::Updater::Instance().ReportLaunchSuccess();
             }
 
             result(run_result);
