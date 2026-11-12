@@ -210,8 +210,9 @@ source_set("updater") {
     "//flutter/fml",
   ]
 
-  # For dart::bin::Process::SetExitHook.
-  configs += [ "$dart_src/runtime:dart_config" ]
+  # For dart::bin::Process::SetExitHook: the include paths only, not
+  # dart_config's warning flags and defines.
+  configs += [ "$dart_src/runtime:dart_public_config" ]
 
   # For the Rust updater C API (shorebird_report_launch_start, etc.)
   include_dirs = [ "//flutter" ]
@@ -322,6 +323,6 @@ if (enable_unittests) {
     ]
 
     # updater_unittests.cc runs the dart:io exit hook.
-    configs += [ "$dart_src/runtime:dart_config" ]
+    configs += [ "$dart_src/runtime:dart_public_config" ]
   }
 }

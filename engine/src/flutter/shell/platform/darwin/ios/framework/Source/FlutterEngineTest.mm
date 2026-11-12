@@ -865,7 +865,7 @@ FLUTTER_ASSERT_ARC
 - (void)testShorebirdSceneAppColdLaunchIsNotInBackground {
   XCTAssertFalse(FLTShorebirdLaunchIsInBackground(UIApplicationStateBackground, YES, @[]));
   XCTAssertFalse(FLTShorebirdLaunchIsInBackground(UIApplicationStateBackground, YES,
-                                                      @[ @(UISceneActivationStateUnattached) ]));
+                                                  @[ @(UISceneActivationStateUnattached) ]));
   XCTAssertFalse(FLTShorebirdLaunchIsInBackground(
       UIApplicationStateBackground, YES,
       @[ @(UISceneActivationStateBackground), @(UISceneActivationStateForegroundInactive) ]));
@@ -873,7 +873,7 @@ FLUTTER_ASSERT_ARC
 
 - (void)testShorebirdSceneInBackgroundIsInBackground {
   XCTAssertTrue(FLTShorebirdLaunchIsInBackground(UIApplicationStateBackground, YES,
-                                                     @[ @(UISceneActivationStateBackground) ]));
+                                                 @[ @(UISceneActivationStateBackground) ]));
 }
 
 - (void)testShorebirdAppWithoutScenesFollowsApplicationState {
