@@ -191,9 +191,74 @@ TEST(ApplyPatchToSettings, LeavesSettingsAloneWithoutAPatch) {
 TEST(ApplyPatchToSettings, ReplacesTheLibraryWithThePatch) {
   Settings settings;
   settings.application_library_paths = {"libapp.so", "/data/app/libapp.so"};
-  ApplyPatchToSettings("patch.vmcode", settings);
+  ApplyPatchToSettings("patch.vmcode", settings,
+                       [](const std::string&) { return true; });
   EXPECT_EQ(settings.application_library_paths,
             std::vector<std::string>({"patch.vmcode"}));
+}
+
+#if !SHOREBIRD_USE_INTERPRETER
+class ApplyPatchToSettingsFallbackTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    auto mock = std::make_unique<shorebird::MockUpdater>();
+    mock_ = mock.get();
+    shorebird::Updater::SetInstanceForTesting(std::move(mock));
+    shorebird::Updater::ResetLaunchStateForTesting();
+  }
+
+  void TearDown() override {
+    mock_ = nullptr;
+    shorebird::Updater::ResetInstanceForTesting();
+    shorebird::Updater::ResetLaunchStateForTesting();
+  }
+
+  shorebird::MockUpdater* mock_ = nullptr;
+};
+
+// A patch that loads boots without any launch report here; the Shell reports.
+TEST_F(ApplyPatchToSettingsFallbackTest, LoadablePatchIsNotReported) {
+  Settings settings;
+  settings.application_library_paths = {"libapp.so"};
+  ApplyPatchToSettings("patch.vmcode", settings,
+                       [](const std::string&) { return true; });
+  EXPECT_EQ(settings.application_library_paths,
+            std::vector<std::string>({"patch.vmcode"}));
+  EXPECT_EQ(mock_->launch_start_count(), 0);
+  EXPECT_EQ(mock_->launch_failure_count(), 0);
+}
+
+// A patch that won't load leaves the release's code in place and is reported
+// failed, so the updater stops booting it.
+TEST_F(ApplyPatchToSettingsFallbackTest, KeepsReleaseCodeWhenPatchWontLoad) {
+  Settings settings;
+  settings.application_library_paths = {"libapp.so", "/data/app/libapp.so"};
+  std::vector<std::string> probed;
+  ApplyPatchToSettings("patch.vmcode", settings,
+                       [&probed](const std::string& path) {
+                         probed.push_back(path);
+                         return false;
+                       });
+  EXPECT_EQ(probed, std::vector<std::string>({"patch.vmcode"}));
+  EXPECT_EQ(settings.application_library_paths,
+            std::vector<std::string>({"libapp.so", "/data/app/libapp.so"}));
+  EXPECT_EQ(mock_->launch_start_count(), 1);
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+}
+
+// The default probe: a patch file that isn't there doesn't load.
+TEST_F(ApplyPatchToSettingsFallbackTest, MissingPatchFileKeepsReleaseCode) {
+  Settings settings;
+  settings.application_library_paths = {"libapp.so"};
+  ApplyPatchToSettings("/nonexistent/shorebird/patch.vmcode", settings);
+  EXPECT_EQ(settings.application_library_paths,
+            std::vector<std::string>({"libapp.so"}));
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+}
+#endif  // !SHOREBIRD_USE_INTERPRETER
+
+TEST(Shorebird, PatchHasSnapshotsIsFalseForAMissingFile) {
+  EXPECT_FALSE(PatchHasSnapshots("/nonexistent/shorebird/patch.vmcode"));
 }
 
 // Desktop multi-window: a second engine in the same process gets
