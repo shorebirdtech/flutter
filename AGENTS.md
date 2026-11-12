@@ -74,6 +74,17 @@ Check that the flavor reached `assemble` (on iOS, `-dFlavor` comes from
 run, so an Xcode build can pick up a stale or missing one), that the build
 wasn't a stale cached one, and what the bundled `shorebird.yaml` actually says.
 
+## Shaping a PR
+
+Keep PRs reviewable. A small PR can carry a little cleanup next to its change;
+once a PR gets large, split it along its seams: a refactor with no behavior
+change, general improvements (fixes, cleanups, tests of existing code,
+simplifications), and each separate behavior change. Improvements land first: we
+always want them, and may not want the feature. A change keeps its own tests and
+fixture updates in its PR; a feature that needs an improvement builds on that
+PR's branch. This holds for Shorebird-owned files; an improvement to an upstream
+file goes to `flutter/flutter`, not here (see above).
+
 ## Landing a PR
 
 No review bot runs here. Land with `--admin` once these hold at the head commit:

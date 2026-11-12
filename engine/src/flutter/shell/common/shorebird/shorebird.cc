@@ -275,7 +275,35 @@ bool LoadPatchOrBase(const std::string& patch_path,
   return load(base_path);
 }
 
+bool PatchHasSnapshots(const std::string& patch_path) {
+  auto library = fml::NativeLibrary::Create(patch_path.c_str());
+  if (!library) {
+    return false;
+  }
+  // Resolve the way the Shell will (DartSnapshot's SearchMapping): through
+  // SymbolMapping, which also tries the "_"-prefixed name that Android
+  // patches export.
+  for (const char* symbol :
+       {DartSnapshot::kVMDataSymbol, DartSnapshot::kVMInstructionsSymbol,
+        DartSnapshot::kIsolateDataSymbol,
+        DartSnapshot::kIsolateInstructionsSymbol}) {
+    if (fml::SymbolMapping(library, symbol).GetMapping() == nullptr) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void ApplyPatchToSettings(const std::string& patch_path, Settings& settings) {
+  ApplyPatchToSettings(patch_path, settings, PatchHasSnapshots);
+}
+
+void ApplyPatchToSettings(
+    const std::string& patch_path,
+    Settings& settings,
+    const std::function<bool(const std::string&)>& can_load) {
+  // Recorded once, before any patch is applied, so the base snapshots resolve
+  // without touching patch files (DartVMData, BaseIsolateSnapshotFromSettings).
   if (settings.base_application_library_paths.empty()) {
     settings.base_application_library_paths =
         settings.application_library_paths;
@@ -287,6 +315,7 @@ void ApplyPatchToSettings(const std::string& patch_path, Settings& settings) {
     return;
   }
 #if SHOREBIRD_USE_INTERPRETER
+  (void)can_load;
   // Front-insert rather than clear. A linked patch carries only the code it
   // rewrote, and everything it linked against still executes out of the base
   // image, so the base has to stay resolvable for the life of the process.
@@ -295,6 +324,18 @@ void ApplyPatchToSettings(const std::string& patch_path, Settings& settings) {
   settings.application_library_paths.insert(
       settings.application_library_paths.begin(), patch_path);
 #else
+  // The patch replaces the release's library outright, so a patch that won't
+  // load would leave the Shell nothing to boot. Decide once, here, for every
+  // Shell in the process: keep the release's paths unless the patch loads.
+  // Same reporting as LoadPatchOrBase on desktop.
+  if (!can_load(patch_path)) {
+    FML_LOG(ERROR) << "Shorebird: patch load failed, running base code "
+                      "instead of "
+                   << patch_path;
+    shorebird::Updater::Instance().ReportLaunchStart();
+    shorebird::Updater::Instance().ReportLaunchFailure();
+    return;
+  }
   settings.application_library_paths.clear();
   settings.application_library_paths.emplace_back(patch_path);
 #endif

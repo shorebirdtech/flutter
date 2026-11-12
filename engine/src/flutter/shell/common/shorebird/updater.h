@@ -91,12 +91,12 @@ struct AppConfig {
 ///
 /// The start carries its own once-per-process guard rather than riding on
 /// the success report's. A patch that fails to load reports launch failure
-/// from `TryLoadIsolateSnapshotFromPatch`, before any Shell exists, and that claims the
-/// shared report guard. The base-code boot that follows still reports
-/// success, and that launch is precisely the one that needs a replacement
-/// patch. The failure report itself does not start the thread, because the
-/// boot is still in progress at that point, which the bullets above rule
-/// out.
+/// from `TryLoadIsolateSnapshotFromPatch`, before any Shell exists, and that
+/// claims the shared report guard. The base-code boot that follows still
+/// reports success, and that launch is precisely the one that needs a
+/// replacement patch. The failure report itself does not start the thread,
+/// because the boot is still in progress at that point, which the bullets above
+/// rule out.
 ///
 /// Tests can call `ResetLaunchStateForTesting()` to re-enable the guards.
 class Updater {

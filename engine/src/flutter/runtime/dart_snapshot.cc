@@ -298,18 +298,6 @@ fml::RefPtr<const DartSnapshot> DartSnapshot::IsolateSnapshotFromSettings(
   if (snapshot->IsValid()) {
     return snapshot;
   }
-#if !DART_SNAPSHOT_STATIC_LINK && !SHOREBIRD_USE_INTERPRETER
-  if (!settings.base_application_library_paths.empty() &&
-      !settings.application_library_paths.empty() &&
-      settings.application_library_paths.front().find(".vmcode") !=
-          std::string::npos) {
-    FML_LOG(ERROR) << "Shorebird: patch load failed, running base code from "
-                      "the app image instead of "
-                   << settings.application_library_paths.front();
-    shorebird::Updater::Instance().ReportLaunchFailure();
-    return BaseIsolateSnapshotFromSettings(settings);
-  }
-#endif
   return nullptr;
 }
 
