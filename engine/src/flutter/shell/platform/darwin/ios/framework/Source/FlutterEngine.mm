@@ -193,6 +193,34 @@ NSString* const kFlutterApplicationRegistrarKey = @"io.flutter.flutter.applicati
 }
 @end
 
+BOOL FlutterShorebirdLaunchIsInBackground(UIApplicationState appState,
+                                          BOOL usesScenes,
+                                          NSArray<NSNumber*>* sceneStates) {
+  if (appState != UIApplicationStateBackground) {
+    return NO;
+  }
+  if (!usesScenes) {
+    return YES;
+  }
+  BOOL sceneInBackground = NO;
+  for (NSNumber* state in sceneStates) {
+    switch (static_cast<UISceneActivationState>(state.integerValue)) {
+      case UISceneActivationStateForegroundActive:
+      case UISceneActivationStateForegroundInactive:
+        return NO;
+      case UISceneActivationStateBackground:
+        sceneInBackground = YES;
+        break;
+      case UISceneActivationStateUnattached:
+        break;
+    }
+  }
+  // No scene connected yet: a cold launch whose scene comes forward next, or
+  // a launch with no UI. Either way the scene's notifications or the
+  // window's cap end the window.
+  return sceneInBackground;
+}
+
 @implementation FlutterEngine {
   std::shared_ptr<flutter::ThreadHost> _threadHost;
   std::unique_ptr<flutter::Shell> _shell;
@@ -948,7 +976,11 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
   // Shorebird: a launch in the background ends the launch window at once.
   // Lifecycle messages only come from a view controller in a window, so an
   // engine without one (background launch, add-to-app) would never close it.
-  flutter::shorebird::Updater::Instance().SetAppInBackground(_isGpuDisabled);
+  // Not from applicationState alone: a scene-based app (the implicit engine
+  // of today's template) reads background here on every cold launch.
+  flutter::shorebird::Updater::Instance().SetAppInBackground(
+      self.viewController ? self.viewController.stateIsBackground
+                          : [self shorebirdLaunchIsInBackground]);
 
   // Create the shell. This is a blocking operation.
   std::unique_ptr<flutter::Shell> shell = flutter::Shell::Create(
@@ -1473,6 +1505,22 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
 
 - (void)applicationDidEnterBackground:(NSNotification*)notification {
   [self flutterDidEnterBackground:notification];
+}
+
+- (BOOL)shorebirdLaunchIsInBackground {
+  UIApplication* application = FlutterSharedApplication.application;
+  if (!application) {
+    // An app extension: no app state to read; the window's cap ends it.
+    return NO;
+  }
+  BOOL usesScenes =
+      [NSBundle.mainBundle objectForInfoDictionaryKey:@"UIApplicationSceneManifest"] != nil;
+  NSMutableArray<NSNumber*>* sceneStates = [NSMutableArray array];
+  for (UIScene* scene in application.connectedScenes) {
+    [sceneStates addObject:@(scene.activationState)];
+  }
+  return FlutterShorebirdLaunchIsInBackground(application.applicationState, usesScenes,
+                                              sceneStates);
 }
 
 - (void)flutterWillEnterForeground:(NSNotification*)notification {

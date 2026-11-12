@@ -860,4 +860,26 @@ FLUTTER_ASSERT_ARC
                  @"No warning should be logged for a plugin that doesn't use lifecycle events");
 }
 
+// Shorebird: a scene-based app reads UIApplicationStateBackground on every
+// cold launch until its scene comes forward; that isn't a background launch.
+- (void)testShorebirdSceneAppColdLaunchIsNotInBackground {
+  XCTAssertFalse(FlutterShorebirdLaunchIsInBackground(UIApplicationStateBackground, YES, @[]));
+  XCTAssertFalse(FlutterShorebirdLaunchIsInBackground(UIApplicationStateBackground, YES,
+                                                      @[ @(UISceneActivationStateUnattached) ]));
+  XCTAssertFalse(FlutterShorebirdLaunchIsInBackground(
+      UIApplicationStateBackground, YES,
+      @[ @(UISceneActivationStateBackground), @(UISceneActivationStateForegroundInactive) ]));
+}
+
+- (void)testShorebirdSceneInBackgroundIsInBackground {
+  XCTAssertTrue(FlutterShorebirdLaunchIsInBackground(UIApplicationStateBackground, YES,
+                                                     @[ @(UISceneActivationStateBackground) ]));
+}
+
+- (void)testShorebirdAppWithoutScenesFollowsApplicationState {
+  XCTAssertTrue(FlutterShorebirdLaunchIsInBackground(UIApplicationStateBackground, NO, @[]));
+  XCTAssertFalse(FlutterShorebirdLaunchIsInBackground(UIApplicationStateInactive, NO, @[]));
+  XCTAssertFalse(FlutterShorebirdLaunchIsInBackground(UIApplicationStateActive, YES, @[]));
+}
+
 @end
