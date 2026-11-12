@@ -91,8 +91,9 @@ jobs:
       # Upstream's android_sdk package carries the NDK the Flutter Gradle
       # plugin asks for (ndkVersion in FlutterExtension.kt); without it every
       # app build in the shard downloads the NDK itself. A bad download is
-      # retried (see the script). Not cached: each release candidate runs on
-      # a branch of its own, which can't read another branch's cache.
+      # retried (see the script). Not cached: a release candidate's run, on a
+      # branch of its own, could read only a cache saved on shorebird/dev,
+      # where nothing runs this workflow, and the repo's Actions cache is full.
       - name: 📦 Android NDK
         if: matrix.shard == 'build_tests'
         timeout-minutes: 17
