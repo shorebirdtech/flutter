@@ -1766,6 +1766,23 @@ void Shell::OnFrameRasterized(const FrameTiming& timing) {
   FML_DCHECK(is_set_up_);
   FML_DCHECK(task_runners_.GetRasterTaskRunner()->RunsTasksOnCurrentThread());
 
+  // Shorebird: the first frame drawn ends the launch window if this Shell's
+  // engine owns it. By then the patch's snapshot loaded and linked, main ran
+  // and a frame was built and drawn: the failures the rollback is for show
+  // before this. The owner check runs on the UI thread, where the engine
+  // lives; the close writes to disk, so it runs on the platform thread.
+  if (!shorebird_first_frame_drawn_) {
+    shorebird_first_frame_drawn_ = true;
+    task_runners_.GetUITaskRunner()->PostTask(
+        [engine = weak_engine_,
+         platform = task_runners_.GetPlatformTaskRunner()] {
+          if (engine && engine->ShorebirdOwnsLaunchWindow()) {
+            platform->PostTask(
+                [] { shorebird::Updater::Instance().CloseLaunchWindow(); });
+          }
+        });
+  }
+
   // The C++ callback defined in settings.h and set by Flutter runner. This is
   // independent of the timings report to the Dart side.
   if (settings_.frame_rasterized_callback) {

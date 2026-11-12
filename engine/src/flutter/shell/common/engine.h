@@ -464,6 +464,11 @@ class Engine final : public RuntimeDelegate, PointerDataDispatcher::Delegate {
   ///
   fml::TaskRunnerAffineWeakPtr<Engine> GetWeakPtr() const;
 
+  /// Shorebird: whether this engine's Run opened the process's launch window.
+  bool ShorebirdOwnsLaunchWindow() const {
+    return shorebird_owns_launch_window_;
+  }
+
   //----------------------------------------------------------------------------
   /// @brief      Moves the root isolate to the `DartIsolate::Phase::Running`
   ///             phase on a successful call to this method.

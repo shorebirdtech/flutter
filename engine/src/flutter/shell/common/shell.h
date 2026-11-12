@@ -491,6 +491,9 @@ class Shell final : public PlatformView::Delegate,
   uint64_t next_pointer_flow_id_ = 0;
 
   bool first_frame_rasterized_ = false;
+  // Shorebird: whether this Shell has drawn a frame, which ends the launch
+  // window if its engine owns it. Raster thread only.
+  bool shorebird_first_frame_drawn_ = false;
   std::atomic<bool> waiting_for_first_frame_ = true;
   std::mutex waiting_for_first_frame_mutex_;
   std::condition_variable waiting_for_first_frame_condition_;

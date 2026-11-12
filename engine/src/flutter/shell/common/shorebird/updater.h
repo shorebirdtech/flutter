@@ -112,11 +112,13 @@ struct AppConfig {
 /// - `ReportLaunchResumed` when the first engine launches its root isolate
 ///   arms it again. That engine owns the launch window, and opens it with
 ///   `OpenLaunchWindow` once the root isolate has launched.
-/// - `CloseLaunchWindow` reports success `LaunchWindow()` after the root
-///   isolate launches, or earlier when the app leaves the foreground or the
-///   owning engine shuts down. A death before then, a crash in building the
-///   isolate, in main or in the first frames, rolls the patch back on the
-///   next launch.
+/// - `CloseLaunchWindow` reports success when the owning engine draws its
+///   first frame, or `LaunchWindow()` after the root isolate launches if no
+///   frame came first (a headless engine never draws), or earlier when the
+///   app leaves the foreground or the owning engine shuts down. A death
+///   before then, a crash in loading or linking the patch, building the
+///   isolate, main or the first frame, rolls the patch back on the next
+///   launch.
 ///
 /// Tests can call `ResetLaunchStateForTesting()` to re-enable the guards.
 class Updater {
@@ -196,7 +198,8 @@ class Updater {
   static void OnProcessExit();
 
   /// How long after the root isolate launches a death still counts against
-  /// the patch.
+  /// the patch when no frame is drawn first: the cap on the window, and the
+  /// only close for a headless engine.
   static fml::TimeDelta LaunchWindow();
   static void SetLaunchWindowForTesting(fml::TimeDelta window);
 

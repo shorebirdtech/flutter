@@ -5318,6 +5318,157 @@ TEST_F(ShorebirdLaunchTest, LeavingTheForegroundClosesTheWindow) {
   DestroyShell(std::move(shell), task_runners);
 }
 
+// Runs every task already posted to the UI task runner, then every one
+// already posted to the platform task runner: what a drawn frame posts to end
+// the launch window.
+static void FlushUIThenPlatformTaskRunner(Shell* shell) {
+  fml::AutoResetWaitableEvent latch;
+  shell->GetTaskRunners().GetUITaskRunner()->PostTask(
+      [&latch]() { latch.Signal(); });
+  latch.Wait();
+  FlushPlatformTaskRunner(shell);
+}
+
+// Settings whose frame_rasterized_callback signals `latch` after each frame
+// the rasterizer draws.
+static Settings SettingsSignalingDrawnFrames(
+    Settings settings,
+    fml::AutoResetWaitableEvent* latch) {
+  settings.frame_rasterized_callback = [latch](const FrameTiming&) {
+    latch->Signal();
+  };
+  return settings;
+}
+
+// The first frame drawn ends the launch window, well before its cap.
+TEST_F(ShorebirdLaunchTest, FirstFrameBeforeTheCapReportsSuccess) {
+  shorebird::Updater::SetLaunchWindowForTesting(
+      fml::TimeDelta::FromSeconds(60 * 60));
+  fml::AutoResetWaitableEvent drawn;
+  auto settings =
+      SettingsSignalingDrawnFrames(CreateSettingsForFixture(), &drawn);
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+  PlatformViewNotifyCreated(shell.get());
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+  FlushPlatformTaskRunner(shell.get());
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  PumpOneFrame(shell.get());
+  drawn.Wait();
+  FlushUIThenPlatformTaskRunner(shell.get());
+  EXPECT_EQ(
+      mock_->call_log(),
+      (std::vector<std::string>{"ReportLaunchStart", "ReportLaunchPaused",
+                                "ReportLaunchResumed", "ReportLaunchSuccess"}));
+
+  // Later frames report nothing more.
+  PumpOneFrame(shell.get());
+  drawn.Wait();
+  FlushUIThenPlatformTaskRunner(shell.get());
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+
+  DestroyShell(std::move(shell), task_runners);
+}
+
+// A headless engine never draws: the cap ends the window, and a frame drawn
+// after it reports nothing more.
+TEST_F(ShorebirdLaunchTest, CapBeforeAnyFrameReportsSuccessOnce) {
+  shorebird::Updater::SetLaunchWindowForTesting(fml::TimeDelta::Zero());
+  fml::AutoResetWaitableEvent drawn;
+  auto settings =
+      SettingsSignalingDrawnFrames(CreateSettingsForFixture(), &drawn);
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+  FlushPlatformTaskRunner(shell.get());
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+
+  PlatformViewNotifyCreated(shell.get());
+  PumpOneFrame(shell.get());
+  drawn.Wait();
+  FlushUIThenPlatformTaskRunner(shell.get());
+  EXPECT_EQ(
+      mock_->call_log(),
+      (std::vector<std::string>{"ReportLaunchStart", "ReportLaunchPaused",
+                                "ReportLaunchResumed", "ReportLaunchSuccess"}));
+
+  DestroyShell(std::move(shell), task_runners);
+}
+
+// Leaving the foreground before the first frame or the cap ends the window
+// then; the frame drawn after it reports nothing more.
+TEST_F(ShorebirdLaunchTest, BackgroundBeforeTheFirstFrameReportsSuccessOnce) {
+  shorebird::Updater::SetLaunchWindowForTesting(
+      fml::TimeDelta::FromSeconds(60 * 60));
+  fml::AutoResetWaitableEvent drawn;
+  auto settings =
+      SettingsSignalingDrawnFrames(CreateSettingsForFixture(), &drawn);
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+  PlatformViewNotifyCreated(shell.get());
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell.get(), std::move(configuration));
+  FlushPlatformTaskRunner(shell.get());
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  SendLifecycleState(shell.get(), "AppLifecycleState.paused");
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+
+  PumpOneFrame(shell.get());
+  drawn.Wait();
+  FlushUIThenPlatformTaskRunner(shell.get());
+  EXPECT_EQ(mock_->launch_success_count(), 1);
+
+  DestroyShell(std::move(shell), task_runners);
+}
+
+// Only the owner's first frame ends the window: a second engine drawing says
+// nothing about whether the patch reached its first frame.
+TEST_F(ShorebirdLaunchTest, AnotherEnginesFrameKeepsTheWindowOpen) {
+  shorebird::Updater::SetLaunchWindowForTesting(
+      fml::TimeDelta::FromSeconds(60 * 60));
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto owner = CreateShell(settings, task_runners);
+  ASSERT_TRUE(owner);
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(owner.get(), std::move(configuration));
+  FlushPlatformTaskRunner(owner.get());
+
+  fml::AutoResetWaitableEvent drawn;
+  auto other_settings =
+      SettingsSignalingDrawnFrames(CreateSettingsForFixture(), &drawn);
+  auto other_task_runners = GetTaskRunnersForFixture();
+  auto other = CreateShell(other_settings, other_task_runners);
+  ASSERT_TRUE(other);
+  PlatformViewNotifyCreated(other.get());
+  auto other_configuration =
+      RunConfiguration::InferFromSettings(other_settings);
+  other_configuration.SetEntrypoint("emptyMain");
+  RunEngine(other.get(), std::move(other_configuration));
+  PumpOneFrame(other.get());
+  drawn.Wait();
+  FlushUIThenPlatformTaskRunner(other.get());
+  FlushPlatformTaskRunner(owner.get());
+  EXPECT_EQ(mock_->launch_success_count(), 0);
+
+  DestroyShell(std::move(other), other_task_runners);
+  DestroyShell(std::move(owner), task_runners);
+}
+
 // An app that left the foreground before its engine ran (a slow cold start,
 // a pre-warmed engine run after its activity stopped) closes the window as
 // soon as the root isolate launches.
