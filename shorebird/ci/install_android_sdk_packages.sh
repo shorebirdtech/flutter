@@ -1,4 +1,9 @@
-#!/bin/bash -e
+#!/usr/bin/env bash
+# Copyright 2014 The Flutter Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+set -e
 
 # cspell:words cmdline sdkmanager Seekable
 
@@ -13,8 +18,11 @@
 # deleted, so the next one starts clean. A copy of shorebirdtech/shorebird's
 # scripts/install_android_sdk_packages.sh.
 #
-# Usage: shorebird/ci/install_android_sdk_packages.sh <package> [package...]
-# e.g. shorebird/ci/install_android_sdk_packages.sh "ndk;28.2.13676358"
+# Not executable (analyze.dart allows only listed files to be), so run it
+# with bash.
+#
+# Usage: bash shorebird/ci/install_android_sdk_packages.sh <package> [package...]
+# e.g. bash shorebird/ci/install_android_sdk_packages.sh "ndk;28.2.13676358"
 
 if [[ -z "$ANDROID_HOME" ]]; then
     echo "❌ ANDROID_HOME is not set."

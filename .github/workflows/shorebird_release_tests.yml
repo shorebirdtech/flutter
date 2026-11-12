@@ -97,7 +97,7 @@ jobs:
       - name: 📦 Android NDK
         if: matrix.shard == 'build_tests'
         timeout-minutes: 17
-        run: shorebird/ci/install_android_sdk_packages.sh "ndk;28.2.13676358"
+        run: bash shorebird/ci/install_android_sdk_packages.sh "ndk;28.2.13676358"
 
       - name: 📦 ktlint
         if: matrix.shard == 'analyze'
