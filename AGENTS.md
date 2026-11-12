@@ -74,6 +74,10 @@ Check that the flavor reached `assemble` (on iOS, `-dFlavor` comes from
 run, so an Xcode build can pick up a stale or missing one), that the build
 wasn't a stale cached one, and what the bundled `shorebird.yaml` actually says.
 
+## Shaping a PR
+
+One change per PR; a PR that does several things is split before review. A refactor with no behavior change is its own PR, apart from any PR that changes behavior. General improvements (fixes, cleanups, tests, simplifications) go in their own PRs ahead of a feature and land first: we always want them, and may not want the feature.
+
 ## Landing a PR
 
 No review bot runs here. Land with `--admin` once these hold at the head commit:
