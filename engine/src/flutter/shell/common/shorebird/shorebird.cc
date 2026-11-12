@@ -288,6 +288,9 @@ void ApplyPatchToSettings(const std::string& patch_path, Settings& settings) {
   settings.application_library_paths.insert(
       settings.application_library_paths.begin(), patch_path);
 #else
+  // Keep the release's paths: if the patch won't load, DartSnapshot boots
+  // from them instead (Settings::base_application_library_paths).
+  settings.base_application_library_paths = settings.application_library_paths;
   settings.application_library_paths.clear();
   settings.application_library_paths.emplace_back(patch_path);
 #endif
