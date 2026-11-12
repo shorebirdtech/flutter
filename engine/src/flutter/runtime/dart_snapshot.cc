@@ -181,31 +181,6 @@ static std::shared_ptr<const fml::Mapping> ResolveIsolateInstructions(
 #endif  // DART_SNAPSHOT_STATIC_LINK
 }
 
-#if !DART_SNAPSHOT_STATIC_LINK && !SHOREBIRD_USE_INTERPRETER
-// Android replaces the app's libraries with the patch (see
-// ApplyPatchToSettings). When the patch's snapshot can't be resolved, boot the
-// release's own code rather than failing: reports the failed launch, so the
-// updater doesn't keep retrying the patch, and returns the settings to
-// resolve from instead. Returns false when there is no patch to fall back from.
-static bool FallBackToBaseSettings(const Settings& settings,
-                                   Settings* base_settings) {
-  if (settings.base_application_library_paths.empty()) {
-    return false;
-  }
-  FML_LOG(ERROR) << "Shorebird: patch load failed, running base code from the "
-                    "app image";
-  // A patch is only booting once the start is reported; both are guarded once
-  // per process (see LoadPatchOrBase).
-  shorebird::Updater::Instance().ReportLaunchStart();
-  shorebird::Updater::Instance().ReportLaunchFailure();
-  *base_settings = settings;
-  base_settings->application_library_paths =
-      settings.base_application_library_paths;
-  base_settings->base_application_library_paths.clear();
-  return true;
-}
-#endif
-
 fml::RefPtr<const DartSnapshot> DartSnapshot::VMSnapshotFromSettings(
     const Settings& settings) {
   TRACE_EVENT0("flutter", "DartSnapshot::VMSnapshotFromSettings");
@@ -216,12 +191,6 @@ fml::RefPtr<const DartSnapshot> DartSnapshot::VMSnapshotFromSettings(
   if (snapshot->IsValid()) {
     return snapshot;
   }
-#if !DART_SNAPSHOT_STATIC_LINK && !SHOREBIRD_USE_INTERPRETER
-  if (Settings base_settings;
-      FallBackToBaseSettings(settings, &base_settings)) {
-    return VMSnapshotFromSettings(base_settings);
-  }
-#endif
   return nullptr;
 }
 
@@ -276,12 +245,6 @@ fml::RefPtr<const DartSnapshot> DartSnapshot::IsolateSnapshotFromSettings(
   if (snapshot->IsValid()) {
     return snapshot;
   }
-#if !DART_SNAPSHOT_STATIC_LINK && !SHOREBIRD_USE_INTERPRETER
-  if (Settings base_settings;
-      FallBackToBaseSettings(settings, &base_settings)) {
-    return IsolateSnapshotFromSettings(base_settings);
-  }
-#endif
   return nullptr;
 }
 

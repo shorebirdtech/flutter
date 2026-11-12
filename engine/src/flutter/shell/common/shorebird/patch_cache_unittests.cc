@@ -14,7 +14,6 @@
 #include "flutter/fml/paths.h"
 #include "flutter/runtime/dart_snapshot.h"
 #include "flutter/runtime/shorebird/patch_mapping.h"
-#include "flutter/shell/common/shorebird/updater.h"
 #include "gtest/gtest.h"
 
 namespace flutter {
@@ -384,69 +383,6 @@ TEST(DartSnapshotShorebird, UnpatchedSnapshotCarriesNoBaseOrLinkHeader) {
   EXPECT_EQ(snapshot->GetLinkHeaderMapping(), nullptr);
   EXPECT_EQ(snapshot->GetLinkHeaderSize(), 0u);
 }
-
-#if !SHOREBIRD_USE_INTERPRETER
-// Android: ApplyPatchToSettings leaves only the patch in
-// application_library_paths. When the patch can't be resolved, the snapshots
-// come from the release's own libraries and the launch is reported failed, so
-// the updater stops retrying the patch.
-//
-// The embedder callbacks stand in for the libraries: the first resolution
-// (the patch) comes back empty, the next (the release) returns data.
-TEST(DartSnapshotShorebird, BootsReleaseCodeWhenPatchWontLoad) {
-  auto mock = std::make_unique<shorebird::MockUpdater>();
-  shorebird::MockUpdater* mock_updater = mock.get();
-  shorebird::Updater::SetInstanceForTesting(std::move(mock));
-  shorebird::Updater::ResetLaunchStateForTesting();
-
-  auto vm_calls = std::make_shared<int>(0);
-  auto iso_calls = std::make_shared<int>(0);
-  auto resolver = [](std::shared_ptr<int> calls, char tag) {
-    return [calls, tag]() -> std::unique_ptr<fml::Mapping> {
-      if ((*calls)++ == 0) {
-        return nullptr;  // The patch doesn't map.
-      }
-      return std::make_unique<fml::DataMapping>(
-          std::vector<uint8_t>{static_cast<uint8_t>(tag), 1, 2, 3});
-    };
-  };
-
-  Settings settings;
-  settings.application_library_paths = {"patch.vmcode"};
-  settings.base_application_library_paths = {"libapp.so"};
-  settings.vm_snapshot_data = resolver(vm_calls, 'D');
-  settings.vm_snapshot_instr = resolver(std::make_shared<int>(0), 'I');
-  settings.isolate_snapshot_data = resolver(iso_calls, 'D');
-  settings.isolate_snapshot_instr = resolver(std::make_shared<int>(0), 'I');
-
-  auto vm = DartSnapshot::VMSnapshotFromSettings(settings);
-  EXPECT_TRUE(vm);
-  auto isolate = DartSnapshot::IsolateSnapshotFromSettings(settings);
-  EXPECT_TRUE(isolate);
-  EXPECT_EQ(mock_updater->launch_failure_count(), 1);
-
-  shorebird::Updater::ResetLaunchStateForTesting();
-  shorebird::Updater::ResetInstanceForTesting();
-}
-
-// With no patch to fall back from, an unresolvable snapshot stays a failure.
-TEST(DartSnapshotShorebird, NoFallbackWithoutAPatch) {
-  auto mock = std::make_unique<shorebird::MockUpdater>();
-  shorebird::MockUpdater* mock_updater = mock.get();
-  shorebird::Updater::SetInstanceForTesting(std::move(mock));
-  shorebird::Updater::ResetLaunchStateForTesting();
-
-  Settings settings;
-  settings.vm_snapshot_data = []() -> std::unique_ptr<fml::Mapping> {
-    return nullptr;
-  };
-  EXPECT_FALSE(DartSnapshot::VMSnapshotFromSettings(settings));
-  EXPECT_EQ(mock_updater->launch_failure_count(), 0);
-
-  shorebird::Updater::ResetLaunchStateForTesting();
-  shorebird::Updater::ResetInstanceForTesting();
-}
-#endif  // !SHOREBIRD_USE_INTERPRETER
 
 }  // namespace testing
 }  // namespace flutter

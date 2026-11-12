@@ -384,12 +384,6 @@ struct Settings {
 
   MergedPlatformUIThread merged_platform_ui_thread =
       MergedPlatformUIThread::kEnabled;
-
-  // Shorebird, Android only: the release's own library paths, recorded before
-  // ApplyPatchToSettings replaces application_library_paths with the patch.
-  // Empty when there is no patch. DartSnapshot boots from these when the patch
-  // cannot be loaded.
-  std::vector<std::string> base_application_library_paths;
 };
 
 }  // namespace flutter
