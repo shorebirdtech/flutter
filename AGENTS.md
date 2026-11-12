@@ -36,6 +36,10 @@ on a future upstream merge.
   runs or what it outputs). Follow precedents such as `shorebirdTraceFile` in
   `BaseFlutterTask`. Call out the future-conflict cost in the PR description.
 
+## Shorebird is a guest in the app
+
+The engine and updater run inside every customer's app, beside code and plugins we can't see. Shorebird never claims a resource that has one slot per process or app where the last writer wins, such as Android's process state summary (`setProcessStateSummary`): we'd overwrite the app's or a plugin's, or they ours, and neither would know. A design that needs one finds another way or drops the feature, and says so. Signal handlers and uncaught-exception or crash handlers can be shared, as crash reporters share them: keep the previous handler and call it, never replace it. Any we add must chain.
+
 ## Test engine changes on the shards they touch
 
 Don't run a full engine build to test a change unless the change touches every
