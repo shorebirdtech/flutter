@@ -5441,7 +5441,16 @@ TEST_F(ShorebirdLaunchTest, AnotherEnginesFrameKeepsTheWindowOpen) {
       fml::TimeDelta::FromSeconds(60 * 60));
   auto settings = CreateSettingsForFixture();
   auto task_runners = GetTaskRunnersForFixture();
-  auto owner = CreateShell(settings, task_runners);
+  // The owner draws nothing here, so it gets no rendering surface: a second
+  // GL surface in one process fails to initialize.
+  auto owner = CreateShell({
+      .settings = settings,
+      .task_runners = task_runners,
+      .platform_view_create_callback =
+          [task_runners](Shell& shell) {
+            return std::make_unique<PlatformView>(shell, task_runners);
+          },
+  });
   ASSERT_TRUE(owner);
   auto configuration = RunConfiguration::InferFromSettings(settings);
   configuration.SetEntrypoint("emptyMain");
