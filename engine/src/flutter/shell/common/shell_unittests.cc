@@ -5319,6 +5319,41 @@ TEST_F(ShellTest, ShorebirdUpdaterReportsOnlyOnceForMultipleShells) {
   shorebird::Updater::ResetInstanceForTesting();
 }
 
+// An add-to-app host may create an engine it never runs before running
+// another. Only the engine that runs reports success, still exactly once.
+TEST_F(ShellTest, ShorebirdLaunchSuccessFromLaterShellWhenFirstNeverRuns) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  auto* mock_ptr = mock.get();
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
+
+  auto settings = CreateSettingsForFixture();
+
+  // Create the first shell and destroy it without running it.
+  auto task_runners1 = GetTaskRunnersForFixture();
+  auto shell1 = CreateShell(settings, task_runners1);
+  ASSERT_TRUE(shell1);
+  DestroyShell(std::move(shell1), task_runners1);
+  EXPECT_EQ(mock_ptr->launch_start_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_success_count(), 0);
+
+  // Create and run a second shell: it reports the success.
+  auto task_runners2 = GetTaskRunnersForFixture();
+  auto shell2 = CreateShell(settings, task_runners2);
+  ASSERT_TRUE(shell2);
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("emptyMain");
+  RunEngine(shell2.get(), std::move(configuration));
+  EXPECT_EQ(mock_ptr->launch_start_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_success_count(), 1);
+  EXPECT_EQ(mock_ptr->launch_failure_count(), 0);
+
+  DestroyShell(std::move(shell2), task_runners2);
+
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
 }  // namespace testing
 }  // namespace flutter
 
