@@ -10,19 +10,27 @@
 // `group:artifact:version` per line; blank lines and lines starting with `#`
 // are skipped.
 //
-// Only the classpaths that decide what ships in the app (`*RuntimeClasspath`)
-// and what it compiles against (`*CompileClasspath`) are pinned. Tool
-// classpaths such as the Kotlin compiler's or lint's are left alone: forcing
-// the app's kotlin-stdlib onto the compiler, for example, could break the
-// build. `force` only changes the version of a module that is already in a
-// graph; it never adds one.
+// Only the application project's classpaths are pinned: its runtime
+// classpaths (`releaseRuntimeClasspath` and the like) decide which libraries
+// ship in the app, and its compile classpaths are what the app's own code
+// compiled against, the same versions in the release. Plugin subprojects are left
+// alone, because in the release each compiled against its own declared
+// versions, not the app's; forcing the app's versions on them could change
+// their compiled code with no source change. Test and tool classpaths (the
+// Kotlin compiler's, lint's) are left alone too. `force` only changes the
+// version of a module that is already in a graph; it never adds one.
 
 def pinsPath = gradle.startParameter.projectProperties['shorebird.pinned-dependencies']
 if (!pinsPath) {
     return
 }
 
-def pins = new File(pinsPath).readLines()
+def pinsFile = new File(pinsPath)
+if (!pinsFile.isFile()) {
+    throw new GradleException(
+            "Shorebird: the Maven versions to pin (shorebird.pinned-dependencies) are missing: $pinsPath")
+}
+def pins = pinsFile.readLines()
         .collect { it.trim() }
         .findAll { it && !it.startsWith('#') }
 if (pins.isEmpty()) {
@@ -30,10 +38,16 @@ if (pins.isEmpty()) {
 }
 
 gradle.allprojects { project ->
-    project.configurations.configureEach { configuration ->
-        if (configuration.name.endsWith('RuntimeClasspath') ||
-                configuration.name.endsWith('CompileClasspath')) {
-            configuration.resolutionStrategy.force(*pins)
+    project.plugins.withId('com.android.application') {
+        project.configurations.configureEach { configuration ->
+            def name = configuration.name
+            if ((name.endsWith('RuntimeClasspath') ||
+                    name.endsWith('CompileClasspath')) &&
+                    !name.contains('UnitTest') &&
+                    !name.contains('AndroidTest') &&
+                    !name.startsWith('test')) {
+                configuration.resolutionStrategy.force(*pins)
+            }
         }
     }
 }
