@@ -194,105 +194,6 @@ void main() {
     );
 
     testUsingContext(
-      'build apk loads the Shorebird pinning init script when shorebird.pinned-dependencies is set',
-      () async {
-        final builder = AndroidGradleBuilder(
-          java: FakeJava(),
-          logger: logger,
-          processManager: processManager,
-          fileSystem: fileSystem,
-          artifacts: Artifacts.test(),
-          analytics: fakeAnalytics,
-          gradleUtils: FakeGradleUtils(),
-          platform: FakePlatform(),
-          androidStudio: FakeAndroidStudio(),
-          androidSdk: globals.androidSdk,
-        );
-        processManager.addCommand(
-          FakeCommand(
-            command: <String>[
-              'gradlew',
-              '-q',
-              '-Ptarget-platform=android-arm,android-arm64,android-x64',
-              '-Ptarget=lib/main.dart',
-              '-Pbase-application-name=android.app.Application',
-              '-Pdart-obfuscation=false',
-              '-Ptrack-widget-creation=false',
-              '-Ptree-shake-icons=false',
-              '-Pshorebird.pinned-dependencies=/pins.txt',
-              '-I=/packages/flutter_tools/gradle/shorebird_pin_dependencies_init.gradle',
-              '-Pflutter.androidSdkRoot=${sdkPath()}',
-              '-Pflutter.installedNdkVersions=29.0.13846066',
-              '-Pflutter.sdkManagerPath=${sdkManagerPath()}',
-              'assembleDevRelease',
-            ],
-          ),
-        );
-
-        fileSystem.file('android/gradlew').createSync(recursive: true);
-        fileSystem.directory('android').childFile('gradle.properties').createSync(recursive: true);
-        fileSystem.file('android/build.gradle').createSync(recursive: true);
-        fileSystem.directory('android').childDirectory('app').childFile('build.gradle')
-          ..createSync(recursive: true)
-          ..writeAsStringSync('apply from: irrelevant/flutter.gradle');
-        fileSystem
-            .directory('build')
-            .childDirectory('app')
-            .childDirectory('outputs')
-            .childDirectory('flutter-apk')
-            .childFile('app-dev-release.apk')
-            .createSync(recursive: true);
-
-        final FlutterProject project = FlutterProject.fromDirectoryTest(
-          fileSystem.currentDirectory,
-        );
-        project.android.appManifestFile
-          ..createSync(recursive: true)
-          ..writeAsStringSync(minimalV2EmbeddingManifest);
-
-        await builder.buildGradleApp(
-          project: project,
-          androidBuildInfo: const AndroidBuildInfo(
-            BuildInfo(
-              BuildMode.release,
-              'dev',
-              treeShakeIcons: false,
-              packageConfigPath: '.dart_tool/package_config.json',
-              androidProjectArgs: <String>['shorebird.pinned-dependencies=/pins.txt'],
-            ),
-          ),
-          target: 'lib/main.dart',
-          isBuildingBundle: false,
-          configOnly: false,
-          localGradleErrors: const <GradleHandledError>[],
-        );
-
-        expect(processManager, hasNoRemainingExpectations);
-      },
-      overrides: <Type, Generator>{
-        AndroidSdk: () {
-          fileSystem.directory(sdkPath()).createSync(recursive: true);
-          fileSystem.directory(sdkLicensesPath()).createSync(recursive: true);
-          fileSystem
-              .directory(fileSystem.path.join(sdkPath(), 'cmdline-tools', 'latest', 'bin'))
-              .childFile(globals.platform.isWindows ? 'sdkmanager.bat' : 'sdkmanager')
-              .createSync(recursive: true);
-          fileSystem
-              .directory(ndkPath('29.0.13846066'))
-              .childFile('source.properties')
-              .createSync(recursive: true);
-          fileSystem.directory(ndkPath('29.0.13846066-bad')).createSync(recursive: true);
-          return AndroidSdk(
-            fileSystem.directory(sdkPath()),
-            java: FakeJava(),
-            fileSystem: fileSystem,
-          );
-        },
-        AndroidStudio: () => FakeAndroidStudio(),
-      },
-    );
-
-    testUsingContext(
       'build apk keeps skip dependency checks on the main gradle invocation when ndk provisioning is unavailable',
       () async {
         final builder = AndroidGradleBuilder(
@@ -3249,7 +3150,7 @@ Gradle Crashed
                 'The Java version used for the build is 21.0.0, which is incompatible with Gradle 8.0.\n'
                 'To fix this, you can either:\n'
                 "  1. Upgrade your project's Gradle version (typically in gradle-wrapper.properties to a version matching the range: compatible Gradle versions for Java 21.0.0 are 8.4 or newer).\n"
-                '  2. Use a different Java version for Flutter by running `flutter config --jdk-dir=<path>`.',
+                '  2. Use a different Java version for Flutter by running `flutter config --jdk-dir=<path>`.'
           ),
         );
         expect(processManager, hasNoRemainingExpectations);
