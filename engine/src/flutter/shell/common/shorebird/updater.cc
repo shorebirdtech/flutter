@@ -7,10 +7,10 @@
 #include <cstdlib>
 
 #include "flutter/fml/logging.h"
+#include "third_party/dart/runtime/bin/process.h"
 
 #if SHOREBIRD_PLATFORM_SUPPORTED
 #include "flutter/shell/common/shorebird/engine_callbacks.h"
-#include "third_party/dart/runtime/bin/process.h"
 #include "third_party/updater/library/include/updater_engine.h"
 #endif
 
