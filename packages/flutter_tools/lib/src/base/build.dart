@@ -8,6 +8,8 @@ import '../artifacts.dart';
 import '../build_info.dart';
 import '../darwin/darwin.dart';
 import '../macos/xcode.dart';
+import '../shorebird/shorebird_aot_tools.dart';
+
 import 'file_system.dart';
 import 'logger.dart';
 import 'process.dart';
@@ -31,6 +33,7 @@ class GenSnapshot {
     required Logger logger,
     required FileSystem fileSystem,
   }) : _fileSystem = fileSystem,
+       _verbose = logger.isVerbose,
        _processUtils = ProcessUtils(logger: logger, processManager: processManager);
 
   final Artifacts _artifacts;
@@ -55,74 +58,8 @@ class GenSnapshot {
     '         See dartbug.com/30524 for more information.',
   };
 
-  /// Returns the path to an analyze_snapshot binary that matches gen_snapshot's
-  /// SDK version, or null if no matching binary can be found.
-  ///
-  /// gen_snapshot and analyze_snapshot share a snapshot-format hash baked into
-  /// each binary; if the hashes disagree, analyze_snapshot rejects gen_snapshot's
-  /// output with "Wrong full snapshot version" at parse time. Pre-existing binary
-  /// layouts (e.g. an older `universal/analyze_snapshot_<arch>` left behind from
-  /// a previous BUILD.gn revision) can shadow the freshly built one. Resolve by
-  /// probing every candidate location and returning only the one whose
-  /// `--sdk_version` matches gen_snapshot's `--version` output.
-  String? getAnalyzeSnapshotPath(SnapshotType snapshotType, CpuArch? cpuArch) {
-    final Artifact genSnapshotArtifact;
-    final String analyzeName;
-    if (snapshotType.platform == TargetPlatform.ios ||
-        snapshotType.platform == TargetPlatform.darwin) {
-      if (cpuArch == CpuArch.arm64) {
-        genSnapshotArtifact = Artifact.genSnapshotArm64;
-        analyzeName = 'analyze_snapshot_arm64';
-      } else {
-        genSnapshotArtifact = Artifact.genSnapshotX64;
-        analyzeName = 'analyze_snapshot_x64';
-      }
-    } else {
-      genSnapshotArtifact = Artifact.genSnapshot;
-      analyzeName = 'analyze_snapshot';
-    }
-    final String genSnapshotPath = getSnapshotterPath(snapshotType, genSnapshotArtifact);
-    final String? genVersion = _probeSdkVersion(genSnapshotPath, '--version');
-    final String dir = _fileSystem.path.dirname(genSnapshotPath);
-    // Cached SDK layout puts analyze_snapshot alongside gen_snapshot. Local
-    // engine layout resolves gen_snapshot via .../universal/gen_snapshot_arm64
-    // while analyze_snapshot lives one level up at the build-dir root. Probe
-    // both. If we successfully read gen_snapshot's version, accept only a
-    // candidate whose --sdk_version matches; otherwise fall back to the first
-    // existing candidate (better than failing closed when the version probe
-    // itself misbehaves).
-    for (final candidate in <String>[
-      _fileSystem.path.join(dir, analyzeName),
-      _fileSystem.path.join(dir, '..', analyzeName),
-    ]) {
-      if (!_fileSystem.file(candidate).existsSync()) {
-        continue;
-      }
-      if (genVersion == null) {
-        return candidate;
-      }
-      final String? candidateVersion = _probeSdkVersion(candidate, '--sdk_version');
-      if (candidateVersion == genVersion) {
-        return candidate;
-      }
-    }
-    return null;
-  }
-
-  /// Runs [binary] with [versionFlag] and returns the trimmed stderr output,
-  /// or null if the binary couldn't be invoked or printed nothing.
-  /// gen_snapshot and analyze_snapshot both write their version line to stderr.
-  String? _probeSdkVersion(String binary, String versionFlag) {
-    try {
-      final RunResult result = _processUtils.runSync(<String>[binary, versionFlag]);
-      final String stderr = result.stderr.trim();
-      return stderr.isEmpty ? null : stderr;
-    } on Exception {
-      return null;
-    }
-  }
-
   final FileSystem _fileSystem;
+  final bool _verbose;
 
   Future<int> run({
     required SnapshotType snapshotType,
@@ -132,6 +69,9 @@ class GenSnapshot {
     // callers do not need to pass it separately.
     CpuArch? cpuArch,
     Iterable<String> additionalArgs = const <String>[],
+    // Shorebird-specific: when set, aot_tools runs gen_snapshot and writes
+    // the extra link files here.
+    String? shorebirdLinkDir,
   }) {
     assert(cpuArch != CpuArch.armv7);
     assert(snapshotType.platform != TargetPlatform.ios || cpuArch != null);
@@ -151,10 +91,19 @@ class GenSnapshot {
 
     final String snapshotterPath = getSnapshotterPath(snapshotType, genSnapshotArtifact);
 
-    return _processUtils.stream(<String>[
-      snapshotterPath,
-      ...args,
-    ], mapFunction: (String line) => kIgnoredWarnings.contains(line) ? null : line);
+    return _processUtils.stream(
+      shorebirdLinkDir == null
+          ? <String>[snapshotterPath, ...args]
+          : shorebirdAotToolsGenSnapshotCommand(
+              _artifacts,
+              _fileSystem,
+              genSnapshotPath: snapshotterPath,
+              linkDir: shorebirdLinkDir,
+              genSnapshotArgs: args,
+              verbose: _verbose,
+            ),
+      mapFunction: (String line) => kIgnoredWarnings.contains(line) ? null : line,
+    );
   }
 }
 
@@ -165,11 +114,7 @@ class AOTSnapshotter {
     required Logger logger,
     required ProcessManager processManager,
     this._xcode,
-    // Shorebird: the environment SHOREBIRD_DD_MAX_BYTES is read from.
-    Platform platform = const LocalPlatform(),
   }) : _logger = logger,
-       _platform = platform,
-       _processUtils = ProcessUtils(logger: logger, processManager: processManager),
        _genSnapshot = GenSnapshot(
          artifacts: artifacts,
          processManager: processManager,
@@ -180,8 +125,6 @@ class AOTSnapshotter {
   final Logger _logger;
   final FileSystem _fileSystem;
   final Xcode? _xcode;
-  final Platform _platform;
-  final ProcessUtils _processUtils;
   final GenSnapshot _genSnapshot;
 
   /// Builds an architecture-specific ahead-of-time compiled snapshot of the specified script.
@@ -196,9 +139,6 @@ class AOTSnapshotter {
     String? splitDebugInfo,
     required bool dartObfuscation,
     bool quiet = false,
-    // Shorebird: the cap on the DD table, from kShorebirdDdMaxBytes. 0 means
-    // no DD pass.
-    int ddMaxBytes = 0,
   }) async {
     assert(platform != TargetPlatform.ios || cpuArch != null);
 
@@ -354,43 +294,13 @@ class AOTSnapshotter {
 
     final snapshotType = SnapshotType(platform, buildMode);
 
-    // DD pass requires:
-    //   1. an analyze_snapshot binary whose --sdk_version matches gen_snapshot's
-    //      --version, and
-    //   2. a single non-racing ELF output path per build invocation.
-    //
-    // macOS builds fail both. (1) The shipped `analyze_snapshot` is a single
-    // host-arch binary; when targeting x64 from an arm64 host, gen_snapshot_x64
-    // reports `macos_simx64` while analyze_snapshot reports `macos_arm64` and
-    // the version-equality check rejects it. (2) Flutter spawns
-    // gen_snapshot_arm64 and gen_snapshot_x64 in parallel and both DD passes
-    // race on the same `App_dd_analysis.so` path under
-    // `.dart_tool/flutter_build/<hash>/`.
-    //
-    // Skip DD on macOS until that work is done. Patches built without DD
-    // activation will compute DD on the fly when applied, which is the
-    // pre-1.6.99 behavior — slightly worse link percentage but functional.
-    final ddPassSupported = platform != TargetPlatform.darwin;
-    if (ddMaxBytes > 0 && usesLinker && ddPassSupported) {
-      final int pass1Exit = await _runDdAnalysisPass(
-        snapshotType: snapshotType,
-        cpuArch: cpuArch,
-        outputDir: outputDir,
-        baseGenSnapshotArgs: genSnapshotArgs,
-        mainPath: mainPath,
-        ddMaxBytes: ddMaxBytes,
-      );
-      if (pass1Exit != 0) {
-        return pass1Exit;
-      }
-    } else if (usesLinker && ddPassSupported) {
-      _deleteDdOutputs(outputDir);
-    }
-
     final int genSnapshotExitCode = await _genSnapshot.run(
       snapshotType: snapshotType,
       additionalArgs: genSnapshotArgs,
       cpuArch: cpuArch,
+      // Shorebird-specific: aot_tools builds iOS snapshots, so they get what
+      // the Shorebird linker needs however the build was started.
+      shorebirdLinkDir: platform == TargetPlatform.ios ? outputDir.parent.path : null,
     );
     if (genSnapshotExitCode != 0) {
       _logger.printError('Dart snapshot generator failed with exit code $genSnapshotExitCode');
