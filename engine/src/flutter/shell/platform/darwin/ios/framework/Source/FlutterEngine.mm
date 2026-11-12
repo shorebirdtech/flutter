@@ -193,7 +193,7 @@ NSString* const kFlutterApplicationRegistrarKey = @"io.flutter.flutter.applicati
 }
 @end
 
-BOOL FlutterShorebirdLaunchIsInBackground(UIApplicationState appState,
+BOOL FLTShorebirdLaunchIsInBackground(UIApplicationState appState,
                                           BOOL usesScenes,
                                           NSArray<NSNumber*>* sceneStates) {
   if (appState != UIApplicationStateBackground) {
@@ -1548,7 +1548,7 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
   for (UIScene* scene in application.connectedScenes) {
     [sceneStates addObject:@(scene.activationState)];
   }
-  return FlutterShorebirdLaunchIsInBackground(application.applicationState, usesScenes,
+  return FLTShorebirdLaunchIsInBackground(application.applicationState, usesScenes,
                                               sceneStates);
 }
 

@@ -863,23 +863,23 @@ FLUTTER_ASSERT_ARC
 // Shorebird: a scene-based app reads UIApplicationStateBackground on every
 // cold launch until its scene comes forward; that isn't a background launch.
 - (void)testShorebirdSceneAppColdLaunchIsNotInBackground {
-  XCTAssertFalse(FlutterShorebirdLaunchIsInBackground(UIApplicationStateBackground, YES, @[]));
-  XCTAssertFalse(FlutterShorebirdLaunchIsInBackground(UIApplicationStateBackground, YES,
+  XCTAssertFalse(FLTShorebirdLaunchIsInBackground(UIApplicationStateBackground, YES, @[]));
+  XCTAssertFalse(FLTShorebirdLaunchIsInBackground(UIApplicationStateBackground, YES,
                                                       @[ @(UISceneActivationStateUnattached) ]));
-  XCTAssertFalse(FlutterShorebirdLaunchIsInBackground(
+  XCTAssertFalse(FLTShorebirdLaunchIsInBackground(
       UIApplicationStateBackground, YES,
       @[ @(UISceneActivationStateBackground), @(UISceneActivationStateForegroundInactive) ]));
 }
 
 - (void)testShorebirdSceneInBackgroundIsInBackground {
-  XCTAssertTrue(FlutterShorebirdLaunchIsInBackground(UIApplicationStateBackground, YES,
+  XCTAssertTrue(FLTShorebirdLaunchIsInBackground(UIApplicationStateBackground, YES,
                                                      @[ @(UISceneActivationStateBackground) ]));
 }
 
 - (void)testShorebirdAppWithoutScenesFollowsApplicationState {
-  XCTAssertTrue(FlutterShorebirdLaunchIsInBackground(UIApplicationStateBackground, NO, @[]));
-  XCTAssertFalse(FlutterShorebirdLaunchIsInBackground(UIApplicationStateInactive, NO, @[]));
-  XCTAssertFalse(FlutterShorebirdLaunchIsInBackground(UIApplicationStateActive, YES, @[]));
+  XCTAssertTrue(FLTShorebirdLaunchIsInBackground(UIApplicationStateBackground, NO, @[]));
+  XCTAssertFalse(FLTShorebirdLaunchIsInBackground(UIApplicationStateInactive, NO, @[]));
+  XCTAssertFalse(FLTShorebirdLaunchIsInBackground(UIApplicationStateActive, YES, @[]));
 }
 
 @end

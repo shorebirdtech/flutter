@@ -1766,9 +1766,9 @@ void Shell::OnFrameRasterized(const FrameTiming& timing) {
   FML_DCHECK(is_set_up_);
   FML_DCHECK(task_runners_.GetRasterTaskRunner()->RunsTasksOnCurrentThread());
 
-  // Shorebird: the first frame drawn ends the launch window if this Shell's
-  // engine owns it. By then the patch's snapshot loaded and linked, main ran
-  // and a frame was built and drawn: the failures the rollback is for show
+  // Shorebird: the first frame rasterized ends the launch window if this
+  // Shell's engine owns it. By then the patch's snapshot loaded and linked,
+  // main ran and a frame was built: the failures the rollback is for show
   // before this. The owner check runs on the UI thread, where the engine
   // lives; the close writes to disk, so it runs on the platform thread.
   if (!shorebird_first_frame_drawn_) {

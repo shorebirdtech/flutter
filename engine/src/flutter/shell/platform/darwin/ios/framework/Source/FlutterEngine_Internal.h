@@ -141,7 +141,7 @@ NS_ASSUME_NONNULL_BEGIN
  * forward, on every cold launch the user starts too, so for such an app only
  * a connected scene in the background, with none in the foreground, says so.
  */
-BOOL FlutterShorebirdLaunchIsInBackground(UIApplicationState appState,
+BOOL FLTShorebirdLaunchIsInBackground(UIApplicationState appState,
                                           BOOL usesScenes,
                                           NSArray<NSNumber*>* sceneStates);
 
