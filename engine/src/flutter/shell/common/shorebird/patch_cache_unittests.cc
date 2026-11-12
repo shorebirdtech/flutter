@@ -402,7 +402,7 @@ TEST(DartSnapshotShorebird, BootsReleaseCodeWhenPatchWontLoad) {
   auto vm_calls = std::make_shared<int>(0);
   auto iso_calls = std::make_shared<int>(0);
   auto resolver = [](std::shared_ptr<int> calls, char tag) {
-    return [calls, tag]() -> std::unique_ptr<const fml::Mapping> {
+    return [calls, tag]() -> std::unique_ptr<fml::Mapping> {
       if ((*calls)++ == 0) {
         return nullptr;  // The patch doesn't map.
       }
@@ -437,7 +437,7 @@ TEST(DartSnapshotShorebird, NoFallbackWithoutAPatch) {
   shorebird::Updater::ResetLaunchStateForTesting();
 
   Settings settings;
-  settings.vm_snapshot_data = []() -> std::unique_ptr<const fml::Mapping> {
+  settings.vm_snapshot_data = []() -> std::unique_ptr<fml::Mapping> {
     return nullptr;
   };
   EXPECT_FALSE(DartSnapshot::VMSnapshotFromSettings(settings));
