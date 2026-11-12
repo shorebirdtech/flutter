@@ -90,10 +90,14 @@ jobs:
 
       # Upstream's android_sdk package carries the NDK the Flutter Gradle
       # plugin asks for (ndkVersion in FlutterExtension.kt); without it every
-      # app build in the shard downloads the NDK itself.
+      # app build in the shard downloads the NDK itself. A bad download is
+      # retried (see the script). Not cached: a release candidate's run, on a
+      # branch of its own, could read only a cache saved on shorebird/dev,
+      # where nothing runs this workflow, and the repo's Actions cache is full.
       - name: 📦 Android NDK
         if: matrix.shard == 'build_tests'
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358" > /dev/null
+        timeout-minutes: 17
+        run: bash shorebird/ci/install_android_sdk_packages.sh "ndk;28.2.13676358"
 
       - name: 📦 ktlint
         if: matrix.shard == 'analyze'
