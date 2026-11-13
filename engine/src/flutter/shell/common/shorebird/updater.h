@@ -60,6 +60,14 @@ struct AppConfig {
 /// - `ReportLaunchStart` copies `next_boot` → `current_boot` in the Rust
 ///   state. If the app crashes before `ReportLaunchSuccess`, the updater
 ///   assumes the patch caused the crash and rolls back on the next launch.
+/// - `IsolateSnapshotFromSettings` reports the start, before the VM and the
+///   root isolate load the patch's snapshots. `Shell::RunEngine` reports the
+///   success, once the root isolate group has been created from the
+///   snapshot and its entrypoint invoked. A patch whose snapshot aborts the
+///   process while loading never reports success, so the next launch's
+///   `Init` finds the boot unfinished, marks the patch bad, and falls back.
+///   A Shell whose engine never runs (or fails to run) reports nothing, and
+///   a process killed in that state also counts as a failed boot.
 ///
 /// These calls are guarded to execute at most once per process because:
 /// 1. The Rust updater is a process-global singleton — calling

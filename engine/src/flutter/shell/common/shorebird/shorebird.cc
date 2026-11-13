@@ -249,8 +249,8 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   // runtime/dart_snapshot.cc reports the start, so a FlutterEngineGroup or
   // add-to-app host that calls ConfigureShorebird() without ever creating a
   // Shell does not record a boot that never happened. The update thread
-  // starts from the Shell's launch-success report, after the boot is
-  // recorded; see the Updater class comment.
+  // starts from the launch-success report in Shell::RunEngine, once the root
+  // isolate is running; see the Updater class comment.
   return init_result;
 }
 
