@@ -46,10 +46,7 @@ jobs:
     # it queued over an hour behind the release's own Dart SDK full CI.
     # Other PRs' runs are tier 2 (a person waits); pushes to shorebird/dev
     # have none.
-    # Namespace priority tiers, the same in every repo (lower starts first, any
-    # priority before none): 1 the release's critical path; 2 short jobs a
-    # person or merge queue waits on; 3 bulk suites (a release's Dart full CI);
-    # none for the rest (scheduled, push-to-main, dart-sdk's own PR CI).
+    # Namespace priority tiers: https://handbook.shorebird.dev/departments/engineering/#ci-runner-priority
     runs-on:
       - nscloud-ubuntu-22.04-amd64-16x64-with-cache${{ startsWith(github.head_ref, 'release/') && ';job.priority=1' || github.event_name == 'pull_request' && ';job.priority=2' || '' }}
       - nscloud-cache-tag-shorebird-engine-tests
