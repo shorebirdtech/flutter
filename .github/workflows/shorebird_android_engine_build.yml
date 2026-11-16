@@ -42,11 +42,38 @@ permissions:
   contents: read
 
 jobs:
+  # Looks for an earlier pass on this job's inputs (DEPS, engine/, this
+  # workflow): see shorebird/ci/engine_pass.sh. A push of a PR's squash
+  # usually has the inputs its PR run passed on.
+  reuse:
+    name: ♻️ Look for an earlier pass
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      artifact: ${{ steps.find.outputs.artifact }}
+      run: ${{ steps.find.outputs.run }}
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          sparse-checkout: shorebird/ci
+
+      - name: ♻️ Look for an earlier pass
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: shorebird/ci/engine_pass.sh android_engine_build
+
   android-engine-build:
     name: 🤖 Shorebird Android Engine Build
     # Fork PRs get no secrets (the sync needs the dart-sdk deploy key) and
     # must not run on our Namespace runners.
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: reuse
+    # !cancelled(): a failed lookup leaves the job to run, not skipped.
+    if: ${{ !cancelled() && needs.reuse.outputs.run == '' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) }}
     # Priorities as in shorebird_engine_tests.yml: a release PR's run first,
     # then other PRs' (a person waits); pushes to shorebird/dev have none.
     # Namespace priority tiers: https://handbook.shorebird.dev/departments/engineering/#ci-runner-priority
@@ -173,3 +200,27 @@ jobs:
       - name: 🔨 Build libflutter.so and the Java embedding
         run: ninja -C out/android_release_arm64 flutter/shell/platform/android:android_jar
         working-directory: engine/src
+
+  # Lets a later run on the same inputs skip android-engine-build
+  # (shorebird/ci/engine_pass.sh). Its own job, after android-engine-build has
+  # concluded, so a failure in its post steps or a timeout records nothing.
+  # Best effort: a failure here costs a rerun later, never the check.
+  record-pass:
+    name: 📝 Record the pass
+    needs: [reuse, android-engine-build]
+    if: needs.android-engine-build.result == 'success' && needs.reuse.outputs.artifact != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - name: 📝 Write the pass
+        run: echo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > "$RUNNER_TEMP/pass.txt"
+
+      - name: 📝 Upload the pass
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ needs.reuse.outputs.artifact }}
+          path: ${{ runner.temp }}/pass.txt
+          retention-days: 30
+          # A re-run attempt of a run uploads the same name again.
+          overwrite: true

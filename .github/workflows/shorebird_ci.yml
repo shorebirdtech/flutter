@@ -11,6 +11,9 @@ on:
       - shorebird/dev
 
 permissions:
+  # The engine workflows look up earlier passes, which are artifacts
+  # (shorebird/ci/engine_pass.sh); a called workflow gets no more than this.
+  actions: read
   contents: read
   # The changes job lists the PR's files.
   pull-requests: read
