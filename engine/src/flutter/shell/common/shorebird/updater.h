@@ -45,6 +45,10 @@ struct AppConfig {
 
   /// YAML configuration from shorebird.yaml.
   std::string yaml_config;
+
+  /// The host app's bundle identifier (Android package name, iOS bundle ID).
+  /// Empty when the platform doesn't pass one; the updater then sends none.
+  std::string host_bundle_id;
 };
 
 /// Abstract interface for the Shorebird updater.
