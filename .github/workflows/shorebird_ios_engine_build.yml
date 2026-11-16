@@ -211,17 +211,22 @@ jobs:
           # shellcheck disable=SC2086 # one target per word
           ninja -C "$out" $targets
 
-      # Lets a later run on the same inputs skip this job
-      # (shorebird/ci/engine_pass.sh). Best effort: a failure here costs a
-      # rerun later, never this job.
-      - name: 📝 Record the pass
-        if: needs.reuse.outputs.artifact != ''
-        continue-on-error: true
+  # Lets a later run on the same inputs skip ios-engine-build
+  # (shorebird/ci/engine_pass.sh). Its own job, after ios-engine-build has
+  # concluded, so a failure in its post steps or a timeout records nothing.
+  # Best effort: a failure here costs a rerun later, never the check.
+  record-pass:
+    name: 📝 Record the pass
+    needs: [reuse, ios-engine-build]
+    if: needs.ios-engine-build.result == 'success' && needs.reuse.outputs.artifact != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - name: 📝 Write the pass
         run: echo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > "$RUNNER_TEMP/pass.txt"
 
       - name: 📝 Upload the pass
-        if: needs.reuse.outputs.artifact != ''
-        continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ needs.reuse.outputs.artifact }}

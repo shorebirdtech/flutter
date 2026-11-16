@@ -13,8 +13,8 @@
 # DEPS or engine/ lands before it is squashed, the push of that squash has
 # the same inputs and needn't run again.
 #
-# A job that passes uploads an empty artifact named
-# shorebird-pass-<job>-<key>. This looks one up and writes, to
+# Once a job passes, its workflow's record job uploads an artifact named
+# shorebird-pass-<job>-<key> holding the run's URL. This looks one up and writes, to
 # $GITHUB_OUTPUT:
 #   artifact  the name the job uploads when it passes
 #   run       the URL of a run that passed on these inputs, or empty
@@ -32,6 +32,14 @@ git cat-file -e "HEAD:$workflow" || { echo "::error::No $workflow"; exit 1; }
 key=$(git ls-tree HEAD DEPS engine "$workflow" shorebird/ci/engine_pass.sh | sha256sum | cut -c1-40)
 artifact="shorebird-pass-$job-$key"
 echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
+
+# A re-run attempt runs the job for real: someone re-ran it on purpose
+# (a new runner image or Xcode, which the key doesn't cover).
+if [[ "${GITHUB_RUN_ATTEMPT:-1}" -gt 1 ]]; then
+  echo "run=" >> "$GITHUB_OUTPUT"
+  echo "Re-run attempt $GITHUB_RUN_ATTEMPT; running the job."
+  exit 0
+fi
 
 if ! id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$artifact&per_page=100" \
     --jq "[.artifacts[] | select((.expired | not) and .workflow_run.head_repository_id == $GITHUB_REPOSITORY_ID)][0].workflow_run.id // empty"); then
