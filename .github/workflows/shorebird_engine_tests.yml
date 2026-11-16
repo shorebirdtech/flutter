@@ -82,10 +82,15 @@ jobs:
           python-version: "3.11.8"
 
       # build_rust_updater.py builds the updater with cargo for the host.
+      # Pinned to the release build's toolchain (_build_engine
+      # shard-build.yaml).
       - name: 🦀 Setup Rust
-        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
-        with:
-          targets: x86_64-unknown-linux-gnu
+        shell: bash
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal --no-self-update
+          rustup default 1.99.1
+          rustup target add --toolchain 1.99.1 x86_64-unknown-linux-gnu
+          echo CARGO_INCREMENTAL=0 >> "$GITHUB_ENV"
 
       # DEPS pulls shorebirdtech/dart-sdk (private) over SSH.
       - name: 🔑 Setup SSH
