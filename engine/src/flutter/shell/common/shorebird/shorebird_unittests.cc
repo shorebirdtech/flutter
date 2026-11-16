@@ -155,6 +155,31 @@ TEST_F(ConfigureShorebirdTest, InitializesTheUpdaterAndReturnsThePatch) {
   EXPECT_EQ(mock_->launch_start_count(), 0);
 }
 
+// The launch reports name the patch at the path ConfigureShorebird returns.
+TEST_F(ConfigureShorebirdTest, LaunchReportsNameTheConfiguredPatch) {
+  mock_->set_next_boot_patch_path("patch.vmcode");
+  mock_->set_next_boot_patch_number(7);
+  std::string patch_path;
+  ASSERT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
+
+  shorebird::Updater::Instance().ReportLaunchStart();
+
+  EXPECT_EQ(mock_->reported_patch_numbers(), std::vector<size_t>({7}));
+}
+
+// Without a patch path, the reports name no patch, whatever the number says.
+TEST_F(ConfigureShorebirdTest, LaunchReportsNameNoPatchWithoutAPath) {
+  mock_->set_next_boot_patch_number(7);
+  std::string patch_path;
+  ASSERT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
+
+  shorebird::Updater::Instance().ReportLaunchStart();
+
+  EXPECT_EQ(mock_->reported_patch_numbers(), std::vector<size_t>({0}));
+}
+
 TEST_F(ConfigureShorebirdTest, PassesTheHostBundleId) {
   std::string patch_path;
   ConfigureShorebird(

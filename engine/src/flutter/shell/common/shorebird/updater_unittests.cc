@@ -180,9 +180,45 @@ TEST_F(UpdaterTest, ResetLaunchStateReenablesGuards) {
   EXPECT_EQ(mock_->launch_success_count(), 2);
 }
 
-// The update thread starts from the launch-success report, once the boot is
-// recorded, and only then. See the Updater class comment for why it must not
-// start earlier.
+// The update thread starts when the launch pauses (the Shell is built), after
+// the launch start told the updater which patch is running, and never before
+// it: a patch check sent earlier can't name the running patch, and an install
+// could retire it. See the Updater class comment.
+TEST_F(UpdaterTest, LaunchPausedStartsUpdateThreadAfterBootIsRecorded) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
+  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+
+  Updater::Instance().ReportLaunchPaused();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+  const auto& log = mock_->call_log();
+  ASSERT_EQ(log.size(), 5u);
+  EXPECT_EQ(log[0], "Init");
+  EXPECT_EQ(log[1], "ReportLaunchStart");
+  EXPECT_EQ(log[2], "ReportLaunchPaused");
+  EXPECT_EQ(log[3], "ShouldAutoUpdate");
+  EXPECT_EQ(log[4], "StartUpdateThread");
+
+  // The launch's success starts no second thread.
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().ReportLaunchSuccess();
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+}
+
+// A pause with no launch start reported doesn't start the thread.
+TEST_F(UpdaterTest, LaunchPausedBeforeStartDoesNotStartUpdateThread) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+
+  Updater::Instance().ReportLaunchPaused();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 0);
+}
+
+// A launch that never paused (no Shell built) still starts the thread from
+// its success.
 TEST_F(UpdaterTest, LaunchSuccessStartsUpdateThreadAfterBootIsRecorded) {
   mock_->set_should_auto_update(true);
   EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
@@ -255,9 +291,9 @@ TEST_F(UpdaterTest, LaunchFailureDoesNotStartUpdateThread) {
   EXPECT_EQ(mock_->start_update_thread_count(), 0);
 }
 
-// A failed Engine::Run reports the failure and still starts the update
-// thread: the process may run another engine, and must get a fixed patch.
-TEST_F(UpdaterTest, RunFailureReportsFailureAndStartsUpdateThread) {
+// A failed Engine::Run reports the failure. The thread started at the pause,
+// and the failure starts no second one.
+TEST_F(UpdaterTest, RunFailureReportsFailureAndKeepsOneUpdateThread) {
   mock_->set_should_auto_update(true);
   EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
   Updater::Instance().ReportLaunchStart();
@@ -271,16 +307,29 @@ TEST_F(UpdaterTest, RunFailureReportsFailureAndStartsUpdateThread) {
   EXPECT_EQ(log[0], "Init");
   EXPECT_EQ(log[1], "ReportLaunchStart");
   EXPECT_EQ(log[2], "ReportLaunchPaused");
-  EXPECT_EQ(log[3], "ReportLaunchResumed");
-  EXPECT_EQ(log[4], "ReportLaunchFailure");
-  EXPECT_EQ(log[5], "ShouldAutoUpdate");
-  EXPECT_EQ(log[6], "StartUpdateThread");
+  EXPECT_EQ(log[3], "ShouldAutoUpdate");
+  EXPECT_EQ(log[4], "StartUpdateThread");
+  EXPECT_EQ(log[5], "ReportLaunchResumed");
+  EXPECT_EQ(log[6], "ReportLaunchFailure");
 
   // A later engine runs: no second outcome, no second thread.
   Updater::Instance().ReportLaunchResumed();
   Updater::Instance().ReportLaunchSuccess();
   EXPECT_EQ(mock_->launch_success_count(), 0);
   EXPECT_EQ(mock_->launch_resumed_count(), 1);
+  EXPECT_EQ(mock_->start_update_thread_count(), 1);
+}
+
+// A run failure with no pause before it (no thread yet) starts the thread:
+// the process may run another engine, and must get a fixed patch.
+TEST_F(UpdaterTest, RunFailureStartsUpdateThreadWhenNotYetStarted) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
+
+  Updater::Instance().ReportRunFailure();
+
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
   EXPECT_EQ(mock_->start_update_thread_count(), 1);
 }
 
@@ -303,8 +352,8 @@ TEST_F(UpdaterTest, PausedAndResumedOnlyCallOnce) {
 
 // After a patch fails to load (TryLoadPatch reports the failure before any
 // Shell exists), the process runs the release: paused and resumed must not
-// arm anything that no success would clear, and the base boot's success
-// still starts the update thread.
+// arm anything that no success would clear, and the base boot's pause still
+// starts the update thread.
 TEST_F(UpdaterTest, PausedAndResumedAfterFailedPatchLoadForwardNothing) {
   mock_->set_should_auto_update(true);
   EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
@@ -319,6 +368,57 @@ TEST_F(UpdaterTest, PausedAndResumedAfterFailedPatchLoadForwardNothing) {
   EXPECT_EQ(mock_->launch_resumed_count(), 0);
   EXPECT_EQ(mock_->launch_success_count(), 0);
   EXPECT_EQ(mock_->start_update_thread_count(), 1);
+  const auto& log = mock_->call_log();
+  ASSERT_EQ(log.size(), 5u);
+  EXPECT_EQ(log[2], "ReportLaunchFailure");
+  EXPECT_EQ(log[3], "ShouldAutoUpdate");
+  EXPECT_EQ(log[4], "StartUpdateThread");
+}
+
+// Every launch report names the patch ConfigureShorebird handed out when the
+// launch started, even if a later engine is configured with another.
+TEST_F(UpdaterTest, LaunchReportsNameThePatchLatchedAtStart) {
+  Updater::SetConfiguredPatchNumber(3);
+  Updater::Instance().ReportLaunchStart();
+  EXPECT_EQ(Updater::LoadedPatchNumber(), 3u);
+
+  // A second engine is configured after an install of patch 4.
+  Updater::SetConfiguredPatchNumber(4);
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->reported_patch_numbers(), std::vector<size_t>({3, 3, 3, 3}));
+}
+
+// A patch that fails to load is reported failed under its own number.
+TEST_F(UpdaterTest, FailedPatchLoadNamesThePatch) {
+  Updater::SetConfiguredPatchNumber(2);
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchFailure();
+
+  EXPECT_EQ(mock_->reported_patch_numbers(), std::vector<size_t>({2, 2}));
+}
+
+// The base release's launch reports name patch 0.
+TEST_F(UpdaterTest, BaseReleaseLaunchReportsNameNoPatch) {
+  Updater::Instance().ReportLaunchStart();
+  Updater::Instance().ReportLaunchPaused();
+  Updater::Instance().ReportLaunchResumed();
+  Updater::Instance().ReportLaunchSuccess();
+
+  EXPECT_EQ(mock_->reported_patch_numbers(), std::vector<size_t>({0, 0, 0, 0}));
+}
+
+// ResetLaunchStateForTesting forgets the configured and latched patch.
+TEST_F(UpdaterTest, ResetLaunchStateForgetsPatchNumbers) {
+  Updater::SetConfiguredPatchNumber(5);
+  Updater::Instance().ReportLaunchStart();
+  Updater::ResetLaunchStateForTesting();
+
+  EXPECT_EQ(Updater::LoadedPatchNumber(), 0u);
+  Updater::Instance().ReportLaunchStart();
+  EXPECT_EQ(Updater::LoadedPatchNumber(), 0u);
 }
 
 // Add-to-app: every engine reports success, but the process gets one update

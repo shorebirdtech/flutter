@@ -239,19 +239,25 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   FML_LOG(INFO) << "Checking for active patch";
   shorebird::Updater::Instance().ValidateNextBootPatch();
   std::string active_path = shorebird::Updater::Instance().NextBootPatchPath();
+  // The launch reports name the patch at this path, so the updater acts on
+  // the patch the engine loads even if its next boot patch moves on.
+  size_t active_patch_number = 0;
   if (!active_path.empty()) {
     patch_path = active_path;
-    FML_LOG(INFO) << "Shorebird updater: patch path: " << patch_path;
+    active_patch_number = shorebird::Updater::Instance().NextBootPatchNumber();
+    FML_LOG(INFO) << "Shorebird updater: patch " << active_patch_number
+                  << " path: " << patch_path;
   } else {
     FML_LOG(INFO) << "Shorebird updater: no active patch.";
   }
+  shorebird::Updater::SetConfiguredPatchNumber(active_patch_number);
 
   // Launch reporting does not happen here. IsolateSnapshotFromSettings in
   // runtime/dart_snapshot.cc reports the start, so a FlutterEngineGroup or
   // add-to-app host that calls ConfigureShorebird() without ever creating a
   // Shell does not record a boot that never happened. The update thread
-  // starts from the launch-success report in Shell::RunEngine, once the root
-  // isolate is running; see the Updater class comment.
+  // starts from the Shell's launch-paused report, once the start is
+  // recorded; see the Updater class comment.
   return init_result;
 }
 

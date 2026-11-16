@@ -8,6 +8,7 @@
 
 #if SHOREBIRD_PLATFORM_SUPPORTED
 #include "flutter/shell/common/shorebird/engine_callbacks.h"
+#include "third_party/updater/library/include/updater_dart.h"
 #include "third_party/updater/library/include/updater_engine.h"
 #endif
 
@@ -24,6 +25,8 @@ std::atomic<bool> Updater::launch_paused_{false};
 std::atomic<bool> Updater::launch_resumed_{false};
 std::atomic<bool> Updater::initialized_{false};
 std::atomic<bool> Updater::update_thread_started_{false};
+std::atomic<size_t> Updater::configured_patch_number_{0};
+std::atomic<size_t> Updater::loaded_patch_number_{0};
 
 Updater& Updater::Instance() {
   std::lock_guard<std::mutex> lock(instance_mutex_);
@@ -54,6 +57,16 @@ void Updater::ResetLaunchStateForTesting() {
   launch_resumed_.store(false);
   initialized_.store(false);
   update_thread_started_.store(false);
+  configured_patch_number_.store(0);
+  loaded_patch_number_.store(0);
+}
+
+void Updater::SetConfiguredPatchNumber(size_t patch_number) {
+  configured_patch_number_.store(patch_number);
+}
+
+size_t Updater::LoadedPatchNumber() {
+  return loaded_patch_number_.load();
 }
 
 bool Updater::Init(const AppConfig& config) {
@@ -82,7 +95,10 @@ void Updater::ReportLaunchStart() {
   if (!launch_started_.compare_exchange_strong(expected, true)) {
     return;
   }
-  DoReportLaunchStart();
+  // The patch this launch loaded: the one the latest ConfigureShorebird
+  // handed out. Every later report names it.
+  loaded_patch_number_.store(configured_patch_number_.load());
+  DoReportLaunchStart(loaded_patch_number_.load());
 }
 
 void Updater::ReportLaunchSuccess() {
@@ -93,23 +109,20 @@ void Updater::ReportLaunchSuccess() {
     std::lock_guard<std::mutex> lock(launch_report_mutex_);
     bool expected = false;
     if (launch_completed_.compare_exchange_strong(expected, true)) {
-      DoReportLaunchSuccess();
+      DoReportLaunchSuccess(loaded_patch_number_.load());
     }
   }
 
-  // Outside the guard above: a patch that failed to load already claimed it
-  // from TryLoadPatch, and the base-code boot reaching here is the launch
-  // that most needs a replacement patch. See the class comment.
+  // Outside the guard above, for a launch that never paused. Usually a no-op:
+  // the pause started the thread. See the class comment.
   MaybeStartUpdateThread();
 }
 
 void Updater::MaybeStartUpdateThread() {
-  // Two paths reach here and they do not share an invariant. After a
-  // successful boot the success report has gone to the updater, so an
-  // install can no longer retire the patch we booted and the patch check
-  // names it. After a failed patch load the failure report claimed the
-  // guard in ReportLaunchSuccess, nothing is recorded as booted, and the
-  // process is running base code. See the class comment.
+  // Reached from the launch pause (the Shell is built), and as a fallback
+  // from the outcome reports. The launch start has been reported by then,
+  // so the updater knows the running patch: the patch check names it, and an
+  // install keeps it. See the class comment.
   // We do not support synchronous updates on launch;
   // users can implement custom check-for-updates using
   // package:shorebird_code_push.
@@ -148,7 +161,7 @@ void Updater::ReportLaunchFailure() {
   if (!launch_completed_.compare_exchange_strong(expected, true)) {
     return;
   }
-  DoReportLaunchFailure();
+  DoReportLaunchFailure(loaded_patch_number_.load());
 }
 
 void Updater::ReportRunFailure() {
@@ -160,21 +173,24 @@ void Updater::ReportRunFailure() {
 }
 
 void Updater::ReportLaunchPaused() {
-  // Already claimed: return without waiting on another engine's report.
-  if (launch_paused_.load()) {
-    return;
+  // Already claimed: nothing to forward, but the thread may still need its
+  // start (see below).
+  if (!launch_paused_.load()) {
+    std::lock_guard<std::mutex> lock(launch_report_mutex_);
+    bool expected = false;
+    // A launch already reported (a patch that failed to load) has nothing
+    // armed.
+    if (launch_paused_.compare_exchange_strong(expected, true) &&
+        !launch_completed_.load()) {
+      DoReportLaunchPaused(loaded_patch_number_.load());
+    }
   }
-  std::lock_guard<std::mutex> lock(launch_report_mutex_);
-  bool expected = false;
-  if (!launch_paused_.compare_exchange_strong(expected, true)) {
-    return;
+  // The Shell is built and the breadcrumb is cleared: start the update
+  // thread, so an engine built and never run still checks for updates. Never
+  // before the launch start, which tells the updater the running patch.
+  if (launch_started_.load()) {
+    MaybeStartUpdateThread();
   }
-  // A launch already reported (a patch that failed to load) has nothing
-  // armed.
-  if (launch_completed_.load()) {
-    return;
-  }
-  DoReportLaunchPaused();
 }
 
 void Updater::ReportLaunchResumed() {
@@ -192,7 +208,7 @@ void Updater::ReportLaunchResumed() {
   if (launch_completed_.load()) {
     return;
   }
-  DoReportLaunchResumed();
+  DoReportLaunchResumed(loaded_patch_number_.load());
 }
 
 #if SHOREBIRD_PLATFORM_SUPPORTED
@@ -244,24 +260,28 @@ std::string RealUpdater::NextBootPatchPath() {
   return path;
 }
 
-void RealUpdater::DoReportLaunchStart() {
-  shorebird_report_launch_start();
+size_t RealUpdater::NextBootPatchNumber() {
+  return shorebird_next_boot_patch_number();
 }
 
-void RealUpdater::DoReportLaunchSuccess() {
-  shorebird_report_launch_success();
+void RealUpdater::DoReportLaunchStart(size_t patch_number) {
+  shorebird_report_launch_start_for_patch(patch_number);
 }
 
-void RealUpdater::DoReportLaunchFailure() {
-  shorebird_report_launch_failure();
+void RealUpdater::DoReportLaunchSuccess(size_t patch_number) {
+  shorebird_report_launch_success_for_patch(patch_number);
 }
 
-void RealUpdater::DoReportLaunchPaused() {
-  shorebird_report_launch_paused();
+void RealUpdater::DoReportLaunchFailure(size_t patch_number) {
+  shorebird_report_launch_failure_for_patch(patch_number);
 }
 
-void RealUpdater::DoReportLaunchResumed() {
-  shorebird_report_launch_resumed();
+void RealUpdater::DoReportLaunchPaused(size_t patch_number) {
+  shorebird_report_launch_paused_for_patch(patch_number);
+}
+
+void RealUpdater::DoReportLaunchResumed(size_t patch_number) {
+  shorebird_report_launch_resumed_for_patch(patch_number);
 }
 
 bool RealUpdater::ShouldAutoUpdate() {
@@ -298,28 +318,38 @@ std::string MockUpdater::NextBootPatchPath() {
   return next_boot_patch_path_;
 }
 
-void MockUpdater::DoReportLaunchStart() {
+size_t MockUpdater::NextBootPatchNumber() {
+  call_log_.push_back("NextBootPatchNumber");
+  return next_boot_patch_number_;
+}
+
+void MockUpdater::DoReportLaunchStart(size_t patch_number) {
   launch_start_count_++;
+  reported_patch_numbers_.push_back(patch_number);
   call_log_.push_back("ReportLaunchStart");
 }
 
-void MockUpdater::DoReportLaunchSuccess() {
+void MockUpdater::DoReportLaunchSuccess(size_t patch_number) {
   launch_success_count_++;
+  reported_patch_numbers_.push_back(patch_number);
   call_log_.push_back("ReportLaunchSuccess");
 }
 
-void MockUpdater::DoReportLaunchFailure() {
+void MockUpdater::DoReportLaunchFailure(size_t patch_number) {
   launch_failure_count_++;
+  reported_patch_numbers_.push_back(patch_number);
   call_log_.push_back("ReportLaunchFailure");
 }
 
-void MockUpdater::DoReportLaunchPaused() {
+void MockUpdater::DoReportLaunchPaused(size_t patch_number) {
   launch_paused_count_++;
+  reported_patch_numbers_.push_back(patch_number);
   call_log_.push_back("ReportLaunchPaused");
 }
 
-void MockUpdater::DoReportLaunchResumed() {
+void MockUpdater::DoReportLaunchResumed(size_t patch_number) {
   launch_resumed_count_++;
+  reported_patch_numbers_.push_back(patch_number);
   call_log_.push_back("ReportLaunchResumed");
 }
 
@@ -345,6 +375,8 @@ void MockUpdater::Reset() {
   init_result_ = true;
   should_auto_update_ = false;
   next_boot_patch_path_.clear();
+  next_boot_patch_number_ = 0;
+  reported_patch_numbers_.clear();
   last_release_version_.clear();
   last_yaml_config_.clear();
   last_config_ = AppConfig();
