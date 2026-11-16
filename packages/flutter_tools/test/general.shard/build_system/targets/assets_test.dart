@@ -518,6 +518,8 @@ flutter:
         final File compiled = fileSystem.file(
           '${environment.buildDir.path}/flutter_assets/shorebird.yaml',
         );
+        // The updater's own line parser strips these quotes (ADR-0059).
+        expect(compiled.readAsStringSync(), 'app_id: base-app-id\nrelease_version: "1.10"');
         expect(loadYaml(compiled.readAsStringSync()), <String, String>{
           'app_id': 'base-app-id',
           'release_version': '1.10',

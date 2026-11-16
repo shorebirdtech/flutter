@@ -434,6 +434,14 @@ class BuildInfo {
     };
   }
 
+  /// Shorebird: the Gradle argument that bakes [shorebirdReleaseVersion]. Only
+  /// `flutter build aar` adds it, so an app build (apk, appbundle) never
+  /// reports a module's version even if the environment variable leaks into
+  /// it.
+  List<String> toShorebirdAarGradleConfig() => <String>[
+    if (shorebirdReleaseVersion != null) '-Pshorebird-release-version=$shorebirdReleaseVersion',
+  ];
+
   /// Convert this config to a series of project level arguments to be passed
   /// on the command line to gradle.
   List<String> toGradleConfig() {
@@ -455,7 +463,6 @@ class BuildInfo {
       if (codeSizeDirectory != null) '-Pcode-size-directory=$codeSizeDirectory',
       if (shorebirdPublicKey != null)
         '-Pshorebird-public-key=${encodeShorebirdPublicKey(shorebirdPublicKey!)}',
-      if (shorebirdReleaseVersion != null) '-Pshorebird-release-version=$shorebirdReleaseVersion',
       for (final String projectArg in androidProjectArgs) '-P$projectArg',
       if (androidGradleProjectCacheDir != null) '--project-cache-dir=$androidGradleProjectCacheDir',
     ];

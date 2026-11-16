@@ -56,11 +56,15 @@ void main() {
   testWithoutContext('toGradleConfig includes the Shorebird values', () {
     expect(
       buildInfo.toGradleConfig(),
-      containsAll(<String>[
-        '-Pshorebird-public-key=${encodeShorebirdPublicKey(publicKey)}',
-        '-Pshorebird-release-version=$releaseVersion',
-      ]),
+      contains('-Pshorebird-public-key=${encodeShorebirdPublicKey(publicKey)}'),
     );
+  });
+
+  testWithoutContext('only the aar Gradle config carries the release version', () {
+    expect(buildInfo.toGradleConfig(), isNot(contains(startsWith('-Pshorebird-release-version'))));
+    expect(buildInfo.toShorebirdAarGradleConfig(), <String>[
+      '-Pshorebird-release-version=$releaseVersion',
+    ]);
   });
 
   testWithoutContext('Shorebird values are omitted when unset', () {
@@ -73,6 +77,7 @@ void main() {
     expect(unset.toBuildSystemEnvironment().keys, isNot(contains(startsWith('Shorebird'))));
     expect(unset.toEnvironmentConfig().keys, isNot(contains(startsWith('SHOREBIRD'))));
     expect(unset.toGradleConfig(), isNot(contains(startsWith('-Pshorebird'))));
+    expect(unset.toShorebirdAarGradleConfig(), isEmpty);
   });
 
   testWithoutContext('a change in a Shorebird value changes the build directory', () {
