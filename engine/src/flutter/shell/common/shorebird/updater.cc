@@ -145,12 +145,15 @@ bool RealUpdater::DoInit(const AppConfig& config) {
     c_paths.push_back(path.c_str());
   }
 
-  AppParameters params;
+  // Zeroed so a field this code doesn't set is null, never stack garbage.
+  AppParameters params = {};
   params.release_version = config.release_version.c_str();
   params.original_libapp_paths = c_paths.data();
   params.original_libapp_paths_size = static_cast<int>(c_paths.size());
   params.app_storage_dir = config.app_storage_dir.c_str();
   params.code_cache_dir = config.code_cache_dir.c_str();
+  params.host_bundle_id =
+      config.host_bundle_id.empty() ? nullptr : config.host_bundle_id.c_str();
 
   // Convert our FileCallbacks to the Rust struct
   ::FileCallbacks rust_callbacks;
