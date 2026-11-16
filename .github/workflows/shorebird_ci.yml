@@ -25,7 +25,9 @@ jobs:
   # runners are free).
   #
   # It also decides whether a PR runs the engine jobs (engine-tests,
-  # ios-engine-build): only when it touches DEPS, engine/ or their workflows.
+  # ios-engine-build, android-engine-build): only when it touches DEPS,
+  # engine/ or their workflows. Those are the only jobs that compile the PR's
+  # engine sources; the Android and iOS tests above use the prebuilt engine.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -54,7 +56,7 @@ jobs:
             exit 0
           fi
           files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename')
-          if grep -qE '^(DEPS$|engine/|\.github/workflows/shorebird_(engine_tests|ios_engine_build)\.yml$)' <<< "$files"; then
+          if grep -qE '^(DEPS$|engine/|\.github/workflows/shorebird_(engine_tests|ios_engine_build|android_engine_build)\.yml$)' <<< "$files"; then
             echo "engine=true" >> "$GITHUB_OUTPUT"
           else
             echo "No changes to DEPS or engine/; skipping the engine jobs."
@@ -226,6 +228,12 @@ jobs:
     uses: ./.github/workflows/shorebird_ios_engine_build.yml
     secrets: inherit
 
+  android-engine-build:
+    needs: changes
+    if: needs.changes.outputs.engine == 'true'
+    uses: ./.github/workflows/shorebird_android_engine_build.yml
+    secrets: inherit
+
   # Aggregator required by branch protection on shorebird/dev so the rule can
   # list a single context ("ci") instead of every matrix-expanded job above.
   # Skipped jobs (see changes) pass it.
@@ -239,6 +247,7 @@ jobs:
       - shorebird-macos-android-smoke-test
       - engine-tests
       - ios-engine-build
+      - android-engine-build
     runs-on: ubuntu-latest
     steps:
       - if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
