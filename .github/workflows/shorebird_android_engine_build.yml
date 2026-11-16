@@ -1,0 +1,164 @@
+name: shorebird_android_engine_build
+
+# Builds the Android engine on engine PRs, so a break shows on the PR
+# instead of in the release's engine build. Before this, no PR check
+# compiled Android engine code: the Shorebird Android Tests build apps
+# against the prebuilt engine in bin/internal/engine.version, not the PR's
+# engine sources. #334's first push changed FlutterMain::Init in
+# flutter_main.cc without its header, and every check was green.
+#
+# What it does: `flutter/tools/gn` for the configuration a release ships
+# (android_release_arm64, linux.json's `android-arm64` shard) less LTO,
+# then builds //flutter/shell/platform/android:android_jar: every C++ source
+# behind libflutter.so (the Android embedder, the shell, Shorebird's sources
+# and the Rust updater) compiled and linked, and the Java embedding
+# compiled. Not covered here: debug and profile (code under their #ifs),
+# other ABIs, and gen_snapshot.
+#
+# The sync mirrors shorebird_engine_tests.yml (a Namespace runner whose
+# persistent volume holds the gclient git mirrors, depot_tools and the CIPD
+# cache), on its own cache tag for the same reason: PR code runs with it
+# mounted, and must not be able to plant anything a release build later runs.
+
+concurrency:
+  # Named, not ${{ github.workflow }}: called from shorebird_ci.yml, that
+  # is the caller's name, and sharing the caller's group deadlocks.
+  group: shorebird_android_engine_build-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  # PRs run this through shorebird_ci.yml, so the required `ci` check waits
+  # on it; its `changes` job holds the path filter for PRs.
+  workflow_call:
+  push:
+    branches:
+      - shorebird/dev
+    paths:
+      - DEPS
+      - engine/**
+      - .github/workflows/shorebird_android_engine_build.yml
+
+permissions:
+  contents: read
+
+jobs:
+  android-engine-build:
+    name: 🤖 Shorebird Android Engine Build
+    # Fork PRs get no secrets (the sync needs the dart-sdk deploy key) and
+    # must not run on our Namespace runners.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on:
+      - nscloud-ubuntu-22.04-amd64-16x64-with-cache
+      - nscloud-cache-tag-shorebird-android-engine-build
+      - nscloud-cache-size-100gb
+    timeout-minutes: 45
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: 📦 Setup namespace cache
+        uses: namespacelabs/nscloud-cache-action@1124a6f3ce44e5cf84cc22111530961f4d2a15f9 # v1.7.0
+        with:
+          path: |
+            ~/git_cache
+            ~/depot_tools
+            ~/cipd_cache
+
+      # CIPD_CACHE_DIR must be absolute; ~ doesn't expand in `env:`.
+      - name: 📦 Configure CIPD cache
+        run: |
+          mkdir -p "$HOME/cipd_cache"
+          echo "CIPD_CACHE_DIR=$HOME/cipd_cache" >> "$GITHUB_ENV"
+
+      # build_rust_updater.py cross-compiles the updater for the Android
+      # target. Pinned to the release build's toolchain (_build_engine
+      # shard-build.yaml).
+      - name: 🦀 Setup Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master 2026-10-16
+        with:
+          toolchain: 1.99.1
+          targets: aarch64-linux-android
+
+      # DEPS pulls shorebirdtech/dart-sdk (private) over SSH.
+      - name: 🔑 Setup SSH
+        shell: bash
+        env:
+          DART_SDK_DEPLOY_KEY: ${{ secrets.DART_SDK_DEPLOY_KEY }}
+        run: |
+          # Assigned first so a failed ssh-agent fails the step.
+          agent="$(ssh-agent -s)"
+          eval "$agent"
+          ssh-add - <<< "$DART_SDK_DEPLOY_KEY"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+          # GitHub's published host keys (api.github.com/meta).
+          mkdir -p ~/.ssh
+          cat >> ~/.ssh/known_hosts <<'EOF'
+          github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+          github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+          github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+          EOF
+
+      - name: 🧰 Setup depot_tools
+        run: |
+          if [[ ! -d $HOME/depot_tools/.git ]]; then
+            git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git $HOME/depot_tools
+          else
+            cd $HOME/depot_tools
+            git checkout main 2>/dev/null || git checkout -b main origin/main
+            git pull --quiet
+          fi
+          echo "$HOME/depot_tools" >> "$GITHUB_PATH"
+
+      # As in shorebird_engine_tests.yml: an unmanaged solution rooted at
+      # this checkout, with the Android deps (SDK, NDK, JDK) this build
+      # needs. No Fuchsia deps, and no prebuilt Dart SDK (gn below passes
+      # --no-prebuilt-dart-sdk).
+      - name: ⚙️ Setup gclient config
+        run: |
+          cat > .gclient << EOF
+          solutions = [
+            {
+              "managed": False,
+              "name": ".",
+              "url": "git@github.com:shorebirdtech/flutter.git",
+              "custom_deps": {},
+              "custom_vars": {
+                "download_android_deps": True,
+                "download_dart_sdk": False,
+                "download_fuchsia_deps": False,
+              },
+              "deps_file": "DEPS",
+              "safesync_url": "",
+            },
+          ]
+          cache_dir = "$HOME/git_cache"
+          EOF
+
+      - name: 🔄 Sync engine dependencies (gclient)
+        run: |
+          for attempt in 1 2 3; do
+            gclient sync --delete_unversioned_trees --with_tags && exit 0
+            echo "gclient sync failed (attempt $attempt), retrying in $((attempt * 30))s"
+            sleep $((attempt * 30))
+          done
+          exit 1
+
+      # Only the sync needs the deploy key; drop it before gn and ninja.
+      # gclient sync has already run the PR's DEPS hooks with it loaded, which
+      # is why fork PRs don't run this job.
+      - name: 🔑 Remove deploy key
+        run: ssh-add -D
+
+      # linux.json's android_release_arm64 step, which is what ships, without
+      # LTO: the same sources compile, and the link is minutes shorter.
+      - name: ⚙️ Generate build files (gn gen --check)
+        run: ./flutter/tools/gn --android --android-cpu=arm64 --runtime-mode=release --no-lto --no-prebuilt-dart-sdk --no-rbe
+        working-directory: engine/src
+
+      # android_jar depends on flutter_shell_native (libflutter.so) and
+      # flutter_shell_java (the embedding).
+      - name: 🔨 Build libflutter.so and the Java embedding
+        run: ninja -C out/android_release_arm64 flutter/shell/platform/android:android_jar
+        working-directory: engine/src
