@@ -19,6 +19,7 @@ import '../runner/utils.dart';
 void main() {
   // Contains `//`, which an xcconfig would read as the start of a comment.
   const publicKey = 'MIIBIjANBg//kqhkiG9w0+BAQEFAAOCAQ8A=';
+  const releaseVersion = '2.1.0+7';
 
   const buildInfo = BuildInfo(
     BuildMode.release,
@@ -26,6 +27,7 @@ void main() {
     treeShakeIcons: false,
     packageConfigPath: '.dart_tool/package_config.json',
     shorebirdPublicKey: publicKey,
+    shorebirdReleaseVersion: releaseVersion,
   );
 
   testWithoutContext('encodeShorebirdPublicKey has no slash and round-trips', () {
@@ -42,6 +44,7 @@ void main() {
   testWithoutContext('toBuildSystemEnvironment includes the Shorebird values', () {
     final Map<String, String> defines = buildInfo.toBuildSystemEnvironment();
     expect(defines[kShorebirdPublicKey], encodeShorebirdPublicKey(publicKey));
+    expect(defines[kShorebirdReleaseVersion], releaseVersion);
   });
 
   testWithoutContext('toEnvironmentConfig includes the Shorebird values', () {
@@ -53,7 +56,10 @@ void main() {
   testWithoutContext('toGradleConfig includes the Shorebird values', () {
     expect(
       buildInfo.toGradleConfig(),
-      contains('-Pshorebird-public-key=${encodeShorebirdPublicKey(publicKey)}'),
+      containsAll(<String>[
+        '-Pshorebird-public-key=${encodeShorebirdPublicKey(publicKey)}',
+        '-Pshorebird-release-version=$releaseVersion',
+      ]),
     );
   });
 
@@ -84,7 +90,18 @@ void main() {
       buildDirFor(<String, String>{}).path,
       buildDirFor(<String, String>{kShorebirdPublicKey: encodeShorebirdPublicKey('a')}).path,
       buildDirFor(<String, String>{kShorebirdPublicKey: encodeShorebirdPublicKey('b')}).path,
-    }, hasLength(3));
+      buildDirFor(<String, String>{kShorebirdReleaseVersion: '1.0.0'}).path,
+      buildDirFor(<String, String>{kShorebirdReleaseVersion: '1.0.1'}).path,
+    }, hasLength(5));
+  });
+
+  testWithoutContext('shorebirdReleaseVersion returns null when the define is unset or empty', () {
+    expect(shorebirdReleaseVersion(<String, String>{}), isNull);
+    expect(shorebirdReleaseVersion(<String, String>{kShorebirdReleaseVersion: ''}), isNull);
+    expect(
+      shorebirdReleaseVersion(<String, String>{kShorebirdReleaseVersion: releaseVersion}),
+      releaseVersion,
+    );
   });
 
   group('getBuildInfo', () {
@@ -111,6 +128,7 @@ void main() {
       () async {
         final BuildInfo buildInfo = await getBuildInfo();
         expect(buildInfo.shorebirdPublicKey, publicKey);
+        expect(buildInfo.shorebirdReleaseVersion, releaseVersion);
         // No other variable reaches the native build settings or the defines,
         // including SHOREBIRD_DD_MAX_BYTES, which older shorebird CLIs set.
         for (final value in <String>[
@@ -128,6 +146,7 @@ void main() {
         Platform: () => FakePlatform(
           environment: <String, String>{
             'SHOREBIRD_PUBLIC_KEY': publicKey,
+            'SHOREBIRD_RELEASE_VERSION': releaseVersion,
             'SHOREBIRD_DD_MAX_BYTES': '123456',
             'SHOREBIRD_TOKEN': 'token',
           },
@@ -136,14 +155,21 @@ void main() {
     );
 
     testUsingContext(
-      'treats an empty key as unset',
+      'treats empty values as unset',
       () async {
-        expect((await getBuildInfo()).shorebirdPublicKey, isNull);
+        final BuildInfo buildInfo = await getBuildInfo();
+        expect(buildInfo.shorebirdPublicKey, isNull);
+        expect(buildInfo.shorebirdReleaseVersion, isNull);
       },
       overrides: <Type, Generator>{
         FileSystem: () => fileSystem,
         ProcessManager: () => FakeProcessManager.any(),
-        Platform: () => FakePlatform(environment: <String, String>{'SHOREBIRD_PUBLIC_KEY': ''}),
+        Platform: () => FakePlatform(
+          environment: <String, String>{
+            'SHOREBIRD_PUBLIC_KEY': '',
+            'SHOREBIRD_RELEASE_VERSION': '',
+          },
+        ),
       },
     );
   });
