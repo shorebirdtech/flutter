@@ -17,8 +17,11 @@ namespace shorebird {
 // Static member definitions
 std::unique_ptr<Updater> Updater::instance_;
 std::mutex Updater::instance_mutex_;
+std::mutex Updater::launch_report_mutex_;
 std::atomic<bool> Updater::launch_started_{false};
 std::atomic<bool> Updater::launch_completed_{false};
+std::atomic<bool> Updater::launch_paused_{false};
+std::atomic<bool> Updater::launch_resumed_{false};
 std::atomic<bool> Updater::initialized_{false};
 std::atomic<bool> Updater::update_thread_started_{false};
 
@@ -47,6 +50,8 @@ void Updater::ResetInstanceForTesting() {
 void Updater::ResetLaunchStateForTesting() {
   launch_started_.store(false);
   launch_completed_.store(false);
+  launch_paused_.store(false);
+  launch_resumed_.store(false);
   initialized_.store(false);
   update_thread_started_.store(false);
 }
@@ -68,6 +73,7 @@ bool Updater::IsInitialized() {
 void Updater::ReportLaunchStart() {
   // Guard: only the first engine in a process should promote next_boot →
   // current_boot in the Rust updater. See class-level comment for rationale.
+  std::lock_guard<std::mutex> lock(launch_report_mutex_);
   bool expected = false;
   if (!launch_started_.compare_exchange_strong(expected, true)) {
     return;
@@ -79,9 +85,12 @@ void Updater::ReportLaunchSuccess() {
   // Guard: only report success once per process. Subsequent engines reuse
   // the same patch and don't need to re-confirm the boot. A boot already
   // reported as failed keeps that outcome, so the success is not forwarded.
-  bool expected = false;
-  if (launch_completed_.compare_exchange_strong(expected, true)) {
-    DoReportLaunchSuccess();
+  {
+    std::lock_guard<std::mutex> lock(launch_report_mutex_);
+    bool expected = false;
+    if (launch_completed_.compare_exchange_strong(expected, true)) {
+      DoReportLaunchSuccess();
+    }
   }
 
   // Outside the guard above: a patch that failed to load already claimed it
@@ -127,11 +136,48 @@ void Updater::MaybeStartUpdateThread() {
 
 void Updater::ReportLaunchFailure() {
   // Guard: only report failure once per process.
+  std::lock_guard<std::mutex> lock(launch_report_mutex_);
   bool expected = false;
   if (!launch_completed_.compare_exchange_strong(expected, true)) {
     return;
   }
   DoReportLaunchFailure();
+}
+
+void Updater::ReportRunFailure() {
+  ReportLaunchFailure();
+  // The failure cleared the breadcrumb, so no boot is in progress, and this
+  // process may go on to run another engine or native code: it must still
+  // check for a fixed patch. See the class comment.
+  MaybeStartUpdateThread();
+}
+
+void Updater::ReportLaunchPaused() {
+  std::lock_guard<std::mutex> lock(launch_report_mutex_);
+  bool expected = false;
+  if (!launch_paused_.compare_exchange_strong(expected, true)) {
+    return;
+  }
+  // A launch already reported (a patch that failed to load) has nothing
+  // armed.
+  if (launch_completed_.load()) {
+    return;
+  }
+  DoReportLaunchPaused();
+}
+
+void Updater::ReportLaunchResumed() {
+  std::lock_guard<std::mutex> lock(launch_report_mutex_);
+  bool expected = false;
+  if (!launch_resumed_.compare_exchange_strong(expected, true)) {
+    return;
+  }
+  // Nothing to arm once the outcome is reported: after a failed patch load
+  // the process runs the release, and no success would clear it.
+  if (launch_completed_.load()) {
+    return;
+  }
+  DoReportLaunchResumed();
 }
 
 #if SHOREBIRD_PLATFORM_SUPPORTED
@@ -195,6 +241,14 @@ void RealUpdater::DoReportLaunchFailure() {
   shorebird_report_launch_failure();
 }
 
+void RealUpdater::DoReportLaunchPaused() {
+  shorebird_report_launch_paused();
+}
+
+void RealUpdater::DoReportLaunchResumed() {
+  shorebird_report_launch_resumed();
+}
+
 bool RealUpdater::ShouldAutoUpdate() {
   return shorebird_should_auto_update();
 }
@@ -244,6 +298,16 @@ void MockUpdater::DoReportLaunchFailure() {
   call_log_.push_back("ReportLaunchFailure");
 }
 
+void MockUpdater::DoReportLaunchPaused() {
+  launch_paused_count_++;
+  call_log_.push_back("ReportLaunchPaused");
+}
+
+void MockUpdater::DoReportLaunchResumed() {
+  launch_resumed_count_++;
+  call_log_.push_back("ReportLaunchResumed");
+}
+
 bool MockUpdater::ShouldAutoUpdate() {
   call_log_.push_back("ShouldAutoUpdate");
   return should_auto_update_;
@@ -260,6 +324,8 @@ void MockUpdater::Reset() {
   launch_start_count_ = 0;
   launch_success_count_ = 0;
   launch_failure_count_ = 0;
+  launch_paused_count_ = 0;
+  launch_resumed_count_ = 0;
   start_update_thread_count_ = 0;
   init_result_ = true;
   should_auto_update_ = false;

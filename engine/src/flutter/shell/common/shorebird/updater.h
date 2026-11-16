@@ -65,13 +65,19 @@ struct AppConfig {
 ///   state. If the app crashes before `ReportLaunchSuccess`, the updater
 ///   assumes the patch caused the crash and rolls back on the next launch.
 /// - `IsolateSnapshotFromSettings` reports the start, before the VM and the
-///   root isolate load the patch's snapshots. `Shell::RunEngine` reports the
-///   success, once the root isolate group has been created from the
-///   snapshot and its entrypoint invoked. A patch whose snapshot aborts the
-///   process while loading never reports success, so the next launch's
-///   `Init` finds the boot unfinished, marks the patch bad, and falls back.
-///   A Shell whose engine never runs (or fails to run) reports nothing, and
-///   a process killed in that state also counts as a failed boot.
+///   root isolate load the patch's snapshots.
+/// - The Shell constructor reports paused: the Shell is built, but an engine
+///   can be built and never run (add-to-app), so the updater clears its boot
+///   breadcrumb without promoting the patch. A process that ends here does
+///   not blame the patch.
+/// - `Shell::RunEngine` reports resumed just before `Engine::Run`, which arms
+///   the breadcrumb again, and then the outcome: success when `Engine::Run`
+///   launched the root isolate (the isolate group was created from the
+///   snapshot and its entrypoint invoked), failure when it didn't. A patch
+///   whose snapshot aborts the process while loading never reports either,
+///   so the next launch's `Init` finds the boot unfinished, marks the patch
+///   bad, and falls back. No Dart from the patch runs before the outcome:
+///   `main` runs on a later UI task.
 ///
 /// These calls are guarded to execute at most once per process because:
 /// 1. The Rust updater is a process-global singleton — calling
@@ -101,12 +107,18 @@ struct AppConfig {
 ///   patch) and mislabels the boot breadcrumb. After `ReportLaunchSuccess`
 ///   the booted patch is the last booted patch, and installs are safe.
 ///
+/// A failed `Engine::Run` starts the thread too (`ReportRunFailure`): the
+/// failure clears the breadcrumb and marks the patch bad, so no boot is in
+/// progress, and a process whose first engine failed to run may still run
+/// another engine, or run native code for a long time, and must still get
+/// a fixed patch.
+///
 /// The start carries its own once-per-process guard rather than riding on
 /// the success report's. A patch that fails to load reports launch failure
 /// from `TryLoadPatch`, before any Shell exists, and that claims the
 /// shared report guard. The base-code boot that follows still reports
 /// success, and that launch is precisely the one that needs a replacement
-/// patch. The failure report itself does not start the thread, because the
+/// patch. That failure report does not start the thread, because the
 /// boot is still in progress at that point, which the bullets above rule
 /// out.
 ///
@@ -144,6 +156,20 @@ class Updater {
   void ReportLaunchSuccess();
   void ReportLaunchFailure();
 
+  /// `Engine::Run` failed to launch the root isolate: reports the failure,
+  /// unless an outcome was already reported, and starts the update thread.
+  void ReportRunFailure();
+
+  /// The Shell is built. Clears the boot breadcrumb without promoting the
+  /// patch, so an engine that is built and never run doesn't leave it armed.
+  /// Once per process; nothing once the outcome is reported.
+  void ReportLaunchPaused();
+
+  /// An engine is about to launch its root isolate. Arms the boot breadcrumb
+  /// again for the patch this process loaded. Once per process; nothing once
+  /// the outcome is reported.
+  void ReportLaunchResumed();
+
   // Update checking
   virtual bool ShouldAutoUpdate() = 0;
   virtual void StartUpdateThread() = 0;
@@ -175,6 +201,8 @@ class Updater {
   virtual void DoReportLaunchStart() = 0;
   virtual void DoReportLaunchSuccess() = 0;
   virtual void DoReportLaunchFailure() = 0;
+  virtual void DoReportLaunchPaused() = 0;
+  virtual void DoReportLaunchResumed() = 0;
 
  private:
   // Starts the update thread at most once per process, if the updater is
@@ -183,10 +211,18 @@ class Updater {
 
   static std::unique_ptr<Updater> instance_;
   static std::mutex instance_mutex_;
+  // Held while a launch report is claimed and forwarded, so the reports
+  // reach the Rust updater in the order their guards were claimed. Without
+  // it, two engines running at once could forward one's success before the
+  // other's resumed, leaving the breadcrumb armed after the launch
+  // succeeded.
+  static std::mutex launch_report_mutex_;
 
   // Once-per-process guards for launch lifecycle.
   static std::atomic<bool> launch_started_;
   static std::atomic<bool> launch_completed_;
+  static std::atomic<bool> launch_paused_;
+  static std::atomic<bool> launch_resumed_;
   // Whether any `Init` succeeded; the update thread needs a configured
   // updater. Latched, never cleared outside tests.
   static std::atomic<bool> initialized_;
@@ -208,6 +244,8 @@ class NoOpUpdater : public Updater {
   void DoReportLaunchStart() override {}
   void DoReportLaunchSuccess() override {}
   void DoReportLaunchFailure() override {}
+  void DoReportLaunchPaused() override {}
+  void DoReportLaunchResumed() override {}
   bool ShouldAutoUpdate() override { return false; }
   void StartUpdateThread() override {}
 };
@@ -226,6 +264,8 @@ class RealUpdater : public Updater {
   void DoReportLaunchStart() override;
   void DoReportLaunchSuccess() override;
   void DoReportLaunchFailure() override;
+  void DoReportLaunchPaused() override;
+  void DoReportLaunchResumed() override;
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
   void ProtectedDataAvailable() override;
@@ -245,6 +285,8 @@ class MockUpdater : public Updater {
   void DoReportLaunchStart() override;
   void DoReportLaunchSuccess() override;
   void DoReportLaunchFailure() override;
+  void DoReportLaunchPaused() override;
+  void DoReportLaunchResumed() override;
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
 
@@ -254,6 +296,8 @@ class MockUpdater : public Updater {
   int launch_start_count() const { return launch_start_count_; }
   int launch_success_count() const { return launch_success_count_; }
   int launch_failure_count() const { return launch_failure_count_; }
+  int launch_paused_count() const { return launch_paused_count_; }
+  int launch_resumed_count() const { return launch_resumed_count_; }
   int start_update_thread_count() const { return start_update_thread_count_; }
   const std::vector<std::string>& call_log() const { return call_log_; }
 
@@ -280,6 +324,8 @@ class MockUpdater : public Updater {
   int launch_start_count_ = 0;
   int launch_success_count_ = 0;
   int launch_failure_count_ = 0;
+  int launch_paused_count_ = 0;
+  int launch_resumed_count_ = 0;
   int start_update_thread_count_ = 0;
   bool init_result_ = true;
   bool should_auto_update_ = false;
