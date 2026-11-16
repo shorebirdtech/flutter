@@ -199,6 +199,7 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
   config.code_cache_dir = code_cache_dir;
   config.file_callbacks = ShorebirdFileCallbacks();
   config.yaml_config = args.shorebird_yaml;
+  config.host_bundle_id = args.host_bundle_id;
 
   // iOS and macOS patches are diffed against the Dart snapshot regions of
   // App.framework/App rather than the whole file, so re-signing the app after
