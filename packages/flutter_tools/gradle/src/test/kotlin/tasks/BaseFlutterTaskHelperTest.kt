@@ -33,6 +33,7 @@ class BaseFlutterTaskHelperTest {
         internal const val EXTRA_GEN_SNAPSHOT_OPTIONS_TEST = "--debugger"
         internal const val TARGET_PLATFORM_VALUES_JOINED_LIST = "android linux"
         internal const val SHOREBIRD_PUBLIC_KEY_TEST = "a2V5Ly9h"
+        internal const val SHOREBIRD_RELEASE_VERSION_TEST = "1.2.3+4"
         val MIN_SDK_VERSION_TEST = DependencyVersionChecker.warnMinSdkVersion
 
         // Using File.separator to ensure all paths use platform-specific separators
@@ -204,6 +205,7 @@ class BaseFlutterTaskHelperTest {
 
         every { baseFlutterTask.codeSizeDirectory } returns BaseFlutterTaskPropertiesTest.CODE_SIZE_DIRECTORY_TEST
         every { baseFlutterTask.shorebirdPublicKey } returns BaseFlutterTaskPropertiesTest.SHOREBIRD_PUBLIC_KEY_TEST
+        every { baseFlutterTask.shorebirdReleaseVersion } returns BaseFlutterTaskPropertiesTest.SHOREBIRD_RELEASE_VERSION_TEST
         every { baseFlutterTask.flavor } returns BaseFlutterTaskPropertiesTest.FLAVOR_TEST
         every { baseFlutterTask.extraGenSnapshotOptions } returns BaseFlutterTaskPropertiesTest.EXTRA_GEN_SNAPSHOT_OPTIONS_TEST
 
@@ -255,6 +257,7 @@ class BaseFlutterTaskHelperTest {
         verify { mockExecSpec.args("-dBundleSkSLPath=${BaseFlutterTaskPropertiesTest.BUNDLE_SK_SL_PATH_TEST}") }
         verify { mockExecSpec.args("-dCodeSizeDirectory=${BaseFlutterTaskPropertiesTest.CODE_SIZE_DIRECTORY_TEST}") }
         verify { mockExecSpec.args("-dShorebirdPublicKey=${BaseFlutterTaskPropertiesTest.SHOREBIRD_PUBLIC_KEY_TEST}") }
+        verify { mockExecSpec.args("-dShorebirdReleaseVersion=${BaseFlutterTaskPropertiesTest.SHOREBIRD_RELEASE_VERSION_TEST}") }
         verify { mockExecSpec.args("-dFlavor=${BaseFlutterTaskPropertiesTest.FLAVOR_TEST}") }
         verify { mockExecSpec.args("--ExtraGenSnapshotOptions=${BaseFlutterTaskPropertiesTest.EXTRA_GEN_SNAPSHOT_OPTIONS_TEST}") }
         verify { mockExecSpec.args("-dFrontendServerStarterPath=${BaseFlutterTaskPropertiesTest.FRONTEND_SERVER_STARTER_PATH_TEST}") }
@@ -309,6 +312,7 @@ class BaseFlutterTaskHelperTest {
 
         every { baseFlutterTask.codeSizeDirectory } returns null
         every { baseFlutterTask.shorebirdPublicKey } returns null
+        every { baseFlutterTask.shorebirdReleaseVersion } returns null
         every { baseFlutterTask.flavor } returns null
         every { baseFlutterTask.extraGenSnapshotOptions } returns null
 
