@@ -73,6 +73,10 @@ bool Updater::IsInitialized() {
 void Updater::ReportLaunchStart() {
   // Guard: only the first engine in a process should promote next_boot →
   // current_boot in the Rust updater. See class-level comment for rationale.
+  // Already claimed: return without waiting on another engine's report.
+  if (launch_started_.load()) {
+    return;
+  }
   std::lock_guard<std::mutex> lock(launch_report_mutex_);
   bool expected = false;
   if (!launch_started_.compare_exchange_strong(expected, true)) {
@@ -85,7 +89,7 @@ void Updater::ReportLaunchSuccess() {
   // Guard: only report success once per process. Subsequent engines reuse
   // the same patch and don't need to re-confirm the boot. A boot already
   // reported as failed keeps that outcome, so the success is not forwarded.
-  {
+  if (!launch_completed_.load()) {
     std::lock_guard<std::mutex> lock(launch_report_mutex_);
     bool expected = false;
     if (launch_completed_.compare_exchange_strong(expected, true)) {
@@ -136,6 +140,9 @@ void Updater::MaybeStartUpdateThread() {
 
 void Updater::ReportLaunchFailure() {
   // Guard: only report failure once per process.
+  if (launch_completed_.load()) {
+    return;
+  }
   std::lock_guard<std::mutex> lock(launch_report_mutex_);
   bool expected = false;
   if (!launch_completed_.compare_exchange_strong(expected, true)) {
@@ -153,6 +160,10 @@ void Updater::ReportRunFailure() {
 }
 
 void Updater::ReportLaunchPaused() {
+  // Already claimed: return without waiting on another engine's report.
+  if (launch_paused_.load()) {
+    return;
+  }
   std::lock_guard<std::mutex> lock(launch_report_mutex_);
   bool expected = false;
   if (!launch_paused_.compare_exchange_strong(expected, true)) {
@@ -167,6 +178,10 @@ void Updater::ReportLaunchPaused() {
 }
 
 void Updater::ReportLaunchResumed() {
+  // Already claimed: return without waiting on another engine's report.
+  if (launch_resumed_.load()) {
+    return;
+  }
   std::lock_guard<std::mutex> lock(launch_report_mutex_);
   bool expected = false;
   if (!launch_resumed_.compare_exchange_strong(expected, true)) {

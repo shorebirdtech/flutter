@@ -76,8 +76,9 @@ struct AppConfig {
 ///   snapshot and its entrypoint invoked), failure when it didn't. A patch
 ///   whose snapshot aborts the process while loading never reports either,
 ///   so the next launch's `Init` finds the boot unfinished, marks the patch
-///   bad, and falls back. No Dart from the patch runs before the outcome:
-///   `main` runs on a later UI task.
+///   bad, and falls back. The patch's `main` runs on a later UI task, after
+///   the outcome; only Dart plugins' `registerWith` runs inside
+///   `Engine::Run`, while armed.
 ///
 /// These calls are guarded to execute at most once per process because:
 /// 1. The Rust updater is a process-global singleton — calling
@@ -212,7 +213,8 @@ class Updater {
   static std::unique_ptr<Updater> instance_;
   static std::mutex instance_mutex_;
   // Held while a launch report is claimed and forwarded, so the reports
-  // reach the Rust updater in the order their guards were claimed. Without
+  // reach the Rust updater in the order their guards were claimed. A report
+  // whose guard is already claimed returns before taking it. Without
   // it, two engines running at once could forward one's success before the
   // other's resumed, leaving the breadcrumb armed after the launch
   // succeeded.
