@@ -504,6 +504,31 @@ flutter:
     );
 
     testUsingContext(
+      'writes release_version from the ShorebirdReleaseVersion define',
+      () async {
+        // 1.10 would read back as the number 1.1 if written unquoted.
+        environment.defines[kShorebirdReleaseVersion] = '1.10';
+        writeProjectWithShorebirdYaml();
+
+        await const CopyAssets().build(environment);
+
+        final File compiled = fileSystem.file(
+          '${environment.buildDir.path}/flutter_assets/shorebird.yaml',
+        );
+        // The updater's own line parser strips these quotes (ADR-0059).
+        expect(compiled.readAsStringSync(), 'app_id: base-app-id\nrelease_version: "1.10"');
+        expect(loadYaml(compiled.readAsStringSync()), <String, String>{
+          'app_id': 'base-app-id',
+          'release_version': '1.10',
+        });
+      },
+      overrides: <Type, Generator>{
+        FileSystem: () => fileSystem,
+        ProcessManager: () => FakeProcessManager.any(),
+      },
+    );
+
+    testUsingContext(
       'ignores SHOREBIRD_PUBLIC_KEY in the environment',
       () async {
         environment = Environment.test(

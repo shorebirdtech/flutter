@@ -122,6 +122,12 @@ open class BaseFlutterTask : DefaultTask() {
     @Input
     var shorebirdPublicKey: String? = null
 
+    // Shorebird-specific: an add-to-app module's release version, passed to
+    // flutter assemble as a define.
+    @Optional
+    @Input
+    var shorebirdReleaseVersion: String? = null
+
     @Optional
     @Input
     var deferredComponents: Boolean? = null
