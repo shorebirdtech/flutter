@@ -31,6 +31,7 @@ class BuildMacosCommand extends BuildSubCommand {
       DartCompileOptionsBundle(),
       AppleBuildOptionsBundle(),
     ]);
+    usesShorebirdTraceOption(hide: !verboseHelp);
     argParser.addDescriptors(const <OptionDescriptor<Object?>>[
       BuildInfoOptions.trackWidgetCreation,
       AppleBuildOptionsBundle.configOnly,
