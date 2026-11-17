@@ -2,7 +2,7 @@
 # Finds an earlier pass of an engine CI job on the same inputs, so a run
 # whose inputs already passed doesn't build and test them again.
 #
-#   shorebird/ci/engine_pass.sh <job>
+#   bash shorebird/ci/engine_pass.sh <job>
 #
 # <job> is the workflow's name less its prefix: engine_tests,
 # ios_engine_build or android_engine_build (shorebird_<job>.yml). Those jobs
