@@ -507,11 +507,13 @@ TEST_F(UpdaterTest, UpdateThreadGuardPrecedesShouldAutoUpdate) {
 TEST_F(UpdaterTest, ResetLaunchStateForgetsUpdateThreadGuard) {
   mock_->set_should_auto_update(true);
   EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
   Updater::Instance().ReportLaunchSuccess();
   ASSERT_EQ(mock_->start_update_thread_count(), 1);
 
   Updater::ResetLaunchStateForTesting();
   EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
   Updater::Instance().ReportLaunchSuccess();
 
   EXPECT_EQ(mock_->start_update_thread_count(), 2);

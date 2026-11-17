@@ -132,6 +132,7 @@ class ConfigureShorebirdTest : public ::testing::Test {
 
 TEST_F(ConfigureShorebirdTest, InitializesTheUpdaterAndReturnsThePatch) {
   mock_->set_next_boot_patch_path("patch.vmcode");
+  mock_->set_next_boot_patch_number(1);
   std::string patch_path = "stale";
 
   EXPECT_TRUE(
@@ -342,6 +343,7 @@ TEST(Shorebird, PatchHasSnapshotsIsFalseForAMissingFile) {
 // https://github.com/shorebirdtech/shorebird/issues/3888
 TEST_F(ConfigureShorebirdTest, SecondEngineStillBootsThePatch) {
   mock_->set_next_boot_patch_path("patch.vmcode");
+  mock_->set_next_boot_patch_number(1);
   std::string first_path;
   ASSERT_TRUE(
       ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), first_path));
