@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Copyright 2014 The Flutter Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
 # Finds an earlier pass of an engine CI job on the same inputs, so a run
 # whose inputs already passed doesn't build and test them again.
 #
