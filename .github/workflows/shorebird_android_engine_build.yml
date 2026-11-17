@@ -65,7 +65,7 @@ jobs:
         id: find
         env:
           GH_TOKEN: ${{ github.token }}
-        run: shorebird/ci/engine_pass.sh android_engine_build
+        run: bash shorebird/ci/engine_pass.sh android_engine_build
 
   android-engine-build:
     name: 🤖 Shorebird Android Engine Build

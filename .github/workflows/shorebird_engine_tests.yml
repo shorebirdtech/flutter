@@ -59,7 +59,7 @@ jobs:
         id: find
         env:
           GH_TOKEN: ${{ github.token }}
-        run: shorebird/ci/engine_pass.sh engine_tests
+        run: bash shorebird/ci/engine_pass.sh engine_tests
 
   shorebird-unittests:
     name: 🧪 Build and run the Shorebird engine unit tests
