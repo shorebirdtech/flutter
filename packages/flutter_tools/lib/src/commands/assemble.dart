@@ -420,7 +420,7 @@ class AssembleCommand extends FlutterCommand {
       writePerformanceData(result.performance.values, outFile);
     }
     if (argumentResults.wasParsed('shorebird-trace-file')) {
-      final File outFile = globals.fs.file(argumentResults['shorebird-trace-file']);
+      final File outFile = fs.file(argumentResults['shorebird-trace-file']);
       writeTraceData(result.performance.values, outFile);
     }
     if (argumentResults.wasParsed('depfile')) {

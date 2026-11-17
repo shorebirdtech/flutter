@@ -6,12 +6,15 @@ import 'package:file/memory.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
 import 'package:flutter_tools/src/base/logger.dart';
 import 'package:flutter_tools/src/build_info.dart';
+import 'package:flutter_tools/src/build_system/build_system.dart';
 import 'package:flutter_tools/src/cache.dart';
 import 'package:flutter_tools/src/commands/build_web.dart';
 import 'package:flutter_tools/src/commands/run.dart';
 import 'package:flutter_tools/src/runner/flutter_command.dart';
 
 import '../../src/context.dart';
+import '../../src/fakes.dart';
+import '../../src/test_build_system.dart';
 import '../../src/test_flutter_command_runner.dart';
 
 // Shorebird: Flutter's CDN (gstatic.com/flutter-canvaskit) has no CanvasKit
@@ -32,8 +35,12 @@ void main() {
     'build web and run default --web-resources-cdn to off',
     () {
       final buildWeb = BuildWebCommand(
-        logger: BufferLogger.test(),
-        fileSystem: fileSystem,
+        buildSystem: TestBuildSystem.all(BuildResult(success: true)),
+        featureFlags: TestFeatureFlags(),
+        toolContext: FakeToolContext(
+          fs: fileSystem,
+          logger: BufferLogger.test(),
+        ),
         verboseHelp: false,
       );
       expect(buildWeb.argParser.options[FlutterOptions.kWebResourcesCdnFlag]!.defaultsTo, isFalse);
