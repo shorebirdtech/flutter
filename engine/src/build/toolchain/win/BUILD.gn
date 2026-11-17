@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/toolchain/ccache.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/toolchain/toolchain.gni")
 import("//build/toolchain/win/win_toolchain_data.gni")
@@ -42,6 +43,14 @@ if (use_rbe) {
 } else {
   compiler_prefix = ""
   asm_prefix = ""
+}
+
+# ccache wraps C and C++ compiles only: not linking, and not the arm64 asm
+# tool, which runs through tool_wrapper.py with gn's saved environment.
+if (use_ccache) {
+  cl_prefix = "ccache "
+} else {
+  cl_prefix = ""
 }
 
 if (current_toolchain == default_toolchain) {
@@ -290,7 +299,7 @@ template("win_toolchains") {
   msvc_toolchain("clang_" + target_name) {
     environment = "environment." + toolchain_arch
     prefix = rebase_path("$clang_base_path/bin", root_build_dir)
-    cl = "${compiler_prefix}$prefix/clang-cl.exe"
+    cl = "${cl_prefix}${compiler_prefix}$prefix/clang-cl.exe"
     sys_include_flags = "${win_toolchain_data.include_flags_imsvc}"
     toolchain_args = {
       if (defined(invoker.toolchain_args)) {
