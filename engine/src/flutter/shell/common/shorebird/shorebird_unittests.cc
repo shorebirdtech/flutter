@@ -201,10 +201,9 @@ TEST_F(ConfigureShorebirdTest, UnloadablePatchFailureNamesTheConfiguredPatch) {
   ASSERT_TRUE(
       ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
 
-  EXPECT_TRUE(LoadPatchOrBase(patch_path, "base.so",
-                              [](const std::string& path) {
-                                return path == "base.so";
-                              }));
+  EXPECT_TRUE(LoadPatchOrBase(
+      patch_path, "base.so",
+      [](const std::string& path) { return path == "base.so"; }));
 
   EXPECT_EQ(mock_->launch_failure_count(), 1);
   EXPECT_EQ(mock_->reported_patch_numbers(), std::vector<size_t>({7, 7}));
