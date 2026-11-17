@@ -14,12 +14,12 @@ vars = {
   'flutter_git': 'https://flutter.googlesource.com',
   'skia_git': 'https://skia.googlesource.com',
   'llvm_git': 'https://llvm.googlesource.com',
-  'dart_ai_rev': '9c96bfe5f091c9451eff5b59c9bffeb2e806b875',
-  'skia_revision': '0e5d8d1be81b22f5529a41cf4810dd89b63527ba',
-  "dart_sdk_revision": "b65ce89c8057d6880e00693a7b0ecd7b9e5f61ca",
+  "dart_sdk_revision": "51458d81367ec2313666a9d1eabff572d3d27503",
   "dart_sdk_git": "git@github.com:shorebirdtech/dart-sdk.git",
   "updater_git": "https://github.com/shorebirdtech/updater.git",
-  "updater_rev": "fe3733374c222bf7d8ff1913f5ab213421a7d94f",
+  "updater_rev": "91dbbddb958a397868c9d8db4742a10e0f2c3832",
+  'dart_ai_rev': '9c96bfe5f091c9451eff5b59c9bffeb2e806b875',
+  'skia_revision': '0e5d8d1be81b22f5529a41cf4810dd89b63527ba',
 
   # Do not download the Emscripten SDK by default.
   # This prevents us from downloading the Emscripten toolchain for builds
@@ -143,7 +143,7 @@ vars = {
   "upstream_angle": "https://github.com/google/angle.git",
   "upstream_archive": "https://github.com/brendan-duncan/archive.git",
   "upstream_benchmark": "https://github.com/google/benchmark.git",
-  "upstream_boringssl": "https://boringssl.googlesource.com/boringssl.git",
+  "upstream_boringssl": "https://github.com/openssl/openssl.git",
   "upstream_brotli": "https://github.com/google/brotli.git",
   "upstream_dart_style": "https://github.com/dart-lang/dart_style.git",
   "upstream_dartdoc": "https://github.com/dart-lang/dartdoc.git",
@@ -162,8 +162,8 @@ vars = {
   "upstream_imgui": "https://github.com/ocornut/imgui.git",
   "upstream_inja": "https://github.com/pantor/inja.git",
   "upstream_json": "https://github.com/nlohmann/json.git",
-  "upstream_libcxx": "https://github.com/llvm/llvm-project.git",
-  "upstream_libcxxabi": "https://github.com/llvm/llvm-project.git",
+  "upstream_libcxx": "https://github.com/llvm-mirror/libcxx.git",
+  "upstream_libcxxabi": "https://github.com/llvm-mirror/libcxxabi.git",
   "upstream_libexpat": "https://github.com/libexpat/libexpat.git",
   "upstream_libjpeg-turbo": "https://github.com/libjpeg-turbo/libjpeg-turbo.git",
   "upstream_libpng": "https://github.com/glennrp/libpng.git",
@@ -230,10 +230,10 @@ deps = {
   Var('chromium_git') + '/chromium/tools/depot_tools.git' + '@' + '580b4ff3f5cd0dcaa2eacda28cefe0f45320e8f7',
 
   'engine/src/flutter/third_party/rapidjson':
-   Var('flutter_git') + '/third_party/rapidjson' + '@' + 'ef3564c5c8824989393b87df25355baf35ff544b',
+   Var('flutter_git') + '/third_party/rapidjson' + '@' + '47253cab97e9cfe99dbd6b90836fc11589d7d802',
 
   'engine/src/flutter/third_party/harfbuzz':
-   Var('flutter_git') + '/third_party/harfbuzz' + '@' + 'ea6a172f84f2cbcfed803b5ae71064c7afb6b5c2',
+   Var('flutter_git') + '/third_party/harfbuzz' + '@' + '49844c32a7a3f6be371355a1213c952a3f4a44e7',
 
   'engine/src/flutter/third_party/libcxx':
    Var('llvm_git') + '/llvm-project/libcxx' + '@' + 'bd557f6f764d1e40b62528a13b124ce740624f8f',
@@ -245,7 +245,7 @@ deps = {
    Var('llvm_git') + '/llvm-project/libc' + '@' + '5af39a19a1ad51ce93972cdab206dcd3ff9b6afa',
 
   'engine/src/flutter/third_party/glfw':
-   Var('flutter_git') + '/third_party/glfw' + '@' + 'dd8a678a66f1967372e5a5e3deac41ebf65ee127',
+   Var('flutter_git') + '/third_party/glfw' + '@' + '9352d8fe93cd443be18157abe81f16500549aec0',
 
   'engine/src/flutter/third_party/shaderc':
    Var('flutter_git') + '/third_party/shaderc' + '@' + '70b1130380fcbf1d1e9719ee78ba7202a5161424',
@@ -302,7 +302,7 @@ deps = {
    Var('chromium_git') + '/external/github.com/google/benchmark' + '@' + '431abd149fd76a072f821913c0340137cc755f36',
 
   'engine/src/flutter/third_party/googletest':
-   Var('chromium_git') + '/external/github.com/google/googletest' + '@' + '7f036c5563af7d0329f20e8bb42effb04629f0c0',
+   Var('chromium_git') + '/external/github.com/google/googletest' + '@' + 'e9907112b47255d50b4d343e7e2160bce8dc85d1',
 
   'engine/src/flutter/third_party/re2':
    Var('chromium_git') + '/external/github.com/google/re2' + '@' + 'c84a140c93352cdabbfb547c531be34515b12228',
@@ -331,7 +331,7 @@ deps = {
    {'dep_type': 'cipd', 'packages': [{'package': 'dart/third_party/flutter/devtools', 'version': 'git_revision:85f945ac99379d64d4df6f67d9b011e4cc418e7e'}]},
 
   'engine/src/flutter/third_party/dart/third_party/perfetto/src':
-   Var('android_git') + '/platform/external/perfetto' + '@' + Var('dart_perfetto_rev'),
+   Var('chromium_git') + '/external/github.com/google/perfetto' + '@' + Var('dart_perfetto_rev'),
 
   'engine/src/flutter/third_party/dart/third_party/pkg/core':
    Var('dart_git') + '/core.git' + '@' + Var('dart_core_rev'),
@@ -401,9 +401,9 @@ deps = {
     'objects': [
       {
         'object_name': Var('dart_sdk_revision') + '/dart-sdk-linux-x64.tar.gz',
-        'sha256sum': '636bf51574d52487abc148733f33388b3b14e4b05c53c6fca32dd8ed6e0e9574',
-        'size_bytes': 236358097,
-        'generation': 1793823932947849,
+        'sha256sum': '8bbd557bd6aa933b8ffbe8e59b58be828261e8e1b5df9b47ec1a0457bda19185',
+        'size_bytes': 236370625,
+        'generation': 1794881645236916,
       }
     ],
     'dep_type': 'gcs',
@@ -414,9 +414,9 @@ deps = {
     'objects': [
       {
         'object_name': Var('dart_sdk_revision') + '/dart-sdk-linux-arm64.tar.gz',
-        'sha256sum': 'b12c40f8c1059a2a721daffd89847d1cd622a15d8944ce44b4be263be7b2ee75',
-        'size_bytes': 233727766,
-        'generation': 1793823402614692,
+        'sha256sum': 'df299e116e76b8430702be90b1076d7167640020d7d46d90a37ebbb79fbac495',
+        'size_bytes': 233723451,
+        'generation': 1794882087984081,
       }
     ],
     'dep_type': 'gcs',
@@ -427,52 +427,35 @@ deps = {
     'objects': [
       {
         'object_name': Var('dart_sdk_revision') + '/dart-sdk-darwin-x64.tar.gz',
-        'sha256sum': '897513e7cb465cc8e3ffec483fa9424d653e7f4468754489452a4853e36aeb9f',
-        'size_bytes': 225533540,
-        'generation': 1793824033166029,
+        'sha256sum': 'fd61b3613bae92c4f2c9f46b57c81079c6da7a921131f3fb5333c1ce28580f21',
+        'size_bytes': 225542422,
+        'generation': 1794881614490077,
       }
     ],
     'dep_type': 'gcs',
     'condition': 'host_os == "mac" and download_dart_sdk'
   },
-  # Consume Shorebird's own published Dart SDK (built from
-  # shorebirdtech/dart-sdk) from GCS instead of Google's CIPD prebuilt, so
-  # the engine builds against our Dart fork and skips rebuilding it from
-  # source (no engine shard passes --no-prebuilt-dart-sdk).
-  # The object is keyed by Var('dart_sdk_revision') so it tracks the same
-  # fork revision as the source clone above; sha256sum/size_bytes pin the
-  # specific artifact's content and must be updated whenever that revision
-  # bumps. tar.gz (not zip) so gclient's extraction preserves the executable
-  # bit on bin/dart etc. The bot reads this private bucket via a keyless-WIF
-  # reader SA (shorebirdtech/_build_engine sync.yaml).
   'engine/src/flutter/prebuilts/macos-arm64/dart-sdk': {
     'bucket': 'shorebird-dart-sdk-prebuilt',
     'objects': [
       {
         'object_name': Var('dart_sdk_revision') + '/dart-sdk-darwin-arm64.tar.gz',
-        'sha256sum': '5968b313316b9edc8d6b003e9fb663e024568d00cea5efe0214191020412ffbf',
-        'size_bytes': 205230386,
-        'generation': 1780425558083300,
+        'sha256sum': 'bcf9b7f06730d657c04fff850b7d419a5e50d0321f9593abc976591c429569c9',
+        'size_bytes': 222626521,
+        'generation': 1794881136936892,
       }
     ],
     'dep_type': 'gcs',
-    # Dry-run 3.47.0-rc0: mac-arm64 builds Dart from source
-    # (--no-prebuilt-dart-sdk in shards/macos.json), so this prebuilt is never
-    # consumed. Disabled because it was never published for the offsets-regen
-    # tip (046fbc2), which 404s gclient sync. Real release: either publish it
-    # via publish-darwin-arm64 + update sha256sum/size_bytes/generation, or drop
-    # this hook (it is vestigial post the #155 partial revert). See
-    # notes/3.47.0-rc0/deferred-followups.md.
-    'condition': 'False'
+    'condition': 'host_os == "mac" and download_dart_sdk'
   },
   'engine/src/flutter/prebuilts/windows-x64/dart-sdk': {
     'bucket': 'shorebird-dart-sdk-prebuilt',
     'objects': [
       {
         'object_name': Var('dart_sdk_revision') + '/dart-sdk-windows-x64.tar.gz',
-        'sha256sum': 'f59a947d40c3741a5ac459362cb79017d90b7e2b480ed8c42d8ced75b0d737f6',
-        'size_bytes': 219250245,
-        'generation': 1793823863246002,
+        'sha256sum': '356de5709f00f3758912e6f53e8edba6f09547d8ab31e72c08a23bd3ddf92adc',
+        'size_bytes': 219248581,
+        'generation': 1794881186295184,
       }
     ],
     'dep_type': 'gcs',
@@ -483,14 +466,17 @@ deps = {
     'objects': [
       {
         'object_name': Var('dart_sdk_revision') + '/dart-sdk-windows-arm64.tar.gz',
-        'sha256sum': '66fe3d602469ae7478e6337bc919cdf7405a0f6ad48552572552f103269367b5',
-        'size_bytes': 161053466,
-        'generation': 1793822932927316,
+        'sha256sum': '03e32ed85324279e35f2fcba62fb47d0a1c43402bf738a52539c6608884d0d7c',
+        'size_bytes': 161047134,
+        'generation': 1794881781404621,
       }
     ],
     'dep_type': 'gcs',
     'condition': 'host_os == "win" and download_dart_sdk'
-  },
+  }
+
+  'engine/src/flutter/third_party/updater':
+   Var('updater_git') + '@' + Var('updater_rev'),,
 
   # esbuild download
   'engine/src/flutter/prebuilts/linux-x64/esbuild': {
@@ -546,9 +532,6 @@ deps = {
   'engine/src/flutter/third_party/ocmock':
    Var('flutter_git') + '/third_party/ocmock' + '@' +  Var('ocmock_rev'),
 
-  'engine/src/flutter/third_party/updater':
-   Var('updater_git') + '@' + Var('updater_rev'),
-
   'engine/src/flutter/third_party/libjpeg-turbo/src':
    Var('flutter_git') + '/third_party/libjpeg-turbo' + '@' + '0fb821f3b2e570b2783a94ccd9a2fb1f4916ae9f',
 
@@ -562,7 +545,7 @@ deps = {
    Var('skia_git') + '/external/github.com/google/wuffs-mirror-release-c.git' + '@' + '600cd96cf47788ee3a74b40a6028b035c9fd6a61',
 
   'engine/src/flutter/third_party/zlib':
-   Var('chromium_git') + '/chromium/src/third_party/zlib.git' + '@' + '7d77fb7fd66d8a5640618ad32c71fdeb7d3e02df',
+   Var('chromium_git') + '/chromium/src/third_party/zlib.git' + '@' + '7eda07b1e067ef3fd7eea0419c88b5af45c9a776',
 
   'engine/src/flutter/third_party/cpu_features/src':
    Var('chromium_git') + '/external/github.com/google/cpu_features.git' + '@' + '936b9ab5515dead115606559502e3864958f7f6e',
@@ -623,7 +606,7 @@ deps = {
   Var('dart_git') + '/external/github.com/google/vector_math.dart.git' + '@' + '0a5fd95449083d404df9768bc1b321b88a7d2eef', # 2.1.0
 
   'engine/src/flutter/third_party/imgui':
-  Var('flutter_git') + '/third_party/imgui.git' + '@' + '3ea0fad204e994d669f79ed29dcaf61cd5cb571d',
+  Var('flutter_git') + '/third_party/imgui.git' + '@' + '2a1b69f05748ad909f03acf4533447cac1331611',
 
   'engine/src/flutter/third_party/json':
   Var('flutter_git') + '/third_party/json.git' + '@' + '17d9eacd248f58b73f4d1be518ef649fe2295642',
