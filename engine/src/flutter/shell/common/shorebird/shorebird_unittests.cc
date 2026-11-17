@@ -168,6 +168,48 @@ TEST_F(ConfigureShorebirdTest, LaunchReportsNameTheConfiguredPatch) {
   EXPECT_EQ(mock_->reported_patch_numbers(), std::vector<size_t>({7}));
 }
 
+// An install by another process between the reads: the number moved, so the
+// path may not be that number's. Run the release and name no patch.
+TEST_F(ConfigureShorebirdTest, NumberChangedAroundThePathRunsTheRelease) {
+  mock_->set_next_boot_patch_path("patch.vmcode");
+  mock_->set_next_boot_patch_numbers({3, 4});
+  std::string patch_path = "stale";
+  ASSERT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
+
+  EXPECT_EQ(patch_path, "");
+  shorebird::Updater::Instance().ReportLaunchStart();
+  EXPECT_EQ(mock_->reported_patch_numbers(), std::vector<size_t>({0}));
+}
+
+// A path with no number (a failed read) is not booted under patch 0.
+TEST_F(ConfigureShorebirdTest, PathWithoutANumberRunsTheRelease) {
+  mock_->set_next_boot_patch_path("patch.vmcode");
+  std::string patch_path = "stale";
+  ASSERT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
+
+  EXPECT_EQ(patch_path, "");
+}
+
+// The configured patch, not a later one, is named when the patch can't load
+// and its failure is reported.
+TEST_F(ConfigureShorebirdTest, UnloadablePatchFailureNamesTheConfiguredPatch) {
+  mock_->set_next_boot_patch_path("patch.vmcode");
+  mock_->set_next_boot_patch_number(7);
+  std::string patch_path;
+  ASSERT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
+
+  EXPECT_TRUE(LoadPatchOrBase(patch_path, "base.so",
+                              [](const std::string& path) {
+                                return path == "base.so";
+                              }));
+
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  EXPECT_EQ(mock_->reported_patch_numbers(), std::vector<size_t>({7, 7}));
+}
+
 // Without a patch path, the reports name no patch, whatever the number says.
 TEST_F(ConfigureShorebirdTest, LaunchReportsNameNoPatchWithoutAPath) {
   mock_->set_next_boot_patch_number(7);

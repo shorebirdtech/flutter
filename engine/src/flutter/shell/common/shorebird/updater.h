@@ -346,6 +346,11 @@ class MockUpdater : public Updater {
   void set_next_boot_patch_number(size_t number) {
     next_boot_patch_number_ = number;
   }
+  /// Each NextBootPatchNumber call returns the next of these, then the
+  /// number above once they run out: the state changing between reads.
+  void set_next_boot_patch_numbers(std::vector<size_t> numbers) {
+    next_boot_patch_numbers_ = std::move(numbers);
+  }
 
   // Reset all counters and logs
   void Reset();
@@ -363,6 +368,7 @@ class MockUpdater : public Updater {
   bool should_auto_update_ = false;
   std::string next_boot_patch_path_;
   size_t next_boot_patch_number_ = 0;
+  std::vector<size_t> next_boot_patch_numbers_;
   std::vector<size_t> reported_patch_numbers_;
   std::string last_release_version_;
   std::string last_yaml_config_;

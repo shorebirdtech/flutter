@@ -130,6 +130,11 @@ void Updater::MaybeStartUpdateThread() {
   // Normal for a build that never configured the updater: Android only calls
   // ConfigureShorebird in release mode, and iOS skips it when the bundle has
   // no shorebird.yaml. Also covers an Init that failed.
+  // Never before the launch start, which tells the updater the running
+  // patch: checked here so the rule holds for every caller.
+  if (!launch_started_.load()) {
+    return;
+  }
   // Checked before the guard below so an engine that never configured cannot
   // claim it on behalf of one that did.
   if (!initialized_.load()) {
@@ -186,11 +191,9 @@ void Updater::ReportLaunchPaused() {
     }
   }
   // The Shell is built and the breadcrumb is cleared: start the update
-  // thread, so an engine built and never run still checks for updates. Never
-  // before the launch start, which tells the updater the running patch.
-  if (launch_started_.load()) {
-    MaybeStartUpdateThread();
-  }
+  // thread, so an engine built and never run still checks for updates.
+  // MaybeStartUpdateThread waits for the launch start.
+  MaybeStartUpdateThread();
 }
 
 void Updater::ReportLaunchResumed() {
@@ -320,6 +323,11 @@ std::string MockUpdater::NextBootPatchPath() {
 
 size_t MockUpdater::NextBootPatchNumber() {
   call_log_.push_back("NextBootPatchNumber");
+  if (!next_boot_patch_numbers_.empty()) {
+    size_t number = next_boot_patch_numbers_.front();
+    next_boot_patch_numbers_.erase(next_boot_patch_numbers_.begin());
+    return number;
+  }
   return next_boot_patch_number_;
 }
 

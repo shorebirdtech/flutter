@@ -277,6 +277,7 @@ TEST_F(UpdaterTest, UnconfiguredEngineDoesNotClaimUpdateThreadGuard) {
   ASSERT_EQ(mock_->start_update_thread_count(), 0);
 
   EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+  Updater::Instance().ReportLaunchStart();
   Updater::Instance().ReportLaunchSuccess();
 
   EXPECT_EQ(mock_->start_update_thread_count(), 1);
@@ -331,6 +332,17 @@ TEST_F(UpdaterTest, RunFailureStartsUpdateThreadWhenNotYetStarted) {
 
   EXPECT_EQ(mock_->launch_failure_count(), 1);
   EXPECT_EQ(mock_->start_update_thread_count(), 1);
+}
+
+// The fallbacks keep the rule too: no thread before the launch start.
+TEST_F(UpdaterTest, OutcomeReportsBeforeStartDoNotStartUpdateThread) {
+  mock_->set_should_auto_update(true);
+  EXPECT_TRUE(Updater::Instance().Init(AppConfig{}));
+
+  Updater::Instance().ReportLaunchSuccess();
+  Updater::Instance().ReportRunFailure();
+
+  EXPECT_EQ(mock_->start_update_thread_count(), 0);
 }
 
 // Paused and resumed are forwarded once each per process: later engines are
