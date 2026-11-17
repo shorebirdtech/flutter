@@ -183,8 +183,6 @@ class AOTSnapshotter {
     _logger.printTrace('targetingAndroidPlatform = $targetingAndroidPlatform');
 
     final bool shouldSplitDebugInfo = splitDebugInfo?.isNotEmpty ?? false;
-
-    final bool shouldSplitDebugInfo = splitDebugInfo?.isNotEmpty ?? false;
     // We strip snapshot by default, but allow to suppress this behavior
     // by supplying --no-strip in extraGenSnapshotOptions.
     var shouldStrip = true;
