@@ -578,14 +578,13 @@ STDERR STUFF
   testUsingContext(
     'macOS build with --shorebird-trace passes trace plumbing to xcodebuild and writes the trace',
     () async {
-      final command = BuildCommand(
+      final BuildCommand command = createFakeBuildCommand(
         androidSdk: FakeAndroidSdk(),
         buildSystem: TestBuildSystem.all(BuildResult(success: true)),
         fileSystem: fileSystem,
         logger: logger,
         osUtils: FakeOperatingSystemUtils(),
         config: FakeConfig(),
-        platform: FakePlatform(),
         fileSystemUtils: FakeFileSystemUtils(),
         terminal: FakeTerminal(),
         plistParser: FakePlistParser(),
@@ -1719,14 +1718,13 @@ STDERR STUFF
     () async {
       createMinimalMockProjectFiles();
 
-      final command = BuildCommand(
+      final BuildCommand command = createFakeBuildCommand(
         androidSdk: FakeAndroidSdk(),
         buildSystem: TestBuildSystem.all(BuildResult(success: true)),
         fileSystem: fileSystem,
         logger: testLogger,
         osUtils: FakeOperatingSystemUtils(),
         config: FakeConfig(),
-        platform: FakePlatform(),
         fileSystemUtils: FakeFileSystemUtils(),
         terminal: FakeTerminal(),
         plistParser: FakePlistParser(),
@@ -1816,7 +1814,7 @@ STDERR STUFF
     // assets build target, which TestBuildSystem.all stubs out entirely.
     // Exercising it needs a real build system or a direct updateShorebirdYaml
     // call; skip until that rework lands.
-    skip: true,
+    skip: true, // [intended] requires real build system or direct updateShorebirdYaml test
   );
 
   group('Analytics for impeller plist setting', () {

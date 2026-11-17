@@ -119,7 +119,7 @@ class AOTSnapshotter {
          artifacts: artifacts,
          processManager: processManager,
          logger: logger,
-         fileSystem: fileSystem,
+         fileSystem: _fileSystem,
        );
 
   final Logger _logger;
@@ -365,27 +365,6 @@ class AOTSnapshotter {
       }
     }
     return 0;
-  }
-
-  /// The files a DD pass leaves next to the snapshot's output directory, which
-  /// LinkSupplement copies into the release's supplement.
-  static const _ddOutputFileNames = <String>[
-    'App.dd_identity.link',
-    'App.dd.link',
-    'App.dd_callers.link',
-    'App.dd_slots.link',
-    'App.dd_resolution.tsv',
-  ];
-
-  /// Deletes the files an earlier DD pass left next to [outputDir], so a build
-  /// that skips the pass does not ship that pass's tables.
-  void _deleteDdOutputs(Directory outputDir) {
-    for (final String name in _ddOutputFileNames) {
-      final File file = outputDir.parent.childFile(name);
-      if (file.existsSync()) {
-        file.deleteSync();
-      }
-    }
   }
 
   bool _isValidAotPlatform(TargetPlatform platform, BuildMode buildMode) {

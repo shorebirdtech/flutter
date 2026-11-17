@@ -32,8 +32,6 @@ void main() {
   late Cache cache;
   late FakeToolContext toolContext;
 
-  late MemoryFileSystem fileSystem;
-
   setUp(() {
     fileSystem = MemoryFileSystem.test();
     fileSystem.file('pubspec.yaml').createSync();
@@ -355,6 +353,7 @@ void main() {
                 elapsedMilliseconds: 123,
                 skipped: false,
                 succeeded: true,
+                startTimeMicroseconds: 0,
               ),
             },
           ),

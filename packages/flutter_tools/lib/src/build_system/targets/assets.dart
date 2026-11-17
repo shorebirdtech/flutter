@@ -14,7 +14,6 @@ import '../../devfs.dart';
 import '../../flutter_manifest.dart';
 import '../../isolated/native_assets/dart_hook_result.dart';
 import '../../project.dart';
-import '../../shorebird/shorebird_build_key.dart';
 import '../../shorebird/shorebird_defines.dart';
 import '../../shorebird/shorebird_yaml.dart';
 import '../build_system.dart';

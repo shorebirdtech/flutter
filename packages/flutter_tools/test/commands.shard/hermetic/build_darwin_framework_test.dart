@@ -560,7 +560,8 @@ void main() {
             '{"codeAssets": [], "dataAssets": [], "dependencies": []}',
           );
 
-        final command = BuildIOSFrameworkCommand(
+        final command = createBuildIOSFrameworkCommand(
+          fileSystem: memoryFileSystem,
           logger: BufferLogger.test(),
           buildSystem: TestBuildSystem.all(BuildResult(success: true), (
             Target target,
@@ -647,7 +648,8 @@ void main() {
         expect(pluginRegistrant.existsSync(), isFalse);
 
         final codesign = FakeDarwinAddToAppCodesigning();
-        final command = BuildIOSFrameworkCommand(
+        final command = createBuildIOSFrameworkCommand(
+          fileSystem: memoryFileSystem,
           logger: BufferLogger.test(),
           buildSystem: TestBuildSystem.all(BuildResult(success: true), (
             Target target,
@@ -731,7 +733,8 @@ void main() {
       }
 
       BuildIOSFrameworkCommand createCommand({required bool consistentAssets}) {
-        return BuildIOSFrameworkCommand(
+        return createBuildIOSFrameworkCommand(
+          fileSystem: memoryFileSystem,
           logger: BufferLogger.test(),
           buildSystem: TestBuildSystem.all(
             BuildResult(
