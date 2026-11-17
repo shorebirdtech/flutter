@@ -40,13 +40,17 @@ if (use_rbe) {
                   [ "--labels=type=compile,compiler=clang-cl,lang=cpp " ]
   compiler_prefix = string_join(" ", compiler_args)
   asm_prefix = " "
-} else if (use_ccache) {
-  # ccache only supports compilation, not linking.
-  compiler_prefix = "ccache "
-  asm_prefix = ""
 } else {
   compiler_prefix = ""
   asm_prefix = ""
+}
+
+# ccache wraps C and C++ compiles only: not linking, and not the arm64 asm
+# tool, which runs through tool_wrapper.py with gn's saved environment.
+if (use_ccache) {
+  cl_prefix = "ccache "
+} else {
+  cl_prefix = ""
 }
 
 if (current_toolchain == default_toolchain) {
@@ -295,7 +299,7 @@ template("win_toolchains") {
   msvc_toolchain("clang_" + target_name) {
     environment = "environment." + toolchain_arch
     prefix = rebase_path("$clang_base_path/bin", root_build_dir)
-    cl = "${compiler_prefix}$prefix/clang-cl.exe"
+    cl = "${cl_prefix}${compiler_prefix}$prefix/clang-cl.exe"
     sys_include_flags = "${win_toolchain_data.include_flags_imsvc}"
     toolchain_args = {
       if (defined(invoker.toolchain_args)) {

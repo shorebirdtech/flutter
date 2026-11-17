@@ -23,8 +23,8 @@ import("//build/toolchain/rbe.gni")  # for use_rbe
 
 declare_args() {
   # Set to true to enable ccache. On Windows it needs ccache 4.6 or later,
-  # which caches clang-cl compiles (including /Zi, which clang-cl treats as
-  # /Z7, and /showIncludes).
+  # which caches clang-cl compiles, including /showIncludes and /Zi (for
+  # clang-cl only, which treats /Zi as /Z7; ccache refuses cl.exe's /Zi).
   use_ccache = false
 }
 
