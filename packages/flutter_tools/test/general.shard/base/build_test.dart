@@ -259,7 +259,6 @@ void main() {
 
     testWithoutContext('builds iOS snapshot with dwarfStackTraces', () async {
       final String outputPath = fileSystem.path.join('build', 'foo');
-      final String assembly = fileSystem.path.join(outputPath, 'snapshot_assembly.S');
       final String debugPath = fileSystem.path.join('foo', 'app.ios-arm64.symbols');
       final String genSnapshotPath = artifacts.getArtifactPath(
         Artifact.genSnapshotArm64,
@@ -272,8 +271,12 @@ void main() {
             ...aotToolsPrefix(genSnapshotPath),
             '--deterministic',
             ...kLinkInfoArgs,
-            '--snapshot_kind=app-aot-assembly',
-            '--assembly=$assembly',
+            '--snapshot_kind=app-aot-macho-dylib',
+            '--macho=build/foo/App.framework/App',
+            '--macho-object=build/foo/app.o',
+            '--macho-min-os-version=15.0',
+            '--macho-rpath=@executable_path/Frameworks,@loader_path/Frameworks',
+            '--macho-install-name=@rpath/App.framework/App',
             '--dwarf-stack-traces',
             '--resolve-dwarf-paths',
             'main.dill',
@@ -281,22 +284,6 @@ void main() {
         ),
         kWhichSysctlCommand,
         kx64CheckCommand,
-        const FakeCommand(
-          command: <String>[
-            'xcrun',
-            'cc',
-            '-arch',
-            'arm64',
-            '-miphoneos-version-min=15.0',
-            '-isysroot',
-            'path/to/sdk',
-            '-c',
-            'build/foo/snapshot_assembly.S',
-            '-o',
-            'build/foo/snapshot_assembly.o',
-          ],
-        ),
-        const FakeCommand(command: <String>['xcrun', 'clang', '-arch', 'arm64', ...kDefaultClang]),
         FakeCommand(
           command: const <String>[
             'xcrun',
@@ -337,7 +324,6 @@ void main() {
 
     testWithoutContext('builds iOS snapshot with obfuscate', () async {
       final String outputPath = fileSystem.path.join('build', 'foo');
-      final String assembly = fileSystem.path.join(outputPath, 'snapshot_assembly.S');
       final String genSnapshotPath = artifacts.getArtifactPath(
         Artifact.genSnapshotArm64,
         platform: TargetPlatform.ios,
@@ -349,30 +335,18 @@ void main() {
             ...aotToolsPrefix(genSnapshotPath),
             '--deterministic',
             ...kLinkInfoArgs,
-            '--snapshot_kind=app-aot-assembly',
-            '--assembly=$assembly',
+            '--snapshot_kind=app-aot-macho-dylib',
+            '--macho=build/foo/App.framework/App',
+            '--macho-object=build/foo/app.o',
+            '--macho-min-os-version=15.0',
+            '--macho-rpath=@executable_path/Frameworks,@loader_path/Frameworks',
+            '--macho-install-name=@rpath/App.framework/App',
             '--obfuscate',
             'main.dill',
           ],
         ),
         kWhichSysctlCommand,
         kx64CheckCommand,
-        const FakeCommand(
-          command: <String>[
-            'xcrun',
-            'cc',
-            '-arch',
-            'arm64',
-            '-miphoneos-version-min=15.0',
-            '-isysroot',
-            'path/to/sdk',
-            '-c',
-            'build/foo/snapshot_assembly.S',
-            '-o',
-            'build/foo/snapshot_assembly.o',
-          ],
-        ),
-        const FakeCommand(command: <String>['xcrun', 'clang', '-arch', 'arm64', ...kDefaultClang]),
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -421,29 +395,17 @@ void main() {
             ...aotToolsPrefix(genSnapshotPath),
             '--deterministic',
             ...kLinkInfoArgs,
-            '--snapshot_kind=app-aot-assembly',
-            '--assembly=${fileSystem.path.join(outputPath, 'snapshot_assembly.S')}',
+            '--snapshot_kind=app-aot-macho-dylib',
+            '--macho=build/foo/App.framework/App',
+            '--macho-object=build/foo/app.o',
+            '--macho-min-os-version=15.0',
+            '--macho-rpath=@executable_path/Frameworks,@loader_path/Frameworks',
+            '--macho-install-name=@rpath/App.framework/App',
             'main.dill',
           ],
         ),
         kWhichSysctlCommand,
         kx64CheckCommand,
-        const FakeCommand(
-          command: <String>[
-            'xcrun',
-            'cc',
-            '-arch',
-            'arm64',
-            '-miphoneos-version-min=15.0',
-            '-isysroot',
-            'path/to/sdk',
-            '-c',
-            'build/foo/snapshot_assembly.S',
-            '-o',
-            'build/foo/snapshot_assembly.o',
-          ],
-        ),
-        const FakeCommand(command: <String>['xcrun', 'clang', '-arch', 'arm64', ...kDefaultClang]),
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -482,7 +444,6 @@ void main() {
 
     testWithoutContext('builds iOS snapshot with obfuscate and dwarfStackTraces', () async {
       final String outputPath = fileSystem.path.join('build', 'foo');
-      final String assembly = fileSystem.path.join(outputPath, 'snapshot_assembly.S');
       final String debugPath = fileSystem.path.join('foo', 'app.ios-arm64.symbols');
       final String genSnapshotPath = artifacts.getArtifactPath(
         Artifact.genSnapshotArm64,
@@ -495,8 +456,12 @@ void main() {
             ...aotToolsPrefix(genSnapshotPath),
             '--deterministic',
             ...kLinkInfoArgs,
-            '--snapshot_kind=app-aot-assembly',
-            '--assembly=$assembly',
+            '--snapshot_kind=app-aot-macho-dylib',
+            '--macho=build/foo/App.framework/App',
+            '--macho-object=build/foo/app.o',
+            '--macho-min-os-version=15.0',
+            '--macho-rpath=@executable_path/Frameworks,@loader_path/Frameworks',
+            '--macho-install-name=@rpath/App.framework/App',
             '--dwarf-stack-traces',
             '--resolve-dwarf-paths',
             '--obfuscate',
@@ -505,22 +470,6 @@ void main() {
         ),
         kWhichSysctlCommand,
         kx64CheckCommand,
-        const FakeCommand(
-          command: <String>[
-            'xcrun',
-            'cc',
-            '-arch',
-            'arm64',
-            '-miphoneos-version-min=15.0',
-            '-isysroot',
-            'path/to/sdk',
-            '-c',
-            'build/foo/snapshot_assembly.S',
-            '-o',
-            'build/foo/snapshot_assembly.o',
-          ],
-        ),
-        const FakeCommand(command: <String>['xcrun', 'clang', '-arch', 'arm64', ...kDefaultClang]),
         FakeCommand(
           command: const <String>[
             'xcrun',
@@ -563,7 +512,6 @@ void main() {
     // the companion is named per-arch.
     testWithoutContext('builds macOS snapshot with dwarfStackTraces', () async {
       final String outputPath = fileSystem.path.join('build', 'foo');
-      final String assembly = fileSystem.path.join(outputPath, 'snapshot_assembly.S');
       final String debugPath = fileSystem.path.join('foo', 'app.darwin-arm64.symbols');
       final String genSnapshotPath = artifacts.getArtifactPath(
         Artifact.genSnapshotArm64,
@@ -576,8 +524,12 @@ void main() {
             genSnapshotPath,
             '--deterministic',
             ...kLinkInfoArgs,
-            '--snapshot_kind=app-aot-assembly',
-            '--assembly=$assembly',
+            '--snapshot_kind=app-aot-macho-dylib',
+            '--macho=build/foo/App.framework/App',
+            '--macho-object=build/foo/app.o',
+            '--macho-min-os-version=12.0',
+            '--macho-rpath=@executable_path/Frameworks,@loader_path/Frameworks',
+            '--macho-install-name=@rpath/App.framework/App',
             '--dwarf-stack-traces',
             '--resolve-dwarf-paths',
             'main.dill',
@@ -585,41 +537,6 @@ void main() {
         ),
         kWhichSysctlCommand,
         kx64CheckCommand,
-        const FakeCommand(
-          command: <String>[
-            'xcrun',
-            'cc',
-            '-arch',
-            'arm64',
-            '-c',
-            'build/foo/snapshot_assembly.S',
-            '-o',
-            'build/foo/snapshot_assembly.o',
-          ],
-        ),
-        const FakeCommand(
-          command: <String>[
-            'xcrun',
-            'clang',
-            '-arch',
-            'arm64',
-            '-dynamiclib',
-            '-Xlinker',
-            '-rpath',
-            '-Xlinker',
-            '@executable_path/Frameworks',
-            '-Xlinker',
-            '-rpath',
-            '-Xlinker',
-            '@loader_path/Frameworks',
-            '-fapplication-extension',
-            '-install_name',
-            '@rpath/App.framework/App',
-            '-o',
-            'build/foo/App.framework/App',
-            'build/foo/snapshot_assembly.o',
-          ],
-        ),
         FakeCommand(
           command: const <String>[
             'xcrun',
@@ -662,7 +579,6 @@ void main() {
     // companion would ship empty.
     testWithoutContext('iOS split debug info keeps DWARF when --strip is passed', () async {
       final String outputPath = fileSystem.path.join('build', 'foo');
-      final String assembly = fileSystem.path.join(outputPath, 'snapshot_assembly.S');
       final String debugPath = fileSystem.path.join('foo', 'app.ios-arm64.symbols');
       final String genSnapshotPath = artifacts.getArtifactPath(
         Artifact.genSnapshotArm64,
@@ -675,8 +591,12 @@ void main() {
             ...aotToolsPrefix(genSnapshotPath),
             '--deterministic',
             ...kLinkInfoArgs,
-            '--snapshot_kind=app-aot-assembly',
-            '--assembly=$assembly',
+            '--snapshot_kind=app-aot-macho-dylib',
+            '--macho=build/foo/App.framework/App',
+            '--macho-object=build/foo/app.o',
+            '--macho-min-os-version=15.0',
+            '--macho-rpath=@executable_path/Frameworks,@loader_path/Frameworks',
+            '--macho-install-name=@rpath/App.framework/App',
             '--dwarf-stack-traces',
             '--resolve-dwarf-paths',
             '--obfuscate',
@@ -685,22 +605,6 @@ void main() {
         ),
         kWhichSysctlCommand,
         kx64CheckCommand,
-        const FakeCommand(
-          command: <String>[
-            'xcrun',
-            'cc',
-            '-arch',
-            'arm64',
-            '-miphoneos-version-min=15.0',
-            '-isysroot',
-            'path/to/sdk',
-            '-c',
-            'build/foo/snapshot_assembly.S',
-            '-o',
-            'build/foo/snapshot_assembly.o',
-          ],
-        ),
-        const FakeCommand(command: <String>['xcrun', 'clang', '-arch', 'arm64', ...kDefaultClang]),
         FakeCommand(
           command: const <String>[
             'xcrun',
@@ -745,7 +649,6 @@ void main() {
     // still reaches gen_snapshot.
     testWithoutContext('iOS forwards --strip when not splitting debug info', () async {
       final String outputPath = fileSystem.path.join('build', 'foo');
-      final String assembly = fileSystem.path.join(outputPath, 'snapshot_assembly.S');
       final String genSnapshotPath = artifacts.getArtifactPath(
         Artifact.genSnapshotArm64,
         platform: TargetPlatform.ios,
@@ -758,29 +661,17 @@ void main() {
             '--deterministic',
             ...kLinkInfoArgs,
             '--strip',
-            '--snapshot_kind=app-aot-assembly',
-            '--assembly=$assembly',
+            '--snapshot_kind=app-aot-macho-dylib',
+            '--macho=build/foo/App.framework/App',
+            '--macho-object=build/foo/app.o',
+            '--macho-min-os-version=15.0',
+            '--macho-rpath=@executable_path/Frameworks,@loader_path/Frameworks',
+            '--macho-install-name=@rpath/App.framework/App',
             'main.dill',
           ],
         ),
         kWhichSysctlCommand,
         kx64CheckCommand,
-        const FakeCommand(
-          command: <String>[
-            'xcrun',
-            'cc',
-            '-arch',
-            'arm64',
-            '-miphoneos-version-min=15.0',
-            '-isysroot',
-            'path/to/sdk',
-            '-c',
-            'build/foo/snapshot_assembly.S',
-            '-o',
-            'build/foo/snapshot_assembly.o',
-          ],
-        ),
-        const FakeCommand(command: <String>['xcrun', 'clang', '-arch', 'arm64', ...kDefaultClang]),
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -821,7 +712,6 @@ void main() {
     // non-zero.
     testWithoutContext('iOS split debug info fails when dsymutil fails', () async {
       final String outputPath = fileSystem.path.join('build', 'foo');
-      final String assembly = fileSystem.path.join(outputPath, 'snapshot_assembly.S');
       final String genSnapshotPath = artifacts.getArtifactPath(
         Artifact.genSnapshotArm64,
         platform: TargetPlatform.ios,
@@ -833,8 +723,12 @@ void main() {
             ...aotToolsPrefix(genSnapshotPath),
             '--deterministic',
             ...kLinkInfoArgs,
-            '--snapshot_kind=app-aot-assembly',
-            '--assembly=$assembly',
+            '--snapshot_kind=app-aot-macho-dylib',
+            '--macho=build/foo/App.framework/App',
+            '--macho-object=build/foo/app.o',
+            '--macho-min-os-version=15.0',
+            '--macho-rpath=@executable_path/Frameworks,@loader_path/Frameworks',
+            '--macho-install-name=@rpath/App.framework/App',
             '--dwarf-stack-traces',
             '--resolve-dwarf-paths',
             'main.dill',
@@ -842,22 +736,6 @@ void main() {
         ),
         kWhichSysctlCommand,
         kx64CheckCommand,
-        const FakeCommand(
-          command: <String>[
-            'xcrun',
-            'cc',
-            '-arch',
-            'arm64',
-            '-miphoneos-version-min=15.0',
-            '-isysroot',
-            'path/to/sdk',
-            '-c',
-            'build/foo/snapshot_assembly.S',
-            '-o',
-            'build/foo/snapshot_assembly.o',
-          ],
-        ),
-        const FakeCommand(command: <String>['xcrun', 'clang', '-arch', 'arm64', ...kDefaultClang]),
         const FakeCommand(
           command: <String>[
             'xcrun',
@@ -893,7 +771,6 @@ void main() {
 
     testWithoutContext('iOS split debug info fails when dsymutil writes no DWARF', () async {
       final String outputPath = fileSystem.path.join('build', 'foo');
-      final String assembly = fileSystem.path.join(outputPath, 'snapshot_assembly.S');
       final String genSnapshotPath = artifacts.getArtifactPath(
         Artifact.genSnapshotArm64,
         platform: TargetPlatform.ios,
@@ -905,8 +782,12 @@ void main() {
             ...aotToolsPrefix(genSnapshotPath),
             '--deterministic',
             ...kLinkInfoArgs,
-            '--snapshot_kind=app-aot-assembly',
-            '--assembly=$assembly',
+            '--snapshot_kind=app-aot-macho-dylib',
+            '--macho=build/foo/App.framework/App',
+            '--macho-object=build/foo/app.o',
+            '--macho-min-os-version=15.0',
+            '--macho-rpath=@executable_path/Frameworks,@loader_path/Frameworks',
+            '--macho-install-name=@rpath/App.framework/App',
             '--dwarf-stack-traces',
             '--resolve-dwarf-paths',
             'main.dill',
@@ -914,22 +795,6 @@ void main() {
         ),
         kWhichSysctlCommand,
         kx64CheckCommand,
-        const FakeCommand(
-          command: <String>[
-            'xcrun',
-            'cc',
-            '-arch',
-            'arm64',
-            '-miphoneos-version-min=15.0',
-            '-isysroot',
-            'path/to/sdk',
-            '-c',
-            'build/foo/snapshot_assembly.S',
-            '-o',
-            'build/foo/snapshot_assembly.o',
-          ],
-        ),
-        const FakeCommand(command: <String>['xcrun', 'clang', '-arch', 'arm64', ...kDefaultClang]),
         const FakeCommand(
           command: <String>[
             'xcrun',
