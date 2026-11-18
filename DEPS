@@ -473,10 +473,10 @@ deps = {
     ],
     'dep_type': 'gcs',
     'condition': 'host_os == "win" and download_dart_sdk'
-  }
+  },
 
   'engine/src/flutter/third_party/updater':
-   Var('updater_git') + '@' + Var('updater_rev'),,
+   Var('updater_git') + '@' + Var('updater_rev'),
 
   # esbuild download
   'engine/src/flutter/prebuilts/linux-x64/esbuild': {
