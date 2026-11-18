@@ -10,8 +10,9 @@ void main() {
   setUpAll(warmUpTemplateProject);
 
   group('shorebird helpers', () {
-    testWithShorebirdProject('can build a base project',
-        (projectDirectory) async {
+    testWithShorebirdProject('can build a base project', (
+      projectDirectory,
+    ) async {
       expect(projectDirectory.existsSync(), isTrue);
 
       expect(projectDirectory.pubspecFile.existsSync(), isTrue);

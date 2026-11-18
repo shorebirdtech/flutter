@@ -48,6 +48,7 @@ class BuildInfo {
     this.shorebirdTraceFilePath,
     this.shorebirdPublicKey,
     this.shorebirdReleaseVersion,
+    this.shorebirdAppId,
     required this.packageConfigPath,
     this.codeSizeDirectory,
     this.androidGradleDaemon = true,
@@ -98,6 +99,7 @@ class BuildInfo {
       performanceMeasurementFile: performanceMeasurementFile,
       shorebirdPublicKey: shorebirdPublicKey,
       shorebirdReleaseVersion: shorebirdReleaseVersion,
+      shorebirdAppId: shorebirdAppId,
       packageConfigPath: packageConfigPath ?? this.packageConfigPath,
       codeSizeDirectory: codeSizeDirectory,
       androidGradleDaemon: androidGradleDaemon,
@@ -206,6 +208,14 @@ class BuildInfo {
   /// `SHOREBIRD_RELEASE_VERSION` environment variable. The shorebird CLI sets
   /// it only for aar and ios-framework builds.
   final String? shorebirdReleaseVersion;
+
+  /// Shorebird: the app ID written into the generated shorebird.yaml in place
+  /// of the one the checked-in shorebird.yaml names, read from the
+  /// `SHOREBIRD_APP_ID` environment variable. The shorebird CLI sets it only
+  /// for aar and ios-framework builds, to the app ID of the `--flavor` the
+  /// module was released with: a module has no Gradle product flavors or Xcode
+  /// schemes, so it can't be built with Flutter's `--flavor`.
+  final String? shorebirdAppId;
 
   /// If provided, an output directory where one or more v8-style heap snapshots
   /// will be written for code size profiling.
@@ -438,6 +448,7 @@ class BuildInfo {
       if (shorebirdPublicKey != null)
         kShorebirdPublicKey: encodeShorebirdPublicKey(shorebirdPublicKey!),
       kShorebirdReleaseVersion: ?shorebirdReleaseVersion,
+      kShorebirdAppId: ?shorebirdAppId,
     };
   }
 
@@ -468,12 +479,13 @@ class BuildInfo {
     };
   }
 
-  /// Shorebird: the Gradle argument that bakes [shorebirdReleaseVersion]. Only
-  /// `flutter build aar` adds it, so an app build (apk, appbundle) never
-  /// reports a module's version even if the environment variable leaks into
-  /// it.
+  /// Shorebird: the Gradle arguments that bake [shorebirdReleaseVersion] and
+  /// [shorebirdAppId]. Only `flutter build aar` adds them, so an app build
+  /// (apk, appbundle) never reports a module's version or app ID even if the
+  /// environment variables leak into it.
   List<String> toShorebirdAarGradleConfig() => <String>[
     if (shorebirdReleaseVersion != null) '-Pshorebird-release-version=$shorebirdReleaseVersion',
+    if (shorebirdAppId != null) '-Pshorebird-app-id=$shorebirdAppId',
   ];
 
   /// Convert this config to a series of project level arguments to be passed

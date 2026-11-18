@@ -1157,9 +1157,9 @@ class GitTagVersion {
     // A stable branch, X.Y.Z, or a side version, X.Y.Z-sb.N (X.Y.Z with
     // fixes picked onto it), reported as its own name. X.Y.Z wins when both
     // hold HEAD. rc branches fall through.
-    final List<String> releaseBranches = LineSplitter.split(
-      shorebirdFlutterReleases,
-    ).map((e) => e.replaceFirst('origin/flutter_release/', '')).toList();
+    final List<String> releaseBranches = LineSplitter.split(shorebirdFlutterReleases)
+        .map((e) => e.replaceFirst('origin/flutter_release/', ''))
+        .toList();
     final String? shorebirdFlutterVersion =
         releaseBranches.where(_stableVersionPattern.hasMatch).firstOrNull ??
         releaseBranches.where(_sideVersionPattern.hasMatch).firstOrNull;

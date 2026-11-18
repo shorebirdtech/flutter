@@ -1236,9 +1236,8 @@ No file or variants found for asset: images/a_dot_burr.jpeg.
         buildCommand('Release'),
       ]);
 
-      await createTestCommandRunner(
-        command,
-      ).run(const <String>['windows', '--release', '--no-pub']);
+      await createTestCommandRunner(command)
+          .run(const <String>['windows', '--release', '--no-pub']);
 
       final String updatedYaml = shorebirdYamlFile.readAsStringSync();
       expect(updatedYaml, contains('app_id: my-app-id'));

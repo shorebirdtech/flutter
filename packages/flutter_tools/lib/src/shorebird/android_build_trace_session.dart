@@ -27,14 +27,11 @@ import 'network_trace_span.dart';
 /// subsequent merge of that method harder.
 class AndroidBuildTraceSession {
   AndroidBuildTraceSession._({
-    required BuildTracer tracer,
+    required this._tracer,
     required FileSystem fileSystem,
-    required String tracePath,
-    required Directory buildDirectory,
-  }) : _tracer = tracer,
-       _fs = fileSystem,
-       _tracePath = tracePath,
-       _buildDirectory = buildDirectory,
+    required this._tracePath,
+    required this._buildDirectory,
+  }) : _fs = fileSystem,
        _flutterPid = currentProcessId(),
        _buildStart = DateTime.now() {
     BuildTracer.start(_tracer);
