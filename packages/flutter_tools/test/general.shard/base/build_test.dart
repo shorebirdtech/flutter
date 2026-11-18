@@ -27,6 +27,11 @@ const kLinkInfoArgs = <String>[
   '--print_stack_map_order_to=build/App.sm.link',
 ];
 
+// macOS writes no stack map order (iOS only).
+final List<String> kMacOSLinkInfoArgs = kLinkInfoArgs
+    .where((String arg) => !arg.startsWith('--print_stack_map_order_to='))
+    .toList();
+
 const _kFakeDwarf = 'fake-macho-dsym';
 
 void _writeFakeDwarf(FileSystem fileSystem, String dsymBundle) {
@@ -503,7 +508,7 @@ void main() {
           command: <String>[
             genSnapshotPath,
             '--deterministic',
-            ...kLinkInfoArgs,
+            ...kMacOSLinkInfoArgs,
             '--snapshot_kind=app-aot-macho-dylib',
             '--macho=build/foo/App.framework/App',
             '--macho-object=build/foo/app.o',
