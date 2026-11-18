@@ -15,27 +15,6 @@ import 'package:flutter_tools/src/shorebird/shorebird_aot_tools.dart';
 import '../../src/common.dart';
 import '../../src/fake_process_manager.dart';
 
-const kDefaultClang = <String>[
-  '-miphoneos-version-min=15.0',
-  '-isysroot',
-  'path/to/sdk',
-  '-dynamiclib',
-  '-Xlinker',
-  '-rpath',
-  '-Xlinker',
-  '@executable_path/Frameworks',
-  '-Xlinker',
-  '-rpath',
-  '-Xlinker',
-  '@loader_path/Frameworks',
-  '-fapplication-extension',
-  '-install_name',
-  '@rpath/App.framework/App',
-  '-o',
-  'build/foo/App.framework/App',
-  'build/foo/snapshot_assembly.o',
-];
-
 // Shorebird link info arguments added for iOS/macOS builds.
 // These correspond to the dumpLinkInfoArgs in AOTSnapshotter.build().
 const kLinkInfoArgs = <String>[
