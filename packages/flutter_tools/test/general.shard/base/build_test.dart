@@ -24,6 +24,7 @@ const kLinkInfoArgs = <String>[
   '--print_field_table_link_info_to=build/App.ft.link',
   '--print_dispatch_table_link_debug_info_to=build/App.dispatch_table.json',
   '--print_dispatch_table_link_info_to=build/App.dt.link',
+  '--print_stack_map_order_to=build/App.sm.link',
 ];
 
 const _kFakeDwarf = 'fake-macho-dsym';

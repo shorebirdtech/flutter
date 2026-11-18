@@ -110,6 +110,7 @@ void main() {
       'App.class_table.json',
       'App.dd.link',
       'App.dd_resolution.tsv',
+      'App.sm.link',
       'app.dill',
       'App.framework.dSYM.zip',
     ]) {
@@ -122,6 +123,7 @@ void main() {
       'App.ct.link',
       'App.dd.link',
       'App.dd_resolution.tsv',
+      'App.sm.link',
     ]);
     expect(shorebirdLinkFileNames(fileSystem, 'missing'), isEmpty);
   });

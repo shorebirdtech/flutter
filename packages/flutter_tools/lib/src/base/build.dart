@@ -162,6 +162,9 @@ class AOTSnapshotter {
       '--print_field_table_link_info_to=${_fileSystem.path.join(outputDir.parent.path, 'App.ft.link')}',
       '--print_dispatch_table_link_debug_info_to=${_fileSystem.path.join(outputDir.parent.path, 'App.dispatch_table.json')}',
       '--print_dispatch_table_link_info_to=${_fileSystem.path.join(outputDir.parent.path, 'App.dt.link')}',
+      // A patch built against this release lays its stack maps out in this
+      // order, so the ones it shares with the release stay byte-identical.
+      '--print_stack_map_order_to=${_fileSystem.path.join(outputDir.parent.path, 'App.sm.link')}',
     ];
 
     final genSnapshotArgs = <String>[
