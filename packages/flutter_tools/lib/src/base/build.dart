@@ -31,9 +31,8 @@ class GenSnapshot {
     required this._artifacts,
     required ProcessManager processManager,
     required Logger logger,
-    required FileSystem fileSystem,
-  }) : _fileSystem = fileSystem,
-       _verbose = logger.isVerbose,
+    required this._fileSystem,
+  }) : _verbose = logger.isVerbose,
        _processUtils = ProcessUtils(logger: logger, processManager: processManager);
 
   final Artifacts _artifacts;
@@ -193,8 +192,8 @@ class AOTSnapshotter {
           shouldStrip = false;
           continue;
         }
-        // Stripping in gen_snapshot drops the DWARF before it reaches the
-        // assembly, leaving dsymutil nothing to build a dSYM from. The shipped
+        // Stripping in gen_snapshot drops the DWARF from the Mach-O it writes,
+        // leaving dsymutil nothing to build a dSYM from. The shipped
         // binary is still stripped, after the dSYM is extracted.
         if (option == '--strip' && targetingApplePlatform && shouldSplitDebugInfo) {
           _logger.printTrace(
@@ -279,9 +278,9 @@ class AOTSnapshotter {
       if (shouldSplitDebugInfo) ...<String>[
         '--dwarf-stack-traces',
         '--resolve-dwarf-paths',
-        // Alongside an assembly snapshot this writes an ELF with no build ID,
-        // which symbol servers skip (dartbug.com/43274). Apple takes the
-        // companion from dsymutil in _buildFramework instead.
+        // On Apple platforms this writes an ELF with no build ID, which symbol
+        // servers skip (dartbug.com/43274). Apple takes the companion from
+        // dsymutil after gen_snapshot instead.
         if (!targetingApplePlatform)
           '--save-debugging-info=${_fileSystem.path.join(splitDebugInfo!, debugFilename)}',
       ],

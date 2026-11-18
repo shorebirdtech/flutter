@@ -20,6 +20,7 @@ void main() {
   // Contains `//`, which an xcconfig would read as the start of a comment.
   const publicKey = 'MIIBIjANBg//kqhkiG9w0+BAQEFAAOCAQ8A=';
   const releaseVersion = '2.1.0+7';
+  const appId = 'internal-app-id';
 
   const buildInfo = BuildInfo(
     BuildMode.release,
@@ -28,6 +29,7 @@ void main() {
     packageConfigPath: '.dart_tool/package_config.json',
     shorebirdPublicKey: publicKey,
     shorebirdReleaseVersion: releaseVersion,
+    shorebirdAppId: appId,
   );
 
   testWithoutContext('encodeShorebirdPublicKey has no slash and round-trips', () {
@@ -45,6 +47,7 @@ void main() {
     final Map<String, String> defines = buildInfo.toBuildSystemEnvironment();
     expect(defines[kShorebirdPublicKey], encodeShorebirdPublicKey(publicKey));
     expect(defines[kShorebirdReleaseVersion], releaseVersion);
+    expect(defines[kShorebirdAppId], appId);
   });
 
   testWithoutContext('toEnvironmentConfig includes the Shorebird values', () {
@@ -60,10 +63,12 @@ void main() {
     );
   });
 
-  testWithoutContext('only the aar Gradle config carries the release version', () {
+  testWithoutContext('only the aar Gradle config carries the release version and app ID', () {
     expect(buildInfo.toGradleConfig(), isNot(contains(startsWith('-Pshorebird-release-version'))));
+    expect(buildInfo.toGradleConfig(), isNot(contains(startsWith('-Pshorebird-app-id'))));
     expect(buildInfo.toShorebirdAarGradleConfig(), <String>[
       '-Pshorebird-release-version=$releaseVersion',
+      '-Pshorebird-app-id=$appId',
     ]);
   });
 
@@ -97,7 +102,9 @@ void main() {
       buildDirFor(<String, String>{kShorebirdPublicKey: encodeShorebirdPublicKey('b')}).path,
       buildDirFor(<String, String>{kShorebirdReleaseVersion: '1.0.0'}).path,
       buildDirFor(<String, String>{kShorebirdReleaseVersion: '1.0.1'}).path,
-    }, hasLength(5));
+      buildDirFor(<String, String>{kShorebirdAppId: 'a'}).path,
+      buildDirFor(<String, String>{kShorebirdAppId: 'b'}).path,
+    }, hasLength(7));
   });
 
   testWithoutContext('shorebirdReleaseVersion returns null when the define is unset or empty', () {
@@ -107,6 +114,12 @@ void main() {
       shorebirdReleaseVersion(<String, String>{kShorebirdReleaseVersion: releaseVersion}),
       releaseVersion,
     );
+  });
+
+  testWithoutContext('shorebirdAppId returns null when the define is unset or empty', () {
+    expect(shorebirdAppId(<String, String>{}), isNull);
+    expect(shorebirdAppId(<String, String>{kShorebirdAppId: ''}), isNull);
+    expect(shorebirdAppId(<String, String>{kShorebirdAppId: appId}), appId);
   });
 
   group('getBuildInfo', () {
@@ -134,6 +147,7 @@ void main() {
         final BuildInfo buildInfo = await getBuildInfo();
         expect(buildInfo.shorebirdPublicKey, publicKey);
         expect(buildInfo.shorebirdReleaseVersion, releaseVersion);
+        expect(buildInfo.shorebirdAppId, appId);
         // No other variable reaches the native build settings or the defines,
         // including SHOREBIRD_DD_MAX_BYTES, which older shorebird CLIs set.
         for (final value in <String>[
@@ -152,6 +166,7 @@ void main() {
           environment: <String, String>{
             'SHOREBIRD_PUBLIC_KEY': publicKey,
             'SHOREBIRD_RELEASE_VERSION': releaseVersion,
+            'SHOREBIRD_APP_ID': appId,
             'SHOREBIRD_DD_MAX_BYTES': '123456',
             'SHOREBIRD_TOKEN': 'token',
           },
@@ -165,6 +180,7 @@ void main() {
         final BuildInfo buildInfo = await getBuildInfo();
         expect(buildInfo.shorebirdPublicKey, isNull);
         expect(buildInfo.shorebirdReleaseVersion, isNull);
+        expect(buildInfo.shorebirdAppId, isNull);
       },
       overrides: <Type, Generator>{
         FileSystem: () => fileSystem,
@@ -173,6 +189,7 @@ void main() {
           environment: <String, String>{
             'SHOREBIRD_PUBLIC_KEY': '',
             'SHOREBIRD_RELEASE_VERSION': '',
+            'SHOREBIRD_APP_ID': '',
           },
         ),
       },
