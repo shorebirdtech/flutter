@@ -17,6 +17,11 @@ _shorebird_report_launch_paused
 _shorebird_report_launch_resumed
 _shorebird_report_launch_failure
 _shorebird_report_launch_success
+_shorebird_report_launch_start_for_patch
+_shorebird_report_launch_paused_for_patch
+_shorebird_report_launch_resumed_for_patch
+_shorebird_report_launch_failure_for_patch
+_shorebird_report_launch_success_for_patch
 _shorebird_protected_data_available
 #
 # Rust mangled symbols, v0 mangling (_R...) and legacy mangling
