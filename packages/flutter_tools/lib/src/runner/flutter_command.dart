@@ -1150,9 +1150,9 @@ abstract class FlutterCommand extends Command<void> {
     // Shorebird-specific: the shorebird CLI sets these environment variables
     // on `flutter build`. They are the only ones read here, and BuildInfo
     // passes them to `flutter assemble` as defines.
-    final String? shorebirdPublicKey = globals.platform.environment['SHOREBIRD_PUBLIC_KEY'];
-    final String? shorebirdReleaseVersion =
-        globals.platform.environment['SHOREBIRD_RELEASE_VERSION'];
+    final String? shorebirdPublicKey = _platform.environment['SHOREBIRD_PUBLIC_KEY'];
+    final String? shorebirdReleaseVersion = _platform.environment['SHOREBIRD_RELEASE_VERSION'];
+    final String? shorebirdAppId = _platform.environment['SHOREBIRD_APP_ID'];
 
     return BuildInfo(
       buildMode,
@@ -1174,6 +1174,7 @@ abstract class FlutterCommand extends Command<void> {
       shorebirdTraceFilePath: shorebirdTraceFilePath,
       shorebirdPublicKey: shorebirdPublicKey == '' ? null : shorebirdPublicKey,
       shorebirdReleaseVersion: shorebirdReleaseVersion == '' ? null : shorebirdReleaseVersion,
+      shorebirdAppId: shorebirdAppId == '' ? null : shorebirdAppId,
       packageConfigPath: packagesPath ?? packageConfigFile.path,
       codeSizeDirectory: codeSizeDirectory,
       androidGradleDaemon: androidGradleDaemon,

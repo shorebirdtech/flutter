@@ -19,9 +19,8 @@ const _kCacheArtifactName = 'shorebird_aot_tools';
 /// The engine CI already publishes it to `shorebird/<engine>/aot-tools.dill`,
 /// where the shorebird CLI downloads it from.
 class ShorebirdAotTools extends CachedArtifact {
-  ShorebirdAotTools(Cache cache, {required Platform platform})
-    : _platform = platform,
-      super(_kCacheArtifactName, cache, DevelopmentArtifact.iOS);
+  ShorebirdAotTools(Cache cache, {required this._platform})
+    : super(_kCacheArtifactName, cache, DevelopmentArtifact.iOS);
 
   final Platform _platform;
 

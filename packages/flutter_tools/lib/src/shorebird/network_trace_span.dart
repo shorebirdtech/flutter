@@ -22,10 +22,8 @@ const int networkTid = 5;
 /// otherwise, so net.dart can drop one of these in every return path
 /// without branching on tracing state.
 class NetworkTraceSpan {
-  NetworkTraceSpan.start({required Uri url, required bool onlyHeaders})
-    : _url = url,
-      _onlyHeaders = onlyHeaders,
-      _start = DateTime.now();
+  NetworkTraceSpan.start({required this._url, required this._onlyHeaders})
+    : _start = DateTime.now();
 
   final Uri _url;
   final bool _onlyHeaders;
@@ -50,8 +48,8 @@ class NetworkTraceSpan {
       args: <String, Object?>{
         'method': _onlyHeaders ? 'HEAD' : 'GET',
         'host': _url.host,
-        if (statusCode != null) 'status': statusCode,
-        if (errorKind != null) 'error': errorKind,
+        'status': ?statusCode,
+        'error': ?errorKind,
       },
     );
   }

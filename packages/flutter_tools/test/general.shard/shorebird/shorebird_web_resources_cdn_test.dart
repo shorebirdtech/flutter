@@ -37,10 +37,7 @@ void main() {
       final buildWeb = BuildWebCommand(
         buildSystem: TestBuildSystem.all(BuildResult(success: true)),
         featureFlags: TestFeatureFlags(),
-        toolContext: FakeToolContext(
-          fs: fileSystem,
-          logger: BufferLogger.test(),
-        ),
+        toolContext: FakeToolContext(fs: fileSystem, logger: BufferLogger.test()),
         verboseHelp: false,
       );
       expect(buildWeb.argParser.options[FlutterOptions.kWebResourcesCdnFlag]!.defaultsTo, isFalse);

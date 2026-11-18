@@ -598,9 +598,8 @@ STDERR STUFF
       );
       createMinimalMockProjectFiles();
 
-      await createTestCommandRunner(
-        command,
-      ).run(const <String>['build', 'macos', '--no-pub', '--shorebird-trace=build/trace.json']);
+      await createTestCommandRunner(command)
+          .run(const <String>['build', 'macos', '--no-pub', '--shorebird-trace=build/trace.json']);
 
       final File traceFile = fileSystem.file('build/trace.json');
       expect(traceFile, exists);
@@ -1737,9 +1736,8 @@ STDERR STUFF
         flutterVersion: FakeFlutterVersion(),
       );
 
-      await createTestCommandRunner(
-        command,
-      ).run(<String>['build', 'macos', '--release', '--no-pub']);
+      await createTestCommandRunner(command)
+          .run(<String>['build', 'macos', '--release', '--no-pub']);
 
       expect(
         testLogger.warningText,

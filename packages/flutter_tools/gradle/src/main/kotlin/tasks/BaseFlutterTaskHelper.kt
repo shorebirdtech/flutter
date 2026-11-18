@@ -143,6 +143,9 @@ object BaseFlutterTaskHelper {
             baseFlutterTask.shorebirdReleaseVersion?.let {
                 args("-dShorebirdReleaseVersion=$it")
             }
+            baseFlutterTask.shorebirdAppId?.let {
+                args("-dShorebirdAppId=$it")
+            }
             baseFlutterTask.flavor?.let {
                 args("-dFlavor=$it")
             }

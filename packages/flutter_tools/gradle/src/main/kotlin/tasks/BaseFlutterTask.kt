@@ -128,6 +128,12 @@ open class BaseFlutterTask : DefaultTask() {
     @Input
     var shorebirdReleaseVersion: String? = null
 
+    // Shorebird-specific: the app ID of an add-to-app module's Shorebird
+    // flavor, passed to flutter assemble as a define.
+    @Optional
+    @Input
+    var shorebirdAppId: String? = null
+
     @Optional
     @Input
     var deferredComponents: Boolean? = null

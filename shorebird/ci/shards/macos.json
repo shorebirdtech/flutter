@@ -2,75 +2,119 @@
   "android": {
     "steps": [
       {
-        "type": "gn_ninja",
-        "gn_args": ["--android", "--android-cpu=arm64", "--runtime-mode=release", "--gn-args=host_cpu=\"x64\""],
-        "ninja_targets": ["flutter/shell/platform/android:gen_snapshot"],
-        "out_dir": "android_release_arm64"
+        "type": "builder",
+        "builds": ["mac_android_aot_engine/ci/android_release_arm64"],
+        "gn_args": {
+          "add": ["--gn-args=host_cpu=\"x64\""],
+          "why": "Upstream's Mac Android AOT bots are x64 (drone cpu=x86); ours are arm64, and the published darwin-x64 gen_snapshot must be x64."
+        },
+        "ninja_targets": {
+          "remove": ["flutter/lib/snapshot"],
+          "why": "Not published from this shard (its artifacts and composes say what is), so not worth the compile minutes."
+        }
       },
       {
-        "type": "gn_ninja",
-        "gn_args": ["--android", "--runtime-mode=release", "--gn-args=host_cpu=\"x64\""],
-        "ninja_targets": ["flutter/shell/platform/android:gen_snapshot"],
-        "out_dir": "android_release"
+        "type": "builder",
+        "builds": ["mac_android_aot_engine/ci/android_release"],
+        "gn_args": {
+          "add": ["--gn-args=host_cpu=\"x64\""],
+          "why": "Upstream's Mac Android AOT bots are x64 (drone cpu=x86); ours are arm64, and the published darwin-x64 gen_snapshot must be x64."
+        },
+        "ninja_targets": {
+          "remove": ["flutter/lib/snapshot"],
+          "why": "Not published from this shard (its artifacts and composes say what is), so not worth the compile minutes."
+        }
       },
       {
-        "type": "gn_ninja",
-        "gn_args": ["--android", "--android-cpu=x64", "--runtime-mode=release", "--gn-args=host_cpu=\"x64\""],
-        "ninja_targets": ["flutter/shell/platform/android:gen_snapshot"],
-        "out_dir": "android_release_x64"
+        "type": "builder",
+        "builds": ["mac_android_aot_engine/ci/android_release_x64"],
+        "gn_args": {
+          "add": ["--gn-args=host_cpu=\"x64\""],
+          "why": "Upstream's Mac Android AOT bots are x64 (drone cpu=x86); ours are arm64, and the published darwin-x64 gen_snapshot must be x64."
+        },
+        "ninja_targets": {
+          "remove": ["flutter/lib/snapshot"],
+          "why": "Not published from this shard (its artifacts and composes say what is), so not worth the compile minutes."
+        }
       },
       {
-        "type": "gn_ninja",
-        "gn_args": ["--android", "--android-cpu=arm64", "--runtime-mode=profile", "--gn-args=host_cpu=\"x64\""],
-        "ninja_targets": ["flutter/shell/platform/android:gen_snapshot"],
-        "out_dir": "android_profile_arm64"
+        "type": "builder",
+        "builds": ["mac_android_aot_engine/ci/android_profile_arm64"],
+        "gn_args": {
+          "add": ["--gn-args=host_cpu=\"x64\""],
+          "why": "Upstream's Mac Android AOT bots are x64 (drone cpu=x86); ours are arm64, and the published darwin-x64 gen_snapshot must be x64."
+        },
+        "ninja_targets": {
+          "remove": ["flutter/lib/snapshot"],
+          "why": "Not published from this shard (its artifacts and composes say what is), so not worth the compile minutes."
+        }
       },
       {
-        "type": "gn_ninja",
-        "gn_args": ["--android", "--runtime-mode=profile", "--gn-args=host_cpu=\"x64\""],
-        "ninja_targets": ["flutter/shell/platform/android:gen_snapshot"],
-        "out_dir": "android_profile"
+        "type": "builder",
+        "builds": ["mac_android_aot_engine/ci/android_profile"],
+        "gn_args": {
+          "add": ["--gn-args=host_cpu=\"x64\""],
+          "why": "Upstream's Mac Android AOT bots are x64 (drone cpu=x86); ours are arm64, and the published darwin-x64 gen_snapshot must be x64."
+        },
+        "ninja_targets": {
+          "remove": ["flutter/lib/snapshot"],
+          "why": "Not published from this shard (its artifacts and composes say what is), so not worth the compile minutes."
+        }
       },
       {
-        "type": "gn_ninja",
-        "gn_args": ["--android", "--android-cpu=x64", "--runtime-mode=profile", "--gn-args=host_cpu=\"x64\""],
-        "ninja_targets": ["flutter/shell/platform/android:gen_snapshot"],
-        "out_dir": "android_profile_x64"
+        "type": "builder",
+        "builds": ["mac_android_aot_engine/ci/android_profile_x64"],
+        "gn_args": {
+          "add": ["--gn-args=host_cpu=\"x64\""],
+          "why": "Upstream's Mac Android AOT bots are x64 (drone cpu=x86); ours are arm64, and the published darwin-x64 gen_snapshot must be x64."
+        },
+        "ninja_targets": {
+          "remove": ["flutter/lib/snapshot"],
+          "why": "Not published from this shard (its artifacts and composes say what is), so not worth the compile minutes."
+        }
       }
     ],
     "artifacts": [
-      {"src": "android_release_arm64/zip_archives/android-arm64-release/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/darwin-x64.zip"},
-      {"src": "android_release/zip_archives/android-arm-release/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/darwin-x64.zip"},
-      {"src": "android_release_x64/zip_archives/android-x64-release/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/darwin-x64.zip"},
-      {"src": "android_profile_arm64/zip_archives/android-arm64-profile/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-profile/darwin-x64.zip"},
-      {"src": "android_profile/zip_archives/android-arm-profile/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-profile/darwin-x64.zip"},
-      {"src": "android_profile_x64/zip_archives/android-x64-profile/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-profile/darwin-x64.zip"}
+      {"src": "ci/android_release_arm64/zip_archives/android-arm64-release/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-release/darwin-x64.zip"},
+      {"src": "ci/android_release/zip_archives/android-arm-release/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-release/darwin-x64.zip"},
+      {"src": "ci/android_release_x64/zip_archives/android-x64-release/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-release/darwin-x64.zip"},
+      {"src": "ci/android_profile_arm64/zip_archives/android-arm64-profile/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm64-profile/darwin-x64.zip"},
+      {"src": "ci/android_profile/zip_archives/android-arm-profile/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-arm-profile/darwin-x64.zip"},
+      {"src": "ci/android_profile_x64/zip_archives/android-x64-profile/darwin-x64.zip", "dst": "flutter_infra_release/flutter/$engine/android-x64-profile/darwin-x64.zip"}
     ]
   },
   "ios": {
     "steps": [
       {
-        "type": "gn_ninja",
-        "gn_args": ["--ios", "--runtime-mode=release", "--gn-arg=shorebird_include_mixed_mode=true"],
-        "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
-        "out_dir": "ios_release"
+        "type": "builder",
+        "builds": ["mac_ios_engine/ci/ios_release"],
+        "gn_args": {
+          "add": ["--gn-arg=shorebird_include_mixed_mode=true"],
+          "why": "Shorebird: the iOS release engine runs patches in mixed mode (interpreted and AOT code)."
+        }
       },
       {"type": "verify_exported"},
       {
-        "type": "gn_ninja",
-        "gn_args": ["--ios", "--runtime-mode=debug", "--simulator"],
-        "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
-        "out_dir": "ios_debug_sim"
+        "type": "builder",
+        "builds": ["mac_ios_engine/ci/ios_debug_sim"],
+        "ninja_targets": {
+          "add": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
+          "remove": ["default"],
+          "why": "Upstream builds the default target (everything); we build only what this shard publishes or a compose reads. What this shard's artifacts, composes or later steps need that upstream's build doesn't list."
+        }
       },
       {
         "type": "clang_tidy",
-        "out_dir": "ios_debug_sim"
+        "out_dir": "ci/ios_debug_sim"
       },
       {
-        "type": "gn_ninja",
-        "gn_args": ["--ios", "--runtime-mode=debug", "--simulator", "--simulator-cpu=arm64"],
-        "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
-        "out_dir": "ios_debug_sim_arm64"
+        "type": "builder",
+        "builds": ["mac_ios_engine/ci/ios_debug_sim_arm64"],
+        "ninja_targets": {
+          "add": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
+          "remove": ["default"],
+          "why": "Upstream builds the default target (everything); we build only what this shard publishes or a compose reads. What this shard's artifacts, composes or later steps need that upstream's build doesn't list."
+        }
       }
     ],
     "compose_input": "ios-framework"
@@ -78,20 +122,16 @@
   "ios-debug": {
     "steps": [
       {
-        "type": "gn_ninja",
-        "gn_args": ["--ios", "--runtime-mode=debug"],
-        "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
-        "out_dir": "ios_debug"
+        "type": "builder",
+        "builds": ["mac_ios_engine/ci/ios_debug"]
       }
     ]
   },
   "ios-profile": {
     "steps": [
       {
-        "type": "gn_ninja",
-        "gn_args": ["--ios", "--runtime-mode=profile"],
-        "ninja_targets": ["flutter/shell/platform/darwin/ios:flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins"],
-        "out_dir": "ios_profile"
+        "type": "builder",
+        "builds": ["mac_ios_engine/ci/ios_profile"]
       }
     ]
   },
@@ -104,18 +144,20 @@
         "out_dir": "host_release_arm64"
       },
       {
-        "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=release", "--mac", "--mac-cpu=arm64"],
-        "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts", "flutter/tools/font_subset"],
-        "out_dir": "mac_release_arm64"
+        "type": "builder",
+        "builds": ["mac_host_engine/ci/mac_release_arm64", "mac_host_engine/ci/mac_release_framework_arm64"],
+        "ninja_targets": {
+          "add": ["flutter/lib/snapshot:generate_snapshot_bins"],
+          "why": "What this shard's artifacts, composes or later steps need that upstream's build doesn't list."
+        }
       }
     ],
     "compose_input": "macos-framework",
     "artifacts": [
       {"src": "host_release_arm64/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-darwin-arm64.zip", "zip": true, "content_hash": true},
-      {"src": "mac_release_arm64/zip_archives/darwin-arm64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64-release/artifacts.zip"},
-      {"src": "mac_release_arm64/zip_archives/darwin-arm64/font-subset.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-arm64/font-subset.zip"},
-      {"src": "mac_release_arm64/analyze_snapshot_arm64", "dst": "shorebird/$engine/analyze-snapshot-macos-arm64"}
+      {"src": "ci/mac_release_arm64/zip_archives/darwin-arm64-release/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64-release/artifacts.zip"},
+      {"src": "ci/mac_release_arm64/zip_archives/darwin-arm64/font-subset.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-arm64/font-subset.zip"},
+      {"src": "ci/mac_release_arm64/analyze_snapshot_arm64", "dst": "shorebird/$engine/analyze-snapshot-macos-arm64"}
     ]
   },
   "mac-x64": {
@@ -127,78 +169,90 @@
         "out_dir": "host_release"
       },
       {
-        "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=release", "--mac", "--mac-cpu=x64"],
-        "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts", "flutter/tools/font_subset"],
-        "out_dir": "mac_release"
+        "type": "builder",
+        "builds": ["mac_host_engine/ci/host_release", "mac_host_engine/ci/host_release_framework"],
+        "ninja_targets": {
+          "add": ["flutter/lib/snapshot:generate_snapshot_bins"],
+          "why": "What this shard's artifacts, composes or later steps need that upstream's build doesn't list."
+        }
       },
       {
         "type": "shell",
-        "command": "flutter/bin/et stamp && cp out/engine_stamp.json out/mac_release/engine_stamp.json"
+        "command": "flutter/bin/et stamp && cp out/engine_stamp.json out/ci/host_release/engine_stamp.json"
       }
     ],
     "compose_input": "macos-framework",
     "artifacts": [
       {"src": "host_release/dart-sdk", "dst": "flutter_infra_release/flutter/$engine/dart-sdk-darwin-x64.zip", "zip": true, "content_hash": true},
-      {"src": "mac_release/zip_archives/darwin-x64/font-subset.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64/font-subset.zip"},
-      {"src": "mac_release/engine_stamp.json", "dst": "flutter_infra_release/flutter/$engine/engine_stamp.json"},
-      {"src": "mac_release/analyze_snapshot_x64", "dst": "shorebird/$engine/analyze-snapshot-macos-x64"}
+      {"src": "ci/host_release/zip_archives/darwin-x64/font-subset.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64/font-subset.zip"},
+      {"src": "ci/host_release/engine_stamp.json", "dst": "flutter_infra_release/flutter/$engine/engine_stamp.json"},
+      {"src": "ci/host_release/analyze_snapshot_x64", "dst": "shorebird/$engine/analyze-snapshot-macos-x64"}
     ]
   },
   "mac-arm64-debug": {
     "steps": [
       {
-        "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=debug", "--mac", "--mac-cpu=arm64"],
-        "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts"],
-        "out_dir": "mac_debug_arm64"
+        "type": "builder",
+        "builds": ["mac_host_engine/ci/mac_debug_arm64", "mac_host_engine/ci/mac_debug_framework_arm64"],
+        "ninja_targets": {
+          "add": ["flutter/lib/snapshot:generate_snapshot_bins"],
+          "remove": ["flutter/build/archives:dart_sdk_archive", "flutter/impeller/toolkit/interop:sdk", "flutter/build/archives:flutter_embedder_framework"],
+          "why": "Not published from this shard (its artifacts and composes say what is), so not worth the compile minutes. What this shard's artifacts, composes or later steps need that upstream's build doesn't list."
+        }
       },
       {
         "type": "clang_tidy",
-        "out_dir": "mac_debug_arm64"
+        "out_dir": "ci/mac_debug_arm64"
       }
     ],
     "artifacts": [
-      {"src": "mac_debug_arm64/zip_archives/darwin-arm64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-arm64/artifacts.zip"}
+      {"src": "ci/mac_debug_arm64/zip_archives/darwin-arm64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-arm64/artifacts.zip"}
     ]
   },
   "mac-arm64-profile": {
     "steps": [
       {
-        "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=profile", "--mac", "--mac-cpu=arm64"],
-        "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts"],
-        "out_dir": "mac_profile_arm64"
+        "type": "builder",
+        "builds": ["mac_host_engine/ci/mac_profile_arm64", "mac_host_engine/ci/mac_profile_framework_arm64"],
+        "ninja_targets": {
+          "add": ["flutter/lib/snapshot:generate_snapshot_bins"],
+          "why": "What this shard's artifacts, composes or later steps need that upstream's build doesn't list."
+        }
       }
     ],
     "artifacts": [
-      {"src": "mac_profile_arm64/zip_archives/darwin-arm64-profile/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-arm64-profile/artifacts.zip"}
+      {"src": "ci/mac_profile_arm64/zip_archives/darwin-arm64-profile/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-arm64-profile/artifacts.zip"}
     ]
   },
   "mac-x64-debug": {
     "steps": [
       {
-        "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=debug", "--mac", "--mac-cpu=x64"],
-        "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts"],
-        "out_dir": "mac_debug"
+        "type": "builder",
+        "builds": ["mac_host_engine/ci/host_debug", "mac_host_engine/ci/host_debug_framework"],
+        "ninja_targets": {
+          "add": ["flutter/lib/snapshot:generate_snapshot_bins"],
+          "remove": ["flutter/build/archives:dart_sdk_archive", "flutter/impeller/toolkit/interop:sdk", "flutter/build/archives:flutter_embedder_framework"],
+          "why": "Not published from this shard (its artifacts and composes say what is), so not worth the compile minutes. What this shard's artifacts, composes or later steps need that upstream's build doesn't list."
+        }
       }
     ],
     "artifacts": [
-      {"src": "mac_debug/zip_archives/darwin-x64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64/artifacts.zip"}
+      {"src": "ci/host_debug/zip_archives/darwin-x64/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64/artifacts.zip"}
     ]
   },
   "mac-x64-profile": {
     "steps": [
       {
-        "type": "gn_ninja",
-        "gn_args": ["--runtime-mode=profile", "--mac", "--mac-cpu=x64"],
-        "ninja_targets": ["flutter/shell/platform/darwin/macos:zip_macos_flutter_framework", "flutter/lib/snapshot:generate_snapshot_bins", "flutter/build/archives:artifacts"],
-        "out_dir": "mac_profile"
+        "type": "builder",
+        "builds": ["mac_host_engine/ci/host_profile", "mac_host_engine/ci/host_profile_framework"],
+        "ninja_targets": {
+          "add": ["flutter/lib/snapshot:generate_snapshot_bins"],
+          "why": "What this shard's artifacts, composes or later steps need that upstream's build doesn't list."
+        }
       }
     ],
     "artifacts": [
-      {"src": "mac_profile/zip_archives/darwin-x64-profile/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64-profile/artifacts.zip"}
+      {"src": "ci/host_profile/zip_archives/darwin-x64-profile/artifacts.zip", "dst": "flutter_infra_release/flutter/$engine/darwin-x64-profile/artifacts.zip"}
     ]
   }
 }
