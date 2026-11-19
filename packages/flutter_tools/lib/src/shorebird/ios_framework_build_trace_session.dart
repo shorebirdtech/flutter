@@ -29,12 +29,10 @@ import 'network_trace_span.dart';
 /// covers, and to package xcframeworks, which it does not.
 class IosFrameworkBuildTraceSession {
   IosFrameworkBuildTraceSession._({
-    required BuildTracer tracer,
+    required this._tracer,
     required FileSystem fileSystem,
-    required String tracePath,
-  }) : _tracer = tracer,
-       _fs = fileSystem,
-       _tracePath = tracePath,
+    required this._tracePath,
+  }) : _fs = fileSystem,
        _flutterPid = currentProcessId(),
        _buildStart = DateTime.now() {
     BuildTracer.start(_tracer);
@@ -110,12 +108,7 @@ class IosFrameworkBuildTraceSession {
   /// (one App.framework slice) as `assemble` events, exactly as a
   /// `flutter assemble` child would have written them.
   void addAssembleResult(BuildResult result) {
-    addAssembleTraceEvents(
-      _tracer,
-      result.performance.values,
-      pid: _flutterPid,
-      tid: _assembleTid,
-    );
+    addAssembleTraceEvents(_tracer, result.performance.values, pid: _flutterPid, tid: _assembleTid);
   }
 
   /// Clears [BuildTracer.current] without writing the trace. Use on

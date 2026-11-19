@@ -59,10 +59,10 @@ abstract final class WebOptions {
 
   static const webResourcesCdn = FlagOptionDescriptor(
     name: 'web-resources-cdn',
-    // Shorebird: off by default (upstream: defaultsTo: true). Flutter's CDN
-    // (gstatic.com/flutter-canvaskit) has no CanvasKit for Shorebird's
-    // engine revisions, so load the copy built into build/web/canvaskit/.
-    defaultsTo: false,
+    // Shorebird: off by default (upstream: defaultsTo: true; false is the
+    // default, so it is left out). Flutter's CDN (gstatic.com/flutter-canvaskit)
+    // has no CanvasKit for Shorebird's engine revisions, so load the copy built
+    // into build/web/canvaskit/.
     help:
         'Use WebAssembly, CanvasKit, and other web resources from a content delivery network (CDN).\n'
         'Set to "--no-web-resources-cdn" to embed all web resources locally in the built app.',

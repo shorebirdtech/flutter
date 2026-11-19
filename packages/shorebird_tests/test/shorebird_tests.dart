@@ -18,14 +18,14 @@ import 'package:yaml/yaml.dart';
 /// Which since we are running the tests from this inner package , we need to go up two directories
 /// in order to find the flutter binary in the bin folder.
 File get _flutterBinaryFile => File(
-      path.join(
-        Directory.current.path,
-        '..',
-        '..',
-        'bin',
-        'flutter${Platform.isWindows ? '.bat' : ''}',
-      ),
-    );
+  path.join(
+    Directory.current.path,
+    '..',
+    '..',
+    'bin',
+    'flutter${Platform.isWindows ? '.bat' : ''}',
+  ),
+);
 
 /// Whether to print line-by-line subprocess output.
 ///
@@ -83,8 +83,10 @@ Future<ProcessResult> _runFlutterCommand(
 
   final int exitCode = await process.exitCode;
   stopwatch.stop();
-  print('[$command] completed in ${stopwatch.elapsed} '
-      '(exit code $exitCode)');
+  print(
+    '[$command] completed in ${stopwatch.elapsed} '
+    '(exit code $exitCode)',
+  );
   if (exitCode != 0 && !_verbose) {
     print('[$command] stdout:\n$stdoutBuffer');
     print('[$command] stderr:\n$stderrBuffer');
@@ -99,10 +101,11 @@ Future<ProcessResult> _runFlutterCommand(
 }
 
 Future<void> _createFlutterProject(Directory projectDirectory) async {
-  final result = await _runFlutterCommand(
-    ['create', '--empty', '.'],
-    workingDirectory: projectDirectory,
-  );
+  final result = await _runFlutterCommand([
+    'create',
+    '--empty',
+    '.',
+  ], workingDirectory: projectDirectory);
   if (result.exitCode != 0) {
     throw Exception('Failed to create Flutter project: ${result.stderr}');
   }
@@ -139,9 +142,7 @@ ${templateDir.pubspecFile.readAsStringSync()}
     - shorebird.yaml
 ''');
 
-  File(
-    path.join(templateDir.path, 'shorebird.yaml'),
-  ).writeAsStringSync('''
+  File(path.join(templateDir.path, 'shorebird.yaml')).writeAsStringSync('''
 app_id: "123"
 ''');
 
@@ -156,10 +157,7 @@ app_id: "123"
   if (hasGradleCache) {
     print('[warmup] Gradle cache exists, skipping warm-up build');
   } else {
-    await _runFlutterCommand(
-      ['build', 'apk'],
-      workingDirectory: templateDir,
-    );
+    await _runFlutterCommand(['build', 'apk'], workingDirectory: templateDir);
   }
 
   _templateProject = templateDir;
@@ -194,8 +192,10 @@ Future<Directory> _copyTemplateProject() async {
 }
 
 @isTest
-Future<void> testWithShorebirdProject(String name,
-    FutureOr<void> Function(Directory projectDirectory) testFn) async {
+Future<void> testWithShorebirdProject(
+  String name,
+  FutureOr<void> Function(Directory projectDirectory) testFn,
+) async {
   test(
     name,
     () async {
@@ -216,29 +216,27 @@ Future<void> testWithShorebirdProject(String name,
 }
 
 extension ShorebirdProjectDirectoryOnDirectory on Directory {
-  File get pubspecFile => File(
-        path.join(this.path, 'pubspec.yaml'),
-      );
+  File get pubspecFile => File(path.join(this.path, 'pubspec.yaml'));
 
-  File get shorebirdFile => File(
-        path.join(this.path, 'shorebird.yaml'),
-      );
+  File get shorebirdFile => File(path.join(this.path, 'shorebird.yaml'));
 
   YamlMap get shorebirdYaml =>
       loadYaml(shorebirdFile.readAsStringSync()) as YamlMap;
 
-  File get appGradleFile => File(
-        path.join(this.path, 'android', 'app', 'build.gradle'),
-      );
+  File get appGradleFile =>
+      File(path.join(this.path, 'android', 'app', 'build.gradle'));
 
   Future<void> addPubDependency(String name, {bool dev = false}) async {
-    final result = await _runFlutterCommand(
-      ['pub', 'add', if (dev) '--dev', name],
-      workingDirectory: this,
-    );
+    final result = await _runFlutterCommand([
+      'pub',
+      'add',
+      if (dev) '--dev',
+      name,
+    ], workingDirectory: this);
     if (result.exitCode != 0) {
       throw Exception(
-          'Failed to run `flutter pub add $name`: ${result.stderr}');
+        'Failed to run `flutter pub add $name`: ${result.stderr}',
+      );
     }
   }
 
@@ -258,12 +256,7 @@ extension ShorebirdProjectDirectoryOnDirectory on Directory {
       'dev:flutter_flavorizr:2.4.2',
     );
 
-    await File(
-      path.join(
-        this.path,
-        'flavorizr.yaml',
-      ),
-    ).writeAsString('''
+    await File(path.join(this.path, 'flavorizr.yaml')).writeAsString('''
 flavors:
   playStore:
     app:
@@ -299,7 +292,8 @@ flavors:
     );
     if (result.exitCode != 0) {
       throw Exception(
-          'Failed to run `flutter pub run flutter_flavorizr`: ${result.stderr}');
+        'Failed to run `flutter pub run flutter_flavorizr`: ${result.stderr}',
+      );
     }
 
     // flutter_flavorizr 2.4.2 emits per-flavor `resValue` entries in
@@ -310,8 +304,9 @@ flavors:
     // 2.5.0's dart_xcodeproj rewrite breaks `flutter build ipa --no-codesign
     // --flavor`. So we stay on the last Ruby-xcodeproj release and toggle the
     // build feature ourselves.)
-    final gradleProperties =
-        File(path.join(this.path, 'android', 'gradle.properties'));
+    final gradleProperties = File(
+      path.join(this.path, 'android', 'gradle.properties'),
+    );
     await gradleProperties.writeAsString(
       '\nandroid.defaults.buildfeatures.resvalues=true\n',
       mode: FileMode.append,
@@ -327,12 +322,10 @@ flavors:
 ''';
 
     final currentShorebirdContent = shorebirdFile.readAsStringSync();
-    shorebirdFile.writeAsStringSync(
-      '''
+    shorebirdFile.writeAsStringSync('''
 $currentShorebirdContent
 $flavors
-''',
-    );
+''');
   }
 
   Future<void> runFlutterBuildApk({
@@ -340,11 +333,7 @@ $flavors
     Map<String, String>? environment,
   }) async {
     final result = await _runFlutterCommand(
-      [
-        'build',
-        'apk',
-        if (flavor != null) '--flavor=$flavor',
-      ],
+      ['build', 'apk', if (flavor != null) '--flavor=$flavor'],
       workingDirectory: this,
       environment: environment,
     );
@@ -379,70 +368,69 @@ $flavors
 
   /// The `App.framework` binary inside the built `Runner.xcarchive`.
   File iosAppFrameworkBinary() => File(
-        path.join(
-          iosArchiveFile().path,
-          'Products',
-          'Applications',
-          'Runner.app',
-          'Frameworks',
-          'App.framework',
-          'App',
-        ),
-      );
+    path.join(
+      iosArchiveFile().path,
+      'Products',
+      'Applications',
+      'Runner.app',
+      'Frameworks',
+      'App.framework',
+      'App',
+    ),
+  );
 
   File apkFile({String? flavor}) => File(
-        path.join(
-          this.path,
-          'build',
-          'app',
-          'outputs',
-          'flutter-apk',
-          'app-${flavor != null ? '$flavor-' : ''}release.apk',
-        ),
-      );
+    path.join(
+      this.path,
+      'build',
+      'app',
+      'outputs',
+      'flutter-apk',
+      'app-${flavor != null ? '$flavor-' : ''}release.apk',
+    ),
+  );
 
   Directory iosArchiveFile() => Directory(
-        path.join(
-          this.path,
-          'build',
-          'ios',
-          'archive',
-          'Runner.xcarchive',
-        ),
-      );
+    path.join(this.path, 'build', 'ios', 'archive', 'Runner.xcarchive'),
+  );
 
   Future<YamlMap> getGeneratedAndroidShorebirdYaml({String? flavor}) async {
-    final decodedBytes =
-        ZipDecoder().decodeBytes(apkFile(flavor: flavor).readAsBytesSync());
+    final decodedBytes = ZipDecoder().decodeBytes(
+      apkFile(flavor: flavor).readAsBytesSync(),
+    );
 
     await extractArchiveToDisk(
-        decodedBytes, path.join(this.path, 'apk-extracted'));
+      decodedBytes,
+      path.join(this.path, 'apk-extracted'),
+    );
 
-    final yamlString = File(
-      path.join(
-        this.path,
-        'apk-extracted',
-        'assets',
-        'flutter_assets',
-        'shorebird.yaml',
-      ),
-    ).readAsStringSync();
+    final yamlString =
+        File(
+          path.join(
+            this.path,
+            'apk-extracted',
+            'assets',
+            'flutter_assets',
+            'shorebird.yaml',
+          ),
+        ).readAsStringSync();
     return loadYaml(yamlString) as YamlMap;
   }
 
   Future<YamlMap> getGeneratedIosShorebirdYaml() async {
-    final yamlString = File(
-      path.join(
-        iosArchiveFile().path,
-        'Products',
-        'Applications',
-        'Runner.app',
-        'Frameworks',
-        'App.framework',
-        'flutter_assets',
-        'shorebird.yaml',
-      ),
-    ).readAsStringSync();
+    final yamlString =
+        File(
+          path.join(
+            iosArchiveFile().path,
+            'Products',
+            'Applications',
+            'Runner.app',
+            'Frameworks',
+            'App.framework',
+            'flutter_assets',
+            'shorebird.yaml',
+          ),
+        ).readAsStringSync();
     return loadYaml(yamlString) as YamlMap;
   }
 }

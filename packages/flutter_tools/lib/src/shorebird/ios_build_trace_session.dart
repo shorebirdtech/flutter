@@ -31,14 +31,11 @@ import 'network_trace_span.dart';
 /// every subsequent merge of that method harder.
 class IosBuildTraceSession {
   IosBuildTraceSession._({
-    required BuildTracer tracer,
+    required this._tracer,
     required FileSystem fileSystem,
-    required String tracePath,
-    required String buildDirectoryPath,
-  }) : _tracer = tracer,
-       _fs = fileSystem,
-       _tracePath = tracePath,
-       _buildDirectoryPath = buildDirectoryPath,
+    required this._tracePath,
+    required this._buildDirectoryPath,
+  }) : _fs = fileSystem,
        _flutterPid = currentProcessId(),
        _buildStart = DateTime.now() {
     BuildTracer.start(_tracer);
