@@ -359,6 +359,8 @@ class BaseFlutterTaskHelperTest {
         verify { mockExecSpec.args("-dMinSdkVersion=${BaseFlutterTaskPropertiesTest.MIN_SDK_VERSION_TEST}") }
         verify { mockExecSpec.args(ruleNamesList) }
         verify(exactly = 0) { mockExecSpec.args(match<String> { it.startsWith("--shorebird-trace-file") }) }
+        verify(exactly = 0) { mockExecSpec.args(match<String> { it.startsWith("-dShorebirdReleaseVersion") }) }
+        verify(exactly = 0) { mockExecSpec.args(match<String> { it.startsWith("-dShorebirdAppId") }) }
     }
 
     @Test
