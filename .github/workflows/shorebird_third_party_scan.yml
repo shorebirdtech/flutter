@@ -3,11 +3,10 @@ name: shorebird_third_party_scan
 # Scans the engine's third-party deps in DEPS against osv.dev and uploads the
 # results to Security > Code scanning.
 #
-# Upstream's copy (engine/src/flutter/.github/workflows/third_party_scan.yml)
-# no longer runs: GitHub only reads workflows from the root .github/workflows,
-# it is gated on the archived flutter/engine repo, and it reads DEPS from
-# engine/src/flutter, where it no longer lives. This runs the same
-# ci/scan_deps.py against the root DEPS.
+# Upstream's copy (engine/src/flutter/.github/workflows/third_party_scan.yml,
+# deleted here) never ran: GitHub only reads workflows from the root
+# .github/workflows, and it read DEPS from engine/src/flutter, where DEPS no
+# longer lives. This runs the same ci/scan_deps.py against the root DEPS.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
