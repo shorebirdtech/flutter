@@ -3,7 +3,7 @@ description: Shorebird's  Flutter customizations tests
 version: 1.0.0
 
 environment:
-  sdk: ^3.7.0
+  sdk: ^3.8.0
 
 dependencies:
   archive: ^3.5.1

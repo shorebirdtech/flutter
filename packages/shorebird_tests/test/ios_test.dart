@@ -100,8 +100,8 @@ void main() {
             environment: {'SHOREBIRD_PUBLIC_KEY': base64PublicKey},
           );
 
-          final generatedYaml =
-              await projectDirectory.getGeneratedIosShorebirdYaml();
+          final generatedYaml = await projectDirectory
+              .getGeneratedIosShorebirdYaml();
 
           expect(generatedYaml.keys, containsAll(originalYaml.keys));
 
@@ -119,8 +119,8 @@ void main() {
 
         await projectDirectory.runFlutterBuildIos(flavor: 'internal');
 
-        final generatedYaml =
-            await projectDirectory.getGeneratedIosShorebirdYaml();
+        final generatedYaml = await projectDirectory
+            .getGeneratedIosShorebirdYaml();
 
         expect(generatedYaml['app_id'], equals('internal_123'));
       });
@@ -138,8 +138,8 @@ void main() {
               environment: {'SHOREBIRD_PUBLIC_KEY': base64PublicKey},
             );
 
-            final generatedYaml =
-                await projectDirectory.getGeneratedIosShorebirdYaml();
+            final generatedYaml = await projectDirectory
+                .getGeneratedIosShorebirdYaml();
 
             expect(generatedYaml['app_id'], equals('internal_123'));
             expect(generatedYaml['patch_public_key'], equals(base64PublicKey));

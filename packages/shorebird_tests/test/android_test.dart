@@ -29,8 +29,8 @@ void main() {
             environment: {'SHOREBIRD_PUBLIC_KEY': base64PublicKey},
           );
 
-          final generatedYaml =
-              await projectDirectory.getGeneratedAndroidShorebirdYaml();
+          final generatedYaml = await projectDirectory
+              .getGeneratedAndroidShorebirdYaml();
 
           expect(generatedYaml.keys, containsAll(originalYaml.keys));
 

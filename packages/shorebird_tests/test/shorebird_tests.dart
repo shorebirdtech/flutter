@@ -404,33 +404,31 @@ $flavors
       path.join(this.path, 'apk-extracted'),
     );
 
-    final yamlString =
-        File(
-          path.join(
-            this.path,
-            'apk-extracted',
-            'assets',
-            'flutter_assets',
-            'shorebird.yaml',
-          ),
-        ).readAsStringSync();
+    final yamlString = File(
+      path.join(
+        this.path,
+        'apk-extracted',
+        'assets',
+        'flutter_assets',
+        'shorebird.yaml',
+      ),
+    ).readAsStringSync();
     return loadYaml(yamlString) as YamlMap;
   }
 
   Future<YamlMap> getGeneratedIosShorebirdYaml() async {
-    final yamlString =
-        File(
-          path.join(
-            iosArchiveFile().path,
-            'Products',
-            'Applications',
-            'Runner.app',
-            'Frameworks',
-            'App.framework',
-            'flutter_assets',
-            'shorebird.yaml',
-          ),
-        ).readAsStringSync();
+    final yamlString = File(
+      path.join(
+        iosArchiveFile().path,
+        'Products',
+        'Applications',
+        'Runner.app',
+        'Frameworks',
+        'App.framework',
+        'flutter_assets',
+        'shorebird.yaml',
+      ),
+    ).readAsStringSync();
     return loadYaml(yamlString) as YamlMap;
   }
 }

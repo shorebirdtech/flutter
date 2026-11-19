@@ -38,12 +38,11 @@ class MachO {
       final command = data.getUint32(cursor, endian);
       final commandSize = data.getUint32(cursor + 4, endian);
       if (command == _lcUuid) {
-        uuid =
-            bytes
-                .sublist(cursor + 8, cursor + 24)
-                .map((b) => b.toRadixString(16).padLeft(2, '0'))
-                .join()
-                .toUpperCase();
+        uuid = bytes
+            .sublist(cursor + 8, cursor + 24)
+            .map((b) => b.toRadixString(16).padLeft(2, '0'))
+            .join()
+            .toUpperCase();
       } else if (command == _lcSegment64) {
         final sectionCount = data.getUint32(cursor + 64, endian);
         var section = cursor + 72; // sizeof(segment_command_64)
