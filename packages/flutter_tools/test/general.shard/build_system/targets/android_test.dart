@@ -247,12 +247,12 @@ void main() {
       expect(processManager, hasNoRemainingExpectations);
       // The supplement file is an output, so a build that finds it deleted
       // (the shorebird CLI clears the supplement before each release) reruns.
-      expect(
-        environment.buildDir
-            .childFile('flutter_android_aot_release_android-arm64.d')
-            .readAsStringSync(),
-        contains('App.ref.link'),
-      );
+      final String depfile = environment.buildDir
+          .childFile('flutter_android_aot_release_android-arm64.d')
+          .readAsStringSync();
+      // The base order is an input, so a new release's order reruns the build.
+      expect(depfile, contains(baseRefOrder.path));
+      expect(depfile, contains(refOrderFlag(environment).split('=').last));
     },
   );
 
@@ -297,6 +297,48 @@ void main() {
       expect(processManager, hasNoRemainingExpectations);
     },
   );
+
+  testWithoutContext('AndroidAot passes no object order flags for deferred components', () async {
+    processManager = FakeProcessManager.empty();
+    final Directory supplement = fileSystem.directory('release_supplement');
+    supplement.childDirectory('arm64-v8a').childFile('App.ref.link').createSync(recursive: true);
+    final environment = Environment.test(
+      fileSystem.currentDirectory,
+      outputDir: fileSystem.directory('out')..createSync(),
+      defines: <String, String>{
+        kBuildMode: 'release',
+        kDeferredComponents: 'true',
+        kShorebirdReleaseSupplementDir: supplement.path,
+      },
+      artifacts: artifacts,
+      processManager: processManager,
+      fileSystem: fileSystem,
+      logger: logger,
+    );
+    final Directory abiDir = environment.buildDir.childDirectory('arm64-v8a');
+    processManager.addCommand(
+      FakeCommand(
+        command: <String>[
+          artifacts.getArtifactPath(
+            Artifact.genSnapshot,
+            platform: TargetPlatform.android_arm64,
+            mode: BuildMode.release,
+          ),
+          '--deterministic',
+          '--loading_unit_manifest=${abiDir.childFile('manifest.json').path}',
+          '--snapshot_kind=app-aot-elf',
+          '--elf=${abiDir.childFile('app.so').path}',
+          environment.buildDir.childFile('app.dill').path,
+        ],
+      ),
+    );
+    environment.buildDir.createSync(recursive: true);
+    environment.buildDir.childFile('app.dill').createSync();
+
+    await const AndroidAot(TargetPlatform.android_arm64, BuildMode.release).build(environment);
+
+    expect(processManager, hasNoRemainingExpectations);
+  });
 
   testWithoutContext('AndroidAot provide code size information.', () async {
     processManager = FakeProcessManager.empty();

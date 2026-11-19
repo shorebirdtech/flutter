@@ -234,6 +234,7 @@ class AndroidAot extends AotElfBase {
       kExtraGenSnapshotOptions,
     );
     final outputs = <File>[]; // outputs for the depfile
+    final inputs = <File>[]; // inputs for the depfile
     final manifestPath = '${output.path}${environment.platform.pathSeparator}manifest.json';
     if (environment.defines[kDeferredComponents] == 'true') {
       extraGenSnapshotOptions.add('--loading_unit_manifest=$manifestPath');
@@ -245,7 +246,9 @@ class AndroidAot extends AotElfBase {
     // supplement (build/android/shorebird/<abi>/, which the shorebird CLI
     // uploads), and a patch build reads the release's from the supplement
     // the CLI downloaded. gen_snapshot doesn't reorder programs split into
-    // loading units, so deferred components builds get neither flag.
+    // loading units, so deferred components builds get neither flag. A patch
+    // build also writes its own order over the local file; only a release
+    // uploads it.
     if (environment.defines[kDeferredComponents] != 'true') {
       final File refOrderFile = environment.projectDir
           .childDirectory('build')
@@ -264,8 +267,15 @@ class AndroidAot extends AotElfBase {
             .childFile('App.ref.link');
         // A release built before its Flutter wrote the order has none, and its
         // patches build as before.
+        // The CLI stages it at the same path every patch, so it is an input:
+        // a new release's order reruns gen_snapshot.
         if (baseRefOrderFile.existsSync()) {
           extraGenSnapshotOptions.add('--base_ref_order=${baseRefOrderFile.path}');
+          inputs.add(baseRefOrderFile);
+        } else {
+          environment.logger.printTrace(
+            'No release object order at ${baseRefOrderFile.path}; numbering as usual.',
+          );
         }
       }
     }
@@ -308,7 +318,7 @@ class AndroidAot extends AotElfBase {
       }
     }
     environment.depFileService.writeToFile(
-      Depfile(<File>[], outputs),
+      Depfile(inputs, outputs),
       environment.buildDir.childFile('flutter_$name.d'),
       writeEmpty: true,
     );
