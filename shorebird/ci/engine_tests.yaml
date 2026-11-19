@@ -1,0 +1,100 @@
+# What _build_engine's engine_tests.yaml runs at an engine commit of this
+# fork: builds of upstream's engine CI builders
+# (engine/src/flutter/ci/builders/<builder>.json, or standalone/<builder>.json),
+# each named <builder>/<build> and run by shard_runner's run_builder.dart (gn,
+# ninja, then the build's tests). It lives here, not in _build_engine, so each
+# release line names the builds and tests that line has: upstream moves builds
+# between builders and renames tests across releases.
+#
+# A release tests what the fork could have changed (Eric 2026-11-03, design
+# doc https://app.notion.com/p/40bf369b53c98184b029e2512d24fc5d): the fork
+# changes the Dart VM, runtime/, shell/common and small embedder hooks, so a
+# release runs the suites over runtime/, shell/common and dart:ui on our VM,
+# on Linux, Mac arm64 and Windows, in release-mode host builds where upstream
+# has one, at most four jobs. Everything else upstream runs is in
+# release.yaml's not_run with why, and runs by name:
+#   gh workflow run engine_tests.yaml -R shorebirdtech/_build_engine \
+#     -f engine_revision=<sha> -f builds=linux_unopt/ci/host_debug_unopt
+# A build run by name runs all its tests except those under `skip`.
+#
+# release:  the builds a release runs. Each may list, per test (by its name
+#           in the build's tests list):
+#   args:   arguments added to the test's command, each with why
+#   skip:   tests not run in a release, each with why
+# skip:     tests never run, even by name, because our runners can't, each
+#           with why; or, for a run_tests.py test, the engine executables
+#           and dart-host packages it runs without, and single gtests
+#           (Suite.Name, skipped through GTEST_FILTER): {executables: [...],
+#           dart_host_packages: [...], gtests: [...], why: ...}, any of the
+#           lists. A skip or args entry naming a test the build doesn't
+#           have, an executable it doesn't build or a package the tree
+#           doesn't have, fails the job, so this can't go stale across a
+#           sync. A gtest name isn't checked: one no binary has skips
+#           nothing.
+
+release:
+  linux_host_engine_test/ci/host_release_test:
+    args:
+      Host Tests for host_release:
+        add: &host_filters
+          - --engine-filter=runtime_unittests,dart_plugin_registrant_unittests,no_dart_plugin_registrant_unittests,shell_unittests,shorebird_unittests,ui_unittests
+          - --dart-host-filter=flutter/flutter_frontend_server,flutter/tools/const_finder
+        why: &host_filters_why >-
+          Only the engine gtests over runtime/, shell/common and dart:ui
+          (lib/ui), what the fork changes, and only the dart-host packages
+          that run the fork's Dart (the frontend server, and const_finder over
+          its kernel); the dart (flutter_tester) tests run in full. The rest
+          cover code the fork doesn't change: embedders, fml, display_list,
+          flow, txt, Impeller, the engine benchmarks, and the engine's own dev
+          tools (format.dart, clang_tidy, engine_tool, the githooks, the build
+          config readers; ci/format_test also needs git history our depth-1
+          checkout doesn't have).
+    skip:
+      Generate metrics test: Formats benchmark results for Skia Perf; it tests no engine code, and we keep no perf dashboard.
+      Upload metrics dry-run: Checks the Skia Perf upload; we keep no perf dashboard.
+  mac_unopt/ci/host_release_arm64_tests:
+    args:
+      Dart and engine tests for host_release:
+        add: *host_filters
+        why: *host_filters_why
+  # Upstream has no release-mode Windows host test build.
+  windows_host_engine_test/ci\host_debug_test:
+    args:
+      Host Tests for host_debug_test:
+        # This build runs only --type engine.
+        add:
+          - --engine-filter=runtime_unittests,dart_plugin_registrant_unittests,no_dart_plugin_registrant_unittests,shell_unittests,shorebird_unittests,ui_unittests
+        why: *host_filters_why
+  # The Android embedding's Robolectric tests (run_tests.py --type java), on
+  # the optimized arm debug build: the fork changes the embedding (step
+  # 7659). Not the four-job host cap: a separate suite.
+  linux_unopt/ci/android_debug_test: {}
+
+skip:
+  linux_unopt/ci/host_debug_unopt:
+    pylint: >-
+      Lints the engine's Python build scripts with pylint-2.7, which LUCI's
+      bot environment provides and our runners don't; it checks no code we
+      ship.
+  mac_unopt/ci/host_release_arm64_tests:
+    Dart and engine tests for host_release:
+      executables: [impeller_unittests, impeller_dart_unittests]
+      dart_host_packages: [flutter/ci]
+      gtests:
+        - ShellTest.EncodeImageRetries
+        - ShellTest.EncodeImageRetryOverflows
+        - ShellTest.ToImageRetries
+        - ShellTest.ToImageRetryOverflow
+      why: >-
+        Impeller's playground suites render on Metal, and the macOS runners'
+        VM GPU (AppleParavirtTexture) hangs on some of their shaders
+        (kIOGPUCommandBufferCallbackErrorHang, then an assertion that kills
+        the process: 10 of 7,570 runs in run 42850632939). flutter/ci's
+        format_test needs git history our depth-1 checkout doesn't have
+        (run 42863006365). Graphics code and engine dev tools the fork
+        doesn't change; release runs leave both out too.
+        ui_unittests' four encode/toImage retry tests turn the GPU off and
+        on around Impeller Metal encodes on that GPU, and fail the same way
+        when it hangs or stops taking command buffers (EncodeImageRetryOverflows
+        in release run 42454155581, EncodeImageRetries in run 42869639738), so
+        they are left out of release runs too; the rest of ui_unittests runs.
