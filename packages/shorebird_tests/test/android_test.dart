@@ -26,44 +26,33 @@ void main() {
 
           const base64PublicKey = 'public_123';
           await projectDirectory.runFlutterBuildApk(
-            environment: {
-              'SHOREBIRD_PUBLIC_KEY': base64PublicKey,
-            },
+            environment: {'SHOREBIRD_PUBLIC_KEY': base64PublicKey},
           );
 
-          final generatedYaml =
-              await projectDirectory.getGeneratedAndroidShorebirdYaml();
+          final generatedYaml = await projectDirectory
+              .getGeneratedAndroidShorebirdYaml();
 
-          expect(
-            generatedYaml.keys,
-            containsAll(originalYaml.keys),
-          );
+          expect(generatedYaml.keys, containsAll(originalYaml.keys));
 
-          expect(
-            generatedYaml['patch_public_key'],
-            equals(base64PublicKey),
-          );
+          expect(generatedYaml['patch_public_key'], equals(base64PublicKey));
         },
       );
     });
 
     group('when building with a flavor', () {
-      testWithShorebirdProject(
-        'correctly changes the app id',
-        (projectDirectory) async {
-          await projectDirectory.addProjectFlavors();
-          projectDirectory.addShorebirdFlavors();
+      testWithShorebirdProject('correctly changes the app id', (
+        projectDirectory,
+      ) async {
+        await projectDirectory.addProjectFlavors();
+        projectDirectory.addShorebirdFlavors();
 
-          await projectDirectory.runFlutterBuildApk(flavor: 'internal');
+        await projectDirectory.runFlutterBuildApk(flavor: 'internal');
 
-          final generatedYaml =
-              await projectDirectory.getGeneratedAndroidShorebirdYaml(
-            flavor: 'internal',
-          );
+        final generatedYaml = await projectDirectory
+            .getGeneratedAndroidShorebirdYaml(flavor: 'internal');
 
-          expect(generatedYaml['app_id'], equals('internal_123'));
-        },
-      );
+        expect(generatedYaml['app_id'], equals('internal_123'));
+      });
 
       group('when public key passed through environment variable', () {
         testWithShorebirdProject(
@@ -75,21 +64,14 @@ void main() {
 
             await projectDirectory.runFlutterBuildApk(
               flavor: 'internal',
-              environment: {
-                'SHOREBIRD_PUBLIC_KEY': base64PublicKey,
-              },
+              environment: {'SHOREBIRD_PUBLIC_KEY': base64PublicKey},
             );
 
-            final generatedYaml =
-                await projectDirectory.getGeneratedAndroidShorebirdYaml(
-              flavor: 'internal',
-            );
+            final generatedYaml = await projectDirectory
+                .getGeneratedAndroidShorebirdYaml(flavor: 'internal');
 
             expect(generatedYaml['app_id'], equals('internal_123'));
-            expect(
-              generatedYaml['patch_public_key'],
-              equals(base64PublicKey),
-            );
+            expect(generatedYaml['patch_public_key'], equals(base64PublicKey));
           },
         );
       });
