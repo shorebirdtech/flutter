@@ -208,10 +208,13 @@ std::vector<uint8_t> BuildMinimalVmcodeBytes(bool with_link_header) {
   }
 
   std::vector<uint8_t> vmcode(kPageSize + elf.size(), 0);
-  // Shorebird .link header format: int32_t sim_to_cpu_count followed by
-  // `sim_to_cpu_count` pairs of (int32_t sim_offset, int32_t cpu_offset).
-  const int32_t kHeader[] = {
-      2, 16, 32, 48, 64,
+  // Shorebird link table (dart-sdk runtime/vm/shorebird.cc): uint32_t magic
+  // 'SBLT', uint32_t total length, uint32_t run count, then the runs'
+  // varints. An empty table is just the 12-byte fixed part.
+  const uint32_t kHeader[] = {
+      0x544c4253,  // 'SBLT'
+      12,          // length
+      0,           // run count
   };
   std::memcpy(vmcode.data(), kHeader, sizeof(kHeader));
   std::memcpy(vmcode.data() + kPageSize, elf.data(), elf.size());
@@ -284,9 +287,10 @@ TEST(PatchCache, LoadsLinkHeaderAndSnapshotsFromVmcode) {
   ASSERT_NE(entry, nullptr);
   ASSERT_NE(entry->link_header(), nullptr);
   EXPECT_EQ(entry->link_header()->GetSize(), 16384u);
-  const int32_t* header =
-      reinterpret_cast<const int32_t*>(entry->link_header()->GetMapping());
-  EXPECT_EQ(header[0], 2);  // sim_to_cpu_count
+  const uint32_t* header =
+      reinterpret_cast<const uint32_t*>(entry->link_header()->GetMapping());
+  EXPECT_EQ(header[0], 0x544c4253u);  // 'SBLT'
+  EXPECT_EQ(header[1], 12u);          // length
 
   auto data = PatchMapping::CreateIsolateData(entry);
   auto instructions = PatchMapping::CreateIsolateInstructions(entry);
