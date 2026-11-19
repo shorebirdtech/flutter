@@ -545,22 +545,22 @@ void main() {
         final File toolsStamp = cache.getStampFileFor('flutter_tools')
           ..createSync(recursive: true)
           ..setLastModifiedSync(DateTime(2026));
-        final File generatedXcconfig = projectDir
-            .childDirectory('ios')
-            .childDirectory('Flutter')
-            .childFile('Generated.xcconfig')
-          ..writeAsStringSync('FLUTTER_ROOT=/other/flutter\n')
-          ..setLastModifiedSync(toolsStamp.lastModifiedSync().add(const Duration(minutes: 1)));
+        final File generatedXcconfig =
+            projectDir
+                .childDirectory('ios')
+                .childDirectory('Flutter')
+                .childFile('Generated.xcconfig')
+              ..writeAsStringSync('FLUTTER_ROOT=/other/flutter\n')
+              ..setLastModifiedSync(toolsStamp.lastModifiedSync().add(const Duration(minutes: 1)));
         memoryFileSystem
             .directory('Artifact.flutterXcframework.TargetPlatform.ios.debug')
             .createSync(recursive: true);
         projectDir.childDirectory('.dart_tool').childDirectory('flutter_build')
           ..createSync(recursive: true)
-          ..childFile('link_hooks_result.json').writeAsStringSync(
-            '{"codeAssets": [], "dataAssets": [], "dependencies": []}',
-          );
+          ..childFile('link_hooks_result.json')
+              .writeAsStringSync('{"codeAssets": [], "dataAssets": [], "dependencies": []}');
 
-        final command = createBuildIOSFrameworkCommand(
+        final BuildIOSFrameworkCommand command = createBuildIOSFrameworkCommand(
           fileSystem: memoryFileSystem,
           logger: BufferLogger.test(),
           buildSystem: TestBuildSystem.all(BuildResult(success: true), (
@@ -579,16 +579,11 @@ void main() {
           platform: fakePlatform,
           flutterVersion: fakeFlutterVersion,
           cache: cache,
-          verboseHelp: false,
           codesign: FakeDarwinAddToAppCodesigning(),
         );
 
-        await createTestCommandRunner(command).run(<String>[
-          'ios-framework',
-          '--no-plugins',
-          '--no-profile',
-          '--no-release',
-        ]);
+        await createTestCommandRunner(command)
+            .run(<String>['ios-framework', '--no-plugins', '--no-profile', '--no-release']);
 
         expect(
           generatedXcconfig.readAsStringSync(),
@@ -636,9 +631,8 @@ void main() {
             .createSync(recursive: true);
         projectDir.childDirectory('.dart_tool').childDirectory('flutter_build')
           ..createSync(recursive: true)
-          ..childFile(
-            'link_hooks_result.json',
-          ).writeAsStringSync('{"codeAssets": [], "dataAssets": [], "dependencies": []}');
+          ..childFile('link_hooks_result.json')
+              .writeAsStringSync('{"codeAssets": [], "dataAssets": [], "dependencies": []}');
         // Like a fresh module's .ios/, the generated tooling doesn't exist
         // until the build regenerates it.
         final File pluginRegistrant = projectDir
@@ -648,7 +642,7 @@ void main() {
         expect(pluginRegistrant.existsSync(), isFalse);
 
         final codesign = FakeDarwinAddToAppCodesigning();
-        final command = createBuildIOSFrameworkCommand(
+        final BuildIOSFrameworkCommand command = createBuildIOSFrameworkCommand(
           fileSystem: memoryFileSystem,
           logger: BufferLogger.test(),
           buildSystem: TestBuildSystem.all(BuildResult(success: true), (
@@ -667,13 +661,11 @@ void main() {
           platform: fakePlatform,
           flutterVersion: fakeFlutterVersion,
           cache: cache,
-          verboseHelp: false,
           codesign: codesign,
         );
 
-        await createTestCommandRunner(
-          command,
-        ).run(<String>['ios-framework', '--no-plugins', '--no-profile', '--no-release']);
+        await createTestCommandRunner(command)
+            .run(<String>['ios-framework', '--no-plugins', '--no-profile', '--no-release']);
 
         expect(codesign.pluginRegistrantExistedAtLookup, <bool>[true]);
       },
@@ -727,9 +719,8 @@ void main() {
             .createSync(recursive: true);
         projectDir.childDirectory('.dart_tool').childDirectory('flutter_build')
           ..createSync(recursive: true)
-          ..childFile('link_hooks_result.json').writeAsStringSync(
-            '{"codeAssets": [], "dataAssets": [], "dependencies": []}',
-          );
+          ..childFile('link_hooks_result.json')
+              .writeAsStringSync('{"codeAssets": [], "dataAssets": [], "dependencies": []}');
       }
 
       BuildIOSFrameworkCommand createCommand({required bool consistentAssets}) {
@@ -770,7 +761,6 @@ void main() {
           platform: fakePlatform,
           flutterVersion: fakeFlutterVersion,
           cache: cache,
-          verboseHelp: false,
           codesign: FakeDarwinAddToAppCodesigning(),
         );
       }
