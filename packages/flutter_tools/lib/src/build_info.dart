@@ -218,6 +218,7 @@ class BuildInfo {
   /// module was released with: a module has no Gradle product flavors or Xcode
   /// schemes, so it can't be built with Flutter's `--flavor`.
   final String? shorebirdAppId;
+
   /// Shorebird: the release supplement a patch is built against, read from the
   /// `SHOREBIRD_RELEASE_SUPPLEMENT_DIR` environment variable. The shorebird CLI
   /// sets it only for Android patch builds, which read the release's object
