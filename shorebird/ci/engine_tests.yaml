@@ -38,12 +38,12 @@ release:
       Host Tests for host_release:
         add: &host_filters
           - --engine-filter=runtime_unittests,dart_plugin_registrant_unittests,no_dart_plugin_registrant_unittests,shell_unittests,shorebird_unittests,ui_unittests
-          - --dart-host-filter=flutter/flutter_frontend_server,flutter/tools/const_finder
+          - --dart-host-filter=flutter/flutter_frontend_server
         why: &host_filters_why >-
           Only the engine gtests over runtime/, shell/common and dart:ui
           (lib/ui), what the fork changes, and only the dart-host packages
-          that run the fork's Dart (the frontend server, and const_finder over
-          its kernel); the dart (flutter_tester) tests run in full. The rest
+          that run the fork's Dart (the frontend server; upstream removed
+          const_finder in flutter/flutter#191702); the dart (flutter_tester) tests run in full. The rest
           cover code the fork doesn't change: embedders, fml, display_list,
           flow, txt, Impeller, the engine benchmarks, and the engine's own dev
           tools (format.dart, clang_tidy, engine_tool, the githooks, the build
