@@ -162,12 +162,15 @@ class AOTSnapshotter {
       '--print_field_table_link_info_to=${_fileSystem.path.join(outputDir.parent.path, 'App.ft.link')}',
       '--print_dispatch_table_link_debug_info_to=${_fileSystem.path.join(outputDir.parent.path, 'App.dispatch_table.json')}',
       '--print_dispatch_table_link_info_to=${_fileSystem.path.join(outputDir.parent.path, 'App.dt.link')}',
-      // A patch built against this release lays its stack maps out in this
-      // order, so the ones it shares with the release stay byte-identical.
-      // iOS only: macOS patches aren't linked, and its per-arch builds would
-      // race on the one file.
-      if (platform == TargetPlatform.ios)
+      // A patch built against this release lays its stack maps (App.sm.link)
+      // and its snapshot objects (App.ref.link) out in this release's order,
+      // so what it shares with the release stays byte-identical. iOS only:
+      // macOS patches aren't linked, and its per-arch builds would race on
+      // the one file.
+      if (platform == TargetPlatform.ios) ...<String>[
         '--print_stack_map_order_to=${_fileSystem.path.join(outputDir.parent.path, 'App.sm.link')}',
+        '--print_ref_order_to=${_fileSystem.path.join(outputDir.parent.path, 'App.ref.link')}',
+      ],
     ];
 
     final genSnapshotArgs = <String>[
