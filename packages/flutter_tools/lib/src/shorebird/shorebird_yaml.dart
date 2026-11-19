@@ -13,6 +13,7 @@ void updateShorebirdYaml(
   String shorebirdYamlPath, {
   required String? publicKey,
   String? releaseVersion,
+  String? appId,
 }) {
   final File shorebirdYaml = globals.fs.file(shorebirdYamlPath);
   if (!shorebirdYaml.existsSync()) {
@@ -25,6 +26,7 @@ void updateShorebirdYaml(
     flavor: flavor,
     publicKey: publicKey,
     releaseVersion: releaseVersion,
+    appId: appId,
   );
   // Currently we write out over the same yaml file, we should fix this to
   // write to a new .json file instead and avoid naming confusion between the
@@ -59,9 +61,12 @@ Map<String, dynamic> compileShorebirdYaml(
   required String? flavor,
   required String? publicKey,
   String? releaseVersion,
+  String? appId,
 }) {
-  final String appId = appIdForFlavor(yamlMap, flavor: flavor);
-  final compiled = <String, dynamic>{'app_id': appId};
+  // An add-to-app module released with a Shorebird flavor gets that flavor's
+  // app ID from the shorebird CLI, since a module can't be built with
+  // Flutter's --flavor.
+  final compiled = <String, dynamic>{'app_id': appId ?? appIdForFlavor(yamlMap, flavor: flavor)};
   void copyIfSet(String key) {
     if (yamlMap[key] != null) {
       compiled[key] = yamlMap[key];
