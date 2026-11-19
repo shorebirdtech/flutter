@@ -529,6 +529,26 @@ flutter:
     );
 
     testUsingContext(
+      'writes app_id from the ShorebirdAppId define in place of the flavor app_id',
+      () async {
+        environment.defines[kShorebirdAppId] = 'module-app-id';
+        environment.defines[kFlavor] = 'internal';
+        writeProjectWithShorebirdYaml();
+
+        await const CopyAssets().build(environment);
+
+        final File compiled = fileSystem.file(
+          '${environment.buildDir.path}/flutter_assets/shorebird.yaml',
+        );
+        expect(compiled.readAsStringSync(), 'app_id: module-app-id');
+      },
+      overrides: <Type, Generator>{
+        FileSystem: () => fileSystem,
+        ProcessManager: () => FakeProcessManager.any(),
+      },
+    );
+
+    testUsingContext(
       'ignores SHOREBIRD_PUBLIC_KEY in the environment',
       () async {
         environment = Environment.test(

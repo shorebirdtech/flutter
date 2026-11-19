@@ -199,6 +199,7 @@ Future<Depfile> copyAssets(
                   file.path,
                   publicKey: decodeShorebirdPublicKey(environment.defines),
                   releaseVersion: shorebirdReleaseVersion(environment.defines),
+                  appId: shorebirdAppId(environment.defines),
                 );
               } on Exception catch (error) {
                 throw Exception('Failed to generate shorebird configuration. Error: $error');
