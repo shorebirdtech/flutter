@@ -37,6 +37,7 @@ List<String> linkInfoArgsFor(String buildPath) => <String>[
   '--print_field_table_link_info_to=$buildPath/App.ft.link',
   '--print_dispatch_table_link_debug_info_to=$buildPath/App.dispatch_table.json',
   '--print_dispatch_table_link_info_to=$buildPath/App.dt.link',
+  '--print_stack_map_order_to=$buildPath/App.sm.link',
 ];
 
 final Platform macPlatform = FakePlatform(
