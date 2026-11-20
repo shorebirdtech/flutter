@@ -25,11 +25,15 @@ const kLinkInfoArgs = <String>[
   '--print_dispatch_table_link_debug_info_to=build/App.dispatch_table.json',
   '--print_dispatch_table_link_info_to=build/App.dt.link',
   '--print_stack_map_order_to=build/App.sm.link',
+  '--print_ref_order_to=build/App.ref.link',
 ];
 
-// macOS writes no stack map order (iOS only).
+// macOS writes no stack map or ref order (iOS only).
 final List<String> kMacOSLinkInfoArgs = kLinkInfoArgs
-    .where((String arg) => !arg.startsWith('--print_stack_map_order_to='))
+    .where(
+      (String arg) =>
+          !arg.startsWith('--print_stack_map_order_to=') && !arg.startsWith('--print_ref_order_to='),
+    )
     .toList();
 
 const _kFakeDwarf = 'fake-macho-dsym';
