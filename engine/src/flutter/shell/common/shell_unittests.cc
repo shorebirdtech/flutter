@@ -5271,6 +5271,8 @@ TEST_F(ShellTest, ShorebirdLaunchSuccessWaitsForRootIsolate) {
   ASSERT_TRUE(shell);
   EXPECT_EQ(mock_ptr->launch_start_count(), 1);
   EXPECT_EQ(mock_ptr->launch_success_count(), 0);
+  // The update thread starts once the Shell is built.
+  EXPECT_EQ(mock_ptr->start_update_thread_count(), 1);
 
   // An entrypoint the fixture doesn't define: the engine fails to run the
   // root isolate.
@@ -5398,9 +5400,41 @@ TEST_F(ShellTest, ShorebirdLaunchSuccessFromLaterShellWhenFirstNeverRuns) {
   shorebird::Updater::ResetInstanceForTesting();
 }
 
+// An add-to-app host may build an engine and never run it. The update thread
+// starts once that Shell is built, after the launch start, so the app still
+// checks for updates and rollbacks.
+TEST_F(ShellTest, ShorebirdUpdateThreadStartsWhenShellIsBuilt) {
+  auto mock = std::make_unique<shorebird::MockUpdater>();
+  auto* mock_ptr = mock.get();
+  mock_ptr->set_should_auto_update(true);
+  shorebird::Updater::SetInstanceForTesting(std::move(mock));
+  shorebird::Updater::ResetLaunchStateForTesting();
+  ASSERT_TRUE(shorebird::Updater::Instance().Init(shorebird::AppConfig{}));
+
+  auto settings = CreateSettingsForFixture();
+  auto task_runners = GetTaskRunnersForFixture();
+  auto shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell);
+
+  const auto& log = mock_ptr->call_log();
+  ASSERT_EQ(log.size(), 5u);
+  EXPECT_EQ(log[0], "Init");
+  EXPECT_EQ(log[1], "ReportLaunchStart");
+  EXPECT_EQ(log[2], "ReportLaunchPaused");
+  EXPECT_EQ(log[3], "ShouldAutoUpdate");
+  EXPECT_EQ(log[4], "StartUpdateThread");
+
+  DestroyShell(std::move(shell), task_runners);
+  EXPECT_EQ(mock_ptr->launch_success_count(), 0);
+  EXPECT_EQ(mock_ptr->start_update_thread_count(), 1);
+
+  shorebird::Updater::ResetLaunchStateForTesting();
+  shorebird::Updater::ResetInstanceForTesting();
+}
+
 // The first engine's run fails and a later engine runs: the failure is the
-// launch's outcome, and the update thread starts once, from the failure, so
-// the process can still get a fixed patch.
+// launch's outcome, and the update thread starts once, when the first Shell
+// was built, so the process can still get a fixed patch.
 TEST_F(ShellTest, ShorebirdLaterShellRunsAfterFirstRunFails) {
   auto mock = std::make_unique<shorebird::MockUpdater>();
   auto* mock_ptr = mock.get();

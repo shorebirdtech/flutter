@@ -94,34 +94,34 @@ struct AppConfig {
 ///    promoted to "current" by the second engine's `ReportLaunchStart`,
 ///    even though that engine is still running the old snapshot.
 ///
+/// ## Patch numbers
+///
+/// Every launch report names the patch the engine loaded: the number the
+/// updater gave with the patch path in `ConfigureShorebird`
+/// (`NextBootPatchPath`), or 0 for the base release. The first
+/// `ReportLaunchStart` latches it for the process, and every later report
+/// passes the same number, so the updater acts only on that patch even if its
+/// next boot patch has moved on since (an install in another process, a
+/// second add-to-app engine configured after an install).
+///
 /// ## Update thread
 ///
-/// `ReportLaunchSuccess` is also what starts the background update thread
-/// (when `Init` succeeded and auto-update is enabled). The thread must not
-/// run while a boot is in progress:
-/// - The patch check it sends reports the running patch, which the Rust
-///   updater only learns at `ReportLaunchStart`. A check sent before that
-///   omits `current_patch_number`, and the server cannot attribute the
-///   device to a patch.
-/// - An install that completes during a first boot retires the patch being
-///   booted (the Rust lifecycle only protects the last successfully booted
-///   patch) and mislabels the boot breadcrumb. After `ReportLaunchSuccess`
-///   the booted patch is the last booted patch, and installs are safe.
+/// The update thread starts when the launch pauses: the first Shell is built,
+/// after `ReportLaunchStart` recorded the running patch (so the patch check
+/// names it) and once the boot breadcrumb is cleared. An engine that is built
+/// and never run (add-to-app) still checks for updates and rollbacks. An
+/// install while the patch's first boot is in progress keeps that patch: the
+/// updater never retires the patch it was told is running (updater#454).
 ///
-/// A failed `Engine::Run` starts the thread too (`ReportRunFailure`): the
-/// failure clears the breadcrumb and marks the patch bad, so no boot is in
-/// progress, and a process whose first engine failed to run may still run
-/// another engine, or run native code for a long time, and must still get
-/// a fixed patch.
+/// `ReportLaunchSuccess` and a failed `Engine::Run` (`ReportRunFailure`) also
+/// try to start it, for a launch that never paused. A patch that fails to load
+/// reports launch failure from `TryLoadPatch`, before any Shell exists, and
+/// claims the shared report guard; the pause that follows forwards nothing,
+/// but still starts the thread, since the base-code boot is the launch that
+/// most needs a replacement patch.
 ///
-/// The start carries its own once-per-process guard rather than riding on
-/// the success report's. A patch that fails to load reports launch failure
-/// from `TryLoadPatch`, before any Shell exists, and that claims the
-/// shared report guard. The base-code boot that follows still reports
-/// success, and that launch is precisely the one that needs a replacement
-/// patch. That failure report does not start the thread, because the
-/// boot is still in progress at that point, which the bullets above rule
-/// out.
+/// The start carries its own once-per-process guard, and never runs before
+/// the launch start is reported.
 ///
 /// Tests can call `ResetLaunchStateForTesting()` to re-enable the guards.
 class Updater {
@@ -149,6 +149,19 @@ class Updater {
   /// @return Path to patch, or empty string if no patch available
   virtual std::string NextBootPatchPath() = 0;
 
+  /// The number of the patch that will boot on next run, 0 for none. Read
+  /// with `NextBootPatchPath` to know which patch the path is.
+  virtual size_t NextBootPatchNumber() = 0;
+
+  /// Records the patch `ConfigureShorebird` handed the engine (0: the base
+  /// release). The first `ReportLaunchStart` latches the latest one, and every
+  /// launch report names it. See the class comment.
+  static void SetConfiguredPatchNumber(size_t patch_number);
+
+  /// The patch the launch reports name: latched at the first
+  /// `ReportLaunchStart`, 0 before it and for the base release.
+  static size_t LoadedPatchNumber();
+
   // Boot lifecycle methods. The reports themselves run at most once per
   // process, and later calls are silently ignored. `ReportLaunchSuccess`
   // still attempts the update-thread start on every call, which carries its
@@ -163,7 +176,8 @@ class Updater {
 
   /// The Shell is built. Clears the boot breadcrumb without promoting the
   /// patch, so an engine that is built and never run doesn't leave it armed.
-  /// Once per process; nothing once the outcome is reported.
+  /// Once per process; nothing once the outcome is reported. Then starts the
+  /// update thread, once the launch start has been reported.
   void ReportLaunchPaused();
 
   /// An engine is about to launch its root isolate. Arms the boot breadcrumb
@@ -197,17 +211,19 @@ class Updater {
  protected:
   Updater() = default;
 
-  // Subclass hooks — called by the public guarded methods above.
+  // Subclass hooks — called by the public guarded methods above, with the
+  // patch the engine loaded (0: the base release).
   virtual bool DoInit(const AppConfig& config) = 0;
-  virtual void DoReportLaunchStart() = 0;
-  virtual void DoReportLaunchSuccess() = 0;
-  virtual void DoReportLaunchFailure() = 0;
-  virtual void DoReportLaunchPaused() = 0;
-  virtual void DoReportLaunchResumed() = 0;
+  virtual void DoReportLaunchStart(size_t patch_number) = 0;
+  virtual void DoReportLaunchSuccess(size_t patch_number) = 0;
+  virtual void DoReportLaunchFailure(size_t patch_number) = 0;
+  virtual void DoReportLaunchPaused(size_t patch_number) = 0;
+  virtual void DoReportLaunchResumed(size_t patch_number) = 0;
 
  private:
   // Starts the update thread at most once per process, if the updater is
-  // configured and auto-update is on. Called from `ReportLaunchSuccess`.
+  // configured and auto-update is on. Called from `ReportLaunchPaused`,
+  // `ReportLaunchSuccess` and `ReportRunFailure`.
   void MaybeStartUpdateThread();
 
   static std::unique_ptr<Updater> instance_;
@@ -231,6 +247,10 @@ class Updater {
   // Separate from the launch guards above: a reported failure must not stop
   // a later successful boot from starting the thread. See the class comment.
   static std::atomic<bool> update_thread_started_;
+  // The patch the latest ConfigureShorebird handed the engine, and the one
+  // the first ReportLaunchStart latched from it. 0: the base release.
+  static std::atomic<size_t> configured_patch_number_;
+  static std::atomic<size_t> loaded_patch_number_;
 };
 
 /// No-op implementation for unsupported platforms.
@@ -243,11 +263,12 @@ class NoOpUpdater : public Updater {
   bool DoInit(const AppConfig& config) override { return true; }
   void ValidateNextBootPatch() override {}
   std::string NextBootPatchPath() override { return ""; }
-  void DoReportLaunchStart() override {}
-  void DoReportLaunchSuccess() override {}
-  void DoReportLaunchFailure() override {}
-  void DoReportLaunchPaused() override {}
-  void DoReportLaunchResumed() override {}
+  size_t NextBootPatchNumber() override { return 0; }
+  void DoReportLaunchStart(size_t) override {}
+  void DoReportLaunchSuccess(size_t) override {}
+  void DoReportLaunchFailure(size_t) override {}
+  void DoReportLaunchPaused(size_t) override {}
+  void DoReportLaunchResumed(size_t) override {}
   bool ShouldAutoUpdate() override { return false; }
   void StartUpdateThread() override {}
 };
@@ -263,11 +284,12 @@ class RealUpdater : public Updater {
   bool DoInit(const AppConfig& config) override;
   void ValidateNextBootPatch() override;
   std::string NextBootPatchPath() override;
-  void DoReportLaunchStart() override;
-  void DoReportLaunchSuccess() override;
-  void DoReportLaunchFailure() override;
-  void DoReportLaunchPaused() override;
-  void DoReportLaunchResumed() override;
+  size_t NextBootPatchNumber() override;
+  void DoReportLaunchStart(size_t patch_number) override;
+  void DoReportLaunchSuccess(size_t patch_number) override;
+  void DoReportLaunchFailure(size_t patch_number) override;
+  void DoReportLaunchPaused(size_t patch_number) override;
+  void DoReportLaunchResumed(size_t patch_number) override;
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
   void ProtectedDataAvailable() override;
@@ -284,11 +306,12 @@ class MockUpdater : public Updater {
   bool DoInit(const AppConfig& config) override;
   void ValidateNextBootPatch() override;
   std::string NextBootPatchPath() override;
-  void DoReportLaunchStart() override;
-  void DoReportLaunchSuccess() override;
-  void DoReportLaunchFailure() override;
-  void DoReportLaunchPaused() override;
-  void DoReportLaunchResumed() override;
+  size_t NextBootPatchNumber() override;
+  void DoReportLaunchStart(size_t patch_number) override;
+  void DoReportLaunchSuccess(size_t patch_number) override;
+  void DoReportLaunchFailure(size_t patch_number) override;
+  void DoReportLaunchPaused(size_t patch_number) override;
+  void DoReportLaunchResumed(size_t patch_number) override;
   bool ShouldAutoUpdate() override;
   void StartUpdateThread() override;
 
@@ -302,6 +325,10 @@ class MockUpdater : public Updater {
   int launch_resumed_count() const { return launch_resumed_count_; }
   int start_update_thread_count() const { return start_update_thread_count_; }
   const std::vector<std::string>& call_log() const { return call_log_; }
+  /// The patch number each launch report passed, in call order.
+  const std::vector<size_t>& reported_patch_numbers() const {
+    return reported_patch_numbers_;
+  }
 
   // Last init parameters (for verification)
   const std::string& last_release_version() const {
@@ -315,6 +342,14 @@ class MockUpdater : public Updater {
   void set_should_auto_update(bool value) { should_auto_update_ = value; }
   void set_next_boot_patch_path(const std::string& path) {
     next_boot_patch_path_ = path;
+  }
+  void set_next_boot_patch_number(size_t number) {
+    next_boot_patch_number_ = number;
+  }
+  /// Each NextBootPatchNumber call returns the next of these, then the
+  /// number above once they run out: the state changing between reads.
+  void set_next_boot_patch_numbers(std::vector<size_t> numbers) {
+    next_boot_patch_numbers_ = std::move(numbers);
   }
 
   // Reset all counters and logs
@@ -332,6 +367,9 @@ class MockUpdater : public Updater {
   bool init_result_ = true;
   bool should_auto_update_ = false;
   std::string next_boot_patch_path_;
+  size_t next_boot_patch_number_ = 0;
+  std::vector<size_t> next_boot_patch_numbers_;
+  std::vector<size_t> reported_patch_numbers_;
   std::string last_release_version_;
   std::string last_yaml_config_;
   AppConfig last_config_;

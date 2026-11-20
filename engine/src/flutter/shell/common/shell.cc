@@ -520,9 +520,10 @@ Shell::Shell(DartVMRef vm,
   // Shorebird: if the VM failed to start, report the launch as failed so the
   // updater rolls back the patch. Otherwise report the launch paused: an
   // engine can be built and never run, and that must not leave the patch
-  // armed. RunEngine resumes it and reports the outcome once the root
-  // isolate launches: the isolate snapshot is not deserialized until then.
-  // Guarded inside Updater to run at most once per process.
+  // armed. The pause also starts the update thread. RunEngine resumes it and
+  // reports the outcome once the root isolate launches: the isolate snapshot
+  // is not deserialized until then. Guarded inside Updater to run at most
+  // once per process.
   if (!vm_) {
     shorebird::Updater::Instance().ReportLaunchFailure();
   } else {
@@ -826,13 +827,12 @@ void Shell::RunEngine(
             if (run_result == flutter::Engine::RunStatus::Failure) {
               FML_LOG(ERROR) << "Could not launch engine with configuration.";
               // Shorebird: the root isolate didn't launch, so the patch is
-              // rolled back; the update thread still starts.
+              // rolled back.
               shorebird::Updater::Instance().ReportRunFailure();
             } else {
               // Shorebird: the root isolate group was created from the
               // (possibly patched) snapshot and its entrypoint invoked, so
               // the snapshot loaded (FailureAlreadyRunning: it had already).
-              // Starts the update thread.
               shorebird::Updater::Instance().ReportLaunchSuccess();
             }
 
