@@ -49,6 +49,7 @@ class BuildInfo {
     this.shorebirdPublicKey,
     this.shorebirdReleaseVersion,
     this.shorebirdAppId,
+    this.shorebirdReleaseSupplementDir,
     required this.packageConfigPath,
     this.codeSizeDirectory,
     this.androidGradleDaemon = true,
@@ -100,6 +101,7 @@ class BuildInfo {
       shorebirdPublicKey: shorebirdPublicKey,
       shorebirdReleaseVersion: shorebirdReleaseVersion,
       shorebirdAppId: shorebirdAppId,
+      shorebirdReleaseSupplementDir: shorebirdReleaseSupplementDir,
       packageConfigPath: packageConfigPath ?? this.packageConfigPath,
       codeSizeDirectory: codeSizeDirectory,
       androidGradleDaemon: androidGradleDaemon,
@@ -216,6 +218,12 @@ class BuildInfo {
   /// module was released with: a module has no Gradle product flavors or Xcode
   /// schemes, so it can't be built with Flutter's `--flavor`.
   final String? shorebirdAppId;
+
+  /// Shorebird: the release supplement a patch is built against, read from the
+  /// `SHOREBIRD_RELEASE_SUPPLEMENT_DIR` environment variable. The shorebird CLI
+  /// sets it only for Android patch builds, which read the release's object
+  /// order from it.
+  final String? shorebirdReleaseSupplementDir;
 
   /// If provided, an output directory where one or more v8-style heap snapshots
   /// will be written for code size profiling.
@@ -511,6 +519,8 @@ class BuildInfo {
       if (explicitAndroidEnableHcpp != null) '-Pexplicit-enable-hcpp=$explicitAndroidEnableHcpp',
       if (shorebirdPublicKey != null)
         '-Pshorebird-public-key=${encodeShorebirdPublicKey(shorebirdPublicKey!)}',
+      if (shorebirdReleaseSupplementDir != null)
+        '-Pshorebird-release-supplement-dir=$shorebirdReleaseSupplementDir',
       for (final String projectArg in androidProjectArgs) '-P$projectArg',
       if (androidGradleProjectCacheDir != null) '--project-cache-dir=$androidGradleProjectCacheDir',
     ];

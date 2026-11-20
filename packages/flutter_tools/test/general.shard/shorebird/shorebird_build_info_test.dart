@@ -21,6 +21,7 @@ void main() {
   const publicKey = 'MIIBIjANBg//kqhkiG9w0+BAQEFAAOCAQ8A=';
   const releaseVersion = '2.1.0+7';
   const appId = 'internal-app-id';
+  const releaseSupplementDir = '/tmp/release_supplement';
 
   const buildInfo = BuildInfo(
     BuildMode.release,
@@ -30,6 +31,7 @@ void main() {
     shorebirdPublicKey: publicKey,
     shorebirdReleaseVersion: releaseVersion,
     shorebirdAppId: appId,
+    shorebirdReleaseSupplementDir: releaseSupplementDir,
   );
 
   testWithoutContext('encodeShorebirdPublicKey has no slash and round-trips', () {
@@ -59,7 +61,10 @@ void main() {
   testWithoutContext('toGradleConfig includes the Shorebird values', () {
     expect(
       buildInfo.toGradleConfig(),
-      contains('-Pshorebird-public-key=${encodeShorebirdPublicKey(publicKey)}'),
+      containsAll(<String>[
+        '-Pshorebird-public-key=${encodeShorebirdPublicKey(publicKey)}',
+        '-Pshorebird-release-supplement-dir=$releaseSupplementDir',
+      ]),
     );
   });
 
@@ -107,6 +112,23 @@ void main() {
     }, hasLength(7));
   });
 
+  testWithoutContext(
+    'shorebirdReleaseSupplementDir returns null when the define is unset or empty',
+    () {
+      expect(shorebirdReleaseSupplementDir(<String, String>{}), isNull);
+      expect(
+        shorebirdReleaseSupplementDir(<String, String>{kShorebirdReleaseSupplementDir: ''}),
+        isNull,
+      );
+      expect(
+        shorebirdReleaseSupplementDir(<String, String>{
+          kShorebirdReleaseSupplementDir: releaseSupplementDir,
+        }),
+        releaseSupplementDir,
+      );
+    },
+  );
+
   testWithoutContext('shorebirdReleaseVersion returns null when the define is unset or empty', () {
     expect(shorebirdReleaseVersion(<String, String>{}), isNull);
     expect(shorebirdReleaseVersion(<String, String>{kShorebirdReleaseVersion: ''}), isNull);
@@ -148,6 +170,7 @@ void main() {
         expect(buildInfo.shorebirdPublicKey, publicKey);
         expect(buildInfo.shorebirdReleaseVersion, releaseVersion);
         expect(buildInfo.shorebirdAppId, appId);
+        expect(buildInfo.shorebirdReleaseSupplementDir, releaseSupplementDir);
         // No other variable reaches the native build settings or the defines,
         // including SHOREBIRD_DD_MAX_BYTES, which older shorebird CLIs set.
         for (final value in <String>[
@@ -167,6 +190,7 @@ void main() {
             'SHOREBIRD_PUBLIC_KEY': publicKey,
             'SHOREBIRD_RELEASE_VERSION': releaseVersion,
             'SHOREBIRD_APP_ID': appId,
+            'SHOREBIRD_RELEASE_SUPPLEMENT_DIR': releaseSupplementDir,
             'SHOREBIRD_DD_MAX_BYTES': '123456',
             'SHOREBIRD_TOKEN': 'token',
           },
@@ -181,6 +205,7 @@ void main() {
         expect(buildInfo.shorebirdPublicKey, isNull);
         expect(buildInfo.shorebirdReleaseVersion, isNull);
         expect(buildInfo.shorebirdAppId, isNull);
+        expect(buildInfo.shorebirdReleaseSupplementDir, isNull);
       },
       overrides: <Type, Generator>{
         FileSystem: () => fileSystem,
@@ -190,6 +215,7 @@ void main() {
             'SHOREBIRD_PUBLIC_KEY': '',
             'SHOREBIRD_RELEASE_VERSION': '',
             'SHOREBIRD_APP_ID': '',
+            'SHOREBIRD_RELEASE_SUPPLEMENT_DIR': '',
           },
         ),
       },

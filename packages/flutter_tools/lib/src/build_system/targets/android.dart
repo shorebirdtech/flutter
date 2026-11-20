@@ -10,6 +10,7 @@ import '../../build_info.dart';
 import '../../devfs.dart';
 import '../../isolated/native_assets/dart_hook_result.dart';
 import '../../project.dart';
+import '../../shorebird/shorebird_defines.dart';
 import '../build_system.dart';
 import '../depfile.dart';
 import '../exceptions.dart';
@@ -233,10 +234,50 @@ class AndroidAot extends AotElfBase {
       kExtraGenSnapshotOptions,
     );
     final outputs = <File>[]; // outputs for the depfile
+    final inputs = <File>[]; // inputs for the depfile
     final manifestPath = '${output.path}${environment.platform.pathSeparator}manifest.json';
     if (environment.defines[kDeferredComponents] == 'true') {
       extraGenSnapshotOptions.add('--loading_unit_manifest=$manifestPath');
       outputs.add(environment.fileSystem.file(manifestPath));
+    }
+    // Shorebird-specific: a patch built against this release numbers its
+    // snapshot objects like the release did, so what it shares with the
+    // release stays byte-identical. The release writes its order into its
+    // supplement (build/android/shorebird/<abi>/, which the shorebird CLI
+    // uploads), and a patch build reads the release's from the supplement
+    // the CLI downloaded. gen_snapshot doesn't reorder programs split into
+    // loading units, so deferred components builds get neither flag. A patch
+    // build also writes its own order over the local file; only a release
+    // uploads it.
+    if (environment.defines[kDeferredComponents] != 'true') {
+      final File refOrderFile = environment.projectDir
+          .childDirectory('build')
+          .childDirectory('android')
+          .childDirectory('shorebird')
+          .childDirectory(_androidAbiName)
+          .childFile('App.ref.link');
+      refOrderFile.parent.createSync(recursive: true);
+      extraGenSnapshotOptions.add('--print_ref_order_to=${refOrderFile.path}');
+      outputs.add(refOrderFile);
+      final String? releaseSupplementDir = shorebirdReleaseSupplementDir(environment.defines);
+      if (releaseSupplementDir != null) {
+        final File baseRefOrderFile = environment.fileSystem
+            .directory(releaseSupplementDir)
+            .childDirectory(_androidAbiName)
+            .childFile('App.ref.link');
+        // A release built before its Flutter wrote the order has none, and its
+        // patches build as before.
+        // The CLI stages it at the same path every patch, so it is an input:
+        // a new release's order reruns gen_snapshot.
+        if (baseRefOrderFile.existsSync()) {
+          extraGenSnapshotOptions.add('--base_ref_order=${baseRefOrderFile.path}');
+          inputs.add(baseRefOrderFile);
+        } else {
+          environment.logger.printTrace(
+            'No release object order at ${baseRefOrderFile.path}; numbering as usual.',
+          );
+        }
+      }
     }
     final buildMode = BuildMode.fromCliName(buildModeEnvironment);
     final dartObfuscation = environment.defines[kDartObfuscation] == 'true';
@@ -277,7 +318,7 @@ class AndroidAot extends AotElfBase {
       }
     }
     environment.depFileService.writeToFile(
-      Depfile(<File>[], outputs),
+      Depfile(inputs, outputs),
       environment.buildDir.childFile('flutter_$name.d'),
       writeEmpty: true,
     );

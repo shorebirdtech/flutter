@@ -615,6 +615,7 @@ class FlutterPlugin : Plugin<Project> {
             shorebirdPublicKey = project.findProperty("shorebird-public-key")?.toString()
             shorebirdReleaseVersion = project.findProperty("shorebird-release-version")?.toString()
             shorebirdAppId = project.findProperty("shorebird-app-id")?.toString()
+            shorebirdReleaseSupplementDir = project.findProperty("shorebird-release-supplement-dir")?.toString()
             codeSizeDirectory = compileOptions.codeSizeDirectory
             deferredComponents = compileOptions.deferredComponents
             validateDeferredComponents = compileOptions.validateDeferredComponents

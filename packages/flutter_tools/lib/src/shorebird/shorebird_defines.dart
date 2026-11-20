@@ -19,6 +19,12 @@ const kShorebirdReleaseVersion = 'ShorebirdReleaseVersion';
 /// builds (aar, ios-framework) released with a Shorebird `--flavor`.
 const kShorebirdAppId = 'ShorebirdAppId';
 
+/// The define for the directory holding the release's supplement, set only
+/// when the shorebird CLI builds a patch. An Android patch build reads the
+/// release's object order from `<abi>/App.ref.link` in it, so the patch's
+/// snapshot objects keep their release ids.
+const kShorebirdReleaseSupplementDir = 'ShorebirdReleaseSupplementDir';
+
 /// Encodes the patch public key for [kShorebirdPublicKey].
 ///
 /// The key is base64, and an xcconfig reads `//` as the start of a comment,
@@ -51,4 +57,14 @@ String? shorebirdAppId(Map<String, String> environmentDefines) {
     return null;
   }
   return appId;
+}
+
+/// The release supplement directory in [environmentDefines], or null if it is
+/// unset.
+String? shorebirdReleaseSupplementDir(Map<String, String> environmentDefines) {
+  final String? dir = environmentDefines[kShorebirdReleaseSupplementDir];
+  if (dir == null || dir.isEmpty) {
+    return null;
+  }
+  return dir;
 }

@@ -1153,6 +1153,8 @@ abstract class FlutterCommand extends Command<void> {
     final String? shorebirdPublicKey = _platform.environment['SHOREBIRD_PUBLIC_KEY'];
     final String? shorebirdReleaseVersion = _platform.environment['SHOREBIRD_RELEASE_VERSION'];
     final String? shorebirdAppId = _platform.environment['SHOREBIRD_APP_ID'];
+    final String? shorebirdReleaseSupplementDir =
+        _platform.environment['SHOREBIRD_RELEASE_SUPPLEMENT_DIR'];
 
     return BuildInfo(
       buildMode,
@@ -1175,6 +1177,9 @@ abstract class FlutterCommand extends Command<void> {
       shorebirdPublicKey: shorebirdPublicKey == '' ? null : shorebirdPublicKey,
       shorebirdReleaseVersion: shorebirdReleaseVersion == '' ? null : shorebirdReleaseVersion,
       shorebirdAppId: shorebirdAppId == '' ? null : shorebirdAppId,
+      shorebirdReleaseSupplementDir: shorebirdReleaseSupplementDir == ''
+          ? null
+          : shorebirdReleaseSupplementDir,
       packageConfigPath: packagesPath ?? packageConfigFile.path,
       codeSizeDirectory: codeSizeDirectory,
       androidGradleDaemon: androidGradleDaemon,
