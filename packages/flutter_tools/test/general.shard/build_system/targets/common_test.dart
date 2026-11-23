@@ -10,6 +10,7 @@ import 'package:flutter_tools/src/base/logger.dart';
 import 'package:flutter_tools/src/base/platform.dart';
 import 'package:flutter_tools/src/build_info.dart';
 import 'package:flutter_tools/src/build_system/build_system.dart';
+import 'package:flutter_tools/src/build_system/depfile.dart';
 import 'package:flutter_tools/src/build_system/exceptions.dart';
 import 'package:flutter_tools/src/build_system/targets/common.dart';
 import 'package:flutter_tools/src/build_system/targets/ios.dart';
@@ -18,6 +19,7 @@ import 'package:flutter_tools/src/convert.dart';
 import 'package:flutter_tools/src/features.dart';
 import 'package:flutter_tools/src/ios/xcodeproj.dart';
 import 'package:flutter_tools/src/project.dart';
+import 'package:flutter_tools/src/shorebird/shorebird_defines.dart';
 import 'package:test/fake.dart';
 
 import '../../../src/common.dart';
@@ -183,6 +185,108 @@ void main() {
 
     expect(processManager, hasNoRemainingExpectations);
   }, overrides: <Type, Generator>{FeatureFlags: () => TestFeatureFlags()});
+
+  group('KernelSnapshot Shorebird TFA facts', () {
+    const releaseSupplementDir = '/release_supplement';
+
+    FakeCommand iosProfileCompile(String build, List<String> tfaFactsOptions) {
+      final String flutterPatchedSdkPath = artifacts.getArtifactPath(
+        Artifact.flutterPatchedSdkPath,
+        platform: TargetPlatform.ios,
+        mode: BuildMode.profile,
+      );
+      return FakeCommand(
+        command: <String>[
+          artifacts.getArtifactPath(Artifact.engineDartAotRuntime),
+          artifacts.getArtifactPath(Artifact.frontendServerSnapshotForEngineDartSdk),
+          '--sdk-root',
+          '$flutterPatchedSdkPath/',
+          '--target=flutter',
+          '--no-print-incremental-dependencies',
+          ...buildModeOptions(BuildMode.profile, <String>[]),
+          '--track-creation-locations',
+          '--aot',
+          '--tfa',
+          '--target-os',
+          'ios',
+          '--packages',
+          '/.dart_tool/package_config.json',
+          '--output-dill',
+          '$build/app.dill',
+          '--depfile',
+          '$build/kernel_snapshot_program.d',
+          '--verbosity=error',
+          '--recorded-uses=$build/recorded_uses.json',
+          ...tfaFactsOptions,
+          'file:///lib/main.dart',
+        ],
+        stdout: 'result $kBoundaryKey\n$kBoundaryKey\n$kBoundaryKey $build/app.dill 0\n',
+        onRun: (_) {
+          fileSystem.file('$build/recorded_uses.json').createSync();
+          fileSystem
+              .file('$build/kernel_snapshot_program.d')
+              .writeAsStringSync('$build/app.dill: /lib/main.dart');
+        },
+      );
+    }
+
+    setUp(() {
+      fileSystem.file('.dart_tool/package_config.json')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('{"configVersion": 2, "packages":[]}');
+    });
+
+    testUsingContext('a release writes them', () async {
+      final String build = iosEnvironment.buildDir.path;
+      processManager.addCommand(
+        iosProfileCompile(build, <String>['--shorebird-write-tfa-facts=$build/App.tfa_facts.json']),
+      );
+
+      await const KernelSnapshot().build(iosEnvironment);
+
+      expect(processManager, hasNoRemainingExpectations);
+    }, overrides: <Type, Generator>{FeatureFlags: () => TestFeatureFlags()});
+
+    testUsingContext("a patch reads the release's and recompiles when they change", () async {
+      final String build = iosEnvironment.buildDir.path;
+      fileSystem.file('$releaseSupplementDir/App.tfa_facts.json').createSync(recursive: true);
+      // Left by an earlier build; the supplement must not copy it.
+      fileSystem.file('$build/App.tfa_facts.json').createSync();
+      processManager.addCommand(
+        iosProfileCompile(build, <String>[
+          '--shorebird-read-tfa-facts=$releaseSupplementDir/App.tfa_facts.json',
+        ]),
+      );
+
+      await const KernelSnapshot().build(
+        iosEnvironment..defines[kShorebirdReleaseSupplementDir] = releaseSupplementDir,
+      );
+
+      expect(processManager, hasNoRemainingExpectations);
+      expect(fileSystem.file('$build/App.tfa_facts.json').existsSync(), isFalse);
+      final Depfile depfile = iosEnvironment.depFileService.parse(
+        fileSystem.file('$build/kernel_snapshot_program.d'),
+      );
+      expect(depfile.inputs.map((File file) => file.path), <String>[
+        '/lib/main.dart',
+        '$releaseSupplementDir/App.tfa_facts.json',
+      ]);
+      expect(depfile.outputs.map((File file) => file.path), <String>['$build/app.dill']);
+    }, overrides: <Type, Generator>{FeatureFlags: () => TestFeatureFlags()});
+
+    testUsingContext('a patch of a release without them writes its own', () async {
+      final String build = iosEnvironment.buildDir.path;
+      processManager.addCommand(
+        iosProfileCompile(build, <String>['--shorebird-write-tfa-facts=$build/App.tfa_facts.json']),
+      );
+
+      await const KernelSnapshot().build(
+        iosEnvironment..defines[kShorebirdReleaseSupplementDir] = releaseSupplementDir,
+      );
+
+      expect(processManager, hasNoRemainingExpectations);
+    }, overrides: <Type, Generator>{FeatureFlags: () => TestFeatureFlags()});
+  });
 
   testUsingContext(
     'KernelSnapshot correctly handles an empty string in ExtraFrontEndOptions',

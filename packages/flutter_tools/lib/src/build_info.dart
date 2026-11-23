@@ -221,8 +221,8 @@ class BuildInfo {
 
   /// Shorebird: the release supplement a patch is built against, read from the
   /// `SHOREBIRD_RELEASE_SUPPLEMENT_DIR` environment variable. The shorebird CLI
-  /// sets it only for Android patch builds, which read the release's object
-  /// order from it.
+  /// sets it only for patch builds: Android ones read the release's object
+  /// order from it, and iOS and macOS ones the release's TFA facts.
   final String? shorebirdReleaseSupplementDir;
 
   /// If provided, an output directory where one or more v8-style heap snapshots
@@ -457,6 +457,7 @@ class BuildInfo {
         kShorebirdPublicKey: encodeShorebirdPublicKey(shorebirdPublicKey!),
       kShorebirdReleaseVersion: ?shorebirdReleaseVersion,
       kShorebirdAppId: ?shorebirdAppId,
+      kShorebirdReleaseSupplementDir: ?shorebirdReleaseSupplementDir,
     };
   }
 
@@ -484,6 +485,7 @@ class BuildInfo {
       'FLAVOR': ?flavor,
       if (shorebirdPublicKey != null)
         'SHOREBIRD_ENCODED_PUBLIC_KEY': encodeShorebirdPublicKey(shorebirdPublicKey!),
+      'SHOREBIRD_RELEASE_SUPPLEMENT_DIR': ?shorebirdReleaseSupplementDir,
     };
   }
 

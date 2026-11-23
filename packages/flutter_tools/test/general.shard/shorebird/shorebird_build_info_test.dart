@@ -50,11 +50,13 @@ void main() {
     expect(defines[kShorebirdPublicKey], encodeShorebirdPublicKey(publicKey));
     expect(defines[kShorebirdReleaseVersion], releaseVersion);
     expect(defines[kShorebirdAppId], appId);
+    expect(defines[kShorebirdReleaseSupplementDir], releaseSupplementDir);
   });
 
   testWithoutContext('toEnvironmentConfig includes the Shorebird values', () {
     final Map<String, String> config = buildInfo.toEnvironmentConfig();
     expect(config['SHOREBIRD_ENCODED_PUBLIC_KEY'], encodeShorebirdPublicKey(publicKey));
+    expect(config['SHOREBIRD_RELEASE_SUPPLEMENT_DIR'], releaseSupplementDir);
     expect(config.values, isNot(contains(contains('//'))));
   });
 

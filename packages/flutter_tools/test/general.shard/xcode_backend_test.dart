@@ -87,6 +87,7 @@ void main() {
         'SHOREBIRD_ENCODED_PUBLIC_KEY': 'a2V5Ly9h',
         'SHOREBIRD_PUBLIC_KEY': 'ignored',
         'SHOREBIRD_DD_MAX_BYTES': 'ignored',
+        'SHOREBIRD_RELEASE_SUPPLEMENT_DIR': '/path/to/release_supplement',
       },
       commands: <FakeCommand>[
         FakeCommand(
@@ -114,6 +115,7 @@ void main() {
             '-dXcodeBuildScript=build',
             '-dTargetDeviceOSVersion=',
             '-dShorebirdPublicKey=a2V5Ly9h',
+            '-dShorebirdReleaseSupplementDir=/path/to/release_supplement',
             'release_ios_bundle_flutter_assets',
           ],
         ),

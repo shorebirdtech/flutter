@@ -22,7 +22,8 @@ const kShorebirdAppId = 'ShorebirdAppId';
 /// The define for the directory holding the release's supplement, set only
 /// when the shorebird CLI builds a patch. An Android patch build reads the
 /// release's object order from `<abi>/App.ref.link` in it, so the patch's
-/// snapshot objects keep their release ids.
+/// snapshot objects keep their release ids; an iOS or macOS one reads the
+/// release's TFA facts from `App.tfa_facts.json`.
 const kShorebirdReleaseSupplementDir = 'ShorebirdReleaseSupplementDir';
 
 /// Encodes the patch public key for [kShorebirdPublicKey].
