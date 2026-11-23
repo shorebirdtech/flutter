@@ -32,11 +32,15 @@ void main() {
     );
   });
 
-  Future<void> download(List<FakeRequest> requests, {String url = 'https://download.test/a.zip'}) {
+  Future<void> download(
+    List<FakeRequest> requests, {
+    String url = 'https://download.test/a.zip',
+    OperatingSystemUtils? osUtils,
+  }) {
     return ArtifactUpdater(
       fileSystem: fileSystem,
       logger: BufferLogger.test(),
-      operatingSystemUtils: _FakeOperatingSystemUtils(),
+      operatingSystemUtils: osUtils ?? _FakeOperatingSystemUtils(),
       platform: platform,
       httpClient: FakeHttpClient.list(requests),
       tempStorage: fileSystem.currentDirectory.childDirectory('temp')..createSync(),
@@ -113,6 +117,7 @@ void main() {
       final Map<String, Object?> args = argsOf(downloadSpans().single);
       expect(args[DownloadArgs.edge], 'cloudflare:BOM');
       expect(args.containsKey(DownloadArgs.servedBy), isFalse);
+      expect(args.containsKey(DownloadArgs.redirectUs), isFalse);
     },
   );
 
@@ -133,7 +138,99 @@ void main() {
     final Map<String, Object?> args = argsOf(spans.single);
     expect(args[DownloadArgs.retries], 1);
     expect(args[DownloadArgs.status], 503);
-    expect(args[DownloadArgs.error], contains('Failed to download'));
+    expect(args[DownloadArgs.error], 'Exception: 503');
+  });
+
+  testWithoutContext('a later attempt does not inherit an earlier response', () async {
+    await expectLater(
+      download(<FakeRequest>[
+        FakeRequest(
+          Uri.parse('https://download.test/a.zip'),
+          response: const FakeResponse(
+            statusCode: HttpStatus.serviceUnavailable,
+            headers: <String, List<String>>{
+              'cf-ray': <String>['8f1a2b3c4d5e6f70-BOM'],
+            },
+          ),
+        ),
+        FakeRequest(
+          Uri.parse('https://download.test/a.zip'),
+          responseError: const SocketException('connection reset'),
+        ),
+      ]),
+      throwsToolExit(),
+    );
+
+    final Map<String, Object?> args = argsOf(downloadSpans().single);
+    expect(args[DownloadArgs.retries], 1);
+    expect(args[DownloadArgs.error], contains('connection reset'));
+    expect(args.containsKey(DownloadArgs.status), isFalse);
+    expect(args.containsKey(DownloadArgs.edge), isFalse);
+  });
+
+  testWithoutContext('resolves a relative Location against the redirecting URL', () async {
+    await download(<FakeRequest>[
+      FakeRequest(
+        Uri.parse('https://download.test/a.zip'),
+        response: const FakeResponse(
+          statusCode: HttpStatus.temporaryRedirect,
+          headers: <String, List<String>>{
+            'location': <String>['/mirror/a.zip'],
+          },
+        ),
+      ),
+      FakeRequest(
+        Uri.parse('https://download.test/mirror/a.zip'),
+        response: const FakeResponse(body: <int>[1]),
+      ),
+    ]);
+
+    final Map<String, Object?> args = argsOf(downloadSpans().single);
+    expect(args[DownloadArgs.status], 200);
+    expect(args[DownloadArgs.redirectUs], isA<int>());
+    expect(args.containsKey(DownloadArgs.servedBy), isFalse);
+  });
+
+  testWithoutContext('gives up after maxRedirects hops as a failed download', () async {
+    await expectLater(
+      download(<FakeRequest>[
+        for (var attempt = 0; attempt < 2; attempt++)
+          for (var hop = 0; hop <= 5; hop++)
+            FakeRequest(
+              Uri.parse('https://download.test/a.zip'),
+              response: const FakeResponse(
+                statusCode: HttpStatus.found,
+                headers: <String, List<String>>{
+                  'location': <String>['https://download.test/a.zip'],
+                },
+              ),
+            ),
+      ]),
+      throwsToolExit(),
+    );
+
+    final Map<String, Object?> args = argsOf(downloadSpans().single);
+    expect(args[DownloadArgs.status], 302);
+    expect(args[DownloadArgs.retries], 1);
+  });
+
+  testWithoutContext('an extraction failure retries and is not download time', () async {
+    final osUtils = _FakeOperatingSystemUtils()..failures = 2;
+    await expectLater(
+      download(<FakeRequest>[
+        for (var i = 0; i < 2; i++)
+          FakeRequest(
+            Uri.parse('https://download.test/a.zip'),
+            response: const FakeResponse(body: <int>[1, 2]),
+          ),
+      ], osUtils: osUtils),
+      throwsToolExit(),
+    );
+
+    final Map<String, Object?> args = argsOf(downloadSpans().single);
+    expect(args[DownloadArgs.retries], 1);
+    expect(args[DownloadArgs.bytes], 2);
+    expect(args[DownloadArgs.error], startsWith('extract: '));
   });
 
   testWithoutContext('writes nothing and downloads as before without the variable', () async {
@@ -175,8 +272,14 @@ void main() {
 }
 
 class _FakeOperatingSystemUtils extends Fake implements OperatingSystemUtils {
+  int failures = 0;
+
   @override
   void unzip(File file, Directory targetDirectory) {
+    if (failures > 0) {
+      failures -= 1;
+      throw Exception('bad zip');
+    }
     targetDirectory
         .childFile(file.fileSystem.path.basenameWithoutExtension(file.path))
         .createSync(recursive: true);

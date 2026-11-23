@@ -44,7 +44,8 @@ class ArtifactDownloadTrace {
     try {
       await body(trace);
     } on Object catch (error) {
-      trace._record(error: error);
+      // The cause an attempt saw says more than the ToolExit wrapping it.
+      trace._record(error: trace._lastError ?? error);
       rethrow;
     }
     trace._record();
@@ -55,6 +56,8 @@ class ArtifactDownloadTrace {
   final DateTime _start;
 
   var _attempts = 0;
+  Object? _lastError;
+  DateTime? _lastByteAt;
   Duration? _redirect;
   Duration? _timeToFirstByte;
   Uri? _servedFrom;
@@ -75,6 +78,13 @@ class ArtifactDownloadTrace {
       return request.close();
     }
     _bytes = 0;
+    _lastError = null;
+    _lastByteAt = null;
+    _redirect = null;
+    _timeToFirstByte = null;
+    _servedFrom = null;
+    _status = null;
+    _edge = null;
     final attemptStart = DateTime.now();
     var current = url;
     for (var hop = 0; ; hop++) {
@@ -84,7 +94,7 @@ class ArtifactDownloadTrace {
       final HttpClientResponse response = await request.close();
       final String? location = response.headers.value(HttpHeaders.locationHeader);
       if (!response.isRedirect || location == null || hop >= request.maxRedirects) {
-        _redirect = hopStart.difference(attemptStart);
+        _redirect = hop == 0 ? null : hopStart.difference(attemptStart);
         _timeToFirstByte = DateTime.now().difference(hopStart);
         _servedFrom = current;
         _status = response.statusCode;
@@ -99,6 +109,16 @@ class ArtifactDownloadTrace {
   /// Counts [length] body bytes received on the current attempt.
   void onChunk(int length) {
     _bytes += length;
+    if (_file != null) {
+      _lastByteAt = DateTime.now();
+    }
+  }
+
+  /// Notes why an attempt failed, so the span's error is that cause
+  /// rather than the ToolExit cache.dart wraps it in after the last one.
+  /// An [extracting] failure came after the bytes were all written.
+  void attemptFailed(Object error, {bool extracting = false}) {
+    _lastError = extracting ? 'extract: $error' : error;
   }
 
   void _record({Object? error}) {
@@ -114,7 +134,8 @@ class ArtifactDownloadTrace {
         pid: currentProcessId(),
         tid: networkTid,
         start: _start,
-        end: DateTime.now(),
+        // The download ends at its last byte; unzipping isn't download time.
+        end: _lastByteAt ?? DateTime.now(),
         servedBy: servedBy == _url.host ? null : servedBy,
         status: _status,
         bytes: _servedFrom == null ? null : _bytes,
@@ -204,4 +225,4 @@ void _write(File file, void Function(BuildTracer tracer) record) {
 var _namedProcess = false;
 
 String _truncate(String message) =>
-    message.length <= 200 ? message : '${message.substring(0, 200)}...';
+    message.length <= 300 ? message : '${message.substring(0, 300)}...';

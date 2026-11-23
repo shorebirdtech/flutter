@@ -779,7 +779,9 @@ class Cache {
         continue;
       }
       if (await artifact.isUpToDate(_fileSystem)) {
-        recordArtifactCacheHit(platform: _platform, fileSystem: _fileSystem); // Shorebird
+        if (artifact.downloadCount > 0) {
+          recordArtifactCacheHit(platform: _platform, fileSystem: _fileSystem); // Shorebird
+        }
         continue;
       }
       artifactsToUpdate.add(artifact);
@@ -1300,6 +1302,7 @@ class ArtifactUpdater {
         }
         display.finish();
       } on Exception catch (err) {
+        trace.attemptFailed(err); // Shorebird
         display.cancel();
         _logger.printTrace(err.toString());
         retries -= 1;
@@ -1352,6 +1355,7 @@ class ArtifactUpdater {
       try {
         extractor(tempFile, location);
       } on Exception catch (err) {
+        trace.attemptFailed(err, extracting: true); // Shorebird
         retries -= 1;
         if (retries == 0) {
           throwToolExit(
