@@ -22,14 +22,7 @@ import 'base/context.dart';
 import 'base/error_handling_io.dart';
 import 'base/file_system.dart';
 import 'base/io.dart'
-    show
-        HttpClient,
-        HttpClientRequest,
-        HttpClientResponse,
-        HttpHeaders,
-        HttpStatus,
-        SocketException,
-        Stdio;
+    show HttpClient, HttpClientResponse, HttpHeaders, HttpStatus, SocketException, Stdio;
 import 'base/logger.dart';
 import 'base/net.dart';
 import 'base/os.dart' show OperatingSystemUtils;
@@ -39,6 +32,7 @@ import 'base/user_messages.dart';
 import 'base/utils.dart' show getElapsedAsSeconds, getSizeAsPlatformMB;
 import 'convert.dart';
 import 'features.dart';
+import 'shorebird/artifact_download_trace.dart';
 
 const kShorebirdStorageUrl = 'https://download.shorebird.dev';
 const kFlutterRootEnvironmentVariableName =
@@ -785,6 +779,9 @@ class Cache {
         continue;
       }
       if (await artifact.isUpToDate(_fileSystem)) {
+        if (artifact.downloadCount > 0) {
+          recordArtifactCacheHit(platform: _platform, fileSystem: _fileSystem); // Shorebird
+        }
         continue;
       }
       artifactsToUpdate.add(artifact);
@@ -1265,6 +1262,23 @@ class ArtifactUpdater {
     Uri url,
     Directory location,
     void Function(File, Directory) extractor,
+  ) {
+    // Shorebird: one build-trace span per artifact, retries included.
+    return ArtifactDownloadTrace.run(
+      url: url,
+      platform: _platform,
+      fileSystem: _fileSystem,
+      body: (ArtifactDownloadTrace trace) =>
+          _downloadArchiveTraced(artifactName, url, location, extractor, trace),
+    );
+  }
+
+  Future<void> _downloadArchiveTraced(
+    String artifactName,
+    Uri url,
+    Directory location,
+    void Function(File, Directory) extractor,
+    ArtifactDownloadTrace trace,
   ) async {
     final String downloadPath = flattenNameSubdirs(url, _fileSystem);
     final File tempFile = _createDownloadFile(downloadPath);
@@ -1281,13 +1295,14 @@ class ArtifactUpdater {
         if (tempFile.existsSync()) {
           tempFile.deleteSync();
         }
-        await _download(url, tempFile, display);
+        await _download(url, tempFile, display, trace);
 
         if (!tempFile.existsSync()) {
           throw Exception('Did not find downloaded file ${tempFile.path}');
         }
         display.finish();
       } on Exception catch (err) {
+        trace.attemptFailed(err); // Shorebird
         display.cancel();
         _logger.printTrace(err.toString());
         retries -= 1;
@@ -1340,6 +1355,7 @@ class ArtifactUpdater {
       try {
         extractor(tempFile, location);
       } on Exception catch (err) {
+        trace.attemptFailed(err, extracting: true); // Shorebird
         retries -= 1;
         if (retries == 0) {
           throwToolExit(
@@ -1364,7 +1380,12 @@ class ArtifactUpdater {
   ///
   /// See also:
   ///   * https://cloud.google.com/storage/docs/xml-api/reference-headers#xgooghash
-  Future<void> _download(Uri url, File file, _DownloadDisplay display) async {
+  Future<void> _download(
+    Uri url,
+    File file,
+    _DownloadDisplay display,
+    ArtifactDownloadTrace trace,
+  ) async {
     final bool isAllowedUrl = _allowedBaseUrls.any(
       (String baseUrl) => url.toString().startsWith(baseUrl),
     );
@@ -1386,8 +1407,7 @@ class ArtifactUpdater {
       display.resume();
     }
 
-    final HttpClientRequest request = await _httpClient.getUrl(url);
-    final HttpClientResponse response = await request.close();
+    final HttpClientResponse response = await trace.open(_httpClient, url);
     if (response.statusCode != HttpStatus.ok) {
       throw Exception(response.statusCode);
     }
@@ -1404,6 +1424,7 @@ class ArtifactUpdater {
     final RandomAccessFile randomAccessFile = file.openSync(mode: FileMode.writeOnly);
     await response.forEach((List<int> chunk) {
       inputSink?.add(chunk);
+      trace.onChunk(chunk.length);
       randomAccessFile.writeFromSync(chunk);
       display.onChunk(chunk.length, contentLength);
     });

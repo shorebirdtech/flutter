@@ -80,7 +80,7 @@ dependencies:
   shorebird_build_trace:
     git:
       url: https://github.com/shorebirdtech/shorebird.git
-      ref: cff436f66534e14618cddcaf93f0d0e9862c937a
+      ref: a6dde84953f769c80437c42f9b0e28d283fad24d
       path: packages/shorebird_build_trace
   data_assets: 0.20.0
   record_use: 1.1.1
