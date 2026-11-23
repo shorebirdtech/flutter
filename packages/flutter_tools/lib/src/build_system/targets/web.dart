@@ -24,6 +24,7 @@ import '../../flutter_plugins.dart';
 import '../../globals.dart' as globals;
 import '../../isolated/native_assets/dart_hook_result.dart';
 import '../../project.dart';
+import '../../shorebird/shorebird_canvaskit.dart';
 import '../../web/bootstrap.dart';
 import '../../web/compile.dart';
 import '../../web/content_hash.dart';
@@ -180,7 +181,7 @@ abstract class Dart2WebTarget extends Target {
       );
       if (!canvasKitUrlAlreadySet) {
         dartDefines.add(
-          'FLUTTER_WEB_CANVASKIT_URL=https://www.gstatic.com/flutter-canvaskit/${globals.flutterVersion.engineRevision}/',
+          'FLUTTER_WEB_CANVASKIT_URL=https://www.gstatic.com/flutter-canvaskit/${shorebirdCanvasKitCdnRevision(globals.flutterVersion.engineRevision)}/',
         );
       }
     }
@@ -1449,7 +1450,7 @@ class WebTemplatedFiles extends Target {
               .toList()
         : buildDescriptions;
     final buildConfig = <String, Object>{
-      'engineRevision': globals.flutterVersion.engineRevision,
+      'engineRevision': shorebirdCanvasKitCdnRevision(globals.flutterVersion.engineRevision),
       'wasmHashes': _computeWasmHashes(environment),
       'builds': descriptions,
       if (environment.defines[kUseLocalCanvasKitFlag] == 'true') 'useLocalCanvasKit': true,
