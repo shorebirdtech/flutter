@@ -40,17 +40,17 @@ File? addShorebirdTfaFactsOptions(
     return null;
   }
   final File ownFacts = environment.buildDir.childFile(kShorebirdTfaFactsFileName);
+  // Facts left by an earlier compile must never reach the link supplement:
+  // a patch's are never uploaded, and a release's must be this compile's.
+  if (ownFacts.existsSync()) {
+    ownFacts.deleteSync();
+  }
   final String? releaseSupplementDir = shorebirdReleaseSupplementDir(environment.defines);
   if (releaseSupplementDir != null) {
     final File releaseFacts = environment.fileSystem
         .directory(releaseSupplementDir)
         .childFile(kShorebirdTfaFactsFileName);
     if (releaseFacts.existsSync()) {
-      // A patch's own facts are never uploaded; drop any left from an earlier
-      // build so the link supplement doesn't copy stale ones.
-      if (ownFacts.existsSync()) {
-        ownFacts.deleteSync();
-      }
       extraFrontEndOptions.add('--shorebird-read-tfa-facts=${releaseFacts.path}');
       return releaseFacts;
     }

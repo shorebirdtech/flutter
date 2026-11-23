@@ -238,6 +238,8 @@ void main() {
 
     testUsingContext('a release writes them', () async {
       final String build = iosEnvironment.buildDir.path;
+      // Left by an earlier build; this compile must write its own.
+      fileSystem.file('$build/App.tfa_facts.json').createSync();
       processManager.addCommand(
         iosProfileCompile(build, <String>['--shorebird-write-tfa-facts=$build/App.tfa_facts.json']),
       );
@@ -245,6 +247,7 @@ void main() {
       await const KernelSnapshot().build(iosEnvironment);
 
       expect(processManager, hasNoRemainingExpectations);
+      expect(fileSystem.file('$build/App.tfa_facts.json').existsSync(), isFalse);
     }, overrides: <Type, Generator>{FeatureFlags: () => TestFeatureFlags()});
 
     testUsingContext("a patch reads the release's and recompiles when they change", () async {
