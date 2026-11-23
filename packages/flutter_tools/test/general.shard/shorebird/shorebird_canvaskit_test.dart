@@ -54,6 +54,19 @@ void main() {
   );
 
   test(
+    'fails with a clear error when the mapping is malformed',
+    () => testbed.run(() {
+      globals.fs.file(globals.fs.path.join(Cache.flutterRoot!, kShorebirdUpstreamEnginePath))
+        ..createSync(recursive: true)
+        ..writeAsStringSync('{"engine":');
+      expect(
+        () => shorebirdCanvasKitCdnRevision(_kEngine),
+        throwsToolExit(message: '--no-web-resources-cdn'),
+      );
+    }),
+  );
+
+  test(
     'keeps the engine revision when there is no mapping',
     () => testbed.run(() {
       expect(shorebirdCanvasKitCdnRevision(_kEngine), _kEngine);

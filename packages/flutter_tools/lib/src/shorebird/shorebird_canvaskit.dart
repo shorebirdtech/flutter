@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../base/common.dart';
 import '../base/file_system.dart';
 import '../cache.dart';
 import '../convert.dart';
@@ -52,7 +53,18 @@ String shorebirdCanvasKitCdnRevision(String engineRevision) {
   if (!file.existsSync()) {
     return engineRevision;
   }
-  final Object? mapping = json.decode(file.readAsStringSync());
+  // A malformed file is a bad release commit. Fail the build rather than fall
+  // back to our own revision, which 404s on the CDN and renders a blank app.
+  final Object? mapping;
+  try {
+    mapping = json.decode(file.readAsStringSync());
+  } on FormatException catch (e) {
+    throwToolExit(
+      '${file.path} is not valid JSON ($e). It maps the engine to the upstream '
+      "engine whose CanvasKit Flutter's CDN serves. Pass --no-web-resources-cdn "
+      'to load CanvasKit from the build output instead.',
+    );
+  }
   if (mapping is Map<String, Object?> &&
       mapping['engine'] == engineRevision &&
       mapping['upstreamEngine'] is String) {
