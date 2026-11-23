@@ -110,6 +110,7 @@ void main() {
       'App.class_table.json',
       'App.dd.link',
       'App.dd_resolution.tsv',
+      'App.pool.link',
       'App.ref.link',
       'App.sm.link',
       'app.dill',
@@ -124,6 +125,7 @@ void main() {
       'App.ct.link',
       'App.dd.link',
       'App.dd_resolution.tsv',
+      'App.pool.link',
       'App.ref.link',
       'App.sm.link',
     ]);
