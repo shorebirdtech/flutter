@@ -390,7 +390,7 @@ class _FakeHttpClientResponse extends Stream<List<int>> implements HttpClientRes
   HttpClientResponseCompressionState get compressionState => throw UnimplementedError();
 
   @override
-  HttpConnectionInfo get connectionInfo => throw UnimplementedError();
+  HttpConnectionInfo? get connectionInfo => null;
 
   @override
   int get contentLength => _response.body.length;
@@ -407,7 +407,13 @@ class _FakeHttpClientResponse extends Stream<List<int>> implements HttpClientRes
   final HttpHeaders headers;
 
   @override
-  bool get isRedirect => throw UnimplementedError();
+  bool get isRedirect => const <int>{
+    HttpStatus.movedPermanently,
+    HttpStatus.found,
+    HttpStatus.seeOther,
+    HttpStatus.temporaryRedirect,
+    HttpStatus.permanentRedirect,
+  }.contains(statusCode);
 
   @override
   StreamSubscription<List<int>> listen(

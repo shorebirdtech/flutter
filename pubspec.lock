@@ -1010,8 +1010,8 @@ packages:
     dependency: transitive
     description:
       path: "packages/shorebird_build_trace"
-      ref: cff436f66534e14618cddcaf93f0d0e9862c937a
-      resolved-ref: cff436f66534e14618cddcaf93f0d0e9862c937a
+      ref: e5c029d01d6c5245fc294cf0bd3062886c6c881e
+      resolved-ref: e5c029d01d6c5245fc294cf0bd3062886c6c881e
       url: "https://github.com/shorebirdtech/shorebird.git"
     source: git
     version: "0.1.0"
@@ -1421,5 +1421,5 @@ packages:
     source: hosted
     version: "2.2.4"
 sdks:
-  dart: ">=3.13.0 <4.0.0"
+  dart: ">=3.14.0-286.0.dev <4.0.0"
   flutter: ">=3.47.0"
