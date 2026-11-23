@@ -1010,8 +1010,8 @@ packages:
     dependency: transitive
     description:
       path: "packages/shorebird_build_trace"
-      ref: e5c029d01d6c5245fc294cf0bd3062886c6c881e
-      resolved-ref: e5c029d01d6c5245fc294cf0bd3062886c6c881e
+      ref: a6dde84953f769c80437c42f9b0e28d283fad24d
+      resolved-ref: a6dde84953f769c80437c42f9b0e28d283fad24d
       url: "https://github.com/shorebirdtech/shorebird.git"
     source: git
     version: "0.1.0"
