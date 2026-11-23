@@ -133,6 +133,7 @@ open class BaseFlutterTask : DefaultTask() {
     @Optional
     @Input
     var shorebirdAppId: String? = null
+
     // Shorebird-specific: the release supplement an Android patch is built
     // against, passed to flutter assemble as a define.
     @Optional
