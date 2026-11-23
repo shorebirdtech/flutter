@@ -32,7 +32,8 @@ const kLinkInfoArgs = <String>[
 final List<String> kMacOSLinkInfoArgs = kLinkInfoArgs
     .where(
       (String arg) =>
-          !arg.startsWith('--print_stack_map_order_to=') && !arg.startsWith('--print_ref_order_to='),
+          !arg.startsWith('--print_stack_map_order_to=') &&
+          !arg.startsWith('--print_ref_order_to='),
     )
     .toList();
 
