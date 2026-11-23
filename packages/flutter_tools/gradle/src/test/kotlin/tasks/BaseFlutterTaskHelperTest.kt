@@ -263,7 +263,11 @@ class BaseFlutterTaskHelperTest {
         verify { mockExecSpec.args("-dShorebirdPublicKey=${BaseFlutterTaskPropertiesTest.SHOREBIRD_PUBLIC_KEY_TEST}") }
         verify { mockExecSpec.args("-dShorebirdReleaseVersion=${BaseFlutterTaskPropertiesTest.SHOREBIRD_RELEASE_VERSION_TEST}") }
         verify { mockExecSpec.args("-dShorebirdAppId=${BaseFlutterTaskPropertiesTest.SHOREBIRD_APP_ID_TEST}") }
-        verify { mockExecSpec.args("-dShorebirdReleaseSupplementDir=${BaseFlutterTaskPropertiesTest.SHOREBIRD_RELEASE_SUPPLEMENT_DIR_TEST}") }
+        verify {
+            mockExecSpec.args(
+                "-dShorebirdReleaseSupplementDir=${BaseFlutterTaskPropertiesTest.SHOREBIRD_RELEASE_SUPPLEMENT_DIR_TEST}"
+            )
+        }
         verify { mockExecSpec.args("-dFlavor=${BaseFlutterTaskPropertiesTest.FLAVOR_TEST}") }
         verify { mockExecSpec.args("--ExtraGenSnapshotOptions=${BaseFlutterTaskPropertiesTest.EXTRA_GEN_SNAPSHOT_OPTIONS_TEST}") }
         verify { mockExecSpec.args("-dFrontendServerStarterPath=${BaseFlutterTaskPropertiesTest.FRONTEND_SERVER_STARTER_PATH_TEST}") }
