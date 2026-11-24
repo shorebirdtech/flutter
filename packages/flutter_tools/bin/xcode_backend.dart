@@ -758,6 +758,11 @@ class Context {
     if (environment['SHOREBIRD_ENCODED_PUBLIC_KEY']?.isNotEmpty ?? false) {
       flutterArgs.add('-dShorebirdPublicKey=${environment['SHOREBIRD_ENCODED_PUBLIC_KEY']}');
     }
+    if (environment['SHOREBIRD_RELEASE_SUPPLEMENT_DIR']?.isNotEmpty ?? false) {
+      flutterArgs.add(
+        '-dShorebirdReleaseSupplementDir=${environment['SHOREBIRD_RELEASE_SUPPLEMENT_DIR']}',
+      );
+    }
 
     return flutterArgs;
   }
