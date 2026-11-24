@@ -73,6 +73,7 @@ jobs:
         with:
           # The tool reads its version from tags.
           fetch-depth: 0
+          persist-credentials: false
 
       # Upstream's dependencies for these targets: open_jdk 21 and the
       # Android SDK (on the image), clang, cmake, ninja and GTK for Linux
