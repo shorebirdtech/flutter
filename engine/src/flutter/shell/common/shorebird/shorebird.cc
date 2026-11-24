@@ -238,20 +238,41 @@ bool ConfigureShorebird(const ShorebirdConfigArgs& args,
 
   FML_LOG(INFO) << "Checking for active patch";
   shorebird::Updater::Instance().ValidateNextBootPatch();
+  // The launch reports name the patch at this path, so the updater acts on
+  // the patch the engine loads even if its next boot patch moves on. The
+  // updater trusts the number it is given, so the number must be the path's:
+  // each call reads the state anew, and another process of this app can
+  // install between them. Read the number on both sides of the path; if it
+  // moved, or a path came back without a number (a read failed), run the
+  // release this launch rather than name the wrong patch. The next launch
+  // boots the patch.
+  size_t number_before = shorebird::Updater::Instance().NextBootPatchNumber();
   std::string active_path = shorebird::Updater::Instance().NextBootPatchPath();
+  size_t active_patch_number = 0;
   if (!active_path.empty()) {
-    patch_path = active_path;
-    FML_LOG(INFO) << "Shorebird updater: patch path: " << patch_path;
+    size_t number_after = shorebird::Updater::Instance().NextBootPatchNumber();
+    if (number_after == 0 || number_after != number_before) {
+      FML_LOG(ERROR) << "Shorebird updater: next boot patch changed while "
+                        "reading it (patch "
+                     << number_before << ", then " << number_after
+                     << "), running the release this launch.";
+    } else {
+      patch_path = active_path;
+      active_patch_number = number_after;
+      FML_LOG(INFO) << "Shorebird updater: patch " << active_patch_number
+                    << " path: " << patch_path;
+    }
   } else {
     FML_LOG(INFO) << "Shorebird updater: no active patch.";
   }
+  shorebird::Updater::SetConfiguredPatchNumber(active_patch_number);
 
   // Launch reporting does not happen here. IsolateSnapshotFromSettings in
   // runtime/dart_snapshot.cc reports the start, so a FlutterEngineGroup or
   // add-to-app host that calls ConfigureShorebird() without ever creating a
   // Shell does not record a boot that never happened. The update thread
-  // starts from the launch-success report in Shell::RunEngine, once the root
-  // isolate is running; see the Updater class comment.
+  // starts from the Shell's launch-paused report, once the start is
+  // recorded; see the Updater class comment.
   return init_result;
 }
 

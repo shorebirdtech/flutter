@@ -132,6 +132,7 @@ class ConfigureShorebirdTest : public ::testing::Test {
 
 TEST_F(ConfigureShorebirdTest, InitializesTheUpdaterAndReturnsThePatch) {
   mock_->set_next_boot_patch_path("patch.vmcode");
+  mock_->set_next_boot_patch_number(1);
   std::string patch_path = "stale";
 
   EXPECT_TRUE(
@@ -153,6 +154,72 @@ TEST_F(ConfigureShorebirdTest, InitializesTheUpdaterAndReturnsThePatch) {
   EXPECT_EQ(mock_->validate_count(), 1);
   // The Shell reports the boot once it exists.
   EXPECT_EQ(mock_->launch_start_count(), 0);
+}
+
+// The launch reports name the patch at the path ConfigureShorebird returns.
+TEST_F(ConfigureShorebirdTest, LaunchReportsNameTheConfiguredPatch) {
+  mock_->set_next_boot_patch_path("patch.vmcode");
+  mock_->set_next_boot_patch_number(7);
+  std::string patch_path;
+  ASSERT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
+
+  shorebird::Updater::Instance().ReportLaunchStart();
+
+  EXPECT_EQ(mock_->reported_patch_numbers(), std::vector<size_t>({7}));
+}
+
+// An install by another process between the reads: the number moved, so the
+// path may not be that number's. Run the release and name no patch.
+TEST_F(ConfigureShorebirdTest, NumberChangedAroundThePathRunsTheRelease) {
+  mock_->set_next_boot_patch_path("patch.vmcode");
+  mock_->set_next_boot_patch_numbers({3, 4});
+  std::string patch_path = "stale";
+  ASSERT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
+
+  EXPECT_EQ(patch_path, "");
+  shorebird::Updater::Instance().ReportLaunchStart();
+  EXPECT_EQ(mock_->reported_patch_numbers(), std::vector<size_t>({0}));
+}
+
+// A path with no number (a failed read) is not booted under patch 0.
+TEST_F(ConfigureShorebirdTest, PathWithoutANumberRunsTheRelease) {
+  mock_->set_next_boot_patch_path("patch.vmcode");
+  std::string patch_path = "stale";
+  ASSERT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
+
+  EXPECT_EQ(patch_path, "");
+}
+
+// The configured patch, not a later one, is named when the patch can't load
+// and its failure is reported.
+TEST_F(ConfigureShorebirdTest, UnloadablePatchFailureNamesTheConfiguredPatch) {
+  mock_->set_next_boot_patch_path("patch.vmcode");
+  mock_->set_next_boot_patch_number(7);
+  std::string patch_path;
+  ASSERT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
+
+  EXPECT_TRUE(LoadPatchOrBase(
+      patch_path, "base.so",
+      [](const std::string& path) { return path == "base.so"; }));
+
+  EXPECT_EQ(mock_->launch_failure_count(), 1);
+  EXPECT_EQ(mock_->reported_patch_numbers(), std::vector<size_t>({7, 7}));
+}
+
+// Without a patch path, the reports name no patch, whatever the number says.
+TEST_F(ConfigureShorebirdTest, LaunchReportsNameNoPatchWithoutAPath) {
+  mock_->set_next_boot_patch_number(7);
+  std::string patch_path;
+  ASSERT_TRUE(
+      ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
+
+  shorebird::Updater::Instance().ReportLaunchStart();
+
+  EXPECT_EQ(mock_->reported_patch_numbers(), std::vector<size_t>({0}));
 }
 
 TEST_F(ConfigureShorebirdTest, PassesTheHostBundleId) {
@@ -276,6 +343,7 @@ TEST(Shorebird, PatchHasSnapshotsIsFalseForAMissingFile) {
 // https://github.com/shorebirdtech/shorebird/issues/3888
 TEST_F(ConfigureShorebirdTest, SecondEngineStillBootsThePatch) {
   mock_->set_next_boot_patch_path("patch.vmcode");
+  mock_->set_next_boot_patch_number(1);
   std::string first_path;
   ASSERT_TRUE(
       ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), first_path));
