@@ -137,9 +137,9 @@ jobs:
       - name: 🧰 Setup depot_tools
         run: |
           if [[ ! -d $HOME/depot_tools/.git ]]; then
-            git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git $HOME/depot_tools
+            git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git "$HOME/depot_tools"
           else
-            cd $HOME/depot_tools
+            cd "$HOME/depot_tools"
             git checkout main 2>/dev/null || git checkout -b main origin/main
             git pull --quiet
           fi

@@ -1,0 +1,16 @@
+# Configuration for actionlint, which shorebird_ci.yml's "Lint Workflows" job
+# runs over .github/workflows/shorebird_*.yml. Not at actionlint's default
+# .github/actionlint.yaml, and not over the whole directory: the other 20
+# workflow files there are upstream's, and a required check that reds on one
+# after an upstream merge would block every PR on a file we don't edit.
+self-hosted-runner:
+  # Namespace (namespace.so) runner labels the engine workflows ask for. The
+  # amd64 one carries a job.priority suffix built from an expression, which
+  # actionlint doesn't check, so it is here for the day that suffix goes away.
+  labels:
+    - nscloud-ubuntu-22.04-amd64-16x64-with-cache
+    - nscloud-macos-sequoia-arm64-12x28-with-cache
+    - nscloud-cache-tag-shorebird-android-engine-build
+    - nscloud-cache-tag-shorebird-engine-tests
+    - nscloud-cache-tag-shorebird-ios-engine-build
+    - nscloud-cache-size-100gb
