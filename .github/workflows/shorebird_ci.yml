@@ -270,6 +270,34 @@ jobs:
           bin/flutter pub get -C dev/bots
           bin/cache/dart-sdk/bin/dart --enable-asserts dev/bots/analyze.dart --only=lint-kotlin,lint-kotlin-templates,format
 
+  # Catches a workflow GitHub would refuse to start (it fails such a
+  # workflow's runs with no jobs and no error on the PR), plus shellcheck over
+  # every run: script. Scoped to the fork's own workflows, since the other 20
+  # files in that directory are upstream's. Unconditional rather than behind
+  # changes, because that filter doesn't cover shorebird/ci/, where the config
+  # it reads lives.
+  actionlint:
+    runs-on: ubuntu-latest
+    # The image pull from Docker Hub is the only network step; bound it so a
+    # Docker Hub stall fails fast instead of holding the required check.
+    timeout-minutes: 5
+
+    name: 🔍 Lint Workflows
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # The image bundles shellcheck. Its digest is actionlint 1.7.12.
+      - name: 🔍 Run actionlint
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/repo" --workdir /repo \
+            rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
+            -color -config-file shorebird/ci/actionlint.yaml \
+            .github/workflows/shorebird_*.yml
+
   # The engine workflows, here rather than on their own pull_request
   # triggers so the required `ci` check below waits on them: before, engine
   # PRs could land with them pending or red (#316).
@@ -303,6 +331,7 @@ jobs:
       - shorebird-ios-tests
       - shorebird-macos-android-smoke-test
       - analyze-lint-format
+      - actionlint
       - engine-tests
       - ios-engine-build
       - android-engine-build
