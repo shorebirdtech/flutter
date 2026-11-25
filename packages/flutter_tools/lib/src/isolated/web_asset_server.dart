@@ -27,6 +27,7 @@ import '../cache.dart';
 import '../convert.dart';
 import '../dart/package_map.dart';
 import '../globals.dart' as globals;
+import '../shorebird/shorebird_canvaskit.dart';
 import '../web/bootstrap.dart';
 import '../web/chrome.dart';
 import '../web/compile.dart';
@@ -672,7 +673,7 @@ class WebAssetServer implements AssetReader {
     }
 
     final buildConfig = <String, Object>{
-      'engineRevision': globals.flutterVersion.engineRevision,
+      'engineRevision': shorebirdCanvasKitCdnRevision(globals.flutterVersion.engineRevision),
       'wasmHashes': wasmHashes,
       'builds': <Object>[
         <String, Object>{
