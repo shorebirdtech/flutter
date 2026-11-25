@@ -18,6 +18,8 @@ source_set("assets") {
     "directory_asset_bundle.h",
     "native_assets.cc",
     "native_assets.h",
+    "shorebird_asset_resolver.cc",
+    "shorebird_asset_resolver.h",
   ]
 
   deps = [
@@ -37,11 +39,15 @@ if (enable_unittests) {
   executable("assets_unittests") {
     testonly = true
 
-    sources = [ "native_assets_unittests.cc" ]
+    sources = [
+      "native_assets_unittests.cc",
+      "shorebird_asset_resolver_unittests.cc",
+    ]
 
     deps = [
       ":assets",
       ":assets_fixtures",
+      "//flutter/fml",
       "//flutter/testing",
     ]
 
