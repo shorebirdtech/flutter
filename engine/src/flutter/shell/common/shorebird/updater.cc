@@ -244,6 +244,16 @@ std::string RealUpdater::NextBootPatchPath() {
   return path;
 }
 
+std::string RealUpdater::NextBootPatchAssetsDir() {
+  char* c_path = shorebird_next_boot_patch_assets_dir();
+  if (c_path == nullptr) {
+    return "";
+  }
+  std::string path(c_path);
+  shorebird_free_string(c_path);
+  return path;
+}
+
 void RealUpdater::DoReportLaunchStart() {
   shorebird_report_launch_start();
 }
@@ -298,6 +308,11 @@ std::string MockUpdater::NextBootPatchPath() {
   return next_boot_patch_path_;
 }
 
+std::string MockUpdater::NextBootPatchAssetsDir() {
+  call_log_.push_back("NextBootPatchAssetsDir");
+  return next_boot_patch_assets_dir_;
+}
+
 void MockUpdater::DoReportLaunchStart() {
   launch_start_count_++;
   call_log_.push_back("ReportLaunchStart");
@@ -345,6 +360,7 @@ void MockUpdater::Reset() {
   init_result_ = true;
   should_auto_update_ = false;
   next_boot_patch_path_.clear();
+  next_boot_patch_assets_dir_.clear();
   last_release_version_.clear();
   last_yaml_config_.clear();
   last_config_ = AppConfig();

@@ -96,6 +96,23 @@ TEST_F(UpdaterTest, MockUpdaterCallLogRecordsSequence) {
   EXPECT_EQ(log[2], "ReportLaunchSuccess");
 }
 
+TEST_F(UpdaterTest, MockUpdaterTracksNextBootPatchAssetsDirSeparately) {
+  mock_->set_next_boot_patch_path("/patches/1/dlc.vmcode");
+  mock_->set_next_boot_patch_assets_dir("/patches/1/assets");
+
+  EXPECT_EQ(Updater::Instance().NextBootPatchPath(), "/patches/1/dlc.vmcode");
+  EXPECT_EQ(Updater::Instance().NextBootPatchAssetsDir(), "/patches/1/assets");
+
+  const auto& log = mock_->call_log();
+  ASSERT_EQ(log.size(), 2u);
+  EXPECT_EQ(log[0], "NextBootPatchPath");
+  EXPECT_EQ(log[1], "NextBootPatchAssetsDir");
+
+  mock_->Reset();
+  EXPECT_EQ(Updater::Instance().NextBootPatchPath(), "");
+  EXPECT_EQ(Updater::Instance().NextBootPatchAssetsDir(), "");
+}
+
 TEST_F(UpdaterTest, MockUpdaterResetClearsState) {
   Updater::Instance().ReportLaunchStart();
   Updater::Instance().ReportLaunchSuccess();

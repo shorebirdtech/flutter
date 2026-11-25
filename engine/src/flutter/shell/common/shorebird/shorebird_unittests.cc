@@ -5,7 +5,11 @@
 #include <string>
 #include <vector>
 
+#include "flutter/assets/asset_manager.h"
+#include "flutter/fml/file.h"
+#include "flutter/fml/mapping.h"
 #include "flutter/fml/paths.h"
+#include "flutter/shell/common/run_configuration.h"
 #include "flutter/shell/common/shorebird/updater.h"
 #include "gtest/gtest.h"
 
@@ -292,6 +296,86 @@ TEST_F(ConfigureShorebirdTest, FailsWhenNoInitSucceeded) {
   std::string patch_path;
   EXPECT_FALSE(
       ConfigureShorebird(Args("app_id: abc\n", {"1.0.0", "3"}), patch_path));
+}
+
+TEST_F(ConfigureShorebirdTest,
+       RunConfigurationPrependsShorebirdAssetResolverAheadOfReleaseBundle) {
+  fml::ScopedTemporaryDirectory temp_dir;
+  fml::UniqueFD release_dir = fml::CreateDirectory(
+      temp_dir.fd(), {"release_assets"}, fml::FilePermission::kReadWrite);
+  ASSERT_TRUE(release_dir.is_valid());
+  ASSERT_TRUE(fml::WriteAtomically(release_dir, "modified.txt",
+                                   fml::DataMapping("release-modified")));
+  ASSERT_TRUE(fml::WriteAtomically(release_dir, "unchanged.txt",
+                                   fml::DataMapping("release-unchanged")));
+  ASSERT_TRUE(fml::WriteAtomically(release_dir, "AssetManifest.json",
+                                   fml::DataMapping("release-manifest")));
+
+  fml::UniqueFD patch_dir = fml::CreateDirectory(
+      temp_dir.fd(), {"patch_assets"}, fml::FilePermission::kReadWrite);
+  ASSERT_TRUE(patch_dir.is_valid());
+  fml::UniqueFD patch_files_dir = fml::CreateDirectory(
+      patch_dir, {"files"}, fml::FilePermission::kReadWrite);
+  ASSERT_TRUE(patch_files_dir.is_valid());
+  ASSERT_TRUE(fml::WriteAtomically(
+      patch_dir, "manifest.json",
+      fml::DataMapping(
+          R"({"version":1,"assets":{"modified.txt":{"hash":"aaa","size":14,"encoding":"whole"},"added.txt":{"hash":"bbb","size":9,"encoding":"whole"}}})")));
+  ASSERT_TRUE(fml::WriteAtomically(patch_files_dir, "modified.txt",
+                                   fml::DataMapping("patch-modified")));
+  ASSERT_TRUE(fml::WriteAtomically(patch_files_dir, "added.txt",
+                                   fml::DataMapping("patch-new")));
+
+  mock_->set_next_boot_patch_assets_dir(
+      fml::paths::JoinPaths({temp_dir.path(), "patch_assets"}));
+  ASSERT_TRUE(shorebird::Updater::Instance().Init(shorebird::AppConfig{}));
+
+  Settings settings;
+  settings.assets_path =
+      fml::paths::JoinPaths({temp_dir.path(), "release_assets"});
+  RunConfiguration config = RunConfiguration::InferFromSettings(settings);
+  auto asset_manager = config.GetAssetManager();
+  ASSERT_NE(asset_manager, nullptr);
+
+  auto read_asset = [&](const std::string& name) -> std::string {
+    auto mapping = asset_manager->GetAsMapping(name);
+    if (!mapping) {
+      return "";
+    }
+    return std::string(reinterpret_cast<const char*>(mapping->GetMapping()),
+                       mapping->GetSize());
+  };
+
+  EXPECT_EQ(read_asset("modified.txt"), "patch-modified");
+  EXPECT_EQ(read_asset("added.txt"), "patch-new");
+  EXPECT_EQ(read_asset("unchanged.txt"), "release-unchanged");
+  EXPECT_EQ(read_asset("AssetManifest.json"), "release-manifest");
+}
+
+TEST_F(ConfigureShorebirdTest,
+       RunConfigurationSkipsPatchAssetsWhenUpdaterUninitialized) {
+  fml::ScopedTemporaryDirectory temp_dir;
+  fml::UniqueFD release_dir = fml::CreateDirectory(
+      temp_dir.fd(), {"release_assets"}, fml::FilePermission::kReadWrite);
+  ASSERT_TRUE(release_dir.is_valid());
+  ASSERT_TRUE(fml::WriteAtomically(release_dir, "modified.txt",
+                                   fml::DataMapping("release-modified")));
+
+  mock_->set_next_boot_patch_assets_dir("/nonexistent/patch_assets");
+
+  Settings settings;
+  settings.assets_path =
+      fml::paths::JoinPaths({temp_dir.path(), "release_assets"});
+  RunConfiguration config = RunConfiguration::InferFromSettings(settings);
+  auto asset_manager = config.GetAssetManager();
+  ASSERT_NE(asset_manager, nullptr);
+
+  auto mapping = asset_manager->GetAsMapping("modified.txt");
+  ASSERT_NE(mapping, nullptr);
+  EXPECT_EQ(std::string(reinterpret_cast<const char*>(mapping->GetMapping()),
+                        mapping->GetSize()),
+            "release-modified");
+  EXPECT_TRUE(mock_->call_log().empty());
 }
 
 }  // namespace testing

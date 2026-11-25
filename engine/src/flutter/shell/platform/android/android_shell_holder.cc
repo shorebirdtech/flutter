@@ -14,12 +14,14 @@
 #include <utility>
 
 #include "common/settings.h"
+#include "flutter/assets/shorebird_asset_resolver.h"
 #include "flutter/fml/cpu_affinity.h"
 #include "flutter/fml/logging.h"
 #include "flutter/fml/message_loop.h"
 #include "flutter/lib/ui/painting/image_generator_registry.h"
 #include "flutter/shell/common/rasterizer.h"
 #include "flutter/shell/common/run_configuration.h"
+#include "flutter/shell/common/shorebird/updater.h"
 #include "flutter/shell/common/thread_host.h"
 #include "flutter/shell/platform/android/android_display.h"
 #include "flutter/shell/platform/android/android_image_generator.h"
@@ -343,6 +345,14 @@ std::optional<RunConfiguration> AndroidShellHolder::BuildRunConfiguration(
   }
 
   RunConfiguration config(std::move(isolate_configuration));
+  if (shorebird::Updater::IsInitialized()) {
+    std::string patch_assets_dir =
+        shorebird::Updater::Instance().NextBootPatchAssetsDir();
+    if (!patch_assets_dir.empty()) {
+      config.AddAssetResolver(std::make_unique<ShorebirdAssetResolver>(
+          std::move(patch_assets_dir)));
+    }
+  }
   config.AddAssetResolver(apk_asset_provider_->Clone());
 
   {

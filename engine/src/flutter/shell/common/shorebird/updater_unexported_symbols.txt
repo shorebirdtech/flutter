@@ -11,6 +11,7 @@
 _shorebird_set_engine_callbacks
 _shorebird_should_auto_update
 _shorebird_next_boot_patch_path
+_shorebird_next_boot_patch_assets_dir
 _shorebird_start_update_thread
 _shorebird_report_launch_start
 _shorebird_report_launch_paused

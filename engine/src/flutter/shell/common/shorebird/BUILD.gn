@@ -227,9 +227,10 @@ source_set("shorebird") {
     "shorebird.h",
   ]
 
+  public_deps = [ ":updater" ]
+
   deps = [
     ":snapshots_data_handle",
-    ":updater",
     "//flutter/fml",
     "//flutter/runtime",
     "//flutter/runtime:libdart",
@@ -309,8 +310,10 @@ if (enable_unittests) {
       ":shorebird_fixtures",
       ":snapshots_data_handle",
       ":updater",
+      "//flutter/assets",
       "//flutter/runtime",
       "//flutter/runtime/shorebird:patch_cache",
+      "//flutter/shell/common",
       "//flutter/testing",
       "//flutter/testing:fixture_test",
     ]
