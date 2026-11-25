@@ -8,11 +8,13 @@
 #include <utility>
 
 #include "flutter/assets/directory_asset_bundle.h"
+#include "flutter/assets/shorebird_asset_resolver.h"
 #include "flutter/common/graphics/persistent_cache.h"
 #include "flutter/fml/file.h"
 #include "flutter/fml/unique_fd.h"
 #include "flutter/runtime/dart_vm.h"
 #include "flutter/runtime/isolate_configuration.h"
+#include "flutter/shell/common/shorebird/updater.h"
 
 namespace flutter {
 
@@ -21,6 +23,15 @@ RunConfiguration RunConfiguration::InferFromSettings(
     const fml::RefPtr<fml::TaskRunner>& io_worker,
     IsolateLaunchType launch_type) {
   auto asset_manager = std::make_shared<AssetManager>();
+
+  if (shorebird::Updater::IsInitialized()) {
+    std::string patch_assets_dir =
+        shorebird::Updater::Instance().NextBootPatchAssetsDir();
+    if (!patch_assets_dir.empty()) {
+      asset_manager->PushBack(std::make_unique<ShorebirdAssetResolver>(
+          std::move(patch_assets_dir)));
+    }
+  }
 
   if (fml::UniqueFD::traits_type::IsValid(settings.assets_dir)) {
     asset_manager->PushBack(std::make_unique<DirectoryAssetBundle>(

@@ -149,6 +149,11 @@ class Updater {
   /// @return Path to patch, or empty string if no patch available
   virtual std::string NextBootPatchPath() = 0;
 
+  /// Get the path to the patched assets directory for the patch that will boot
+  /// on next run.
+  /// @return Path to patched assets directory, or empty string if none
+  virtual std::string NextBootPatchAssetsDir() = 0;
+
   // Boot lifecycle methods. The reports themselves run at most once per
   // process, and later calls are silently ignored. `ReportLaunchSuccess`
   // still attempts the update-thread start on every call, which carries its
@@ -243,6 +248,7 @@ class NoOpUpdater : public Updater {
   bool DoInit(const AppConfig& config) override { return true; }
   void ValidateNextBootPatch() override {}
   std::string NextBootPatchPath() override { return ""; }
+  std::string NextBootPatchAssetsDir() override { return ""; }
   void DoReportLaunchStart() override {}
   void DoReportLaunchSuccess() override {}
   void DoReportLaunchFailure() override {}
@@ -263,6 +269,7 @@ class RealUpdater : public Updater {
   bool DoInit(const AppConfig& config) override;
   void ValidateNextBootPatch() override;
   std::string NextBootPatchPath() override;
+  std::string NextBootPatchAssetsDir() override;
   void DoReportLaunchStart() override;
   void DoReportLaunchSuccess() override;
   void DoReportLaunchFailure() override;
@@ -284,6 +291,7 @@ class MockUpdater : public Updater {
   bool DoInit(const AppConfig& config) override;
   void ValidateNextBootPatch() override;
   std::string NextBootPatchPath() override;
+  std::string NextBootPatchAssetsDir() override;
   void DoReportLaunchStart() override;
   void DoReportLaunchSuccess() override;
   void DoReportLaunchFailure() override;
@@ -316,6 +324,9 @@ class MockUpdater : public Updater {
   void set_next_boot_patch_path(const std::string& path) {
     next_boot_patch_path_ = path;
   }
+  void set_next_boot_patch_assets_dir(const std::string& dir) {
+    next_boot_patch_assets_dir_ = dir;
+  }
 
   // Reset all counters and logs
   void Reset();
@@ -332,6 +343,7 @@ class MockUpdater : public Updater {
   bool init_result_ = true;
   bool should_auto_update_ = false;
   std::string next_boot_patch_path_;
+  std::string next_boot_patch_assets_dir_;
   std::string last_release_version_;
   std::string last_yaml_config_;
   AppConfig last_config_;
